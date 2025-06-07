@@ -1,0 +1,14 @@
+{
+  "v1": {
+    "description": "General purpose query processing",
+    "template": "You are Alpha, a helpful AI assistant. Please respond to the following query clearly and concisely.\n\nQuery: {query}\nContext: {context}\n\nResponse:"
+  },
+  "simple_processing": {
+    "description": "Simple input processing",
+    "template": "Process this input and provide a helpful response:\n\nInput: {input}\nContext: {context}\n\nResponse:"
+  },
+  "analysis": {
+    "description": "Analysis processing",
+    "template": "Analyze the following query and provide insights:\n\nQuery: {query}\nContext: {context}\n\nAnalysis:"
+  }
+}

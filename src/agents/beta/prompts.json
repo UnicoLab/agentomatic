@@ -1,0 +1,14 @@
+{
+  "simple_processing": {
+    "description": "Simple problem processing",
+    "template": "You are Beta, an analytical AI assistant. Process this simple request:\n\nInput: {input}\nContext: {context}\n\nProvide a clear and helpful response:"
+  },
+  "analysis": {
+    "description": "Complex problem analysis",
+    "template": "You are Beta, an analytical AI assistant. Analyze this complex problem step by step:\n\nProblem: {problem}\nContext: {context}\n\nProvide a detailed analysis:"
+  },
+  "solution": {
+    "description": "Solution generation based on analysis",
+    "template": "Based on the following analysis, provide a practical solution:\n\nProblem: {problem}\nAnalysis: {analysis}\n\nSolution:"
+  }
+}

@@ -26,19 +26,22 @@ class AgentRegistry:
             logger.warning("Agents directory not found")
             return
 
-        # Look for agent directories
+        # Look for agent directories - both old pattern (agent_*) and new simplified pattern
         for agent_dir in agents_dir.iterdir():
-            if (agent_dir.is_dir() and
-                agent_dir.name.startswith("agent_") and
-                (agent_dir / "__init__.py").exists()):
+            if agent_dir.is_dir() and (agent_dir / "__init__.py").exists():
+                # Handle old pattern: agent_alpha, agent_beta
+                if agent_dir.name.startswith("agent_"):
+                    agent_name = agent_dir.name.replace("agent_", "")
+                    self._discover_agent_old_pattern(agent_name, agent_dir)
+                # Handle new simplified pattern: alpha, beta
+                elif agent_dir.name in ["alpha", "beta"]:  # Add more agent names as needed
+                    agent_name = agent_dir.name
+                    self._discover_agent_new_pattern(agent_name, agent_dir)
 
-                agent_name = agent_dir.name.replace("agent_", "")
-                self._discover_agent(agent_name, agent_dir)
-
-    def _discover_agent(self, agent_name: str, agent_dir: Path) -> None:
-        """Discover and register a specific agent."""
+    def _discover_agent_old_pattern(self, agent_name: str, agent_dir: Path) -> None:
+        """Discover and register an agent using the old pattern."""
         try:
-            # Import the agent module
+            # Import the agent module (old pattern)
             module_path = f"src.agents.agent_{agent_name}"
 
             # Try to import the main agent class
@@ -55,7 +58,7 @@ class AgentRegistry:
                     self._agents[agent_name] = agent_instance
                     self._agent_configs[agent_name] = llm_config
 
-                    logger.info(f"Registered agent: {agent_name}")
+                    logger.info(f"Registered agent (old pattern): {agent_name}")
                 else:
                     logger.warning(f"No valid agent class found in {module_path}.agent")
 
@@ -64,6 +67,37 @@ class AgentRegistry:
 
         except Exception as e:
             logger.error(f"Failed to discover agent {agent_name}: {e}")
+
+    def _discover_agent_new_pattern(self, agent_name: str, agent_dir: Path) -> None:
+        """Discover and register an agent using the new simplified pattern."""
+        try:
+            # Import the agent module (new pattern)
+            module_path = f"src.agents.{agent_name}"
+
+            # Try to import the agent instance directly
+            try:
+                agent_module = importlib.import_module(f"{module_path}.agent")
+                agent_instance = getattr(agent_module, "agent", None)
+
+                if agent_instance and isinstance(agent_instance, BaseAgent):
+                    # Register the pre-instantiated agent
+                    self._agents[agent_name] = agent_instance
+                    self._agent_configs[agent_name] = agent_instance.llm.config
+
+                    logger.info(f"Registered agent (new pattern): {agent_name}")
+                else:
+                    logger.warning(f"No valid agent instance found in {module_path}.agent")
+
+            except ImportError as e:
+                logger.warning(f"Could not import agent {agent_name}: {e}")
+
+        except Exception as e:
+            logger.error(f"Failed to discover agent {agent_name}: {e}")
+
+    def _discover_agent(self, agent_name: str, agent_dir: Path) -> None:
+        """Discover and register a specific agent (legacy method)."""
+        # This method is kept for backward compatibility but now calls the old pattern method
+        self._discover_agent_old_pattern(agent_name, agent_dir)
 
     def _create_default_llm_config(self, agent_name: str) -> LLMConfig:
         """Create default LLM configuration for an agent."""
@@ -105,8 +139,8 @@ class AgentRegistry:
         return {
             name: {
                 "class": agent.__class__.__name__,
-                "llm_provider": agent.llm_config.provider.value,
-                "model": agent.llm_config.model_name,
+                "llm_provider": agent.llm.config.provider.value,
+                "model": agent.llm.config.model_name,
                 "status": "registered"
             }
             for name, agent in self._agents.items()

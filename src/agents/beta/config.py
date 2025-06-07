@@ -4,15 +4,10 @@ from pydantic import BaseModel
 
 
 class BetaConfig(BaseModel):
-    """Configuration for the Beta agent.
-    
-    Example:
-        config = BetaConfig()
-        print(config.name)  # "beta"
-    """
-    
+    """Configuration for the Beta agent."""
+
     name: str = "beta"
-    model_name: str = "gemma2:1b"
+    model_name: str = "gemma3:1b"
     prompt_version: str = "v1"
     prompts_file: str = "prompts.json"
     max_tokens: int = 1500

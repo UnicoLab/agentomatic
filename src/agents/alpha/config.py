@@ -4,12 +4,7 @@ from pydantic import BaseModel
 
 
 class AlphaConfig(BaseModel):
-    """Configuration for the Alpha agent.
-
-    Example:
-        config = AlphaConfig()
-        print(config.name)  # "alpha"
-    """
+    """Configuration for the Alpha agent."""
 
     name: str = "alpha"
     model_name: str = "gemma3:1b"

@@ -19,7 +19,6 @@ class LLMProvider(Enum):
     """Supported LLM providers."""
     OLLAMA = "ollama"
     GEMINI = "gemini"
-    OPENAI = "openai"
 
 
 @dataclass
@@ -34,9 +33,9 @@ class LLMConfig:
 
     # Provider-specific configs
     base_url: Optional[str] = None  # For Ollama
-    api_key: Optional[str] = None   # For OpenAI
     project_id: Optional[str] = None  # For Gemini
     location: Optional[str] = None    # For Gemini
+    api_key: Optional[str] = None     # For any provider that needs it
 
     def model_dump(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -78,7 +77,7 @@ class BaseLLMWrapper(ABC):
         pass
 
     @abstractmethod
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> bool:
         """Check if the LLM is healthy and responsive."""
         pass
 
@@ -116,15 +115,11 @@ class OllamaWrapper(BaseLLMWrapper):
         """Generate response from Ollama."""
         await self.ensure_initialized()
 
-        # Override config with kwargs
-        temperature = kwargs.get('temperature', self.config.temperature)
-        max_tokens = kwargs.get('max_tokens', self.config.max_tokens)
-
         try:
             message = HumanMessage(content=prompt)
 
             if streaming:
-                return self._stream_generate(message, temperature, max_tokens)
+                return self._stream_generate(message)
             else:
                 response = await self._llm.ainvoke([message])
                 return response.content
@@ -133,7 +128,7 @@ class OllamaWrapper(BaseLLMWrapper):
             logger.error(f"Ollama generation failed: {e}")
             raise
 
-    async def _stream_generate(self, message, temperature, max_tokens) -> AsyncGenerator[str, None]:
+    async def _stream_generate(self, message) -> AsyncGenerator[str, None]:
         """Stream generate responses from Ollama."""
         try:
             async for chunk in self._llm.astream([message]):
@@ -143,27 +138,16 @@ class OllamaWrapper(BaseLLMWrapper):
             logger.error(f"Ollama streaming failed: {e}")
             yield f"Error: {str(e)}"
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> bool:
         """Check Ollama health."""
         try:
             await self.ensure_initialized()
-
             # Simple test generation
             test_response = await self.generate("Hello", streaming=False)
-
-            return {
-                "status": "healthy",
-                "provider": "ollama",
-                "model": self.config.model_name,
-                "base_url": self.config.base_url,
-                "test_response_length": len(test_response) if test_response else 0
-            }
+            return bool(test_response)
         except Exception as e:
-            return {
-                "status": "unhealthy",
-                "provider": "ollama",
-                "error": str(e)
-            }
+            logger.error(f"Ollama health check failed: {e}")
+            return False
 
 
 class GeminiWrapper(BaseLLMWrapper):
@@ -217,27 +201,16 @@ class GeminiWrapper(BaseLLMWrapper):
             logger.error(f"Gemini streaming failed: {e}")
             yield f"Error: {str(e)}"
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> bool:
         """Check Gemini health."""
         try:
             await self.ensure_initialized()
-
             # Simple test generation
             test_response = await self.generate("Hello", streaming=False)
-
-            return {
-                "status": "healthy",
-                "provider": "gemini",
-                "model": self.config.model_name,
-                "project_id": self.config.project_id,
-                "test_response_length": len(test_response) if test_response else 0
-            }
+            return bool(test_response)
         except Exception as e:
-            return {
-                "status": "unhealthy",
-                "provider": "gemini",
-                "error": str(e)
-            }
+            logger.error(f"Gemini health check failed: {e}")
+            return False
 
 
 class LLMFactory:
@@ -247,19 +220,7 @@ class LLMFactory:
 
     @classmethod
     async def create_llm(cls, config: LLMConfig) -> BaseLLMWrapper:
-        """Create or get cached LLM instance.
-
-        Args:
-            config: LLM configuration
-
-        Returns:
-            LLM wrapper instance
-
-        Example:
-            config = LLMConfig(provider=LLMProvider.OLLAMA, model_name="gemma2:1b")
-            llm = await LLMFactory.create_llm(config)
-        """
-        # Create cache key
+        """Create or get cached LLM instance."""
         cache_key = f"{config.provider.value}:{config.model_name}:{config.base_url or ''}"
 
         if cache_key in cls._instances:
@@ -278,6 +239,26 @@ class LLMFactory:
         cls._instances[cache_key] = instance
 
         logger.info(f"Created and cached LLM instance: {cache_key}")
+        return instance
+
+    @classmethod
+    def create_llm_sync(cls, config: LLMConfig) -> BaseLLMWrapper:
+        """Create LLM instance synchronously (for use in __init__ methods)."""
+        cache_key = f"{config.provider.value}:{config.model_name}:{config.base_url or ''}"
+
+        if cache_key in cls._instances:
+            return cls._instances[cache_key]
+
+        # Create new instance without initializing
+        if config.provider == LLMProvider.OLLAMA:
+            instance = OllamaWrapper(config)
+        elif config.provider == LLMProvider.GEMINI:
+            instance = GeminiWrapper(config)
+        else:
+            raise ValueError(f"Unsupported LLM provider: {config.provider}")
+
+        cls._instances[cache_key] = instance
+        logger.info(f"Created (not initialized) LLM instance: {cache_key}")
         return instance
 
     @classmethod

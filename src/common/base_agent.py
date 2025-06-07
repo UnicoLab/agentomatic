@@ -30,16 +30,15 @@ class BaseAgent(ABC):
                 pass
     """
 
-    def __init__(self, agent_name: str, llm_config: LLMConfig) -> None:
-        self.agent_name = agent_name
-        self.llm_config = llm_config
-        self.llm: BaseLLMWrapper = LLMFactory.create_llm(llm_config)
-        self.prompt_manager = PromptManager(agent_name)
+    def __init__(self, name: str, llm: BaseLLMWrapper, prompt_manager: PromptManager) -> None:
+        self.name = name
+        self.llm = llm
+        self.prompt_manager = prompt_manager
         self.graph: Optional[StateGraph] = None
 
         # Build the graph after initialization
         self.graph = self.build_graph()
-        logger.info(f"Initialized {agent_name} agent with {llm_config.provider} provider")
+        logger.info(f"Initialized {name} agent")
 
     def get_prompt(self, version: str = "v1") -> Optional[str]:
         """Get a prompt template string by version.
@@ -93,18 +92,18 @@ class BaseAgent(ABC):
             prompt_versions = self.prompt_manager.list_versions()
 
             return {
-                "agent": self.agent_name,
+                "agent": self.name,
                 "status": "healthy" if llm_healthy and prompt_versions else "degraded",
                 "llm_healthy": llm_healthy,
-                "llm_provider": self.llm_config.provider.value,
-                "model_name": self.llm_config.model_name,
+                "llm_provider": self.llm.config.provider.value,
+                "model_name": self.llm.config.model_name,
                 "prompt_versions": prompt_versions,
                 "graph_ready": self.graph is not None
             }
         except Exception as e:
-            logger.error(f"Health check failed for {self.agent_name}: {e}")
+            logger.error(f"Health check failed for {self.name}: {e}")
             return {
-                "agent": self.agent_name,
+                "agent": self.name,
                 "status": "unhealthy",
                 "error": str(e)
             }
