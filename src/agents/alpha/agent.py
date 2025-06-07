@@ -96,7 +96,7 @@ class AlphaAgent(BaseAgent):
         else:
             query = str(input_data)
             context = ""
-        
+
         # Create initial state
         initial_state = AgentState(
             messages=[HumanMessage(content=query)],
@@ -108,19 +108,19 @@ class AlphaAgent(BaseAgent):
             error=None,
             metadata={}
         )
-        
+
         if streaming:
             return self._stream_response(initial_state)
-        
+
         try:
             # Run synchronously
             result = await self.graph.ainvoke(initial_state)
-            
+
             # Handle case where result might be None or missing output
             output = result.get("output") if result else None
             if output is None:
                 output = "Error: No response generated"
-            
+
             # Return properly formatted output
             return AlphaOutput(
                 response=output,

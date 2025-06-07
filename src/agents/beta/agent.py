@@ -150,7 +150,7 @@ class BetaAgent(BaseAgent):
         else:
             problem = str(input_data)
             context = ""
-        
+
         # Create initial state
         initial_state = AgentState(
             messages=[HumanMessage(content=problem)],
@@ -162,19 +162,19 @@ class BetaAgent(BaseAgent):
             error=None,
             metadata={}
         )
-        
+
         if streaming:
             return self._stream_response(initial_state)
-        
+
         try:
             # Run synchronously
             result = await self.graph.ainvoke(initial_state)
-            
+
             # Handle case where result might be None or missing output
             output = result.get("output") if result else None
             if output is None:
                 output = "Error: No analysis generated"
-            
+
             # Return properly formatted output
             return BetaOutput(
                 analysis=output,

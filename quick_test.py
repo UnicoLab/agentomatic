@@ -39,13 +39,13 @@ async def test_architecture():
 
         # Test agent execution (with error handling)
         print("\n4. Testing agent execution...")
-        
+
         # Alpha test
         alpha_input = AlphaInput(query="Test query", context="Test context")
         alpha_result = await alpha.run(alpha_input)
         print(f"✅ Alpha result: {alpha_result.response[:50]}...")
-        
-        # Beta test  
+
+        # Beta test
         beta_input = BetaInput(problem="Test problem", domain="Test domain")
         beta_result = await beta.run(beta_input)
         print(f"✅ Beta result: {beta_result.analysis[:50]}...")
