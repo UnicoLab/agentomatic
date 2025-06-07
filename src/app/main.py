@@ -1,0 +1,192 @@
+"""Main FastAPI application factory."""
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from loguru import logger
+import sys
+import os
+
+from .settings import config
+from .api import create_api_router
+from .dependencies import agent_registry
+from ..common.api_decorators import APIResponse
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan context manager."""
+    # Startup
+    agent_name = os.getenv("AGENT_NAME", "alpha")
+    logger.info(f"Starting Vision Backend for agent: {agent_name}")
+    logger.info(f"API Version: {config.api_version}")
+    logger.info(f"Debug Mode: {config.debug}")
+    logger.info(f"Default LLM Provider: {config.default_llm_provider}")
+
+    # Register the specific agent based on AGENT_NAME
+    if agent_name:
+        agent_registry.register_agent_by_name(agent_name)
+        logger.info(f"Registered agent: {agent_name}")
+    else:
+        # Fallback: Discover and register all agents
+        agent_registry.discover_agents()
+        logger.info(f"Registered {agent_registry.get_agent_count()} agents")
+
+    yield
+
+    # Shutdown
+    logger.info(f"Shutting down Vision Backend for agent: {agent_name}")
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application.
+
+    Example:
+        app = create_app()
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    """
+    # Configure logging
+    logger.remove()
+    logger.add(
+        sys.stdout,
+        level=config.log_level,
+        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+    )
+
+    # Get agent name for the app title
+    agent_name = os.getenv("AGENT_NAME", "alpha")
+
+    # Create FastAPI app
+    app = FastAPI(
+        title=f"Vision Backend - {agent_name.title()} Agent",
+        description=f"Scalable multi-agent architecture - {agent_name.title()} Agent Service",
+        version="0.1.0",
+        debug=config.debug,
+        lifespan=lifespan,
+    )
+
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Custom exception handlers
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Handle validation errors with proper HTTP status codes."""
+        logger.warning(f"Validation error: {exc.errors()}")
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=APIResponse(
+                success=False,
+                error="Validation error",
+                data={"details": exc.errors()},
+                message="Request validation failed"
+            ).model_dump()
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """Handle general exceptions."""
+        logger.error(f"Unhandled exception: {exc}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=APIResponse(
+                success=False,
+                error=str(exc),
+                message="Internal server error"
+            ).model_dump()
+        )
+
+    # Root endpoint
+    @app.get("/", tags=["Root"])
+    async def root():
+        """Root endpoint with basic API information."""
+        return APIResponse(
+            data={
+                "name": "Vision Backend",
+                "version": "0.1.0",
+                "api_version": config.api_version,
+                "description": "Multi-agent architecture with LangGraph and FastAPI",
+                "docs_url": "/docs",
+                "health_url": "/healthz",
+                "agents_url": f"/api/{config.api_version}/agents"
+            },
+            message="Welcome to Vision Backend API"
+        )
+
+    # Health check endpoint
+    @app.get("/healthz", tags=["Health"])
+    async def health_check():
+        """Comprehensive health check endpoint."""
+        try:
+            agents_info = agent_registry.list_agents()
+            agent_health = {}
+
+            # Check health of each agent
+            for agent_name in agents_info.keys():
+                try:
+                    agent = agent_registry.get_agent(agent_name)
+                    health_info = await agent.health_check()
+                    agent_health[agent_name] = health_info
+                except Exception as e:
+                    agent_health[agent_name] = {
+                        "status": "unhealthy",
+                        "error": str(e)
+                    }
+
+            overall_status = "healthy" if all(
+                info.get("status") == "healthy"
+                for info in agent_health.values()
+            ) else "degraded"
+
+            return APIResponse(
+                data={
+                    "status": overall_status,
+                    "api_version": config.api_version,
+                    "agents": agent_health,
+                    "config": {
+                        "default_llm_provider": config.default_llm_provider.value,
+                        "streaming_enabled": config.enable_streaming,
+                        "queue_enabled": config.enable_queue,
+                        "max_queue_size": config.max_queue_size
+                    }
+                },
+                message="Health check completed"
+            )
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=APIResponse(
+                    success=False,
+                    error=str(e),
+                    message="Health check failed"
+                ).model_dump()
+            )
+
+    # Include API router
+    api_router = create_api_router()
+    app.include_router(api_router)
+
+    return app
+
+
+# Create app instance
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "src.app.main:app",
+        host=config.host,
+        port=config.port,
+        reload=config.debug,
+    )

@@ -1,0 +1,39 @@
+{
+  "v1": "You are Beta, a specialized reasoning and analysis AI assistant. You excel at breaking down complex problems into logical steps.\n\nProblem: {problem}\nDomain: {domain}\nRequirements: {requirements}\n\nPlease provide a structured analysis with:\n1. Problem decomposition\n2. Logical reasoning steps\n3. Solution approach\n4. Risk assessment\n\nResponse:",
+  "v2": "You are Beta, an advanced reasoning AI that specializes in systematic problem-solving and critical analysis.\n\nProblem Statement: {problem}\nDomain/Context: {domain}\nSpecific Requirements: {requirements}\nConstraints: {constraints}\nIteration: {run_count}\n\nProvide a comprehensive analysis using the following framework:\n\n## Analysis Framework\n1. **Problem Understanding**\n   - Core issue identification\n   - Stakeholder impact\n   - Success criteria\n\n2. **Systematic Reasoning**\n   - Logical decomposition\n   - Cause-effect relationships\n   - Alternative perspectives\n\n3. **Solution Design**\n   - Approach selection\n   - Implementation steps\n   - Resource requirements\n\n4. **Risk & Validation**\n   - Potential risks\n   - Mitigation strategies\n   - Validation methods\n\nResponse:",
+  "input_classification": {
+    "version": "1.0",
+    "template": "Analyze the following user input and classify it into one of these categories: question, task, analysis, creative, or general.\n\nUser Input: {user_input}\n\nAvailable Types: {available_types}\n\nProvide only the classification type as your response.",
+    "required_variables": ["user_input", "available_types"]
+  },
+  "question_processing": {
+    "version": "1.0",
+    "template": "You are a helpful assistant answering a question. Provide a clear, comprehensive answer.\n\nQuestion: {question}\nContext: {context}\n\nAnswer:",
+    "required_variables": ["question", "context"]
+  },
+  "task_planning": {
+    "version": "1.0",
+    "template": "Create a step-by-step plan for the following task:\n\nTask: {task}\nContext: {context}\n\nProvide a clear, actionable plan:",
+    "required_variables": ["task", "context"]
+  },
+  "task_execution": {
+    "version": "1.0",
+    "template": "Execute the following task based on the provided plan:\n\nTask: {task}\nPlan: {plan}\nContext: {context}\n\nProvide the execution results:",
+    "required_variables": ["task", "plan", "context"]
+  },
+  "analysis_processing": {
+    "version": "1.0",
+    "template": "Perform a detailed analysis of the following subject:\n\nSubject: {subject}\nContext: {context}\n\nProvide a thorough analysis including key insights, patterns, and conclusions:",
+    "required_variables": ["subject", "context"]
+  },
+  "creative_processing": {
+    "version": "1.0",
+    "template": "Generate a creative response to the following prompt:\n\nPrompt: {prompt}\nContext: {context}\n\nBe imaginative and original in your response:",
+    "required_variables": ["prompt", "context"]
+  },
+  "general_processing": {
+    "version": "1.0",
+    "template": "Process the following input and provide an appropriate response:\n\nInput: {input}\nContext: {context}\n\nResponse:",
+    "required_variables": ["input", "context"]
+  }
+}
