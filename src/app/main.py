@@ -19,25 +19,32 @@ from ..common.api_decorators import APIResponse
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
     # Startup
-    agent_name = os.getenv("AGENT_NAME", "alpha")
-    logger.info(f"Starting Vision Backend for agent: {agent_name}")
+    primary_agent_name = os.getenv("AGENT_NAME", "alpha")
+    logger.info(f"Starting Vision Backend (primary agent: {primary_agent_name})")
     logger.info(f"API Version: {config.api_version}")
     logger.info(f"Debug Mode: {config.debug}")
     logger.info(f"Default LLM Provider: {config.default_llm_provider}")
 
-    # Register the specific agent based on AGENT_NAME
-    if agent_name:
-        agent_registry.register_agent_by_name(agent_name)
-        logger.info(f"Registered agent: {agent_name}")
+    # Register all agents for multi-agent API support
+    agent_registry.discover_agents()
+    agent_count = agent_registry.get_agent_count()
+    logger.info(f"Registered {agent_count} agents")
+
+    # Log which agents were registered
+    registered_agents = list(agent_registry.list_agents().keys())
+    logger.info(f"Available agents: {', '.join(registered_agents)}")
+
+    # Set primary agent based on AGENT_NAME for backward compatibility
+    primary_agent = os.getenv("AGENT_NAME", "alpha")
+    if primary_agent in registered_agents:
+        logger.info(f"Primary agent set to: {primary_agent}")
     else:
-        # Fallback: Discover and register all agents
-        agent_registry.discover_agents()
-        logger.info(f"Registered {agent_registry.get_agent_count()} agents")
+        logger.warning(f"Primary agent '{primary_agent}' not found in registered agents")
 
     yield
 
     # Shutdown
-    logger.info(f"Shutting down Vision Backend for agent: {agent_name}")
+    logger.info(f"Shutting down Vision Backend with {agent_registry.get_agent_count()} agents")
 
 
 def create_app() -> FastAPI:
@@ -122,7 +129,7 @@ def create_app() -> FastAPI:
         )
 
     # Health check endpoint
-    @app.get("/healthz", tags=["Health"])
+    @app.get("/health", tags=["Health"])
     async def health_check():
         """Comprehensive health check endpoint."""
         try:

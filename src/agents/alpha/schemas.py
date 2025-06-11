@@ -1,13 +1,25 @@
 """Simplified schemas for Alpha agent."""
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class AlphaInput(BaseModel):
     """Input for Alpha agent."""
-    query: str = Field(..., description="The question or task to process")
-    context: Optional[str] = Field(default="", description="Additional context")
+    query: str = Field(..., min_length=1, max_length=10000, description="The question or task to process")
+    context: Optional[str] = Field(default="", max_length=5000, description="Additional context")
+
+    @validator('query')
+    def validate_query(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Query cannot be empty or just whitespace')
+        return v.strip()
+
+    @validator('context')
+    def validate_context(cls, v):
+        if v:
+            return v.strip()
+        return v
 
 
 class AlphaOutput(BaseModel):

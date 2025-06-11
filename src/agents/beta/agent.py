@@ -7,10 +7,10 @@ from langchain_core.messages import HumanMessage
 
 from ...common.base_agent import BaseAgent
 from ...common.llm_factory import LLMFactory, LLMConfig, LLMProvider
-from ...common.agent_state import AgentState
+from .state import AgentState  # Use local state
 from ...common.prompt_manager import PromptManager
 from .config import BetaConfig
-from .schemas import BetaInput, BetaOutput
+from .schemas import BetaOutput
 
 
 class BetaAgent(BaseAgent):

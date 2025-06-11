@@ -1,9 +1,8 @@
 """Application dependencies and agent registry."""
 
 import importlib
-import os
 from pathlib import Path
-from typing import Dict, Type, Optional, List
+from typing import Dict, Optional
 from loguru import logger
 
 from ..common.base_agent import BaseAgent
@@ -19,7 +18,7 @@ class AgentRegistry:
         self._agent_configs: Dict[str, LLMConfig] = {}
 
     def discover_agents(self) -> None:
-        """Discover all agents in the agents package."""
+        """Discover all agents in the agents package automatically."""
         agents_dir = Path("src/agents")
 
         if not agents_dir.exists():
@@ -33,8 +32,8 @@ class AgentRegistry:
                 if agent_dir.name.startswith("agent_"):
                     agent_name = agent_dir.name.replace("agent_", "")
                     self._discover_agent_old_pattern(agent_name, agent_dir)
-                # Handle new simplified pattern: alpha, beta
-                elif agent_dir.name in ["alpha", "beta"]:  # Add more agent names as needed
+                # Handle new simplified pattern: any valid directory name
+                elif not agent_dir.name.startswith("_"):  # Skip private directories
                     agent_name = agent_dir.name
                     self._discover_agent_new_pattern(agent_name, agent_dir)
 
@@ -129,6 +128,27 @@ class AgentRegistry:
         """Manually register an agent."""
         self._agents[agent_name] = agent
         logger.info(f"Manually registered agent: {agent_name}")
+
+    def register_agent_by_name(self, agent_name: str) -> None:
+        """Register a specific agent by name."""
+        agents_dir = Path("src/agents")
+
+        if not agents_dir.exists():
+            logger.warning("Agents directory not found")
+            return
+
+        # Look for the specific agent directory
+        agent_dir = agents_dir / agent_name
+        if agent_dir.exists() and agent_dir.is_dir() and (agent_dir / "__init__.py").exists():
+            # Handle new simplified pattern: alpha, beta
+            self._discover_agent_new_pattern(agent_name, agent_dir)
+        else:
+            # Try old pattern
+            old_pattern_dir = agents_dir / f"agent_{agent_name}"
+            if old_pattern_dir.exists() and old_pattern_dir.is_dir() and (old_pattern_dir / "__init__.py").exists():
+                self._discover_agent_old_pattern(agent_name, old_pattern_dir)
+            else:
+                logger.error(f"Agent directory not found for: {agent_name}")
 
     def get_agent(self, agent_name: str) -> Optional[BaseAgent]:
         """Get an agent by name."""

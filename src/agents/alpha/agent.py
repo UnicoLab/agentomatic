@@ -1,16 +1,16 @@
 """Alpha Agent - Simplified implementation."""
 
-from typing import Dict, Any, Optional
+from typing import Any
 from langgraph.graph import StateGraph, END
 from langgraph.types import Command
 from langchain_core.messages import HumanMessage
 
 from ...common.base_agent import BaseAgent
 from ...common.llm_factory import LLMFactory, LLMConfig, LLMProvider
-from ...common.agent_state import AgentState
+from .state import AgentState  # Use local state
 from ...common.prompt_manager import PromptManager
 from .config import AlphaConfig
-from .schemas import AlphaInput, AlphaOutput
+from .schemas import AlphaOutput
 
 
 class AlphaAgent(BaseAgent):
@@ -53,7 +53,7 @@ class AlphaAgent(BaseAgent):
 
         return graph.compile()
 
-    async def _process_node(self, state: Dict[str, Any]) -> Command:
+    async def _process_node(self, state: dict[str, Any]) -> Command:
         """Main processing node for Alpha agent."""
         try:
             messages = state.get("messages", [])
@@ -87,7 +87,7 @@ class AlphaAgent(BaseAgent):
                 goto=END
             )
 
-    async def run(self, input_data, streaming: bool = False):
+    async def run(self, input_data, streaming: bool = False) -> AlphaOutput:
         """Run the Alpha agent."""
         # Convert input to proper format
         if hasattr(input_data, 'query'):

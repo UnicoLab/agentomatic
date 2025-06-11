@@ -5,7 +5,20 @@
 .DEFAULT_GOAL := help
 
 # Colors for output
-CYAN := \033[36m
+CYAtest-agents: ## Test agent endpoints (simplified)
+	@echo "$(CYAN)Testing primary agent endpoints...$(RESET)"
+	@echo "Testing Alpha via /invoke endpoint..."
+	@curl -X POST http://localhost:8000/api/v1/agents/alpha/invoke \
+		-H "Content-Type: application/json" \
+		-d '{"payload":{"query":"What is AI?","context":"test"},"streaming":false}' 2>/dev/null && echo "$(GREEN)✓ Alpha invoke$(RESET)" || echo "$(YELLOW)Alpha invoke not available$(RESET)"
+	@echo "Testing Beta via /invoke endpoint..."
+	@curl -X POST http://localhost:8000/api/v1/agents/beta/invoke \
+		-H "Content-Type: application/json" \
+		-d '{"payload":{"problem":"How to optimize code?","domain":"Software Engineering"},"streaming":false}' 2>/dev/null && echo "$(GREEN)✓ Beta invoke$(RESET)" || echo "$(YELLOW)Beta invoke not available$(RESET)"
+	@echo "Testing Alpha via /chat endpoint..."
+	@curl -X POST http://localhost:8000/api/v1/agents/alpha/chat \
+		-H "Content-Type: application/json" \
+		-d '{"input":"What is AI?","context":"test"}' 2>/dev/null && echo "$(GREEN)✓ Alpha chat$(RESET)" || echo "$(YELLOW)Alpha chat not available$(RESET)"36m
 GREEN := \033[32m
 YELLOW := \033[33m
 RED := \033[31m
@@ -243,6 +256,34 @@ ci-lint: ## Run linting for CI environment
 	@$(POETRY_RUN) flake8 src tests --max-line-length=88
 	@$(POETRY_RUN) mypy src --ignore-missing-imports
 
+# Utility commands
+setup-dirs: ## Create necessary directories
+	@echo "$(CYAN)Creating necessary directories...$(RESET)"
+	@mkdir -p logs reports htmlcov
+	@echo "$(GREEN)✓ Directories created$(RESET)"
+
+clean: ## Clean up build artifacts and cache files
+	@echo "$(CYAN)Cleaning up build artifacts...$(RESET)"
+	@find . -type d -name "__pycache__" -delete
+	@find . -type f -name "*.pyc" -delete
+	@find . -type f -name "*.pyo" -delete
+	@find . -type f -name ".coverage" -delete
+	@rm -rf htmlcov/ .pytest_cache/ dist/ build/ *.egg-info/
+	@echo "$(GREEN)✓ Clean completed$(RESET)"
+
+restart-ollama: ## Restart Ollama service
+	@echo "$(CYAN)Restarting Ollama service...$(RESET)"
+	@pkill -f ollama || true
+	@sleep 2
+	@ollama serve &
+	@sleep 5
+	@echo "$(GREEN)✓ Ollama restarted$(RESET)"
+
+pull-model: ## Pull the required Ollama model
+	@echo "$(CYAN)Pulling Ollama model: gemma3:1b...$(RESET)"
+	@ollama pull gemma3:1b
+	@echo "$(GREEN)✓ Model pulled$(RESET)"
+
 # Quick setup commands
 quick-setup: install setup-dirs ## Quick development setup
 	@echo "$(GREEN)✓ Quick setup complete!$(RESET)"
@@ -260,3 +301,31 @@ verify: format-check lint type-check test-fast ## Quick verification workflow
 
 verify-full: check-all test docker-build ## Full verification workflow
 	@echo "$(GREEN)✓ Full verification complete$(RESET)"
+
+# API testing commands
+test-api: ## Test API endpoints
+	@echo "$(CYAN)Testing API endpoints...$(RESET)"
+	@echo "Testing system endpoints..."
+	@curl -f http://localhost:8000/api/v1/agents 2>/dev/null && echo "$(GREEN)✓ Agents list$(RESET)" || echo "$(RED)✗ Agents list failed$(RESET)"
+	@curl -f http://localhost:8000/api/v1/agents/alpha/health 2>/dev/null && echo "$(GREEN)✓ Alpha health$(RESET)" || echo "$(RED)✗ Alpha health failed$(RESET)"
+	@curl -f http://localhost:8000/api/v1/agents/beta/health 2>/dev/null && echo "$(GREEN)✓ Beta health$(RESET)" || echo "$(RED)✗ Beta health failed$(RESET)"
+
+test-schemas: ## Test agent schema endpoints
+	@echo "$(CYAN)Testing agent schemas...$(RESET)"
+	@curl -f http://localhost:8000/api/v1/agents/alpha/schema 2>/dev/null && echo "$(GREEN)✓ Alpha schema$(RESET)" || echo "$(RED)✗ Alpha schema failed$(RESET)"
+	@curl -f http://localhost:8000/api/v1/agents/beta/schema 2>/dev/null && echo "$(GREEN)✓ Beta schema$(RESET)" || echo "$(RED)✗ Beta schema failed$(RESET)"
+
+test-universal: ## Test universal agent endpoints
+	@echo "$(CYAN)Testing universal agent endpoints...$(RESET)"
+	@echo "Testing Alpha with universal endpoint..."
+	@curl -X POST http://localhost:8000/api/v1/agents/alpha/invoke \
+		-H "Content-Type: application/json" \
+		-d '{"payload":{"query":"What is AI?","context":"test"},"streaming":false}' 2>/dev/null || echo "$(YELLOW)Alpha universal endpoint not available$(RESET)"
+	@echo "Testing Beta with universal endpoint..."
+	@curl -X POST http://localhost:8000/api/v1/agents/beta/invoke \
+		-H "Content-Type: application/json" \
+		-d '{"payload":{"problem":"How to optimize code?","domain":"Software Engineering"},"streaming":false}' 2>/dev/null || echo "$(YELLOW)Beta universal endpoint not available$(RESET)"
+
+# Complete API test suite
+test-api-complete: test-api test-schemas test-universal ## Run complete API test suite
+	@echo "$(GREEN)✓ Complete API test suite finished$(RESET)"
