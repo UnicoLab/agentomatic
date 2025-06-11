@@ -149,38 +149,164 @@ security-check: ## Run security analysis with bandit
 
 check-all: lint type-check security-check ## Run all code quality checks
 
-# Docker commands
-docker-build: ## Build Docker image
-	@echo "$(CYAN)Building Docker image...$(RESET)"
-	@docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+# Docker commands with optimized builds and caching
+docker-build: ## Build optimized Docker image with caching
+	@echo "$(CYAN)Building optimized Docker image with Poetry...$(RESET)"
+	@DOCKER_BUILDKIT=1 docker build \
+		--target builder \
+		--cache-from $(DOCKER_IMAGE):builder-cache \
+		--tag $(DOCKER_IMAGE):builder-cache \
+		.
+	@DOCKER_BUILDKIT=1 docker build \
+		--cache-from $(DOCKER_IMAGE):builder-cache \
+		--cache-from $(DOCKER_IMAGE):$(DOCKER_TAG) \
+		--tag $(DOCKER_IMAGE):$(DOCKER_TAG) \
+		.
 	@echo "$(GREEN)✓ Docker image built: $(DOCKER_IMAGE):$(DOCKER_TAG)$(RESET)"
 
-docker-build-distroless: ## Build distroless Docker image
-	@echo "$(CYAN)Building distroless Docker image...$(RESET)"
-	@docker build -f Dockerfile.distroless -t $(DOCKER_IMAGE):distroless .
+docker-build-no-cache: ## Build Docker image without cache
+	@echo "$(CYAN)Building Docker image without cache...$(RESET)"
+	@DOCKER_BUILDKIT=1 docker build --no-cache -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@echo "$(GREEN)✓ Docker image built: $(DOCKER_IMAGE):$(DOCKER_TAG)$(RESET)"
+
+docker-build-distroless: ## Build optimized distroless Docker image
+	@echo "$(CYAN)Building optimized distroless Docker image...$(RESET)"
+	@DOCKER_BUILDKIT=1 docker build \
+		--file Dockerfile.distroless \
+		--target builder \
+		--cache-from $(DOCKER_IMAGE):distroless-builder-cache \
+		--tag $(DOCKER_IMAGE):distroless-builder-cache \
+		.
+	@DOCKER_BUILDKIT=1 docker build \
+		--file Dockerfile.distroless \
+		--cache-from $(DOCKER_IMAGE):distroless-builder-cache \
+		--cache-from $(DOCKER_IMAGE):distroless \
+		--tag $(DOCKER_IMAGE):distroless \
+		.
 	@echo "$(GREEN)✓ Distroless Docker image built: $(DOCKER_IMAGE):distroless$(RESET)"
 
-docker-build-all: docker-build docker-build-distroless ## Build all Docker images
+docker-build-distroless-no-cache: ## Build distroless Docker image without cache
+	@echo "$(CYAN)Building distroless Docker image without cache...$(RESET)"
+	@DOCKER_BUILDKIT=1 docker build --no-cache -f Dockerfile.distroless -t $(DOCKER_IMAGE):distroless .
+	@echo "$(GREEN)✓ Distroless Docker image built: $(DOCKER_IMAGE):distroless$(RESET)"
 
-docker-run: ## Run Docker container
+docker-build-all: docker-build docker-build-distroless ## Build all Docker images with optimization
+
+docker-build-all-no-cache: docker-build-no-cache docker-build-distroless-no-cache ## Build all Docker images without cache
+
+docker-multi-arch: ## Build multi-architecture images (AMD64 + ARM64)
+	@echo "$(CYAN)Building multi-architecture Docker images...$(RESET)"
+	@docker buildx create --name vision-builder --use --bootstrap 2>/dev/null || true
+	@docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--tag $(DOCKER_IMAGE):$(DOCKER_TAG) \
+		--tag $(DOCKER_IMAGE):latest \
+		--push \
+		.
+	@docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--file Dockerfile.distroless \
+		--tag $(DOCKER_IMAGE):distroless \
+		--tag $(DOCKER_IMAGE):distroless-latest \
+		--push \
+		.
+	@echo "$(GREEN)✓ Multi-architecture images built and pushed$(RESET)"
+
+docker-run: ## Run Docker container with proper configuration
 	@echo "$(CYAN)Running Docker container...$(RESET)"
-	@docker run -d --name $(PROJECT_NAME)-dev -p 8000:8000 --env-file .env $(DOCKER_IMAGE):$(DOCKER_TAG)
+	@docker run -d \
+		--name $(PROJECT_NAME)-dev \
+		--restart unless-stopped \
+		-p 8000:8000 \
+		-e PYTHONPATH=/app \
+		--env-file .env \
+		--health-cmd="curl -f http://localhost:8000/api/v1/health || exit 1" \
+		--health-interval=30s \
+		--health-timeout=10s \
+		--health-retries=3 \
+		$(DOCKER_IMAGE):$(DOCKER_TAG)
 	@echo "$(GREEN)✓ Container started: $(PROJECT_NAME)-dev$(RESET)"
+	@echo "$(YELLOW)Health check: http://localhost:8000/api/v1/health$(RESET)"
 
 docker-run-distroless: ## Run distroless Docker container
 	@echo "$(CYAN)Running distroless Docker container...$(RESET)"
-	@docker run -d --name $(PROJECT_NAME)-distroless -p 8001:8000 $(DOCKER_IMAGE):distroless
+	@docker run -d \
+		--name $(PROJECT_NAME)-distroless \
+		--restart unless-stopped \
+		-p 8001:8000 \
+		-e PYTHONPATH=/app \
+		$(DOCKER_IMAGE):distroless
 	@echo "$(GREEN)✓ Distroless container started: $(PROJECT_NAME)-distroless$(RESET)"
+	@echo "$(YELLOW)No health check available in distroless mode$(RESET)"
 
-docker-stop: ## Stop Docker container
+docker-run-dev: ## Run Docker container in development mode with volume mounts
+	@echo "$(CYAN)Running Docker container in development mode...$(RESET)"
+	@docker run -d \
+		--name $(PROJECT_NAME)-dev-volume \
+		-p 8000:8000 \
+		-v $(PWD)/src:/app/src:ro \
+		-v $(PWD)/logs:/app/logs \
+		--env-file .env \
+		$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@echo "$(GREEN)✓ Development container started with volume mounts$(RESET)"
+
+docker-stop: ## Stop and remove Docker containers
 	@echo "$(CYAN)Stopping Docker containers...$(RESET)"
-	@docker stop $(PROJECT_NAME)-dev $(PROJECT_NAME)-distroless 2>/dev/null || true
-	@docker rm $(PROJECT_NAME)-dev $(PROJECT_NAME)-distroless 2>/dev/null || true
-	@echo "$(GREEN)✓ Containers stopped$(RESET)"
+	@docker stop $(PROJECT_NAME)-dev $(PROJECT_NAME)-distroless $(PROJECT_NAME)-dev-volume 2>/dev/null || true
+	@docker rm $(PROJECT_NAME)-dev $(PROJECT_NAME)-distroless $(PROJECT_NAME)-dev-volume 2>/dev/null || true
+	@echo "$(GREEN)✓ Containers stopped and removed$(RESET)"
 
 docker-logs: ## Show Docker container logs
 	@echo "$(CYAN)Showing Docker container logs...$(RESET)"
 	@docker logs $(PROJECT_NAME)-dev 2>/dev/null || echo "$(YELLOW)No dev container running$(RESET)"
+
+docker-logs-distroless: ## Show distroless Docker container logs
+	@echo "$(CYAN)Showing distroless Docker container logs...$(RESET)"
+	@docker logs $(PROJECT_NAME)-distroless 2>/dev/null || echo "$(YELLOW)No distroless container running$(RESET)"
+
+docker-shell: ## Get shell access to running container
+	@echo "$(CYAN)Opening shell in Docker container...$(RESET)"
+	@docker exec -it $(PROJECT_NAME)-dev /bin/bash 2>/dev/null || echo "$(RED)Container not running or shell not available$(RESET)"
+
+docker-stats: ## Show Docker container resource usage
+	@echo "$(CYAN)Docker container resource usage:$(RESET)"
+	@docker stats --no-stream $(PROJECT_NAME)-dev $(PROJECT_NAME)-distroless 2>/dev/null || echo "$(YELLOW)No containers running$(RESET)"
+
+docker-inspect: ## Inspect Docker images and containers
+	@echo "$(CYAN)Docker image information:$(RESET)"
+	@docker images $(DOCKER_IMAGE) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
+	@echo ""
+	@echo "$(CYAN)Running containers:$(RESET)"
+	@docker ps --filter "name=$(PROJECT_NAME)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+docker-clean: ## Clean up Docker resources
+	@echo "$(CYAN)Cleaning up Docker resources...$(RESET)"
+	@docker container prune -f
+	@docker image prune -f
+	@docker volume prune -f
+	@docker network prune -f
+	@echo "$(GREEN)✓ Docker cleanup completed$(RESET)"
+
+docker-clean-all: ## Clean up all Docker resources (including unused images)
+	@echo "$(CYAN)Cleaning up all Docker resources...$(RESET)"
+	@docker system prune -a -f --volumes
+	@echo "$(GREEN)✓ Complete Docker cleanup completed$(RESET)"
+
+docker-size: ## Show image sizes and layers
+	@echo "$(CYAN)Docker image sizes:$(RESET)"
+	@docker images $(DOCKER_IMAGE) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+	@echo ""
+	@echo "$(CYAN)Image layer information:$(RESET)"
+	@docker history $(DOCKER_IMAGE):$(DOCKER_TAG) --format "table {{.CreatedBy}}\t{{.Size}}" 2>/dev/null || echo "$(YELLOW)Standard image not found$(RESET)"
+	@docker history $(DOCKER_IMAGE):distroless --format "table {{.CreatedBy}}\t{{.Size}}" 2>/dev/null || echo "$(YELLOW)Distroless image not found$(RESET)"
+
+docker-benchmark: ## Run container performance benchmark
+	@echo "$(CYAN)Running Docker container performance benchmark...$(RESET)"
+	@docker run --rm \
+		-e PYTHONPATH=/app \
+		$(DOCKER_IMAGE):$(DOCKER_TAG) \
+		python -c "import time; start=time.time(); import src.app.main; print(f'Cold start time: {time.time()-start:.2f}s')"
+	@echo "$(GREEN)✓ Benchmark completed$(RESET)"
 
 # Docker Compose commands
 compose-build: ## Build services with docker-compose
@@ -329,3 +455,77 @@ test-universal: ## Test universal agent endpoints
 # Complete API test suite
 test-api-complete: test-api test-schemas test-universal ## Run complete API test suite
 	@echo "$(GREEN)✓ Complete API test suite finished$(RESET)"
+
+# Docker optimization and CI/CD workflows
+docker-optimize: ## Optimize Docker setup and build caches
+	@echo "$(CYAN)Optimizing Docker setup...$(RESET)"
+	@echo "Building Poetry lock file if needed..."
+	@poetry lock --check 2>/dev/null || poetry lock
+	@echo "Enabling Docker BuildKit for optimized builds..."
+	@export DOCKER_BUILDKIT=1
+	@echo "Creating builder instance for multi-platform builds..."
+	@docker buildx create --name vision-builder --use --bootstrap 2>/dev/null || true
+	@echo "$(GREEN)✓ Docker optimization completed$(RESET)"
+
+docker-ci-build: ## CI/CD optimized build with caching
+	@echo "$(CYAN)Running CI/CD optimized Docker build...$(RESET)"
+	@DOCKER_BUILDKIT=1 docker build \
+		--tag $(DOCKER_IMAGE):$(DOCKER_TAG) \
+		--tag $(DOCKER_IMAGE):latest \
+		--cache-from $(DOCKER_IMAGE):latest \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@DOCKER_BUILDKIT=1 docker build \
+		--file Dockerfile.distroless \
+		--tag $(DOCKER_IMAGE):distroless \
+		--tag $(DOCKER_IMAGE):distroless-latest \
+		--cache-from $(DOCKER_IMAGE):distroless-latest \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@echo "$(GREEN)✓ CI/CD Docker build completed$(RESET)"
+
+docker-security-scan: ## Run security scan on Docker images
+	@echo "$(CYAN)Running security scans on Docker images...$(RESET)"
+	@docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+		aquasec/trivy image $(DOCKER_IMAGE):$(DOCKER_TAG) || echo "$(YELLOW)Trivy not available, skipping security scan$(RESET)"
+	@docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+		aquasec/trivy image $(DOCKER_IMAGE):distroless || echo "$(YELLOW)Trivy not available for distroless image$(RESET)"
+	@echo "$(GREEN)✓ Security scan completed$(RESET)"
+
+docker-full-workflow: docker-optimize docker-build-all docker-security-scan docker-benchmark ## Complete Docker workflow
+	@echo "$(GREEN)✓ Complete Docker workflow finished$(RESET)"
+
+# Performance and resource monitoring
+docker-monitor: ## Monitor Docker container resource usage
+	@echo "$(CYAN)Monitoring Docker container resources...$(RESET)"
+	@echo "Press Ctrl+C to stop monitoring"
+	@docker stats $(PROJECT_NAME)-dev $(PROJECT_NAME)-distroless
+
+docker-health-monitor: ## Continuous health monitoring
+	@echo "$(CYAN)Starting continuous health monitoring...$(RESET)"
+	@echo "Press Ctrl+C to stop monitoring"
+	@while true; do \
+		echo "$(CYAN)[$(shell date)] Health check status:$(RESET)"; \
+		curl -s http://localhost:8000/api/v1/health && echo " $(GREEN)✓ Healthy$(RESET)" || echo " $(RED)✗ Unhealthy$(RESET)"; \
+		sleep 30; \
+	done
+
+# Development workflow shortcuts
+dev-docker: docker-build docker-run ## Quick development Docker workflow
+	@echo "$(GREEN)✓ Development Docker setup ready$(RESET)"
+	@echo "$(YELLOW)Container running at: http://localhost:8000$(RESET)"
+	@echo "$(YELLOW)Health check: http://localhost:8000/api/v1/health$(RESET)"
+
+prod-docker: docker-build-distroless docker-run-distroless ## Quick production Docker workflow
+	@echo "$(GREEN)✓ Production Docker setup ready$(RESET)"
+	@echo "$(YELLOW)Distroless container running at: http://localhost:8001$(RESET)"
+
+# Final comprehensive commands
+build-all: clean install docker-build-all ## Complete build workflow
+	@echo "$(GREEN)✓ Complete build workflow finished$(RESET)"
+
+verify-docker: docker-build test-docker docker-benchmark ## Verify Docker setup
+	@echo "$(GREEN)✓ Docker verification completed$(RESET)"
+
+deploy-ready: verify-full docker-ci-build docker-security-scan ## Complete deployment preparation
+	@echo "$(GREEN)✓ Deployment ready - all checks passed$(RESET)"

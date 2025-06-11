@@ -1,0 +1,90 @@
+# .dockerignore - Optimize Docker build context and reduce image size
+
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing and coverage
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+.nyc_output
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Documentation
+docs/
+*.md
+README*
+CHANGELOG*
+TODO*
+
+# Development and build tools
+Makefile
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+nginx.conf
+
+# Logs and temporary files
+logs/
+*.log
+tmp/
+temp/
+.tmp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Application specific
+front/
+tests/
+reports/
+.env.*
+!.env.example
+
+# Poetry lock file is needed
+!poetry.lock
+
+# Keep source code
+!src/
+!pyproject.toml

@@ -1,28 +1,42 @@
 # Multi-stage Docker build for Vision Backend
-# Optimized for quick builds and smaller image size
+# Optimized for quick builds, smaller image size, and Poetry dependency management
 
 # Build stage
 FROM python:3.12-slim as builder
 
-# Set environment variables
+# Set environment variables for optimal Python behavior
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
 
-# Install build dependencies
+# Install system dependencies and Poetry
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Install Poetry
+RUN pip install poetry==1.8.5
 
-# Copy requirements and install dependencies
-COPY pyproject.toml ./
-RUN pip install --upgrade pip setuptools wheel
-RUN pip install -e .
+# Set working directory
+WORKDIR /app
+
+# Copy Poetry configuration files
+COPY pyproject.toml poetry.lock* ./
+
+# Configure Poetry and install dependencies
+RUN poetry config virtualenvs.create true \
+    && poetry config virtualenvs.in-project true \
+    && poetry install --only=main --no-dev --no-root \
+    && rm -rf $POETRY_CACHE_DIR
+
+# Copy source code and install the package
+COPY src/ ./src/
+RUN poetry install --only-root
 
 # Production stage
 FROM python:3.12-slim
@@ -30,36 +44,40 @@ FROM python:3.12-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    VIRTUAL_ENV="/app/.venv"
 
-# Install runtime dependencies
+# Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get autoremove -y \
+    && apt-get clean
 
-# Copy virtual environment from builder stage
-COPY --from=builder /opt/venv /opt/venv
-
-# Create non-root user
+# Create non-root user early
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Set working directory
 WORKDIR /app
 
+# Copy virtual environment from builder stage
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+
 # Copy application code
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser pyproject.toml ./
 
-# Create directories for prompts and logs
-RUN mkdir -p /app/prompts /app/logs && \
-    chown -R appuser:appuser /app
+# Create necessary directories
+RUN mkdir -p /app/logs /app/tmp \
+    && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/healthz || exit 1
+# Health check with proper endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Expose port
 EXPOSE 8000
