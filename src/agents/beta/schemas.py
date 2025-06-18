@@ -1,7 +1,7 @@
 """Simplified schemas for Beta agent."""
 
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class BetaInput(BaseModel):
@@ -11,26 +11,30 @@ class BetaInput(BaseModel):
     requirements: Optional[List[str]] = Field(default_factory=list, description="List of requirements")
     constraints: Optional[str] = Field(default="", max_length=2000, description="Constraints to consider")
 
-    @validator('problem')
+    @field_validator('problem')
+    @classmethod
     def validate_problem(cls, v):
         if not v or not v.strip():
-            raise ValueError('Problem description cannot be empty or just whitespace')
+            raise ValueError('Problem description cannot be empty')
         return v.strip()
 
-    @validator('domain')
+    @field_validator('domain')
+    @classmethod
     def validate_domain(cls, v):
         if v:
             return v.strip()
         return v
 
-    @validator('requirements')
+    @field_validator('requirements')
+    @classmethod
     def validate_requirements(cls, v):
         if v:
             # Clean up requirements list
             return [req.strip() for req in v if req and req.strip()]
         return []
 
-    @validator('constraints')
+    @field_validator('constraints')
+    @classmethod
     def validate_constraints(cls, v):
         if v:
             return v.strip()

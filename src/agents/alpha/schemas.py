@@ -1,7 +1,7 @@
 """Simplified schemas for Alpha agent."""
 
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AlphaInput(BaseModel):
@@ -9,13 +9,15 @@ class AlphaInput(BaseModel):
     query: str = Field(..., min_length=1, max_length=10000, description="The question or task to process")
     context: Optional[str] = Field(default="", max_length=5000, description="Additional context")
 
-    @validator('query')
+    @field_validator('query')
+    @classmethod
     def validate_query(cls, v):
         if not v or not v.strip():
-            raise ValueError('Query cannot be empty or just whitespace')
+            raise ValueError('Query cannot be empty')
         return v.strip()
 
-    @validator('context')
+    @field_validator('context')
+    @classmethod
     def validate_context(cls, v):
         if v:
             return v.strip()

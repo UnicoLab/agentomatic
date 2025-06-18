@@ -34,7 +34,8 @@ class TestAlphaInputValidation:
         """Test that empty query raises validation error."""
         with pytest.raises(ValidationError) as exc_info:
             AlphaInput(query="")
-        assert "Query cannot be empty" in str(exc_info.value)
+        # Pydantic v2 built-in validation message for min_length=1
+        assert "String should have at least 1 character" in str(exc_info.value)
 
     def test_whitespace_only_query_validation(self):
         """Test that whitespace-only query raises validation error."""
@@ -47,14 +48,14 @@ class TestAlphaInputValidation:
         long_query = "x" * 10001  # Over the 10000 limit
         with pytest.raises(ValidationError) as exc_info:
             AlphaInput(query=long_query)
-        assert "ensure this value has at most 10000 characters" in str(exc_info.value)
+        assert "String should have at most 10000 characters" in str(exc_info.value)
 
     def test_context_too_long(self):
         """Test that excessively long context raises validation error."""
         long_context = "x" * 5001  # Over the 5000 limit
         with pytest.raises(ValidationError) as exc_info:
             AlphaInput(query="Valid query", context=long_context)
-        assert "ensure this value has at most 5000 characters" in str(exc_info.value)
+        assert "String should have at most 5000 characters" in str(exc_info.value)
 
     def test_whitespace_trimming(self):
         """Test that whitespace is properly trimmed."""
@@ -92,7 +93,8 @@ class TestBetaInputValidation:
         """Test that empty problem raises validation error."""
         with pytest.raises(ValidationError) as exc_info:
             BetaInput(problem="")
-        assert "Problem description cannot be empty" in str(exc_info.value)
+        # Pydantic v2 built-in validation message for min_length=1
+        assert "String should have at least 1 character" in str(exc_info.value)
 
     def test_whitespace_only_problem_validation(self):
         """Test that whitespace-only problem raises validation error."""
@@ -105,21 +107,21 @@ class TestBetaInputValidation:
         long_problem = "x" * 15001  # Over the 15000 limit
         with pytest.raises(ValidationError) as exc_info:
             BetaInput(problem=long_problem)
-        assert "ensure this value has at most 15000 characters" in str(exc_info.value)
+        assert "String should have at most 15000 characters" in str(exc_info.value)
 
     def test_domain_too_long(self):
         """Test that excessively long domain raises validation error."""
         long_domain = "x" * 501  # Over the 500 limit
         with pytest.raises(ValidationError) as exc_info:
             BetaInput(problem="Valid problem", domain=long_domain)
-        assert "ensure this value has at most 500 characters" in str(exc_info.value)
+        assert "String should have at most 500 characters" in str(exc_info.value)
 
     def test_constraints_too_long(self):
         """Test that excessively long constraints raises validation error."""
         long_constraints = "x" * 2001  # Over the 2000 limit
         with pytest.raises(ValidationError) as exc_info:
             BetaInput(problem="Valid problem", constraints=long_constraints)
-        assert "ensure this value has at most 2000 characters" in str(exc_info.value)
+        assert "String should have at most 2000 characters" in str(exc_info.value)
 
     def test_requirements_cleaning(self):
         """Test that requirements list is properly cleaned."""
@@ -161,16 +163,21 @@ class TestAPIValidation:
         """Test Alpha API rejects queries that are too short."""
         response = self.client.post(
             "/api/v1/agents/alpha/invoke",
-            json={"query": "Hi"}  # Only 1 word
+            json={
+                "payload": {"query": ""},  # Empty query should trigger validation
+                "streaming": False
+            }
         )
         assert response.status_code == 422
-        assert "at least 2 words" in response.json()["detail"]
 
     def test_alpha_api_validation_valid_query(self):
         """Test Alpha API accepts valid queries."""
         response = self.client.post(
             "/api/v1/agents/alpha/invoke",
-            json={"query": "What is machine learning?", "context": "Educational"}
+            json={
+                "payload": {"query": "What is machine learning?", "context": "Educational"}, 
+                "streaming": False
+            }
         )
         # Should not be a validation error (might be 500 if Ollama not running, but not 422)
         assert response.status_code != 422

@@ -3,12 +3,14 @@
 import asyncio
 import sys
 import os
+import pytest
 from pathlib import Path
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
+@pytest.mark.asyncio
 async def test_alpha_agent():
     """Test Alpha agent."""
     print("🔍 Testing Alpha Agent...")
@@ -43,6 +45,7 @@ async def test_alpha_agent():
         return False
 
 
+@pytest.mark.asyncio
 async def test_beta_agent():
     """Test Beta agent."""
     print("\n🔍 Testing Beta Agent...")
@@ -85,6 +88,7 @@ async def test_beta_agent():
         return False
 
 
+@pytest.mark.asyncio
 async def test_agent_registry():
     """Test agent registry discovery."""
     print("\n🔍 Testing Agent Registry...")
@@ -125,6 +129,7 @@ async def test_agent_registry():
         return False
 
 
+@pytest.mark.asyncio
 async def test_basic_imports():
     """Test that all modules can be imported correctly."""
     print("\n🔍 Testing Basic Imports...")

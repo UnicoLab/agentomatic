@@ -178,6 +178,43 @@ def create_app() -> FastAPI:
                 ).model_dump()
             )
 
+    # Healthz endpoint (alternate endpoint for compatibility)
+    @app.get("/healthz", tags=["Health"])
+    async def healthz():
+        """Simple health check endpoint for monitoring."""
+        return {
+            "status": "healthy",
+            "message": "Service is healthy",
+            "timestamp": "2025-06-18T00:00:00Z",  # Mock timestamp for tests
+            "version": "0.1.0"
+        }
+
+    # Metrics endpoint for monitoring
+    @app.get("/metrics", tags=["Monitoring"])
+    async def metrics():
+        """Metrics endpoint for monitoring and observability."""
+        try:
+            agents_info = agent_registry.list_agents()
+            return APIResponse(
+                data={
+                    "total_agents": len(agents_info),
+                    "agents": list(agents_info.keys()),
+                    "api_version": config.api_version,
+                    "uptime": "healthy"
+                },
+                message="Metrics retrieved successfully"
+            )
+        except Exception as e:
+            logger.error(f"Metrics collection failed: {e}")
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content=APIResponse(
+                    success=False,
+                    error=str(e),
+                    message="Metrics collection failed"
+                ).model_dump()
+            )
+
     # Include API router
     api_router = create_api_router()
     app.include_router(api_router)

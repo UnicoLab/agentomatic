@@ -144,7 +144,7 @@ def create_api_router() -> APIRouter:
 
     # === SYSTEM ENDPOINTS ===
 
-    @router.get("/api/{config.api_version}/agents",
+    @router.get(f"/api/{config.api_version}/agents",
                 summary="List all agents",
                 tags=["Agents Management"])
     @handle_api_errors
@@ -157,7 +157,7 @@ def create_api_router() -> APIRouter:
             message=f"Found {len(agents_info)} registered agents"
         )
 
-    @router.get("/api/{config.api_version}/agents/{agent_name}/health",
+    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/health",
                 summary="Agent health check",
                 tags=["Agents Management"])
     @handle_api_errors
@@ -174,7 +174,7 @@ def create_api_router() -> APIRouter:
         health_info = await agent.health_check()
         return APIResponse(data=health_info, message="Health check completed")
 
-    @router.get("/api/{config.api_version}/agents/{agent_name}/schema",
+    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/schema",
                 summary="Get agent input schema",
                 tags=["Agents Management"])
     @handle_api_errors
@@ -194,7 +194,7 @@ def create_api_router() -> APIRouter:
             message=f"Schema information for agent '{agent_name}'"
         )
 
-    @router.get("/api/{config.api_version}/agents/{agent_name}/prompts",
+    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/prompts",
                 summary="List agent prompts",
                 tags=["Prompts Management"])
     @handle_api_errors
@@ -227,7 +227,7 @@ def create_api_router() -> APIRouter:
             message=f"Found {len(prompts_info)} prompt versions"
         )
 
-    @router.get("/api/{config.api_version}/agents/{agent_name}/prompts/{version}",
+    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/prompts/{{version}}",
                 summary="Get specific prompt",
                 tags=["Prompts Management"])
     @handle_api_errors
@@ -268,7 +268,7 @@ def create_api_router() -> APIRouter:
 
     # === UNIVERSAL AGENT ENDPOINTS ===
 
-    @router.post("/api/{config.api_version}/agents/{agent_name}/invoke",
+    @router.post(f"/api/{config.api_version}/agents/{{agent_name}}/invoke",
                  summary="Universal agent invocation with dynamic validation",
                  tags=["Agents"],
                  response_model=UniversalAgentResponse)
@@ -323,7 +323,7 @@ def create_api_router() -> APIRouter:
 
     # === AGENT INTERACTION ENDPOINTS ===
 
-    @router.post("/api/{config.api_version}/agents/{agent_name}/chat",
+    @router.post(f"/api/{config.api_version}/agents/{{agent_name}}/chat",
                  summary="Chat with agent",
                  tags=["Agents"],
                  response_model=Union[AgentResponse, APIResponse])
@@ -395,6 +395,49 @@ def create_api_router() -> APIRouter:
                     ),
                     message="Response generated successfully"
                 )
+
+    # === AGENT CAPABILITIES ENDPOINTS ===
+
+    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/capabilities",
+                summary="Get agent capabilities",
+                tags=["Agents Management"])
+    @handle_api_errors
+    @log_api_call
+    async def get_agent_capabilities(agent_name: str = Path(..., description="Agent name")):
+        """Get the capabilities and features of a specific agent."""
+        agent = agent_registry.get_agent(agent_name)
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Agent '{agent_name}' not found"
+            )
+
+        # Get basic agent information
+        capabilities = {
+            "name": agent_name,
+            "type": type(agent).__name__,
+            "streaming_supported": hasattr(agent, 'supports_streaming') and agent.supports_streaming,
+            "prompt_versions": [],
+            "input_schema": get_agent_schema_info(agent_name),
+            "features": {
+                "batch_processing": hasattr(agent, 'process_batch'),
+                "async_execution": True,
+                "context_aware": True,
+                "configurable": hasattr(agent, 'config')
+            }
+        }
+
+        # Get available prompt versions if available
+        try:
+            if hasattr(agent, 'prompt_manager'):
+                capabilities["prompt_versions"] = agent.prompt_manager.list_versions()
+        except Exception:
+            capabilities["prompt_versions"] = ["v1"]  # Default
+
+        return APIResponse(
+            data=capabilities,
+            message=f"Capabilities for agent '{agent_name}'"
+        )
 
     # === UTILITY FUNCTIONS ===
 

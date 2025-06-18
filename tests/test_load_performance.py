@@ -180,6 +180,14 @@ async def load_test_client():
         yield client
 
 
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for the test session."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
 class TestHealthEndpointLoad:
     """Load test the health endpoint for baseline performance."""
 

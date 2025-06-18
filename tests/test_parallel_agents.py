@@ -69,7 +69,7 @@ def event_loop():
 
 
 @pytest.fixture(scope="session")
-async def mock_llm_factory():
+def mock_llm_factory():
     """Session-scoped mock LLM factory for fastest testing."""
     with patch('src.common.llm_factory.LLMFactory') as mock_factory:
         mock_llm = AsyncMock()
@@ -77,9 +77,9 @@ async def mock_llm_factory():
         mock_llm.astream.return_value = iter(["chunk1", "chunk2", "chunk3"])
         mock_llm.health_check.return_value = True
 
-        mock_factory_instance = MagicMock()
-        mock_factory_instance.create_llm.return_value = mock_llm
-        mock_factory.return_value = mock_factory_instance
+        # Mock both async and sync methods
+        mock_factory.create_llm.return_value = mock_llm
+        mock_factory.create_llm_sync.return_value = mock_llm
 
         yield mock_factory
 
