@@ -324,7 +324,7 @@ class PromptOptimizer:
             max_iterations=10,
             target_score=0.9,
         )
-        print(result.report())
+        logger.info(result.report())
         result.apply()
 
     Args:
@@ -730,7 +730,7 @@ class PromptOptimizer:
             console.print(table)
         except ImportError:
             for version, result in results.items():
-                print(f"  {version}: {result.avg_score:.4f}")
+                logger.info(f"  {version}: {result.avg_score:.4f}")
 
 
 # =====================================================================
@@ -791,7 +791,7 @@ class _ProgressDisplay:
             self._table.add_column("Metrics", width=40)
             self._table.add_column("Status", justify="center", width=8)
         else:
-            print(f"⚡ Optimizing: {agent} | {n_points} points | {n_metrics} metrics")
+            logger.info(f"⚡ Optimizing: {agent} | {n_points} points | {n_metrics} metrics")
 
         self._prev_score = 0.0
 
@@ -804,14 +804,14 @@ class _ProgressDisplay:
                 highlight=False,
             )
         else:
-            print(f"\n--- Iteration {i}/{self.max_iterations} ---")
+            logger.info(f"\n--- Iteration {i}/{self.max_iterations} ---")
 
     def phase(self, msg: str) -> None:
         """Show a phase indicator."""
         if self._has_rich:
             self._console.print(f"  [dim]{msg}[/dim]", highlight=False)
         else:
-            print(f"  {msg}")
+            logger.info(f"  {msg}")
 
     def tick(self) -> None:
         """Increment progress counter."""
@@ -854,16 +854,16 @@ class _ProgressDisplay:
         else:
             marker = " 🏆 BEST" if is_best else ""
             delta_s = f" (Δ {delta:+.4f})" if not is_baseline else ""
-            print(f"  Score: {result.avg_score:.4f}{delta_s}{marker}")
+            logger.info(f"  Score: {result.avg_score:.4f}{delta_s}{marker}")
             if metrics_str:
-                print(f"  {metrics_str}")
+                logger.info(f"  {metrics_str}")
 
     def info(self, msg: str) -> None:
         """Print info message."""
         if self._has_rich:
             self._console.print(f"[bold yellow]{msg}[/bold yellow]")
         else:
-            print(msg)
+            logger.info(msg)
 
     def finish(self, best_score: float, baseline: float, duration: float) -> None:
         """Show final summary."""
@@ -886,6 +886,6 @@ class _ProgressDisplay:
                 )
             )
         else:
-            print(
+            logger.success(
                 f"\n✅ Done! {baseline:.4f} → {best_score:.4f} (+{improvement:.1f}%) in {duration:.1f}s"
             )

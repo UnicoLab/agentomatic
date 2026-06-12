@@ -30,6 +30,7 @@ dependencies = [
     "typing-extensions>=4.12",
     "pyyaml>=6.0",
     "python-multipart>=0.0.12",
+    "click>=8.1.0",
 ]
 
 [project.optional-dependencies]
@@ -70,7 +71,7 @@ dev = [
 ]
 
 [project.scripts]
-agentomatic = "agentomatic.cli.commands:main"
+agentomatic = "agentomatic.cli.commands:cli"
 
 [project.urls]
 Homepage = "https://github.com/UnicoLab/agentomatic"

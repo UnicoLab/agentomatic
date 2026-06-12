@@ -16,12 +16,14 @@ Fallback: works with basic output if Rich is not installed.
 
 from __future__ import annotations
 
-import argparse
 import importlib
 import json
 import sys
 from pathlib import Path
 from typing import Any
+
+import click
+from loguru import logger
 
 # Graceful Rich fallback
 try:
@@ -42,12 +44,12 @@ console = Console() if HAS_RICH else None
 # =====================================================================
 
 
-def _print(msg: str) -> None:
-    """Print with Rich if available, plain otherwise."""
+def _echo(msg: str) -> None:
+    """Print with Rich if available, plain click.echo otherwise."""
     if console:
         console.print(msg)
     else:
-        print(msg)
+        click.echo(msg)
 
 
 def _print_banner() -> None:
@@ -60,29 +62,40 @@ def _print_banner() -> None:
             )
         )
     else:
-        print("⚡ agentomatic — Drop agents, not code")
-        print()
+        click.echo("⚡ agentomatic — Drop agents, not code")
+        click.echo()
 
 
 def _print_success(msg: str) -> None:
     if HAS_RICH:
         console.print(f"[bold green]✅ {msg}[/bold green]")
     else:
-        print(f"✅ {msg}")
+        logger.success(msg)
 
 
 def _print_error(msg: str) -> None:
     if HAS_RICH:
         console.print(f"[bold red]❌ {msg}[/bold red]")
     else:
-        print(f"❌ {msg}")
+        logger.error(msg)
 
 
 def _print_warning(msg: str) -> None:
     if HAS_RICH:
         console.print(f"[bold yellow]⚠️  {msg}[/bold yellow]")
     else:
-        print(f"⚠️  {msg}")
+        logger.warning(msg)
+
+
+# =====================================================================
+# CLI Group
+# =====================================================================
+
+
+@click.group()
+def cli():
+    """⚡ Agentomatic — Drop agents, not code."""
+    pass
 
 
 # =====================================================================
@@ -90,19 +103,26 @@ def _print_warning(msg: str) -> None:
 # =====================================================================
 
 
-def cmd_init(args: argparse.Namespace) -> None:
+@cli.command()
+@click.argument("name")
+@click.option("--dir", "-d", "agents_dir", default="agents", help="Agents directory (default: agents)")
+@click.option(
+    "--template",
+    "-t",
+    type=click.Choice(["basic", "full", "rag", "chatbot", "custom"]),
+    default=None,
+    help="Template to use (default: interactive selection)",
+)
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
     """Scaffold a new agent with template selection."""
     from .templates import TEMPLATES, get_template_files
 
-    name = args.name
-    agents_dir = Path(args.dir)
-    target = agents_dir / name
+    target = Path(agents_dir) / name
 
     _print_banner()
 
     # Template selection
-    template = args.template
-
     if not template:
         # Interactive selection if questionary is available
         try:
@@ -129,10 +149,9 @@ def cmd_init(args: argparse.Namespace) -> None:
     # Check if target exists
     if target.exists() and any(target.iterdir()):
         _print_warning(f"Directory {target} already exists and is not empty")
-        if not args.force:
-            response = input("Overwrite? [y/N]: ").strip().lower()
-            if response != "y":
-                _print("Cancelled")
+        if not force:
+            if not click.confirm("Overwrite?", default=False):
+                logger.info("Cancelled")
                 return
 
     # Generate files
@@ -145,20 +164,20 @@ def cmd_init(args: argparse.Namespace) -> None:
             tree.add(f"[green]📄 {rel_path}[/green]")
         console.print(tree)
     else:
-        print(f"📁 {target}")
+        click.echo(f"📁 {target}")
         for rel_path in sorted(files.keys()):
-            print(f"  📄 {rel_path}")
+            click.echo(f"  📄 {rel_path}")
 
     for rel_path, content in files.items():
         file_path = target / rel_path
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content)
 
-    _print("")
-    _print_success(f"Created agent '{name}' with template '{template}'")
-    _print(f"   📍 Location: {target}")
-    _print(f"   📦 Files: {len(files)}")
-    _print("")
+    click.echo()
+    logger.success(f"Created agent '{name}' with template '{template}'")
+    click.echo(f"   📍 Location: {target}")
+    click.echo(f"   📦 Files: {len(files)}")
+    click.echo()
 
     if HAS_RICH:
         console.print(
@@ -174,10 +193,10 @@ def cmd_init(args: argparse.Namespace) -> None:
             )
         )
     else:
-        print("Next steps:")
-        print(f"  1. Edit {name}/nodes.py with your logic")
-        print("  2. agentomatic run")
-        print(f"  3. agentomatic test {name}")
+        click.echo("Next steps:")
+        click.echo(f"  1. Edit {name}/nodes.py with your logic")
+        click.echo("  2. agentomatic run")
+        click.echo(f"  3. agentomatic test {name}")
 
 
 # =====================================================================
@@ -185,35 +204,47 @@ def cmd_init(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_run(args: argparse.Namespace) -> None:
+@cli.command()
+@click.option("--agents-dir", default="agents", help="Agents directory")
+@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", type=int, default=8000, help="Port to listen on")
+@click.option("--reload", is_flag=True, help="Enable auto-reload")
+@click.option("--title", default=None, help="Platform title")
+@click.option("--log-level", default="INFO", help="Log level")
+@click.option("--with-ui", "--ui", is_flag=True, help="Enable Chainlit debug UI at /chat")
+def run(
+    agents_dir: str,
+    host: str,
+    port: int,
+    reload: bool,
+    title: str | None,
+    log_level: str,
+    with_ui: bool,
+) -> None:
     """Run the platform with Rich status output."""
     _print_banner()
-    _print(
-        f"🚀 Starting platform from [bold]{args.agents_dir}[/bold]..."
-        if HAS_RICH
-        else f"🚀 Starting platform from {args.agents_dir}..."
-    )
+    logger.info(f"Starting platform from {agents_dir}...")
 
     from agentomatic import AgentPlatform
 
     kwargs: dict[str, Any] = {
-        "title": args.title or "Agentomatic Platform",
-        "log_level": args.log_level,
+        "title": title or "Agentomatic Platform",
+        "log_level": log_level,
     }
 
     # Auto-detect and enable UI
-    if args.with_ui or args.ui:
+    if with_ui:
         from agentomatic.ui import is_available
 
         if is_available():
-            _print_success("Debug UI will be available at /chat")
+            logger.success("Debug UI will be available at /chat")
         else:
-            _print_warning("Chainlit not installed. Install: pip install agentomatic[ui]")
+            logger.warning("Chainlit not installed. Install: pip install agentomatic[ui]")
 
-    platform = AgentPlatform.from_folder(args.agents_dir, **kwargs)
+    platform = AgentPlatform.from_folder(agents_dir, **kwargs)
 
     # Mount UI if requested
-    if args.with_ui or args.ui:
+    if with_ui:
 
         @platform.on_startup
         async def _mount_ui():
@@ -222,7 +253,7 @@ def cmd_run(args: argparse.Namespace) -> None:
             if platform._app:
                 mount(platform._app)
 
-    platform.run(host=args.host, port=args.port, reload=args.reload)
+    platform.run(host=host, port=port, reload=reload)
 
 
 # =====================================================================
@@ -230,17 +261,19 @@ def cmd_run(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_list(args: argparse.Namespace) -> None:
+@cli.command("list")
+@click.option("--agents-dir", default="agents", help="Agents directory")
+def list_agents(agents_dir: str) -> None:
     """List agents in a directory with Rich table."""
-    agents_dir = Path(args.agents_dir)
+    agents_path = Path(agents_dir)
     _print_banner()
 
-    if not agents_dir.exists():
-        _print_error(f"Directory not found: {agents_dir}")
+    if not agents_path.exists():
+        _print_error(f"Directory not found: {agents_path}")
         sys.exit(1)
 
     agents = []
-    for entry in sorted(agents_dir.iterdir()):
+    for entry in sorted(agents_path.iterdir()):
         if entry.is_dir() and (entry / "__init__.py").exists() and not entry.name.startswith("_"):
             info: dict[str, Any] = {"name": entry.name, "path": str(entry)}
 
@@ -265,11 +298,11 @@ def cmd_list(args: argparse.Namespace) -> None:
             agents.append(info)
 
     if not agents:
-        _print_warning(f"No agents found in {agents_dir}")
+        _print_warning(f"No agents found in {agents_path}")
         return
 
     if HAS_RICH:
-        table = Table(title=f"🤖 Agents in {agents_dir}", show_lines=True)
+        table = Table(title=f"🤖 Agents in {agents_path}", show_lines=True)
         table.add_column("Name", style="bold cyan")
         table.add_column("Files", justify="center")
         table.add_column("Manifest", justify="center")
@@ -285,11 +318,11 @@ def cmd_list(args: argparse.Namespace) -> None:
 
         console.print(table)
     else:
-        print(f"📂 {agents_dir}")
+        click.echo(f"📂 {agents_path}")
         for a in agents:
-            print(f"  🤖 {a['name']} ({a.get('files', '?')} files)")
+            click.echo(f"  🤖 {a['name']} ({a.get('files', '?')} files)")
 
-    _print(f"\n   Total: {len(agents)} agent(s)")
+    _echo(f"\n   Total: {len(agents)} agent(s)")
 
 
 # =====================================================================
@@ -297,21 +330,25 @@ def cmd_list(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_test(args: argparse.Namespace) -> None:
+@cli.command()
+@click.argument("name")
+@click.option("--host", default="localhost", help="Platform API host")
+@click.option("--port", type=int, default=8000, help="Platform API port")
+@click.option("--agents-dir", default="agents", help="Agents directory")
+def test(name: str, host: str, port: int, agents_dir: str) -> None:
     """Test an agent interactively in the terminal."""
     import asyncio
 
     _print_banner()
-    agent_name = args.name
-    base_url = f"http://{args.host}:{args.port}"
+    base_url = f"http://{host}:{port}"
 
-    _print(
-        f"🧪 Testing agent: [bold cyan]{agent_name}[/bold cyan]"
-        if HAS_RICH
-        else f"🧪 Testing agent: {agent_name}"
-    )
-    _print(f"   API: {base_url}/api/v1/{agent_name}/invoke")
-    _print("   Type 'quit' or 'exit' to stop\n")
+    if HAS_RICH:
+        _echo(f"🧪 Testing agent: [bold cyan]{name}[/bold cyan]")
+    else:
+        logger.info(f"Testing agent: {name}")
+
+    click.echo(f"   API: {base_url}/api/v1/{name}/invoke")
+    click.echo("   Type 'quit' or 'exit' to stop\n")
 
     async def _test_loop():
         import httpx
@@ -319,15 +356,15 @@ def cmd_test(args: argparse.Namespace) -> None:
         async with httpx.AsyncClient(base_url=base_url, timeout=60) as client:
             # Health check
             try:
-                resp = await client.get(f"/api/v1/{agent_name}/health")
+                resp = await client.get(f"/api/v1/{name}/health")
                 if resp.status_code == 200:
-                    _print_success(f"Agent '{agent_name}' is healthy")
+                    logger.success(f"Agent '{name}' is healthy")
                 else:
-                    _print_error(f"Agent '{agent_name}' health check failed: {resp.status_code}")
+                    logger.error(f"Agent '{name}' health check failed: {resp.status_code}")
                     return
             except httpx.ConnectError:
-                _print_error(f"Cannot connect to {base_url}. Is the platform running?")
-                _print("   Start with: agentomatic run")
+                logger.error(f"Cannot connect to {base_url}. Is the platform running?")
+                click.echo("   Start with: agentomatic run")
                 return
 
             # Interactive loop
@@ -349,7 +386,7 @@ def cmd_test(args: argparse.Namespace) -> None:
                         payload["thread_id"] = thread_id
 
                     resp = await client.post(
-                        f"/api/v1/{agent_name}/invoke",
+                        f"/api/v1/{name}/invoke",
                         json=payload,
                     )
                     resp.raise_for_status()
@@ -359,7 +396,7 @@ def cmd_test(args: argparse.Namespace) -> None:
 
                     if HAS_RICH:
                         console.print(
-                            f"\n🤖 [bold green]{agent_name}[/bold green]: {data.get('response', '')}"
+                            f"\n🤖 [bold green]{name}[/bold green]: {data.get('response', '')}"
                         )
                         if data.get("steps_taken"):
                             console.print(
@@ -371,16 +408,16 @@ def cmd_test(args: argparse.Namespace) -> None:
                             )
                         console.print(f"   [dim]⏱ {data.get('duration_ms', 0):.0f}ms[/dim]")
                     else:
-                        print(f"\n🤖 {agent_name}: {data.get('response', '')}")
+                        click.echo(f"\n🤖 {name}: {data.get('response', '')}")
                         if data.get("duration_ms"):
-                            print(f"   ⏱ {data['duration_ms']:.0f}ms")
+                            click.echo(f"   ⏱ {data['duration_ms']:.0f}ms")
 
                 except httpx.HTTPStatusError as exc:
-                    _print_error(f"API Error: {exc.response.status_code}")
+                    logger.error(f"API Error: {exc.response.status_code}")
                 except Exception as exc:
-                    _print_error(f"Error: {exc}")
+                    logger.error(f"Error: {exc}")
 
-            _print("\n👋 Test session ended")
+            click.echo("\n👋 Test session ended")
 
     asyncio.run(_test_loop())
 
@@ -390,11 +427,14 @@ def cmd_test(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_inspect(args: argparse.Namespace) -> None:
+@cli.command()
+@click.argument("name")
+@click.option("--agents-dir", default="agents", help="Agents directory")
+def inspect(name: str, agents_dir: str) -> None:
     """Inspect an agent's structure and configuration."""
     _print_banner()
 
-    target = Path(args.agents_dir) / args.name
+    target = Path(agents_dir) / name
     if not target.exists():
         _print_error(f"Agent not found: {target}")
         sys.exit(1)
@@ -405,14 +445,14 @@ def cmd_inspect(args: argparse.Namespace) -> None:
         # Header
         console.print(
             Panel(
-                f"[bold cyan]{args.name}[/bold cyan]\n[dim]{target}[/dim]",
+                f"[bold cyan]{name}[/bold cyan]\n[dim]{target}[/dim]",
                 title="🔍 Agent Inspector",
                 border_style="cyan",
             )
         )
 
         # File tree
-        tree = Tree(f"[bold]📁 {args.name}/[/bold]")
+        tree = Tree(f"[bold]📁 {name}/[/bold]")
         for f in files:
             rel = f.relative_to(target)
             size = f.stat().st_size
@@ -442,11 +482,11 @@ def cmd_inspect(args: argparse.Namespace) -> None:
                 )
             )
     else:
-        print(f"🔍 Agent: {args.name}")
-        print(f"   Path: {target}")
-        print(f"   Files: {len(files)}")
+        click.echo(f"🔍 Agent: {name}")
+        click.echo(f"   Path: {target}")
+        click.echo(f"   Files: {len(files)}")
         for f in files:
-            print(f"   📄 {f.relative_to(target)}")
+            click.echo(f"   📄 {f.relative_to(target)}")
 
 
 # =====================================================================
@@ -454,7 +494,9 @@ def cmd_inspect(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_doctor(args: argparse.Namespace) -> None:
+@cli.command()
+@click.option("--agents-dir", default="agents", help="Agents directory")
+def doctor(agents_dir: str) -> None:
     """Check environment health and dependencies."""
     _print_banner()
 
@@ -492,14 +534,14 @@ def cmd_doctor(args: argparse.Namespace) -> None:
             checks.append((f"{pkg} [{extra}]", False, f"pip install agentomatic[{extra}]"))
 
     # Agents directory
-    agents_dir = Path(args.agents_dir)
-    if agents_dir.exists():
+    agents_path = Path(agents_dir)
+    if agents_path.exists():
         count = len(
-            [d for d in agents_dir.iterdir() if d.is_dir() and (d / "__init__.py").exists()]
+            [d for d in agents_path.iterdir() if d.is_dir() and (d / "__init__.py").exists()]
         )
-        checks.append(("Agents directory", True, f"{count} agent(s) in {agents_dir}"))
+        checks.append(("Agents directory", True, f"{count} agent(s) in {agents_path}"))
     else:
-        checks.append(("Agents directory", False, f"Not found: {agents_dir}"))
+        checks.append(("Agents directory", False, f"Not found: {agents_path}"))
 
     if HAS_RICH:
         table = Table(title="🩺 Environment Health Check", show_lines=True)
@@ -507,23 +549,25 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         table.add_column("Status", justify="center")
         table.add_column("Details")
 
-        for name, ok, detail in checks:
+        for check_name, ok, detail in checks:
             status = "[green]✅[/green]" if ok else "[red]❌[/red]"
             style = "" if ok else "dim"
-            table.add_row(name, status, f"[{style}]{detail}[/{style}]" if style else detail)
+            table.add_row(
+                check_name, status, f"[{style}]{detail}[/{style}]" if style else detail
+            )
 
         console.print(table)
 
         all_ok = all(ok for _, ok, _ in checks[:6])  # Core deps only
         if all_ok:
-            _print_success("All core dependencies satisfied!")
+            logger.success("All core dependencies satisfied!")
         else:
-            _print_error("Some core dependencies are missing")
+            logger.error("Some core dependencies are missing")
     else:
-        print("🩺 Environment Health Check")
-        for name, ok, detail in checks:
+        click.echo("🩺 Environment Health Check")
+        for check_name, ok, detail in checks:
             status = "✅" if ok else "❌"
-            print(f"  {status} {name}: {detail}")
+            click.echo(f"  {status} {check_name}: {detail}")
 
 
 # =====================================================================
@@ -531,28 +575,32 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_ui(args: argparse.Namespace) -> None:
+@cli.command()
+@click.option("--host", default="localhost", help="Platform API host")
+@click.option("--port", type=int, default=8000, help="Platform API port")
+@click.option("--ui-port", type=int, default=8001, help="UI port")
+def ui(host: str, port: int, ui_port: int) -> None:
     """Launch the Chainlit debug UI."""
     _print_banner()
 
     from agentomatic.ui import is_available
 
     if not is_available():
-        _print_error("Chainlit not installed")
-        _print("   Install: pip install agentomatic[ui]")
+        logger.error("Chainlit not installed")
+        click.echo("   Install: pip install agentomatic[ui]")
         sys.exit(1)
 
-    _print_success("Launching debug UI...")
-    _print(f"   Platform API: http://{args.host}:{args.port}")
+    logger.success("Launching debug UI...")
+    click.echo(f"   Platform API: http://{host}:{port}")
 
     import subprocess
 
     chat_path = Path(__file__).parent.parent / "ui" / "chat.py"
     subprocess.run(
-        [sys.executable, "-m", "chainlit", "run", str(chat_path), "--port", str(args.ui_port)],
+        [sys.executable, "-m", "chainlit", "run", str(chat_path), "--port", str(ui_port)],
         env={
             **__import__("os").environ,
-            "AGENTOMATIC_API_URL": f"http://{args.host}:{args.port}",
+            "AGENTOMATIC_API_URL": f"http://{host}:{port}",
         },
     )
 
@@ -562,201 +610,105 @@ def cmd_ui(args: argparse.Namespace) -> None:
 # =====================================================================
 
 
-def cmd_optimize(args: argparse.Namespace) -> None:
-    """Handle optimize command."""
+@cli.command()
+@click.argument("agent")
+@click.option("--dataset", "-d", required=True, help="Path to JSONL/CSV dataset")
+@click.option("--metrics", "-m", default="exact_match", help="Comma-separated metrics")
+@click.option(
+    "--strategy",
+    "-s",
+    default="iterative_rewrite",
+    type=click.Choice(["iterative_rewrite", "few_shot", "chain_of_thought"]),
+    help="Optimization strategy",
+)
+@click.option("--max-iterations", type=int, default=10, help="Max iterations")
+@click.option("--target-score", type=float, default=0.9, help="Target score")
+@click.option("--rewrite-llm", default=None, help="LLM for prompt rewriting")
+@click.option("--eval-llm", default=None, help="LLM for evaluation")
+@click.option("--llm", default="ollama/mistral:7b", help="Default LLM")
+@click.option("--patience", type=int, default=3, help="Early stopping patience")
+@click.option("--prompt", default=None, help="Initial prompt (overrides prompts.json)")
+@click.option("--no-report", is_flag=True, help="Skip HTML report generation")
+@click.option("--apply", "auto_apply", is_flag=True, help="Auto-apply best prompt")
+@click.option("--host", default="http://localhost:8000", help="Platform API base")
+def optimize(
+    agent: str,
+    dataset: str,
+    metrics: str,
+    strategy: str,
+    max_iterations: int,
+    target_score: float,
+    rewrite_llm: str | None,
+    eval_llm: str | None,
+    llm: str,
+    patience: int,
+    prompt: str | None,
+    no_report: bool,
+    auto_apply: bool,
+    host: str,
+) -> None:
+    """Run prompt optimization for an agent."""
     import asyncio
-
-    try:
-        from rich.console import Console
-
-        console = Console()
-    except ImportError:
-        console = None
 
     try:
         from agentomatic.optimize import Dataset, PromptOptimizer
     except ImportError:
-        print("ERROR: Optimization module not available.")
-        print("Install: pip install agentomatic[optimize]")
+        logger.error("Optimization module not available.")
+        click.echo("Install: pip install agentomatic[optimize]")
         return
 
     # Load dataset
-    dataset_path = args.dataset
-    if dataset_path.endswith(".csv"):
-        dataset = Dataset.from_csv(dataset_path)
+    if dataset.endswith(".csv"):
+        ds = Dataset.from_csv(dataset)
     else:
-        dataset = Dataset.from_jsonl(dataset_path)
+        ds = Dataset.from_jsonl(dataset)
 
-    if console:
-        console.print(f"[bold]Dataset:[/bold] {len(dataset)} points from {dataset_path}")
+    logger.info(f"Dataset: {len(ds)} points from {dataset}")
 
     # Parse metrics
-    metrics = [m.strip() for m in args.metrics.split(",")]
+    metric_list = [m.strip() for m in metrics.split(",")]
 
     # Create optimizer
     optimizer = PromptOptimizer(
-        agent=args.agent,
-        metrics=metrics,
-        llm=args.llm,
-        rewrite_llm=args.rewrite_llm,
-        eval_llm=args.eval_llm,
-        strategy=args.strategy,
-        api_base=args.host,
-        auto_report=not args.no_report,
+        agent=agent,
+        metrics=metric_list,
+        llm=llm,
+        rewrite_llm=rewrite_llm,
+        eval_llm=eval_llm,
+        strategy=strategy,
+        api_base=host,
+        auto_report=not no_report,
     )
 
     # Run optimization
     result = asyncio.run(
         optimizer.optimize(
-            dataset=dataset,
-            initial_prompt=args.prompt,
-            max_iterations=args.max_iterations,
-            target_score=args.target_score,
-            patience=args.patience,
+            dataset=ds,
+            initial_prompt=prompt,
+            max_iterations=max_iterations,
+            target_score=target_score,
+            patience=patience,
         )
     )
 
     # Print report
-    print(result.report())
+    click.echo(result.report())
 
     # Auto-apply if requested
-    if args.apply:
+    if auto_apply:
         version = result.apply()
-        if console:
-            console.print(f"\n[bold green]✅ Applied as '{version}'[/bold green]")
+        logger.success(f"Applied as '{version}'")
 
 
 # =====================================================================
-# Main CLI entry point
+# Backward-compatible main() entry point
 # =====================================================================
 
 
 def main() -> None:
-    """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        prog="agentomatic",
-        description="⚡ Agentomatic — Drop agents, not code",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  agentomatic init my_agent                    # Basic template
-  agentomatic init my_agent --template full    # All files
-  agentomatic init my_agent --template rag     # RAG pipeline
-  agentomatic run                              # Start platform
-  agentomatic run --with-ui                    # Start with debug UI
-  agentomatic list                             # Show agents
-  agentomatic test my_agent                    # Interactive test
-  agentomatic inspect my_agent                 # Show details
-  agentomatic doctor                           # Check environment
-  agentomatic optimize my_agent -d qa.jsonl    # Optimize prompts
-        """,
-    )
-    sub = parser.add_subparsers(dest="command", help="Available commands")
-
-    # --- init ---
-    p_init = sub.add_parser("init", help="Scaffold a new agent")
-    p_init.add_argument("name", help="Agent name (snake_case)")
-    p_init.add_argument("--dir", default="agents", help="Agents directory (default: agents)")
-    p_init.add_argument(
-        "--template",
-        "-t",
-        choices=["basic", "full", "rag", "chatbot", "custom"],
-        default=None,
-        help="Template to use (default: interactive selection)",
-    )
-    p_init.add_argument("--force", "-f", action="store_true", help="Overwrite existing files")
-
-    # --- run ---
-    p_run = sub.add_parser("run", help="Start the platform")
-    p_run.add_argument("--agents-dir", default="agents", help="Agents directory")
-    p_run.add_argument("--host", default="0.0.0.0")
-    p_run.add_argument("--port", type=int, default=8000)
-    p_run.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    p_run.add_argument("--title", default=None, help="Platform title")
-    p_run.add_argument("--log-level", default="INFO")
-    p_run.add_argument(
-        "--with-ui",
-        "--ui",
-        action="store_true",
-        dest="with_ui",
-        help="Enable Chainlit debug UI at /chat",
-    )
-    # compat alias
-    p_run.set_defaults(ui=False)
-
-    # --- list ---
-    p_list = sub.add_parser("list", help="List discovered agents")
-    p_list.add_argument("--agents-dir", default="agents", help="Agents directory")
-
-    # --- test ---
-    p_test = sub.add_parser("test", help="Test an agent interactively")
-    p_test.add_argument("name", help="Agent name")
-    p_test.add_argument("--host", default="localhost")
-    p_test.add_argument("--port", type=int, default=8000)
-    p_test.add_argument("--agents-dir", default="agents", help="Agents directory")
-
-    # --- inspect ---
-    p_inspect = sub.add_parser("inspect", help="Show agent details")
-    p_inspect.add_argument("name", help="Agent name")
-    p_inspect.add_argument("--agents-dir", default="agents", help="Agents directory")
-
-    # --- doctor ---
-    p_doctor = sub.add_parser("doctor", help="Check environment health")
-    p_doctor.add_argument("--agents-dir", default="agents", help="Agents directory")
-
-    # --- ui ---
-    p_ui = sub.add_parser("ui", help="Launch debug UI standalone")
-    p_ui.add_argument("--host", default="localhost", help="Platform API host")
-    p_ui.add_argument("--port", type=int, default=8000, help="Platform API port")
-    p_ui.add_argument("--ui-port", type=int, default=8001, help="UI port")
-
-    # --- optimize ---
-    p_optimize = sub.add_parser("optimize", help="Run prompt optimization")
-    p_optimize.add_argument("agent", help="Agent name to optimize")
-    p_optimize.add_argument("--dataset", "-d", required=True, help="Path to JSONL/CSV dataset")
-    p_optimize.add_argument(
-        "--metrics", "-m", default="exact_match", help="Comma-separated metrics"
-    )
-    p_optimize.add_argument(
-        "--strategy",
-        "-s",
-        default="iterative_rewrite",
-        choices=["iterative_rewrite", "few_shot", "chain_of_thought"],
-        help="Optimization strategy",
-    )
-    p_optimize.add_argument("--max-iterations", type=int, default=10, help="Max iterations")
-    p_optimize.add_argument("--target-score", type=float, default=0.9, help="Target score")
-    p_optimize.add_argument("--rewrite-llm", default=None, help="LLM for prompt rewriting")
-    p_optimize.add_argument("--eval-llm", default=None, help="LLM for evaluation")
-    p_optimize.add_argument("--llm", default="ollama/mistral:7b", help="Default LLM")
-    p_optimize.add_argument("--patience", type=int, default=3, help="Early stopping patience")
-    p_optimize.add_argument(
-        "--prompt", default=None, help="Initial prompt (overrides prompts.json)"
-    )
-    p_optimize.add_argument("--no-report", action="store_true", help="Skip HTML report generation")
-    p_optimize.add_argument("--apply", action="store_true", help="Auto-apply best prompt")
-    p_optimize.add_argument("--host", default="http://localhost:8000", help="Platform API base")
-
-    args = parser.parse_args()
-
-    commands = {
-        "init": cmd_init,
-        "run": cmd_run,
-        "list": cmd_list,
-        "test": cmd_test,
-        "inspect": cmd_inspect,
-        "doctor": cmd_doctor,
-        "ui": cmd_ui,
-        "optimize": cmd_optimize,
-    }
-
-    if args.command in commands:
-        commands[args.command](args)
-    else:
-        if HAS_RICH:
-            _print_banner()
-        parser.print_help()
+    """CLI entry point (backward compatible)."""
+    cli()
 
 
 if __name__ == "__main__":
-    main()
+    cli()
