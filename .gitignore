@@ -1,4 +1,44 @@
-*.pyc
-__pycache__/*
-*.pyc
-*/__pycache__/*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/
+*.db
+*.sqlite
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+
+# Poetry
+poetry.lock
