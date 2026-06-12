@@ -28,6 +28,7 @@ dependencies = [
 all = [
     { name = "aiosqlite" },
     { name = "deepeval" },
+    { name = "holysheet" },
     { name = "langchain-core" },
     { name = "langchain-ollama" },
     { name = "langgraph" },
@@ -90,6 +91,7 @@ openai = [
 ]
 optimize = [
     { name = "deepeval" },
+    { name = "holysheet" },
 ]
 ui = [
     { name = "chainlit" },
@@ -107,6 +109,7 @@ requires-dist = [
     { name = "chainlit", marker = "extra == 'ui'", specifier = ">=2.0" },
     { name = "deepeval", marker = "extra == 'optimize'", specifier = ">=2.0" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "holysheet", marker = "extra == 'optimize'", specifier = ">=0.1" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "langchain", marker = "extra == 'langchain'", specifier = ">=0.3" },
     { name = "langchain-community", marker = "extra == 'langchain'", specifier = ">=0.3" },
@@ -1676,6 +1679,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "holysheet"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "jinja2" },
+    { name = "loguru" },
+    { name = "orjson" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/98/e78caebed514c63dcc35ae109cd98ccb0f8e7737e74d581fff35963922a5/holysheet-1.0.0.tar.gz", hash = "sha256:d0d56b374a5aa18815423f373644907c352721311e281b9c7fea10942d7cb372", size = 12537464, upload-time = "2026-05-22T09:24:06.923Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/1e/faa5cb789927184d3e828ec1a207cb3af3011c6e56163ceea92954f3bc12/holysheet-1.0.0-py3-none-any.whl", hash = "sha256:f26bd6d5081590ab0cd55bef5b3b95f459a28f9a6e808686612dcd89e57ed9ee", size = 627735, upload-time = "2026-05-22T09:24:05.033Z" },
 ]
 
 [[package]]

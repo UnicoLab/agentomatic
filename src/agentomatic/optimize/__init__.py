@@ -36,8 +36,11 @@ from agentomatic.optimize.metrics import (
     BaseMetric,
     ContainsMetric,
     CustomMetric,
+    DeepEvalMetric,
     ExactMatchMetric,
+    GEvalMetric,
     LLMJudgeMetric,
+    RedTeamMetric,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
 from agentomatic.optimize.report import generate_html_report
@@ -54,6 +57,8 @@ from agentomatic.optimize.synthesizer import (
     DataSynthesizer,
     augment_dataset,
     generate_dataset,
+    generate_from_docs,
+    red_team,
 )
 
 __all__ = [
@@ -66,8 +71,11 @@ __all__ = [
     "BaseMetric",
     "ContainsMetric",
     "CustomMetric",
+    "DeepEvalMetric",
     "ExactMatchMetric",
+    "GEvalMetric",
     "LLMJudgeMetric",
+    "RedTeamMetric",
     # Strategies
     "OptimizationStrategy",
     "IterativeRewrite",
@@ -76,10 +84,12 @@ __all__ = [
     "MIPRO",
     "BootstrapRandomSearch",
     "EnsembleOptimizer",
-    # Synthesis
+    # Synthesis & Red Team
     "DataSynthesizer",
     "generate_dataset",
     "augment_dataset",
+    "generate_from_docs",
+    "red_team",
     # Reports
     "generate_html_report",
 ]

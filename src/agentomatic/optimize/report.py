@@ -1,24 +1,29 @@
 """Report generator for prompt optimization experiments.
 
-Generates self-contained HTML reports with:
-- Prompt diff between iterations (side-by-side)
-- Metrics chart (score vs iteration) as inline SVG
-- Full iteration history table
-- Experiment metadata
+Generates interactive HTML dashboard reports via HolySheet when available,
+with automatic fallback to a self-contained HTML/SVG report.
 
-No external dependencies — uses Python's built-in difflib + inline SVG.
+Dashboard includes:
+- KPI cards (baseline, best, improvement, duration, best iteration)
+- Score-vs-iteration line chart (avg + per-metric)
+- Full iteration history data table
+- Prompt diff (baseline → best) via unified diff
+- All prompt versions (readable sections)
 """
 from __future__ import annotations
 
 import difflib
 import html
-import json
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+
+# =====================================================================
+# Public API — signature kept unchanged
+# =====================================================================
 
 
 def generate_html_report(
@@ -27,6 +32,9 @@ def generate_html_report(
 ) -> str:
     """Generate a self-contained HTML optimization report.
 
+    Uses HolySheet for an interactive dashboard when installed, otherwise
+    falls back to the built-in HTML/SVG renderer.
+
     Args:
         result: OptimizationResult from an optimization run.
         output_path: Path to write the HTML file. Auto-generated if None.
@@ -34,6 +42,252 @@ def generate_html_report(
     Returns:
         Path to the generated report file.
     """
+    try:
+        return _generate_holysheet_report(result, output_path)
+    except ImportError:
+        logger.debug("holysheet not installed — falling back to built-in HTML report")
+        return _generate_fallback_html(result, output_path)
+
+
+# =====================================================================
+# HolySheet report (primary)
+# =====================================================================
+
+
+def _generate_holysheet_report(
+    result: Any,
+    output_path: str | Path | None = None,
+) -> str:
+    """Build an interactive dashboard report using HolySheet.
+
+    Raises ``ImportError`` if *holysheet* is not installed so the caller
+    can fall back transparently.
+    """
+    from holysheet import (  # noqa: WPS433 – conditional import by design
+        BarChart,
+        DataTable,
+        Divider,
+        KPI,
+        LineChart,
+        Markdown,
+        Report,
+        Section,
+    )
+
+    if output_path is None:
+        output_path = Path(f".optimize/{result.agent}/report_{result.experiment_id}.html")
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ── collect metrics ───────────────────────────────────────────────
+    iterations = result.history
+    metric_names = sorted(
+        {m for it in iterations for m in it.per_metric_scores},
+    )
+
+    # ── initialise report ─────────────────────────────────────────────
+    report = Report(
+        title="⚡ Prompt Optimization Report",
+        subtitle=f"Agent: {result.agent}  ·  Experiment: {result.experiment_id}",
+        theme="dark",
+        author="agentomatic optimize",
+    )
+
+    # ── 1. KPI cards ─────────────────────────────────────────────────
+    report.add(Section(title="Key Results"))
+
+    improvement_pct = f"{result.improvement:+.1f}%"
+    improvement_status = "positive" if result.improvement > 0 else "negative"
+
+    report.add(KPI(label="Baseline Score", value=round(result.baseline_score, 4)))
+    report.add(KPI(
+        label="Best Score",
+        value=round(result.best_score, 4),
+        status="positive",
+    ))
+    report.add(KPI(
+        label="Improvement",
+        value=improvement_pct,
+        delta=improvement_pct,
+        status=improvement_status,
+    ))
+    report.add(KPI(
+        label="Duration",
+        value=round(result.duration_seconds, 1),
+        unit="s",
+    ))
+    report.add(KPI(
+        label="Best Iteration",
+        value=f"#{result.best_iteration}",
+    ))
+
+    report.add(Divider())
+
+    # ── 2. Score vs Iteration line chart ─────────────────────────────
+    report.add(Section(title="📈 Score vs Iteration"))
+
+    chart_data: list[dict[str, Any]] = []
+    for it in iterations:
+        row: dict[str, Any] = {
+            "iteration": "BL" if it.iteration == 0 else str(it.iteration),
+            "avg_score": round(it.avg_score, 4),
+        }
+        for m in metric_names:
+            row[m] = round(it.per_metric_scores.get(m, 0.0), 4)
+        chart_data.append(row)
+
+    # Primary avg_score line
+    report.add(LineChart(
+        title="Average Score",
+        data=chart_data,
+        x="iteration",
+        y="avg_score",
+    ))
+
+    # Per-metric lines (one chart per metric keeps things readable)
+    if metric_names:
+        per_metric_chart_data: list[dict[str, Any]] = []
+        for it in iterations:
+            row = {
+                "iteration": "BL" if it.iteration == 0 else str(it.iteration),
+            }
+            for m in metric_names:
+                row[m] = round(it.per_metric_scores.get(m, 0.0), 4)
+            per_metric_chart_data.append(row)
+
+        for m in metric_names:
+            report.add(LineChart(
+                title=f"Metric: {m}",
+                data=per_metric_chart_data,
+                x="iteration",
+                y=m,
+            ))
+
+    report.add(Divider())
+
+    # ── 3. Iteration history data table ──────────────────────────────
+    report.add(Section(title="📋 Iteration History"))
+
+    table_data: list[dict[str, Any]] = []
+    for i, it in enumerate(iterations):
+        label = "Baseline" if i == 0 else f"#{it.iteration}"
+        delta = (
+            f"{it.avg_score - iterations[i - 1].avg_score:+.4f}" if i > 0 else "—"
+        )
+        n_fail = len(it.failures) if hasattr(it, "failures") else 0
+
+        row: dict[str, Any] = {
+            "Iteration": label,
+            "Avg Score": round(it.avg_score, 4),
+            "Δ": delta,
+        }
+        for m in metric_names:
+            row[m] = round(it.per_metric_scores.get(m, 0.0), 4)
+        row["Failures"] = n_fail
+        table_data.append(row)
+
+    report.add(DataTable(title="Full History", data=table_data))
+
+    report.add(Divider())
+
+    # ── 4. Prompt diff (baseline → best) ─────────────────────────────
+    report.add(Section(title="📝 Prompt Evolution"))
+
+    if len(iterations) >= 2:
+        baseline = iterations[0]
+        best = next(
+            (it for it in iterations if it.iteration == result.best_iteration),
+            iterations[-1],
+        )
+
+        if baseline.prompt != best.prompt:
+            diff_text = _unified_diff(
+                baseline.prompt,
+                best.prompt,
+                "Baseline",
+                f"Best (#{best.iteration})",
+            )
+            report.add(Markdown(
+                content=(
+                    f"### Baseline → Best (#{best.iteration})\n\n"
+                    f"```diff\n{diff_text}\n```"
+                ),
+            ))
+        else:
+            report.add(Markdown(content="_No prompt changes between baseline and best._"))
+
+        # Last few sequential diffs
+        prev_prompt = iterations[0].prompt
+        changes = 0
+        for it in iterations[1:]:
+            if it.prompt != prev_prompt and changes < 3:
+                diff_text = _unified_diff(
+                    prev_prompt,
+                    it.prompt,
+                    f"Iteration #{it.iteration - 1}",
+                    f"Iteration #{it.iteration}",
+                )
+                report.add(Markdown(
+                    content=(
+                        f"### Iteration #{it.iteration - 1} → #{it.iteration}\n\n"
+                        f"```diff\n{diff_text}\n```"
+                    ),
+                ))
+                changes += 1
+            prev_prompt = it.prompt
+    else:
+        report.add(Markdown(content="_Only one iteration — no diff available._"))
+
+    report.add(Divider())
+
+    # ── 5. All prompt versions ───────────────────────────────────────
+    report.add(Section(title="📄 Full Prompt Versions"))
+
+    for it in iterations:
+        is_best = it.iteration == result.best_iteration
+        label = "Baseline" if it.iteration == 0 else f"Iteration #{it.iteration}"
+        badge = " 🏆" if is_best else ""
+
+        report.add(Markdown(
+            content=(
+                f"### {label}{badge} — Score: {it.avg_score:.4f}\n\n"
+                f"```\n{it.prompt}\n```"
+            ),
+        ))
+
+    # ── export ────────────────────────────────────────────────────────
+    report.export_html(str(output_path))
+    logger.info(f"📊 Report saved to {output_path}")
+    return str(output_path)
+
+
+# =====================================================================
+# Helpers
+# =====================================================================
+
+
+def _unified_diff(old: str, new: str, old_label: str, new_label: str) -> str:
+    """Return a unified-diff string between two prompt texts."""
+    diff_lines = difflib.unified_diff(
+        old.splitlines(),
+        new.splitlines(),
+        fromfile=old_label,
+        tofile=new_label,
+        lineterm="",
+    )
+    return "\n".join(diff_lines)
+
+
+# =====================================================================
+# Fallback: self-contained HTML/SVG report (no external deps)
+# =====================================================================
+
+
+def _generate_fallback_html(
+    result: Any,
+    output_path: str | Path | None = None,
+) -> str:
+    """Original built-in HTML report — used when HolySheet is unavailable."""
     if output_path is None:
         output_path = Path(f".optimize/{result.agent}/report_{result.experiment_id}.html")
 
@@ -47,12 +301,9 @@ def generate_html_report(
 
 
 def _build_html(result: Any) -> str:
-    """Build the full HTML report."""
+    """Build the full fallback HTML report."""
     iterations = result.history
-    metric_names = set()
-    for it in iterations:
-        metric_names.update(it.per_metric_scores.keys())
-    metric_names = sorted(metric_names)
+    metric_names = sorted({m for it in iterations for m in it.per_metric_scores})
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -133,7 +384,7 @@ def _build_html(result: Any) -> str:
 
 
 # =====================================================================
-# SVG Chart Generator
+# SVG Chart Generator (fallback)
 # =====================================================================
 
 
@@ -255,7 +506,7 @@ def _generate_svg_chart(
 
 
 # =====================================================================
-# History Table
+# History Table (fallback)
 # =====================================================================
 
 
@@ -318,7 +569,7 @@ def _generate_history_table(
 
 
 # =====================================================================
-# Prompt Diff
+# Prompt Diff (fallback)
 # =====================================================================
 
 
@@ -389,7 +640,7 @@ def _make_diff(old: str, new: str, old_label: str, new_label: str) -> str:
 
 
 # =====================================================================
-# Prompt Accordion
+# Prompt Accordion (fallback)
 # =====================================================================
 
 
@@ -413,7 +664,7 @@ def _generate_prompt_accordion(iterations: list[Any], best_iteration: int) -> st
 
 
 # =====================================================================
-# CSS
+# CSS (fallback)
 # =====================================================================
 
 _CSS = """

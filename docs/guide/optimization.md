@@ -185,14 +185,16 @@ Optimized prompts are saved as new versions in `prompts.json`:
 }
 ```
 
-## HTML Reports
+## HTML Reports (HolySheet)
 
-After optimization, an HTML report is auto-generated with:
+After optimization, an interactive HTML report is auto-generated using [HolySheet](https://github.com/UnicoLab/holysheet):
 
-- 📊 Score vs iteration chart (inline SVG)
-- 📝 Prompt diffs between versions (side-by-side)
-- 📋 Full iteration history table
+- 📊 Interactive score vs iteration chart (ECharts)
+- 📝 Prompt diffs between versions
+- 📋 Full iteration history with KPI cards
 - 🏆 Best prompt highlighted
+
+Falls back to inline SVG reports if HolySheet is not installed.
 
 ```python
 # Disable auto-report
@@ -201,6 +203,93 @@ optimizer = PromptOptimizer(agent="bot", auto_report=False)
 # Generate manually
 from agentomatic.optimize import generate_html_report
 generate_html_report(result, output_path="my_report.html")
+```
+
+## Data Synthesis & Augmentation
+
+### Generate from Description
+
+```python
+from agentomatic.optimize import DataSynthesizer
+
+synth = DataSynthesizer(model="ollama/mistral:7b")
+
+dataset = await synth.generate(
+    description="HR assistant that answers policy questions",
+    n_samples=50,
+    categories=["leave", "benefits", "expenses"],
+    difficulty_levels=["easy", "medium", "hard"],
+)
+dataset.to_jsonl("eval_data.jsonl")
+```
+
+### Generate from Documents (DeepEval)
+
+```python
+# Uses DeepEval's native Synthesizer when available
+dataset = await synth.generate_from_docs(
+    document_paths=["handbook.pdf", "policy.txt"],
+    n_samples=50,
+)
+```
+
+### Augment Existing Data
+
+5 augmentation strategies:
+
+```python
+augmented = await synth.augment(
+    dataset=existing_dataset,
+    strategies=["paraphrase", "perturbation", "adversarial"],
+    multiplier=5,
+)
+```
+
+| Strategy | What It Does |
+|---|---|
+| `paraphrase` | Rephrase queries preserving intent |
+| `perturbation` | Typos, informal language, abbreviations |
+| `expansion` | Related follow-up questions |
+| `adversarial` | Edge cases, ambiguous queries |
+| `formality_shift` | Casual ↔ professional tone |
+
+### Red Team Testing
+
+```python
+attacks = await synth.red_team(
+    agent_description="HR assistant with employee data access",
+    n_samples=30,
+    vulnerabilities=["pii", "bias", "prompt_injection"],
+)
+```
+
+## All 7 Optimization Strategies
+
+| Strategy | Alias | Inspired By | Approach |
+|---|---|---|---|
+| `iterative_rewrite` | — | DSPy COPRO | LLM failure analysis → rewrite |
+| `few_shot_bootstrap` | `few_shot` | DSPy BootstrapFewShot | Auto-select best examples |
+| `chain_of_thought` | `cot` | DSPy CoT | Add reasoning instructions |
+| `mipro` | — | DSPy MIPROv2 | N parallel candidates → fuse best |
+| `bootstrap_random_search` | `random_search` | DSPy RandomSearch | Weighted random example subsets |
+| `ensemble` | — | Multi-path | Run ALL strategies → fuse results |
+
+## DeepEval Native Integration
+
+The module uses DeepEval natively when installed:
+
+- **Metrics**: `LLMTestCase`, `GEval`, `AnswerRelevancyMetric`, etc.
+- **Synthesizer**: `generate_goldens_from_docs()` for document-based dataset creation
+- **Red Teaming**: `RedTeamer` for 40+ vulnerability scans
+- **Dataset bridge**: Convert between agentomatic `Dataset` ↔ DeepEval `EvaluationDataset`
+
+```python
+# Wrap ANY DeepEval metric
+from deepeval.metrics import FaithfulnessMetric
+from agentomatic.optimize import DeepEvalMetric
+
+metric = DeepEvalMetric(FaithfulnessMetric())
+optimizer = PromptOptimizer(agent="rag_bot", metrics=[metric])
 ```
 
 ## Comparing Prompt Versions
@@ -227,6 +316,9 @@ All runs are logged to `.optimize/{agent}/experiments.json`:
     "agent": "my_agent",
     "best_score": 0.92,
     "best_iteration": 7,
+    "rewrite_llm": "ollama/llama3:70b",
+    "eval_llm": "ollama/mistral:7b",
     "iterations": [...]
 }]
 ```
+
