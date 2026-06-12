@@ -1,17 +1,18 @@
 """Circuit breaker and concurrency control."""
+
 from __future__ import annotations
 
 import asyncio
 import time
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Any
 
 from loguru import logger
 
 
 class CircuitState(Enum):
     """States for the circuit breaker."""
+
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
@@ -69,7 +70,9 @@ class CircuitBreaker:
         self._last_failure_time = time.monotonic()
         if self._failure_count >= self.failure_threshold:
             self._state = CircuitState.OPEN
-            logger.warning(f"Circuit breaker '{self.name}' opened after {self._failure_count} failures")
+            logger.warning(
+                f"Circuit breaker '{self.name}' opened after {self._failure_count} failures"
+            )
 
 
 class AgentSemaphore:

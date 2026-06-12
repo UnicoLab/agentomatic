@@ -2,6 +2,7 @@
 
 Tests the full stack: platform → router → agent → storage → middleware.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -9,7 +10,6 @@ from fastapi.testclient import TestClient
 
 from agentomatic import AgentManifest, AgentPlatform
 from agentomatic.storage.memory import MemoryStore
-
 
 # =========================================================================
 # Fixtures
@@ -165,16 +165,19 @@ class TestInvoke:
         assert data["citations"] == [{"source": "test"}]
 
     def test_invoke_with_all_params(self, client):
-        resp = client.post("/api/v1/echo/invoke", json={
-            "query": "Full params",
-            "user_id": "user-42",
-            "thread_id": "thread-xyz",
-            "prompt_version": "v2",
-            "temperature": 0.7,
-            "max_tokens": 256,
-            "context": {"role": "admin"},
-            "metadata": {"source": "test"},
-        })
+        resp = client.post(
+            "/api/v1/echo/invoke",
+            json={
+                "query": "Full params",
+                "user_id": "user-42",
+                "thread_id": "thread-xyz",
+                "prompt_version": "v2",
+                "temperature": 0.7,
+                "max_tokens": 256,
+                "context": {"role": "admin"},
+                "metadata": {"source": "test"},
+            },
+        )
         assert resp.status_code == 200
         assert "Full params" in resp.json()["response"]
 
@@ -201,11 +204,14 @@ class TestChat:
         assert "duration_ms" in data
 
     def test_chat_with_thread(self, client):
-        resp = client.post("/api/v1/echo/chat", json={
-            "content": "Continue",
-            "thread_id": "existing-thread",
-            "user_id": "user-1",
-        })
+        resp = client.post(
+            "/api/v1/echo/chat",
+            json={
+                "content": "Continue",
+                "thread_id": "existing-thread",
+                "user_id": "user-1",
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["thread_id"] == "existing-thread"
 
@@ -270,10 +276,13 @@ class TestAgentMetadata:
 
 class TestA2ATasks:
     def test_submit_task(self, client):
-        resp = client.post("/api/v1/echo/a2a/tasks", json={
-            "message": {"content": "A2A query"},
-            "metadata": {"from": "agent-x"},
-        })
+        resp = client.post(
+            "/api/v1/echo/a2a/tasks",
+            json={
+                "message": {"content": "A2A query"},
+                "metadata": {"from": "agent-x"},
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "completed"
@@ -312,8 +321,10 @@ class TestThreadsWithoutStore:
 
     def test_list_no_store(self):
         p = AgentPlatform(agents_dir="/tmp/empty")
+
         async def fn(state):
             return {"response": "ok"}
+
         p.register_agent(manifest=AgentManifest(name="x", slug="x"), node_fn=fn)
         app = p.build()
         c = TestClient(app)
@@ -323,8 +334,10 @@ class TestThreadsWithoutStore:
 
     def test_get_thread_no_store(self):
         p = AgentPlatform(agents_dir="/tmp/empty")
+
         async def fn(state):
             return {"response": "ok"}
+
         p.register_agent(manifest=AgentManifest(name="y", slug="y"), node_fn=fn)
         app = p.build()
         c = TestClient(app)
@@ -359,8 +372,10 @@ class TestProgrammaticRegistration:
     def test_multiple_agents(self):
         p = AgentPlatform(agents_dir="/tmp/empty")
         for name in ["agent_a", "agent_b", "agent_c"]:
+
             async def fn(state, _name=name):
                 return {"response": f"I am {_name}"}
+
             p.register_agent(
                 manifest=AgentManifest(name=name, slug=f"test-{name}"),
                 node_fn=fn,
@@ -387,8 +402,10 @@ class TestPlatformFactory:
 
     def test_custom_prefix(self):
         p = AgentPlatform(agents_dir="/tmp/t", api_prefix="/custom/v2")
+
         async def fn(state):
             return {"response": "ok"}
+
         p.register_agent(manifest=AgentManifest(name="x", slug="x"), node_fn=fn)
         app = p.build()
         c = TestClient(app)
@@ -519,6 +536,7 @@ class TestMemoryStore:
 class TestExtraRouters:
     def test_include_router(self):
         from fastapi import APIRouter
+
         p = AgentPlatform(agents_dir="/tmp/empty")
         r = APIRouter()
 
@@ -530,6 +548,7 @@ class TestExtraRouters:
 
         async def fn(state):
             return {"response": "ok"}
+
         p.register_agent(manifest=AgentManifest(name="x", slug="x"), node_fn=fn)
 
         app = p.build()

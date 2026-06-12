@@ -1,8 +1,8 @@
 """Tests for agentomatic.optimize module."""
+
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,10 +10,8 @@ import pytest
 
 from agentomatic.optimize.dataset import DataPoint, Dataset
 from agentomatic.optimize.metrics import (
-    BaseMetric,
     ContainsMetric,
     CustomMetric,
-    EvalResult,
     ExactMatchMetric,
     resolve_metrics,
 )
@@ -23,15 +21,14 @@ from agentomatic.optimize.optimizer import (
     PromptOptimizer,
 )
 from agentomatic.optimize.report import generate_html_report
+from agentomatic.optimize.runner import AgentRunner, RunResult
 from agentomatic.optimize.strategies import (
     ChainOfThought,
     FewShotBootstrap,
-    IterativeRewrite,
     IterationResult,
+    IterativeRewrite,
     resolve_strategy,
 )
-from agentomatic.optimize.runner import AgentRunner, RunResult
-
 
 # =====================================================================
 # Dataset Tests
@@ -71,10 +68,12 @@ class TestDataPoint:
 
 class TestDataset:
     def test_from_list(self):
-        ds = Dataset.from_list([
-            {"query": "Q1", "expected_answer": "A1"},
-            {"query": "Q2"},
-        ])
+        ds = Dataset.from_list(
+            [
+                {"query": "Q1", "expected_answer": "A1"},
+                {"query": "Q2"},
+            ]
+        )
         assert len(ds) == 2
         assert ds[0].query == "Q1"
         assert ds[1].expected_answer is None
@@ -99,8 +98,7 @@ class TestDataset:
     def test_from_jsonl(self, tmp_path):
         path = tmp_path / "data.jsonl"
         path.write_text(
-            '{"query": "Q1", "expected_answer": "A1"}\n'
-            '{"query": "Q2", "context": ["c1"]}\n'
+            '{"query": "Q1", "expected_answer": "A1"}\n{"query": "Q2", "context": ["c1"]}\n'
         )
         ds = Dataset.from_jsonl(str(path))
         assert len(ds) == 2
@@ -108,9 +106,11 @@ class TestDataset:
         assert ds[1].context == ["c1"]
 
     def test_to_jsonl(self, tmp_path):
-        ds = Dataset.from_list([
-            {"query": "Q1", "expected_answer": "A1"},
-        ])
+        ds = Dataset.from_list(
+            [
+                {"query": "Q1", "expected_answer": "A1"},
+            ]
+        )
         path = tmp_path / "out.jsonl"
         ds.to_jsonl(str(path))
         loaded = Dataset.from_jsonl(str(path))
@@ -349,9 +349,7 @@ class TestPromptOptimizer:
         assert opt.eval_llm == "ollama/mistral:7b"
 
     def test_constructor_single_llm_propagates(self):
-        opt = PromptOptimizer(
-            agent="test", llm="openai/gpt-4", auto_report=False
-        )
+        opt = PromptOptimizer(agent="test", llm="openai/gpt-4", auto_report=False)
         assert opt.rewrite_llm == "openai/gpt-4"
         assert opt.eval_llm == "openai/gpt-4"
 
@@ -370,14 +368,30 @@ class TestOptimizationResult:
             baseline_prompt="You are ok",
             baseline_score=0.60,
             history=[
-                IterationResult(iteration=0, prompt="You are ok", avg_score=0.60,
-                                per_metric_scores={"exact_match": 0.55, "contains": 0.65}),
-                IterationResult(iteration=1, prompt="You are good", avg_score=0.70,
-                                per_metric_scores={"exact_match": 0.65, "contains": 0.75}),
-                IterationResult(iteration=2, prompt="You are better", avg_score=0.75,
-                                per_metric_scores={"exact_match": 0.70, "contains": 0.80}),
-                IterationResult(iteration=3, prompt="You are great", avg_score=0.85,
-                                per_metric_scores={"exact_match": 0.80, "contains": 0.90}),
+                IterationResult(
+                    iteration=0,
+                    prompt="You are ok",
+                    avg_score=0.60,
+                    per_metric_scores={"exact_match": 0.55, "contains": 0.65},
+                ),
+                IterationResult(
+                    iteration=1,
+                    prompt="You are good",
+                    avg_score=0.70,
+                    per_metric_scores={"exact_match": 0.65, "contains": 0.75},
+                ),
+                IterationResult(
+                    iteration=2,
+                    prompt="You are better",
+                    avg_score=0.75,
+                    per_metric_scores={"exact_match": 0.70, "contains": 0.80},
+                ),
+                IterationResult(
+                    iteration=3,
+                    prompt="You are great",
+                    avg_score=0.85,
+                    per_metric_scores={"exact_match": 0.80, "contains": 0.90},
+                ),
             ],
             duration_seconds=12.5,
             experiment_id="test123",
@@ -390,8 +404,11 @@ class TestOptimizationResult:
 
     def test_improvement_zero_baseline(self):
         r = OptimizationResult(
-            best_prompt="p", best_score=0.5, best_iteration=1,
-            baseline_prompt="p", baseline_score=0.0,
+            best_prompt="p",
+            best_score=0.5,
+            best_iteration=1,
+            baseline_prompt="p",
+            baseline_score=0.0,
         )
         assert r.improvement == float("inf")
 
@@ -429,9 +446,13 @@ class TestOptimizationResult:
         r = self._make_result()
         agent_dir = tmp_path / "test_agent"
         agent_dir.mkdir()
-        (agent_dir / "prompts.json").write_text(json.dumps({
-            "v1": {"system": "original", "user_template": "{query}"},
-        }))
+        (agent_dir / "prompts.json").write_text(
+            json.dumps(
+                {
+                    "v1": {"system": "original", "user_template": "{query}"},
+                }
+            )
+        )
         version = r.apply(agent_dir=str(agent_dir))
         prompts = json.loads((agent_dir / "prompts.json").read_text())
         assert "v1" in prompts  # original preserved
@@ -502,12 +523,24 @@ class TestReport:
             baseline_prompt="You are ok",
             baseline_score=0.60,
             history=[
-                IterationResult(iteration=0, prompt="You are ok", avg_score=0.60,
-                                per_metric_scores={"exact_match": 0.55}),
-                IterationResult(iteration=1, prompt="You are good", avg_score=0.70,
-                                per_metric_scores={"exact_match": 0.65}),
-                IterationResult(iteration=2, prompt="You are great", avg_score=0.85,
-                                per_metric_scores={"exact_match": 0.80}),
+                IterationResult(
+                    iteration=0,
+                    prompt="You are ok",
+                    avg_score=0.60,
+                    per_metric_scores={"exact_match": 0.55},
+                ),
+                IterationResult(
+                    iteration=1,
+                    prompt="You are good",
+                    avg_score=0.70,
+                    per_metric_scores={"exact_match": 0.65},
+                ),
+                IterationResult(
+                    iteration=2,
+                    prompt="You are great",
+                    avg_score=0.85,
+                    per_metric_scores={"exact_match": 0.80},
+                ),
             ],
             duration_seconds=5.0,
             experiment_id="rpt123",
@@ -542,6 +575,7 @@ class TestFeedbackCollector:
     @pytest.fixture
     def collector(self):
         from agentomatic.middleware.feedback import FeedbackCollector
+
         return FeedbackCollector()
 
     @pytest.mark.asyncio
@@ -562,12 +596,18 @@ class TestFeedbackCollector:
     @pytest.mark.asyncio
     async def test_get_feedback(self, collector):
         await collector.record(
-            agent_name="bot1", user_id="u1",
-            query="Q1", response="A1", rating=5,
+            agent_name="bot1",
+            user_id="u1",
+            query="Q1",
+            response="A1",
+            rating=5,
         )
         await collector.record(
-            agent_name="bot2", user_id="u2",
-            query="Q2", response="A2", rating=1,
+            agent_name="bot2",
+            user_id="u2",
+            query="Q2",
+            response="A2",
+            rating=1,
         )
         # All
         all_fb = await collector.get_feedback()
@@ -580,7 +620,8 @@ class TestFeedbackCollector:
     @pytest.mark.asyncio
     async def test_export_jsonl(self, collector):
         await collector.record(
-            agent_name="bot", user_id="u1",
+            agent_name="bot",
+            user_id="u1",
             query="How to reset password?",
             response="Go to settings.",
             rating=4,
@@ -593,7 +634,8 @@ class TestFeedbackCollector:
     @pytest.mark.asyncio
     async def test_export_with_correction(self, collector):
         await collector.record(
-            agent_name="bot", user_id="u1",
+            agent_name="bot",
+            user_id="u1",
             query="What is PTO?",
             response="PTO is paid time off.",
             correction="PTO is Paid Time Off — each employee gets 25 days/year.",
@@ -610,8 +652,10 @@ class TestFeedbackCollector:
         collector._buffer_size = 5
         for i in range(10):
             await collector.record(
-                agent_name="bot", user_id="u1",
-                query=f"Q{i}", response=f"A{i}",
+                agent_name="bot",
+                user_id="u1",
+                query=f"Q{i}",
+                response=f"A{i}",
             )
         assert len(collector._buffer) <= 5
 
@@ -624,8 +668,11 @@ class TestFeedbackCollector:
         collector = FeedbackCollector(store=mock_store)
 
         await collector.record(
-            agent_name="bot", user_id="u1",
-            query="Q", response="A", rating=5,
+            agent_name="bot",
+            user_id="u1",
+            query="Q",
+            response="A",
+            rating=5,
         )
         mock_store.add_feedback.assert_called_once()
 
@@ -640,8 +687,11 @@ class TestFeedbackCollector:
 
     def test_singleton_pattern(self):
         from agentomatic.middleware.feedback import (
-            get_collector, set_collector, FeedbackCollector,
+            FeedbackCollector,
+            get_collector,
+            set_collector,
         )
+
         c = FeedbackCollector()
         set_collector(c)
         assert get_collector() is c
@@ -650,12 +700,13 @@ class TestFeedbackCollector:
 class TestFeedbackRecord:
     def test_to_dict_filters_empty(self):
         from agentomatic.middleware.feedback import FeedbackRecord
+
         r = FeedbackRecord(agent_name="bot", rating=5)
         d = r.to_dict()
         assert "agent_name" in d
         assert "rating" in d
         assert "comment" not in d  # None filtered
-        assert "query" not in d     # "" filtered
+        assert "query" not in d  # "" filtered
 
 
 # =====================================================================
@@ -667,14 +718,18 @@ class TestTelemetry:
     def test_import_without_otel(self):
         """Module should import cleanly even without opentelemetry."""
         from agentomatic.observability.telemetry import (
-            setup_telemetry, traced, get_tracer,
+            get_tracer,
+            setup_telemetry,
+            traced,
         )
+
         assert callable(setup_telemetry)
         assert callable(traced)
         assert callable(get_tracer)
 
     def test_noop_tracer(self):
-        from agentomatic.observability.telemetry import _NoOpTracer, _NoOpSpan
+        from agentomatic.observability.telemetry import _NoOpSpan, _NoOpTracer
+
         tracer = _NoOpTracer()
         span = tracer.start_as_current_span("test")
         assert isinstance(span, _NoOpSpan)
@@ -705,13 +760,15 @@ class TestTelemetry:
         assert result == 10
 
     def test_get_tracer_returns_noop_without_otel(self):
-        from agentomatic.observability.telemetry import get_tracer, _NoOpTracer
+        from agentomatic.observability.telemetry import get_tracer
+
         tracer = get_tracer("test")
         # Should always return something usable
         assert hasattr(tracer, "start_as_current_span")
 
     def test_setup_telemetry_without_otel(self):
-        from agentomatic.observability.telemetry import setup_telemetry, HAS_OTEL
+        from agentomatic.observability.telemetry import HAS_OTEL, setup_telemetry
+
         # Should not raise even without OTEL
         result = setup_telemetry(app=None)
         if not HAS_OTEL:
@@ -754,6 +811,7 @@ class TestRunnerContext:
 class TestRouterModels:
     def test_optimize_invoke_request(self):
         from agentomatic.core.router_factory import OptimizeInvokeRequest
+
         req = OptimizeInvokeRequest(query="test")
         assert req.query == "test"
         assert req.include_retrieval_context is True
@@ -763,6 +821,7 @@ class TestRouterModels:
 
     def test_optimize_invoke_response(self):
         from agentomatic.core.router_factory import OptimizeInvokeResponse
+
         resp = OptimizeInvokeResponse(
             response="Hello",
             retrieval_context=["doc1"],
@@ -776,6 +835,7 @@ class TestRouterModels:
 
     def test_feedback_request(self):
         from agentomatic.core.router_factory import FeedbackRequest
+
         req = FeedbackRequest(
             rating=5,
             query="What is PTO?",
@@ -786,10 +846,10 @@ class TestRouterModels:
 
     def test_feedback_request_with_correction(self):
         from agentomatic.core.router_factory import FeedbackRequest
+
         req = FeedbackRequest(
             rating=2,
             correction="PTO = 25 days/year.",
             feedback_type="correction",
         )
         assert req.correction == "PTO = 25 days/year."
-

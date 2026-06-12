@@ -1,4 +1,5 @@
 """Auto-generate REST + A2A endpoints for every registered agent."""
+
 from __future__ import annotations
 
 import json
@@ -10,7 +11,6 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
@@ -455,13 +455,27 @@ def create_default_router(
 
             return OptimizeInvokeResponse(
                 response=result.get("response", str(result)),
-                retrieval_context=result.get("retrieval_context", result.get("context_documents", [])),
+                retrieval_context=result.get(
+                    "retrieval_context", result.get("context_documents", [])
+                ),
                 tool_calls=result.get("tool_calls", result.get("tools_used", [])),
                 steps_taken=result.get("steps_taken", []),
                 reasoning=result.get("reasoning", result.get("chain_of_thought", "")),
                 citations=result.get("citations", []),
                 duration_ms=duration_ms,
-                metadata={k: v for k, v in result.items() if k not in ("response", "retrieval_context", "tool_calls", "steps_taken", "reasoning", "citations")},
+                metadata={
+                    k: v
+                    for k, v in result.items()
+                    if k
+                    not in (
+                        "response",
+                        "retrieval_context",
+                        "tool_calls",
+                        "steps_taken",
+                        "reasoning",
+                        "citations",
+                    )
+                },
             )
         except HTTPException:
             raise
@@ -474,6 +488,7 @@ def create_default_router(
     async def submit_feedback(request: FeedbackRequest) -> dict[str, Any]:
         """Submit user feedback on an agent response."""
         from agentomatic.middleware.feedback import get_collector
+
         collector = get_collector()
         record = await collector.record(
             agent_name=agent_name,
@@ -494,6 +509,7 @@ def create_default_router(
     async def list_feedback(limit: int = 50) -> dict[str, Any]:
         """List feedback for this agent."""
         from agentomatic.middleware.feedback import get_collector
+
         collector = get_collector()
         records = await collector.get_feedback(agent_name=agent_name, limit=limit)
         return {"agent": agent_name, "feedback": records, "count": len(records)}
@@ -503,6 +519,7 @@ def create_default_router(
     async def export_feedback() -> dict[str, Any]:
         """Export feedback as JSONL for optimization datasets."""
         from agentomatic.middleware.feedback import get_collector
+
         collector = get_collector()
         jsonl = await collector.export_jsonl(agent_name=agent_name)
         return {

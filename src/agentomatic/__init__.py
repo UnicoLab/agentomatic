@@ -25,7 +25,11 @@ With storage::
         auth_api_key="secret",
     )
 """
+
 from __future__ import annotations
+
+# Version
+from agentomatic._version import __version__
 
 # Core public API
 from agentomatic.core.manifest import AgentManifest, RegisteredAgent
@@ -35,9 +39,6 @@ from agentomatic.core.state import BaseAgentState
 
 # Protocols
 from agentomatic.protocols.decorators import APIResponse, handle_api_errors, log_api_call
-
-# Version
-from agentomatic._version import __version__
 
 __all__ = [
     # Core

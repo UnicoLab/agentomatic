@@ -4,6 +4,7 @@ All storage backends must implement this interface.
 This ensures you can swap MemoryStore → SQLAlchemy → Redis → MongoDB
 without changing any application code.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -102,7 +103,9 @@ class BaseStore(ABC):
         return False
 
     async def update_thread(
-        self, thread_id: str, **updates: Any,
+        self,
+        thread_id: str,
+        **updates: Any,
     ) -> dict[str, Any] | None:
         """Update thread fields. Returns updated thread or None."""
         return None

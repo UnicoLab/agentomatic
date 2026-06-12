@@ -11,19 +11,20 @@ Features:
 - A/B comparison between prompt versions
 - Early stopping with patience
 """
+
 from __future__ import annotations
 
 import json
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
-from agentomatic.optimize.dataset import DataPoint, Dataset
+from agentomatic.optimize.dataset import Dataset
 from agentomatic.optimize.metrics import BaseMetric, EvalResult, resolve_metrics
 from agentomatic.optimize.runner import AgentRunner
 from agentomatic.optimize.strategies import (
@@ -31,7 +32,6 @@ from agentomatic.optimize.strategies import (
     OptimizationStrategy,
     resolve_strategy,
 )
-
 
 # =====================================================================
 # Experiment Tracking
@@ -56,15 +56,17 @@ class ExperimentLog:
 
     def log_iteration(self, result: IterationResult) -> None:
         """Record an iteration."""
-        self.iterations.append({
-            "iteration": result.iteration,
-            "prompt_version": f"opt_{result.iteration}",
-            "avg_score": result.avg_score,
-            "per_metric": result.per_metric_scores,
-            "num_failures": len(result.failures),
-            "improvements": result.improvements,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self.iterations.append(
+            {
+                "iteration": result.iteration,
+                "prompt_version": f"opt_{result.iteration}",
+                "avg_score": result.avg_score,
+                "per_metric": result.per_metric_scores,
+                "num_failures": len(result.failures),
+                "improvements": result.improvements,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if result.avg_score > self.best_score:
             self.best_score = result.avg_score
             self.best_iteration = result.iteration
@@ -84,16 +86,18 @@ class ExperimentLog:
             except (json.JSONDecodeError, ValueError):
                 existing = []
 
-        existing.append({
-            "experiment_id": self.experiment_id,
-            "agent": self.agent,
-            "started_at": self.started_at,
-            "best_iteration": self.best_iteration,
-            "best_score": self.best_score,
-            "total_iterations": len(self.iterations),
-            "iterations": self.iterations,
-            "metadata": self.metadata,
-        })
+        existing.append(
+            {
+                "experiment_id": self.experiment_id,
+                "agent": self.agent,
+                "started_at": self.started_at,
+                "best_iteration": self.best_iteration,
+                "best_score": self.best_score,
+                "total_iterations": len(self.iterations),
+                "iterations": self.iterations,
+                "metadata": self.metadata,
+            }
+        )
 
         path.write_text(json.dumps(existing, indent=2, default=str))
         logger.info(f"📊 Experiment log saved to {path}")
@@ -170,7 +174,7 @@ class OptimizationResult:
                     "baseline_score": self.baseline_score,
                     "improvement_pct": round(self.improvement, 2),
                     "iterations": self.best_iteration,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
                 },
             },
         }
@@ -215,7 +219,7 @@ class OptimizationResult:
         console = Console(record=True)
 
         # Summary
-        console.print(f"\n[bold magenta]⚡ Optimization Report[/bold magenta]")
+        console.print("\n[bold magenta]⚡ Optimization Report[/bold magenta]")
         console.print(f"   Agent: [cyan]{self.agent}[/cyan]")
         console.print(f"   Experiment: [dim]{self.experiment_id}[/dim]")
         console.print(f"   Duration: [yellow]{self.duration_seconds:.1f}s[/yellow]")
@@ -230,9 +234,7 @@ class OptimizationResult:
 
         for it in self.history:
             score_color = "green" if it.avg_score >= self.baseline_score else "red"
-            metrics_str = " | ".join(
-                f"{k}: {v:.3f}" for k, v in it.per_metric_scores.items()
-            )
+            metrics_str = " | ".join(f"{k}: {v:.3f}" for k, v in it.per_metric_scores.items())
             is_best = "🏆" if it.iteration == self.best_iteration else ""
             table.add_row(
                 str(it.iteration),
@@ -244,25 +246,31 @@ class OptimizationResult:
         console.print(table)
 
         # Prompt comparison
-        console.print(f"\n[bold]Baseline prompt:[/bold]")
-        console.print(f"[dim]{self.baseline_prompt[:200]}...[/dim]" if len(self.baseline_prompt) > 200
-                       else f"[dim]{self.baseline_prompt}[/dim]")
-        console.print(f"\n[bold]Best prompt:[/bold]")
-        console.print(f"[green]{self.best_prompt[:300]}...[/green]" if len(self.best_prompt) > 300
-                       else f"[green]{self.best_prompt}[/green]")
+        console.print("\n[bold]Baseline prompt:[/bold]")
+        console.print(
+            f"[dim]{self.baseline_prompt[:200]}...[/dim]"
+            if len(self.baseline_prompt) > 200
+            else f"[dim]{self.baseline_prompt}[/dim]"
+        )
+        console.print("\n[bold]Best prompt:[/bold]")
+        console.print(
+            f"[green]{self.best_prompt[:300]}...[/green]"
+            if len(self.best_prompt) > 300
+            else f"[green]{self.best_prompt}[/green]"
+        )
 
         return console.export_text()
 
     def _plain_report(self) -> str:
         """Plain text report."""
         lines = [
-            f"\n⚡ Optimization Report",
+            "\n⚡ Optimization Report",
             f"   Agent: {self.agent}",
             f"   Improvement: +{self.improvement:.1f}%",
             f"   Best score: {self.best_score:.4f} (iteration {self.best_iteration})",
             f"   Baseline: {self.baseline_score:.4f}",
             f"   Duration: {self.duration_seconds:.1f}s",
-            f"\nIteration History:",
+            "\nIteration History:",
         ]
         for it in self.history:
             marker = " 🏆" if it.iteration == self.best_iteration else ""
@@ -370,14 +378,10 @@ class PromptOptimizer:
 
         # Resolve metrics (use eval_llm for evaluation)
         self._raw_metrics = metrics or ["exact_match"]
-        self._metrics: list[BaseMetric] = resolve_metrics(
-            self._raw_metrics, model=self.eval_llm
-        )
+        self._metrics: list[BaseMetric] = resolve_metrics(self._raw_metrics, model=self.eval_llm)
 
         # Resolve strategy (use rewrite_llm for prompt generation)
-        self._strategy: OptimizationStrategy = resolve_strategy(
-            strategy, model=self.rewrite_llm
-        )
+        self._strategy: OptimizationStrategy = resolve_strategy(strategy, model=self.rewrite_llm)
 
         # Runner
         self._runner = AgentRunner(
@@ -411,7 +415,7 @@ class PromptOptimizer:
             OptimizationResult with best prompt and full history.
         """
         experiment = ExperimentLog(agent=self.agent)
-        experiment.started_at = datetime.now(timezone.utc).isoformat()
+        experiment.started_at = datetime.now(UTC).isoformat()
         experiment.metadata = {
             "strategy": self._strategy.name,
             "metrics": [m.name for m in self._metrics],
@@ -438,9 +442,7 @@ class PromptOptimizer:
 
         # === Baseline evaluation ===
         progress.start(self.agent, len(dataset), len(self._metrics))
-        baseline_result = await self._evaluate_iteration(
-            dataset, current_prompt, 0, progress
-        )
+        baseline_result = await self._evaluate_iteration(dataset, current_prompt, 0, progress)
         history.append(baseline_result)
         experiment.log_iteration(baseline_result)
 
@@ -466,9 +468,7 @@ class PromptOptimizer:
             # Generate improved prompt
             progress.phase("Generating improved prompt...")
             dataset_sample = [p.to_dict() for p in dataset.points[:10]]
-            eval_for_strategy = self._results_to_strategy_input(
-                history[-1], dataset
-            )
+            eval_for_strategy = self._results_to_strategy_input(history[-1], dataset)
 
             new_prompt = await self._strategy.step(
                 current_prompt=current_prompt,
@@ -478,9 +478,7 @@ class PromptOptimizer:
             )
 
             # Evaluate new prompt
-            iter_result = await self._evaluate_iteration(
-                dataset, new_prompt, i, progress
-            )
+            iter_result = await self._evaluate_iteration(dataset, new_prompt, i, progress)
 
             # Track improvement
             is_better = iter_result.avg_score > best_score + min_improvement
@@ -526,6 +524,7 @@ class PromptOptimizer:
         if self.auto_report:
             try:
                 from agentomatic.optimize.report import generate_html_report
+
                 report_path = generate_html_report(result)
                 logger.info(f"📊 HTML report: {report_path}")
             except Exception as exc:
@@ -606,11 +605,13 @@ class PromptOptimizer:
             if run_result.error:
                 for m in self._metrics:
                     all_scores[m.name].append(0.0)
-                failures.append({
-                    "query": run_result.query,
-                    "error": run_result.error,
-                    "avg_score": 0.0,
-                })
+                failures.append(
+                    {
+                        "query": run_result.query,
+                        "error": run_result.error,
+                        "avg_score": 0.0,
+                    }
+                )
                 continue
 
             point_scores: list[float] = []
@@ -622,19 +623,17 @@ class PromptOptimizer:
                         query=run_result.query,
                         response=run_result.response,
                         expected=run_result.expected,
-                        context=(
-                            run_result.retrieval_context
-                            or run_result.context
-                            or None
-                        ),
+                        context=(run_result.retrieval_context or run_result.context or None),
                     )
                     all_scores[metric.name].append(eval_result.score)
                     point_scores.append(eval_result.score)
-                    point_details.append({
-                        "metric": eval_result.metric_name,
-                        "score": eval_result.score,
-                        "reason": eval_result.reason,
-                    })
+                    point_details.append(
+                        {
+                            "metric": eval_result.metric_name,
+                            "score": eval_result.score,
+                            "reason": eval_result.reason,
+                        }
+                    )
                 except Exception as exc:
                     logger.warning(f"Metric {metric.name} failed: {exc}")
                     all_scores[metric.name].append(0.0)
@@ -642,13 +641,15 @@ class PromptOptimizer:
 
             avg = sum(point_scores) / len(point_scores) if point_scores else 0.0
             if avg < 0.5:
-                failures.append({
-                    "query": run_result.query,
-                    "response": run_result.response,
-                    "expected": run_result.expected,
-                    "avg_score": avg,
-                    "details": point_details,
-                })
+                failures.append(
+                    {
+                        "query": run_result.query,
+                        "response": run_result.response,
+                        "expected": run_result.expected,
+                        "avg_score": avg,
+                        "details": point_details,
+                    }
+                )
 
             progress.tick()
 
@@ -657,9 +658,7 @@ class PromptOptimizer:
             name: (sum(scores) / len(scores)) if scores else 0.0
             for name, scores in all_scores.items()
         }
-        avg_score = (
-            sum(per_metric.values()) / len(per_metric) if per_metric else 0.0
-        )
+        avg_score = sum(per_metric.values()) / len(per_metric) if per_metric else 0.0
 
         return IterationResult(
             iteration=iteration,
@@ -716,9 +715,7 @@ class PromptOptimizer:
                 table.add_column(m.name, justify="center")
             table.add_column("Rank", justify="center")
 
-            sorted_results = sorted(
-                results.items(), key=lambda x: x[1].avg_score, reverse=True
-            )
+            sorted_results = sorted(results.items(), key=lambda x: x[1].avg_score, reverse=True)
             for rank, (version, result) in enumerate(sorted_results, 1):
                 row = [
                     version,
@@ -763,7 +760,7 @@ class _ProgressDisplay:
 
         try:
             from rich.console import Console
-            from rich.table import Table
+
             self._has_rich = True
             self._console = Console()
         except ImportError:
@@ -775,14 +772,18 @@ class _ProgressDisplay:
 
         if self._has_rich:
             from rich.panel import Panel
-            self._console.print(Panel.fit(
-                f"[bold magenta]⚡ Prompt Optimizer[/bold magenta]\n"
-                f"[dim]Agent: {agent} | {n_points} points | {n_metrics} metrics | "
-                f"max {self.max_iterations} iterations[/dim]",
-                border_style="magenta",
-            ))
+
+            self._console.print(
+                Panel.fit(
+                    f"[bold magenta]⚡ Prompt Optimizer[/bold magenta]\n"
+                    f"[dim]Agent: {agent} | {n_points} points | {n_metrics} metrics | "
+                    f"max {self.max_iterations} iterations[/dim]",
+                    border_style="magenta",
+                )
+            )
 
             from rich.table import Table
+
             self._table = Table(title="📈 Optimization Progress", show_lines=True)
             self._table.add_column("#", justify="center", style="dim", width=4)
             self._table.add_column("Score", justify="center", width=10)
@@ -827,9 +828,7 @@ class _ProgressDisplay:
         delta = result.avg_score - self._prev_score
         self._prev_score = result.avg_score
 
-        metrics_str = " | ".join(
-            f"{k}: {v:.3f}" for k, v in result.per_metric_scores.items()
-        )
+        metrics_str = " | ".join(f"{k}: {v:.3f}" for k, v in result.per_metric_scores.items())
 
         if self._has_rich and self._table:
             status = ""
@@ -875,13 +874,18 @@ class _ProgressDisplay:
 
         if self._has_rich:
             from rich.panel import Panel
-            self._console.print(Panel.fit(
-                f"[bold green]✅ Optimization Complete[/bold green]\n\n"
-                f"  Baseline:    [dim]{baseline:.4f}[/dim]\n"
-                f"  Best:        [bold green]{best_score:.4f}[/bold green]\n"
-                f"  Improvement: [bold cyan]+{improvement:.1f}%[/bold cyan]\n"
-                f"  Duration:    [yellow]{duration:.1f}s[/yellow]",
-                border_style="green",
-            ))
+
+            self._console.print(
+                Panel.fit(
+                    f"[bold green]✅ Optimization Complete[/bold green]\n\n"
+                    f"  Baseline:    [dim]{baseline:.4f}[/dim]\n"
+                    f"  Best:        [bold green]{best_score:.4f}[/bold green]\n"
+                    f"  Improvement: [bold cyan]+{improvement:.1f}%[/bold cyan]\n"
+                    f"  Duration:    [yellow]{duration:.1f}s[/yellow]",
+                    border_style="green",
+                )
+            )
         else:
-            print(f"\n✅ Done! {baseline:.4f} → {best_score:.4f} (+{improvement:.1f}%) in {duration:.1f}s")
+            print(
+                f"\n✅ Done! {baseline:.4f} → {best_score:.4f} (+{improvement:.1f}%) in {duration:.1f}s"
+            )

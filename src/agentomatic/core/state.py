@@ -1,4 +1,5 @@
 """Default agent state for LangGraph-based agents."""
+
 from __future__ import annotations
 
 from typing import Annotated, Any, TypedDict

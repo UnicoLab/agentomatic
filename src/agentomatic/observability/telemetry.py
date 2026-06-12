@@ -22,13 +22,15 @@ Environment variables:
     OTEL_EXPORTER_OTLP_HEADERS: Optional headers
     OTEL_TRACES_SAMPLER: Sampling strategy
 """
+
 from __future__ import annotations
 
 import asyncio
 import functools
 import os
 import time
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from loguru import logger
 
@@ -149,9 +151,7 @@ def setup_telemetry(
                 provider.add_span_processor(BatchSpanProcessor(exporter))
                 logger.info(f"📡 OTEL traces (HTTP) → {otlp_endpoint}")
             except ImportError:
-                logger.warning(
-                    "OTLP exporter packages not installed — falling back to console"
-                )
+                logger.warning("OTLP exporter packages not installed — falling back to console")
                 enable_console = True
 
     if enable_console or not otlp_endpoint:
@@ -168,9 +168,7 @@ def setup_telemetry(
             FastAPIInstrumentor.instrument_app(app)
             logger.info("🔭 FastAPI auto-instrumented with OpenTelemetry")
         except ImportError:
-            logger.debug(
-                "opentelemetry-instrumentation-fastapi not installed — skipping"
-            )
+            logger.debug("opentelemetry-instrumentation-fastapi not installed — skipping")
 
     # ── Auto-instrument httpx ─────────────────────────────────────────
     try:
@@ -179,9 +177,7 @@ def setup_telemetry(
         HTTPXClientInstrumentor().instrument()
         logger.debug("🔭 httpx auto-instrumented")
     except ImportError:
-        logger.debug(
-            "opentelemetry-instrumentation-httpx not installed — skipping"
-        )
+        logger.debug("opentelemetry-instrumentation-httpx not installed — skipping")
 
     logger.info(f"🔭 OpenTelemetry configured (service={svc_name})")
     return _tracer

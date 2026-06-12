@@ -13,6 +13,7 @@ Commands:
 Requires: pip install agentomatic[cli]
 Fallback: works with basic output if Rich is not installed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,7 +29,7 @@ try:
     from rich.panel import Panel
     from rich.table import Table
     from rich.tree import Tree
-    from rich import print as rprint
+
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
@@ -39,6 +40,7 @@ console = Console() if HAS_RICH else None
 # =====================================================================
 # Utilities
 # =====================================================================
+
 
 def _print(msg: str) -> None:
     """Print with Rich if available, plain otherwise."""
@@ -51,11 +53,12 @@ def _print(msg: str) -> None:
 def _print_banner() -> None:
     """Show the agentomatic banner."""
     if HAS_RICH:
-        console.print(Panel.fit(
-            "[bold magenta]⚡ agentomatic[/bold magenta]\n"
-            "[dim]Drop agents, not code[/dim]",
-            border_style="magenta",
-        ))
+        console.print(
+            Panel.fit(
+                "[bold magenta]⚡ agentomatic[/bold magenta]\n[dim]Drop agents, not code[/dim]",
+                border_style="magenta",
+            )
+        )
     else:
         print("⚡ agentomatic — Drop agents, not code")
         print()
@@ -86,6 +89,7 @@ def _print_warning(msg: str) -> None:
 # INIT — Scaffold a new agent
 # =====================================================================
 
+
 def cmd_init(args: argparse.Namespace) -> None:
     """Scaffold a new agent with template selection."""
     from .templates import TEMPLATES, get_template_files
@@ -103,10 +107,8 @@ def cmd_init(args: argparse.Namespace) -> None:
         # Interactive selection if questionary is available
         try:
             import questionary
-            choices = [
-                questionary.Choice(f"{k} — {v}", value=k)
-                for k, v in TEMPLATES.items()
-            ]
+
+            choices = [questionary.Choice(f"{k} — {v}", value=k) for k, v in TEMPLATES.items()]
             template = questionary.select(
                 "Select a template:",
                 choices=choices,
@@ -159,20 +161,22 @@ def cmd_init(args: argparse.Namespace) -> None:
     _print("")
 
     if HAS_RICH:
-        console.print(Panel(
-            f"[bold]Next steps:[/bold]\n\n"
-            f"  1. [cyan]cd {agents_dir}[/cyan]\n"
-            f"  2. Edit [yellow]{name}/nodes.py[/yellow] with your logic\n"
-            f"  3. [cyan]agentomatic run[/cyan] to start\n"
-            f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
-            f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs",
-            title="🚀 What's next?",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                f"[bold]Next steps:[/bold]\n\n"
+                f"  1. [cyan]cd {agents_dir}[/cyan]\n"
+                f"  2. Edit [yellow]{name}/nodes.py[/yellow] with your logic\n"
+                f"  3. [cyan]agentomatic run[/cyan] to start\n"
+                f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
+                f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs",
+                title="🚀 What's next?",
+                border_style="green",
+            )
+        )
     else:
         print("Next steps:")
         print(f"  1. Edit {name}/nodes.py with your logic")
-        print(f"  2. agentomatic run")
+        print("  2. agentomatic run")
         print(f"  3. agentomatic test {name}")
 
 
@@ -180,11 +184,15 @@ def cmd_init(args: argparse.Namespace) -> None:
 # RUN — Start the platform
 # =====================================================================
 
+
 def cmd_run(args: argparse.Namespace) -> None:
     """Run the platform with Rich status output."""
     _print_banner()
-    _print(f"🚀 Starting platform from [bold]{args.agents_dir}[/bold]..." if HAS_RICH
-           else f"🚀 Starting platform from {args.agents_dir}...")
+    _print(
+        f"🚀 Starting platform from [bold]{args.agents_dir}[/bold]..."
+        if HAS_RICH
+        else f"🚀 Starting platform from {args.agents_dir}..."
+    )
 
     from agentomatic import AgentPlatform
 
@@ -196,6 +204,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     # Auto-detect and enable UI
     if args.with_ui or args.ui:
         from agentomatic.ui import is_available
+
         if is_available():
             _print_success("Debug UI will be available at /chat")
         else:
@@ -205,9 +214,11 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     # Mount UI if requested
     if args.with_ui or args.ui:
+
         @platform.on_startup
         async def _mount_ui():
             from agentomatic.ui import mount
+
             if platform._app:
                 mount(platform._app)
 
@@ -217,6 +228,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 # =====================================================================
 # LIST — Show discovered agents
 # =====================================================================
+
 
 def cmd_list(args: argparse.Namespace) -> None:
     """List agents in a directory with Rich table."""
@@ -235,10 +247,11 @@ def cmd_list(args: argparse.Namespace) -> None:
             # Try to read manifest
             try:
                 spec = importlib.util.spec_from_file_location(
-                    f"_agent_{entry.name}", entry / "__init__.py",
+                    f"_agent_{entry.name}",
+                    entry / "__init__.py",
                 )
                 if spec and spec.loader:
-                    mod = importlib.util.module_from_spec(spec)
+                    _ = importlib.util.module_from_spec(spec)
                     # Don't actually exec — just check for manifest in source
                     source = (entry / "__init__.py").read_text()
                     if "AgentManifest" in source:
@@ -283,6 +296,7 @@ def cmd_list(args: argparse.Namespace) -> None:
 # TEST — Interactive agent testing
 # =====================================================================
 
+
 def cmd_test(args: argparse.Namespace) -> None:
     """Test an agent interactively in the terminal."""
     import asyncio
@@ -291,13 +305,17 @@ def cmd_test(args: argparse.Namespace) -> None:
     agent_name = args.name
     base_url = f"http://{args.host}:{args.port}"
 
-    _print(f"🧪 Testing agent: [bold cyan]{agent_name}[/bold cyan]" if HAS_RICH
-           else f"🧪 Testing agent: {agent_name}")
+    _print(
+        f"🧪 Testing agent: [bold cyan]{agent_name}[/bold cyan]"
+        if HAS_RICH
+        else f"🧪 Testing agent: {agent_name}"
+    )
     _print(f"   API: {base_url}/api/v1/{agent_name}/invoke")
     _print("   Type 'quit' or 'exit' to stop\n")
 
     async def _test_loop():
         import httpx
+
         async with httpx.AsyncClient(base_url=base_url, timeout=60) as client:
             # Health check
             try:
@@ -340,11 +358,17 @@ def cmd_test(args: argparse.Namespace) -> None:
                     thread_id = data.get("thread_id", thread_id)
 
                     if HAS_RICH:
-                        console.print(f"\n🤖 [bold green]{agent_name}[/bold green]: {data.get('response', '')}")
+                        console.print(
+                            f"\n🤖 [bold green]{agent_name}[/bold green]: {data.get('response', '')}"
+                        )
                         if data.get("steps_taken"):
-                            console.print(f"   [dim]Steps: {' → '.join(data['steps_taken'])}[/dim]")
+                            console.print(
+                                f"   [dim]Steps: {' → '.join(data['steps_taken'])}[/dim]"
+                            )
                         if data.get("suggestions"):
-                            console.print(f"   [dim]Suggestions: {', '.join(data['suggestions'])}[/dim]")
+                            console.print(
+                                f"   [dim]Suggestions: {', '.join(data['suggestions'])}[/dim]"
+                            )
                         console.print(f"   [dim]⏱ {data.get('duration_ms', 0):.0f}ms[/dim]")
                     else:
                         print(f"\n🤖 {agent_name}: {data.get('response', '')}")
@@ -365,6 +389,7 @@ def cmd_test(args: argparse.Namespace) -> None:
 # INSPECT — Show agent details
 # =====================================================================
 
+
 def cmd_inspect(args: argparse.Namespace) -> None:
     """Inspect an agent's structure and configuration."""
     _print_banner()
@@ -378,12 +403,13 @@ def cmd_inspect(args: argparse.Namespace) -> None:
 
     if HAS_RICH:
         # Header
-        console.print(Panel(
-            f"[bold cyan]{args.name}[/bold cyan]\n"
-            f"[dim]{target}[/dim]",
-            title="🔍 Agent Inspector",
-            border_style="cyan",
-        ))
+        console.print(
+            Panel(
+                f"[bold cyan]{args.name}[/bold cyan]\n[dim]{target}[/dim]",
+                title="🔍 Agent Inspector",
+                border_style="cyan",
+            )
+        )
 
         # File tree
         tree = Tree(f"[bold]📁 {args.name}/[/bold]")
@@ -408,11 +434,13 @@ def cmd_inspect(args: argparse.Namespace) -> None:
         prompts_file = target / "prompts.json"
         if prompts_file.exists():
             data = json.loads(prompts_file.read_text())
-            console.print(Panel(
-                json.dumps(data, indent=2),
-                title=f"prompts.json ({len(data)} versions)",
-                border_style="blue",
-            ))
+            console.print(
+                Panel(
+                    json.dumps(data, indent=2),
+                    title=f"prompts.json ({len(data)} versions)",
+                    border_style="blue",
+                )
+            )
     else:
         print(f"🔍 Agent: {args.name}")
         print(f"   Path: {target}")
@@ -424,6 +452,7 @@ def cmd_inspect(args: argparse.Namespace) -> None:
 # =====================================================================
 # DOCTOR — Environment health check
 # =====================================================================
+
 
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Check environment health and dependencies."""
@@ -465,8 +494,9 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     # Agents directory
     agents_dir = Path(args.agents_dir)
     if agents_dir.exists():
-        count = len([d for d in agents_dir.iterdir()
-                     if d.is_dir() and (d / "__init__.py").exists()])
+        count = len(
+            [d for d in agents_dir.iterdir() if d.is_dir() and (d / "__init__.py").exists()]
+        )
         checks.append(("Agents directory", True, f"{count} agent(s) in {agents_dir}"))
     else:
         checks.append(("Agents directory", False, f"Not found: {agents_dir}"))
@@ -500,6 +530,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 # UI — Launch debug UI
 # =====================================================================
 
+
 def cmd_ui(args: argparse.Namespace) -> None:
     """Launch the Chainlit debug UI."""
     _print_banner()
@@ -515,6 +546,7 @@ def cmd_ui(args: argparse.Namespace) -> None:
     _print(f"   Platform API: http://{args.host}:{args.port}")
 
     import subprocess
+
     chat_path = Path(__file__).parent.parent / "ui" / "chat.py"
     subprocess.run(
         [sys.executable, "-m", "chainlit", "run", str(chat_path), "--port", str(args.ui_port)],
@@ -529,17 +561,20 @@ def cmd_ui(args: argparse.Namespace) -> None:
 # OPTIMIZE — Prompt optimization
 # =====================================================================
 
+
 def cmd_optimize(args: argparse.Namespace) -> None:
     """Handle optimize command."""
     import asyncio
+
     try:
         from rich.console import Console
+
         console = Console()
     except ImportError:
         console = None
 
     try:
-        from agentomatic.optimize import PromptOptimizer, Dataset
+        from agentomatic.optimize import Dataset, PromptOptimizer
     except ImportError:
         print("ERROR: Optimization module not available.")
         print("Install: pip install agentomatic[optimize]")
@@ -571,13 +606,15 @@ def cmd_optimize(args: argparse.Namespace) -> None:
     )
 
     # Run optimization
-    result = asyncio.run(optimizer.optimize(
-        dataset=dataset,
-        initial_prompt=args.prompt,
-        max_iterations=args.max_iterations,
-        target_score=args.target_score,
-        patience=args.patience,
-    ))
+    result = asyncio.run(
+        optimizer.optimize(
+            dataset=dataset,
+            initial_prompt=args.prompt,
+            max_iterations=args.max_iterations,
+            target_score=args.target_score,
+            patience=args.patience,
+        )
+    )
 
     # Print report
     print(result.report())
@@ -592,6 +629,7 @@ def cmd_optimize(args: argparse.Namespace) -> None:
 # =====================================================================
 # Main CLI entry point
 # =====================================================================
+
 
 def main() -> None:
     """CLI entry point."""
@@ -620,7 +658,8 @@ Examples:
     p_init.add_argument("name", help="Agent name (snake_case)")
     p_init.add_argument("--dir", default="agents", help="Agents directory (default: agents)")
     p_init.add_argument(
-        "--template", "-t",
+        "--template",
+        "-t",
         choices=["basic", "full", "rag", "chatbot", "custom"],
         default=None,
         help="Template to use (default: interactive selection)",
@@ -635,8 +674,13 @@ Examples:
     p_run.add_argument("--reload", action="store_true", help="Enable auto-reload")
     p_run.add_argument("--title", default=None, help="Platform title")
     p_run.add_argument("--log-level", default="INFO")
-    p_run.add_argument("--with-ui", "--ui", action="store_true", dest="with_ui",
-                        help="Enable Chainlit debug UI at /chat")
+    p_run.add_argument(
+        "--with-ui",
+        "--ui",
+        action="store_true",
+        dest="with_ui",
+        help="Enable Chainlit debug UI at /chat",
+    )
     # compat alias
     p_run.set_defaults(ui=False)
 
@@ -670,17 +714,25 @@ Examples:
     p_optimize = sub.add_parser("optimize", help="Run prompt optimization")
     p_optimize.add_argument("agent", help="Agent name to optimize")
     p_optimize.add_argument("--dataset", "-d", required=True, help="Path to JSONL/CSV dataset")
-    p_optimize.add_argument("--metrics", "-m", default="exact_match", help="Comma-separated metrics")
-    p_optimize.add_argument("--strategy", "-s", default="iterative_rewrite",
-                            choices=["iterative_rewrite", "few_shot", "chain_of_thought"],
-                            help="Optimization strategy")
+    p_optimize.add_argument(
+        "--metrics", "-m", default="exact_match", help="Comma-separated metrics"
+    )
+    p_optimize.add_argument(
+        "--strategy",
+        "-s",
+        default="iterative_rewrite",
+        choices=["iterative_rewrite", "few_shot", "chain_of_thought"],
+        help="Optimization strategy",
+    )
     p_optimize.add_argument("--max-iterations", type=int, default=10, help="Max iterations")
     p_optimize.add_argument("--target-score", type=float, default=0.9, help="Target score")
     p_optimize.add_argument("--rewrite-llm", default=None, help="LLM for prompt rewriting")
     p_optimize.add_argument("--eval-llm", default=None, help="LLM for evaluation")
     p_optimize.add_argument("--llm", default="ollama/mistral:7b", help="Default LLM")
     p_optimize.add_argument("--patience", type=int, default=3, help="Early stopping patience")
-    p_optimize.add_argument("--prompt", default=None, help="Initial prompt (overrides prompts.json)")
+    p_optimize.add_argument(
+        "--prompt", default=None, help="Initial prompt (overrides prompts.json)"
+    )
     p_optimize.add_argument("--no-report", action="store_true", help="Skip HTML report generation")
     p_optimize.add_argument("--apply", action="store_true", help="Auto-apply best prompt")
     p_optimize.add_argument("--host", default="http://localhost:8000", help="Platform API base")

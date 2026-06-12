@@ -1,4 +1,5 @@
 """Request logging middleware with X-Request-ID."""
+
 from __future__ import annotations
 
 import time

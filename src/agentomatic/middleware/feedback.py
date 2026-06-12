@@ -19,14 +19,16 @@ Usage::
         store=MemoryStore(),
     )
 """
+
 from __future__ import annotations
 
 import asyncio
 import functools
-import time
 import uuid
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC
+from typing import Any, TypeVar
 
 from loguru import logger
 
@@ -36,6 +38,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 @dataclass
 class FeedbackRecord:
     """A feedback entry."""
+
     feedback_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     agent_name: str = ""
     user_id: str = ""
@@ -43,10 +46,10 @@ class FeedbackRecord:
     message_id: int | None = None
     query: str = ""
     response: str = ""
-    rating: int | None = None        # 1 (thumbs down) or 5 (thumbs up)
-    comment: str | None = None       # Free-text comment
-    correction: str | None = None    # User-provided correct answer
-    feedback_type: str = "thumbs"    # thumbs, rating, correction, comment
+    rating: int | None = None  # 1 (thumbs down) or 5 (thumbs up)
+    comment: str | None = None  # Free-text comment
+    correction: str | None = None  # User-provided correct answer
+    feedback_type: str = "thumbs"  # thumbs, rating, correction, comment
     timestamp: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -81,7 +84,8 @@ class FeedbackCollector:
         metadata: dict[str, Any] | None = None,
     ) -> FeedbackRecord:
         """Record a feedback entry."""
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         record = FeedbackRecord(
             agent_name=agent_name,
             user_id=user_id,
@@ -92,12 +96,12 @@ class FeedbackCollector:
             correction=correction,
             feedback_type=feedback_type,
             thread_id=thread_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             metadata=metadata or {},
         )
 
         # Store via backend
-        if self._store and hasattr(self._store, 'add_feedback'):
+        if self._store and hasattr(self._store, "add_feedback"):
             try:
                 await self._store.add_feedback(
                     thread_id=thread_id or "",
@@ -114,7 +118,7 @@ class FeedbackCollector:
         async with self._lock:
             self._buffer.append(record)
             if len(self._buffer) > self._buffer_size:
-                self._buffer = self._buffer[-self._buffer_size:]
+                self._buffer = self._buffer[-self._buffer_size :]
 
         logger.debug(f"📝 Feedback recorded for {agent_name} (rating={rating})")
         return record
@@ -125,9 +129,10 @@ class FeedbackCollector:
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Get stored feedback."""
-        if self._store and hasattr(self._store, 'get_feedback'):
+        if self._store and hasattr(self._store, "get_feedback"):
             return await self._store.get_feedback(
-                agent_name=agent_name, limit=limit,
+                agent_name=agent_name,
+                limit=limit,
             )
         # Fall back to buffer
         async with self._lock:
@@ -139,6 +144,7 @@ class FeedbackCollector:
     async def export_jsonl(self, agent_name: str | None = None) -> str:
         """Export feedback as JSONL string (for optimization datasets)."""
         import json
+
         records = await self.get_feedback(agent_name=agent_name, limit=10000)
         lines = []
         for r in records:
@@ -166,6 +172,7 @@ def collect_feedback(
     Records every invocation's query and response.
     Useful for building optimization datasets from production traffic.
     """
+
     def decorator(fn: F) -> F:
         @functools.wraps(fn)
         async def wrapper(state: dict, *args, **kwargs):
@@ -175,18 +182,22 @@ def collect_feedback(
                 response = result.get("response", "") if isinstance(result, dict) else str(result)
                 logger.info(f"📊 [feedback] Q={query[:50]}... A={response[:50]}...")
             return result
+
         return wrapper  # type: ignore
+
     return decorator
 
 
 # Module-level singleton
 _collector: FeedbackCollector | None = None
 
+
 def get_collector() -> FeedbackCollector:
     global _collector
     if _collector is None:
         _collector = FeedbackCollector()
     return _collector
+
 
 def set_collector(collector: FeedbackCollector) -> None:
     global _collector

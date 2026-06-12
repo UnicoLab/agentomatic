@@ -3,6 +3,7 @@
 Enabled via ``FEATURES__ENABLE_RATE_LIMIT=true``.
 Configured via ``RATE_LIMIT__REQUESTS`` and ``RATE_LIMIT__WINDOW_SECONDS``.
 """
+
 from __future__ import annotations
 
 import time

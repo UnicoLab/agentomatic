@@ -18,13 +18,14 @@ Usage::
     # Wire into platform
     platform = AgentPlatform.from_folder("agents/", store=store)
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -65,17 +66,21 @@ class SQLAlchemyStore(BaseStore):
         engine_kwargs: dict[str, Any] = {"echo": echo}
         # SQLite doesn't support pool_size
         if "sqlite" not in url:
-            engine_kwargs.update({
-                "pool_size": pool_size,
-                "max_overflow": max_overflow,
-                "pool_recycle": pool_recycle,
-                "pool_pre_ping": pool_pre_ping,
-            })
+            engine_kwargs.update(
+                {
+                    "pool_size": pool_size,
+                    "max_overflow": max_overflow,
+                    "pool_recycle": pool_recycle,
+                    "pool_pre_ping": pool_pre_ping,
+                }
+            )
 
         self._url = url
         self._engine = create_async_engine(url, **engine_kwargs)
         self._session_factory = async_sessionmaker(
-            self._engine, expire_on_commit=False, class_=AsyncSession,
+            self._engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
         )
         _safe_url = url.split("@")[-1] if "@" in url else url
         logger.info(f"🗄️ SQLAlchemy store configured: {_safe_url}")
@@ -142,9 +147,7 @@ class SQLAlchemyStore(BaseStore):
     async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
         """Get a thread by ID."""
         async with self._session() as session:
-            result = await session.execute(
-                select(ThreadModel).where(ThreadModel.id == thread_id)
-            )
+            result = await session.execute(select(ThreadModel).where(ThreadModel.id == thread_id))
             thread = result.scalar_one_or_none()
             return thread.to_dict() if thread else None
 
@@ -170,9 +173,7 @@ class SQLAlchemyStore(BaseStore):
     async def delete_thread(self, thread_id: str) -> bool:
         """Delete a thread and all its messages (cascading)."""
         async with self._session() as session:
-            result = await session.execute(
-                select(ThreadModel).where(ThreadModel.id == thread_id)
-            )
+            result = await session.execute(select(ThreadModel).where(ThreadModel.id == thread_id))
             thread = result.scalar_one_or_none()
             if thread:
                 await session.delete(thread)
@@ -181,20 +182,20 @@ class SQLAlchemyStore(BaseStore):
             return False
 
     async def update_thread(
-        self, thread_id: str, **updates: Any,
+        self,
+        thread_id: str,
+        **updates: Any,
     ) -> dict[str, Any] | None:
         """Update thread fields."""
         async with self._session() as session:
-            result = await session.execute(
-                select(ThreadModel).where(ThreadModel.id == thread_id)
-            )
+            result = await session.execute(select(ThreadModel).where(ThreadModel.id == thread_id))
             thread = result.scalar_one_or_none()
             if not thread:
                 return None
             for key, val in updates.items():
                 if hasattr(thread, key):
                     setattr(thread, key, val)
-            thread.updated_at = datetime.now(timezone.utc)
+            thread.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(thread)
             return thread.to_dict()
@@ -221,13 +222,11 @@ class SQLAlchemyStore(BaseStore):
             )
             session.add(msg)
             # Update thread message count and timestamp
-            result = await session.execute(
-                select(ThreadModel).where(ThreadModel.id == thread_id)
-            )
+            result = await session.execute(select(ThreadModel).where(ThreadModel.id == thread_id))
             thread = result.scalar_one_or_none()
             if thread:
                 thread.message_count += 1
-                thread.updated_at = datetime.now(timezone.utc)
+                thread.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(msg)
             return msg.to_dict()

@@ -1,11 +1,12 @@
 """Dataset container for prompt optimization."""
+
 from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 
 @dataclass
@@ -93,31 +94,37 @@ class Dataset:
                 if not line:
                     continue
                 data = json.loads(line)
-                points.append(DataPoint(
-                    query=data["query"],
-                    expected_answer=data.get("expected_answer"),
-                    context=data.get("context", []),
-                    metadata=data.get("metadata", {}),
-                ))
+                points.append(
+                    DataPoint(
+                        query=data["query"],
+                        expected_answer=data.get("expected_answer"),
+                        context=data.get("context", []),
+                        metadata=data.get("metadata", {}),
+                    )
+                )
         return cls(points=points)
 
     @classmethod
-    def from_csv(cls, path: str, query_col: str = "query",
-                 answer_col: str = "expected_answer") -> Dataset:
+    def from_csv(
+        cls, path: str, query_col: str = "query", answer_col: str = "expected_answer"
+    ) -> Dataset:
         """Load from CSV file."""
         points: list[DataPoint] = []
         with open(path) as f:
             reader = csv.DictReader(f)
             for row in reader:
-                points.append(DataPoint(
-                    query=row[query_col],
-                    expected_answer=row.get(answer_col),
-                    context=[v for k, v in row.items()
-                             if k.startswith("context") and v],
-                    metadata={k: v for k, v in row.items()
-                              if k not in (query_col, answer_col)
-                              and not k.startswith("context")},
-                ))
+                points.append(
+                    DataPoint(
+                        query=row[query_col],
+                        expected_answer=row.get(answer_col),
+                        context=[v for k, v in row.items() if k.startswith("context") and v],
+                        metadata={
+                            k: v
+                            for k, v in row.items()
+                            if k not in (query_col, answer_col) and not k.startswith("context")
+                        },
+                    )
+                )
         return cls(points=points)
 
     @classmethod

@@ -1,4 +1,5 @@
 """Default configuration values."""
+
 from __future__ import annotations
 
 DEFAULT_API_PREFIX = "/api/v1"

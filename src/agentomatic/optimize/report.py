@@ -10,16 +10,16 @@ Dashboard includes:
 - Prompt diff (baseline → best) via unified diff
 - All prompt versions (readable sections)
 """
+
 from __future__ import annotations
 
 import difflib
 import html
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
-
 
 # =====================================================================
 # Public API — signature kept unchanged
@@ -64,10 +64,9 @@ def _generate_holysheet_report(
     can fall back transparently.
     """
     from holysheet import (  # noqa: WPS433 – conditional import by design
-        BarChart,
+        KPI,
         DataTable,
         Divider,
-        KPI,
         LineChart,
         Markdown,
         Report,
@@ -100,26 +99,34 @@ def _generate_holysheet_report(
     improvement_status = "positive" if result.improvement > 0 else "negative"
 
     report.add(KPI(label="Baseline Score", value=round(result.baseline_score, 4)))
-    report.add(KPI(
-        label="Best Score",
-        value=round(result.best_score, 4),
-        status="positive",
-    ))
-    report.add(KPI(
-        label="Improvement",
-        value=improvement_pct,
-        delta=improvement_pct,
-        status=improvement_status,
-    ))
-    report.add(KPI(
-        label="Duration",
-        value=round(result.duration_seconds, 1),
-        unit="s",
-    ))
-    report.add(KPI(
-        label="Best Iteration",
-        value=f"#{result.best_iteration}",
-    ))
+    report.add(
+        KPI(
+            label="Best Score",
+            value=round(result.best_score, 4),
+            status="positive",
+        )
+    )
+    report.add(
+        KPI(
+            label="Improvement",
+            value=improvement_pct,
+            delta=improvement_pct,
+            status=improvement_status,
+        )
+    )
+    report.add(
+        KPI(
+            label="Duration",
+            value=round(result.duration_seconds, 1),
+            unit="s",
+        )
+    )
+    report.add(
+        KPI(
+            label="Best Iteration",
+            value=f"#{result.best_iteration}",
+        )
+    )
 
     report.add(Divider())
 
@@ -137,12 +144,14 @@ def _generate_holysheet_report(
         chart_data.append(row)
 
     # Primary avg_score line
-    report.add(LineChart(
-        title="Average Score",
-        data=chart_data,
-        x="iteration",
-        y="avg_score",
-    ))
+    report.add(
+        LineChart(
+            title="Average Score",
+            data=chart_data,
+            x="iteration",
+            y="avg_score",
+        )
+    )
 
     # Per-metric lines (one chart per metric keeps things readable)
     if metric_names:
@@ -156,12 +165,14 @@ def _generate_holysheet_report(
             per_metric_chart_data.append(row)
 
         for m in metric_names:
-            report.add(LineChart(
-                title=f"Metric: {m}",
-                data=per_metric_chart_data,
-                x="iteration",
-                y=m,
-            ))
+            report.add(
+                LineChart(
+                    title=f"Metric: {m}",
+                    data=per_metric_chart_data,
+                    x="iteration",
+                    y=m,
+                )
+            )
 
     report.add(Divider())
 
@@ -171,9 +182,7 @@ def _generate_holysheet_report(
     table_data: list[dict[str, Any]] = []
     for i, it in enumerate(iterations):
         label = "Baseline" if i == 0 else f"#{it.iteration}"
-        delta = (
-            f"{it.avg_score - iterations[i - 1].avg_score:+.4f}" if i > 0 else "—"
-        )
+        delta = f"{it.avg_score - iterations[i - 1].avg_score:+.4f}" if i > 0 else "—"
         n_fail = len(it.failures) if hasattr(it, "failures") else 0
 
         row: dict[str, Any] = {
@@ -207,12 +216,13 @@ def _generate_holysheet_report(
                 "Baseline",
                 f"Best (#{best.iteration})",
             )
-            report.add(Markdown(
-                content=(
-                    f"### Baseline → Best (#{best.iteration})\n\n"
-                    f"```diff\n{diff_text}\n```"
-                ),
-            ))
+            report.add(
+                Markdown(
+                    content=(
+                        f"### Baseline → Best (#{best.iteration})\n\n```diff\n{diff_text}\n```"
+                    ),
+                )
+            )
         else:
             report.add(Markdown(content="_No prompt changes between baseline and best._"))
 
@@ -227,12 +237,14 @@ def _generate_holysheet_report(
                     f"Iteration #{it.iteration - 1}",
                     f"Iteration #{it.iteration}",
                 )
-                report.add(Markdown(
-                    content=(
-                        f"### Iteration #{it.iteration - 1} → #{it.iteration}\n\n"
-                        f"```diff\n{diff_text}\n```"
-                    ),
-                ))
+                report.add(
+                    Markdown(
+                        content=(
+                            f"### Iteration #{it.iteration - 1} → #{it.iteration}\n\n"
+                            f"```diff\n{diff_text}\n```"
+                        ),
+                    )
+                )
                 changes += 1
             prev_prompt = it.prompt
     else:
@@ -248,12 +260,13 @@ def _generate_holysheet_report(
         label = "Baseline" if it.iteration == 0 else f"Iteration #{it.iteration}"
         badge = " 🏆" if is_best else ""
 
-        report.add(Markdown(
-            content=(
-                f"### {label}{badge} — Score: {it.avg_score:.4f}\n\n"
-                f"```\n{it.prompt}\n```"
-            ),
-        ))
+        report.add(
+            Markdown(
+                content=(
+                    f"### {label}{badge} — Score: {it.avg_score:.4f}\n\n```\n{it.prompt}\n```"
+                ),
+            )
+        )
 
     # ── export ────────────────────────────────────────────────────────
     report.export_html(str(output_path))
@@ -338,7 +351,7 @@ def _build_html(result: Any) -> str:
             <div class="card-label">Best Score</div>
             <div class="card-value">{result.best_score:.4f}</div>
         </div>
-        <div class="card {'card-green' if result.improvement > 0 else 'card-red'}">
+        <div class="card {"card-green" if result.improvement > 0 else "card-red"}">
             <div class="card-label">Improvement</div>
             <div class="card-value">{result.improvement:+.1f}%</div>
         </div>
@@ -375,7 +388,7 @@ def _build_html(result: Any) -> str:
     </section>
 
     <footer>
-        Generated by <strong>agentomatic optimize</strong> at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+        Generated by <strong>agentomatic optimize</strong> at {datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")}
     </footer>
 
 </div>
@@ -482,15 +495,12 @@ def _generate_svg_chart(
 
     # Legend
     legend_items = [("avg_score", "#e94560")] + [
-        (name, colors[(i + 1) % len(colors)])
-        for i, name in enumerate(metric_names[:5])
+        (name, colors[(i + 1) % len(colors)]) for i, name in enumerate(metric_names[:5])
     ]
     for i, (name, color) in enumerate(legend_items):
         lx = padding + 10 + i * 130
         ly = 20
-        svg_parts.append(
-            f'<rect x="{lx}" y="{ly}" width="12" height="12" fill="{color}" rx="2"/>'
-        )
+        svg_parts.append(f'<rect x="{lx}" y="{ly}" width="12" height="12" fill="{color}" rx="2"/>')
         svg_parts.append(
             f'<text x="{lx + 18}" y="{ly + 10}" fill="#ccc" font-size="10">{name}</text>'
         )
@@ -585,7 +595,9 @@ def _generate_prompt_diffs(iterations: list[Any], best_iteration: int) -> str:
     best = next((it for it in iterations if it.iteration == best_iteration), iterations[-1])
 
     if baseline.prompt != best.prompt:
-        diff_html = _make_diff(baseline.prompt, best.prompt, "Baseline", f"Best (#{best.iteration})")
+        diff_html = _make_diff(
+            baseline.prompt, best.prompt, "Baseline", f"Best (#{best.iteration})"
+        )
         diffs.append(f"""
         <div class="diff-section">
             <h3>Baseline → Best (#{best.iteration})</h3>
@@ -598,7 +610,9 @@ def _generate_prompt_diffs(iterations: list[Any], best_iteration: int) -> str:
     changes = 0
     for it in iterations[1:]:
         if it.prompt != prev_prompt and changes < 3:
-            diff_html = _make_diff(prev_prompt, it.prompt, f"#{it.iteration - 1}", f"#{it.iteration}")
+            diff_html = _make_diff(
+                prev_prompt, it.prompt, f"#{it.iteration - 1}", f"#{it.iteration}"
+            )
             diffs.append(f"""
             <div class="diff-section">
                 <h3>Iteration #{it.iteration - 1} → #{it.iteration}</h3>
@@ -617,8 +631,10 @@ def _make_diff(old: str, new: str, old_label: str, new_label: str) -> str:
     new_lines = new.splitlines()
 
     differ = difflib.unified_diff(
-        old_lines, new_lines,
-        fromfile=old_label, tofile=new_label,
+        old_lines,
+        new_lines,
+        fromfile=old_label,
+        tofile=new_label,
         lineterm="",
     )
 

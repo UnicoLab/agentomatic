@@ -1,4 +1,5 @@
 """Agent registry — auto-discovery and management."""
+
 from __future__ import annotations
 
 import importlib
@@ -159,9 +160,7 @@ class AgentRegistry:
                 pm.load_from_file(prompts_file)
                 return pm
             except Exception as exc:
-                logger.warning(
-                    f"  ⚠️ Failed to load prompts for {agent_name}: {exc}"
-                )
+                logger.warning(f"  ⚠️ Failed to load prompts for {agent_name}: {exc}")
         return None
 
     # --- Accessors ---
@@ -176,11 +175,7 @@ class AgentRegistry:
 
     def get_subagents(self) -> dict[str, RegisteredAgent]:
         """Get only subagents (routable by orchestrator)."""
-        return {
-            name: agent
-            for name, agent in self._agents.items()
-            if agent.manifest.is_subagent
-        }
+        return {name: agent for name, agent in self._agents.items() if agent.manifest.is_subagent}
 
     def list_names(self) -> list[str]:
         """List all agent names."""

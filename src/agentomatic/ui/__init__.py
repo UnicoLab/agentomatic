@@ -3,6 +3,7 @@
 Automatically mounts at ``/chat`` when Chainlit is installed.
 Install: ``pip install agentomatic[ui]``
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,6 +21,7 @@ def is_available() -> bool:
     """Check if Chainlit is installed."""
     try:
         import chainlit  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -41,6 +43,7 @@ def mount(app: FastAPI, path: str = "/chat") -> None:
 
     try:
         from chainlit.utils import mount_chainlit
+
         mount_chainlit(app=app, target=_CHAT_MODULE, path=path)
         logger.info(f"🎨 Debug UI mounted at {path}")
     except Exception as exc:

@@ -22,6 +22,7 @@ Usage::
     from agentomatic.storage import BaseStore
     class RedisStore(BaseStore): ...
 """
+
 from __future__ import annotations
 
 from .base import BaseStore
@@ -29,9 +30,11 @@ from .memory import MemoryStore
 
 __all__ = ["BaseStore", "MemoryStore"]
 
+
 # Lazy import for optional SQLAlchemy dependency
 def __getattr__(name: str):
     if name == "SQLAlchemyStore":
         from .sqlalchemy import SQLAlchemyStore
+
         return SQLAlchemyStore
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

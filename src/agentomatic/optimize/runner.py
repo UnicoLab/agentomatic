@@ -5,6 +5,7 @@ Uses the dedicated ``/optimize/invoke`` endpoint when available, falling
 back to ``/invoke`` for full pipeline context capture (retrieval docs,
 tool calls, reasoning steps).
 """
+
 from __future__ import annotations
 
 import time
@@ -78,8 +79,7 @@ class AgentRunner:
                 # Optimize endpoint not available, fall back
                 self._optimize_available = False
                 logger.info(
-                    f"Optimize endpoint not available for '{self.agent}', "
-                    "falling back to /invoke"
+                    f"Optimize endpoint not available for '{self.agent}', falling back to /invoke"
                 )
                 return await self._run_invoke(query, prompt_override, context)
             self._optimize_available = True
@@ -108,9 +108,7 @@ class AgentRunner:
             if context:
                 payload["context"] = {"documents": context}
 
-            async with httpx.AsyncClient(
-                base_url=self.api_base, timeout=self.timeout
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.api_base, timeout=self.timeout) as client:
                 resp = await client.post(
                     f"{self.api_prefix}/{self.agent}/optimize/invoke",
                     json=payload,
@@ -162,9 +160,7 @@ class AgentRunner:
                 payload.setdefault("context", {})
                 payload["context"]["documents"] = context
 
-            async with httpx.AsyncClient(
-                base_url=self.api_base, timeout=self.timeout
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.api_base, timeout=self.timeout) as client:
                 resp = await client.post(
                     f"{self.api_prefix}/{self.agent}/invoke",
                     json=payload,
@@ -246,9 +242,7 @@ class AgentRunner:
         import httpx
 
         try:
-            async with httpx.AsyncClient(
-                base_url=self.api_base, timeout=10.0
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.api_base, timeout=10.0) as client:
                 resp = await client.post(
                     f"{self.api_prefix}/{self.agent}/feedback",
                     json={

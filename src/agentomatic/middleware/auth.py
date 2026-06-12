@@ -3,6 +3,7 @@
 Enabled via ``FEATURES__ENABLE_AUTH=true`` and ``AUTH__API_KEY=your-key``.
 Skips health/readiness probes. Supports both header and query param.
 """
+
 from __future__ import annotations
 
 from starlette.middleware.base import BaseHTTPMiddleware

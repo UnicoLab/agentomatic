@@ -29,6 +29,7 @@ Synthetic data::
         categories=["leave", "benefits", "expenses"],
     )
 """
+
 from __future__ import annotations
 
 from agentomatic.optimize.dataset import DataPoint, Dataset
@@ -45,12 +46,12 @@ from agentomatic.optimize.metrics import (
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
 from agentomatic.optimize.report import generate_html_report
 from agentomatic.optimize.strategies import (
+    MIPRO,
     BootstrapRandomSearch,
     ChainOfThought,
     EnsembleOptimizer,
     FewShotBootstrap,
     IterativeRewrite,
-    MIPRO,
     OptimizationStrategy,
 )
 from agentomatic.optimize.synthesizer import (

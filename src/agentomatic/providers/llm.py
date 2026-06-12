@@ -1,4 +1,5 @@
 """Multi-provider LLM factory."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,6 +33,7 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 
     if provider == "ollama":
         from langchain_ollama import ChatOllama
+
         return ChatOllama(
             model=kwargs.get("model", "mistral:7b"),
             base_url=kwargs.get("base_url", "http://localhost:11434"),
@@ -40,6 +42,7 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 
     elif provider == "azure":
         from langchain_openai import AzureChatOpenAI
+
         return AzureChatOpenAI(
             api_key=kwargs.get("api_key", ""),
             azure_endpoint=kwargs.get("api_base", ""),
@@ -50,6 +53,7 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 
     elif provider == "openai":
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             api_key=kwargs.get("api_key", ""),
             model=kwargs.get("model", "gpt-4"),
@@ -58,6 +62,7 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 
     elif provider == "vertex":
         from langchain_google_vertexai import ChatVertexAI
+
         return ChatVertexAI(
             model_name=kwargs.get("model", "gemini-2.0-flash"),
             project=kwargs.get("project", ""),
@@ -75,6 +80,7 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 def _build_dummy_llm() -> Any:
     """Build a dummy LLM for testing."""
     from langchain_core.language_models import FakeListChatModel
+
     return FakeListChatModel(
         responses=["This is a dummy response from agentomatic."],
     )
@@ -94,6 +100,7 @@ async def invoke_with_retry(
 ) -> Any:
     """Invoke LLM with retry logic."""
     import asyncio
+
     last_exc = None
 
     for attempt in range(max_retries + 1):
@@ -102,7 +109,7 @@ async def invoke_with_retry(
         except Exception as exc:
             last_exc = exc
             if attempt < max_retries:
-                delay = retry_delay * (2 ** attempt)
+                delay = retry_delay * (2**attempt)
                 logger.warning(f"LLM attempt {attempt + 1} failed: {exc}. Retrying in {delay}s...")
                 await asyncio.sleep(delay)
 

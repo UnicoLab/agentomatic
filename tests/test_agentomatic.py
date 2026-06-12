@@ -1,8 +1,8 @@
 """Tests for agentomatic core modules."""
+
 from __future__ import annotations
 
 import pytest
-from pathlib import Path
 
 
 class TestAgentManifest:
@@ -48,8 +48,9 @@ class TestRegisteredAgent:
     """Test RegisteredAgent."""
 
     def test_health_check_no_callable(self):
-        from agentomatic.core.manifest import AgentManifest, RegisteredAgent
         import asyncio
+
+        from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 
         m = AgentManifest(name="empty", slug="empty-agent")
         agent = RegisteredAgent(manifest=m)
@@ -58,8 +59,9 @@ class TestRegisteredAgent:
         assert result["node_fn_ready"] is False
 
     def test_health_check_with_node_fn(self):
-        from agentomatic.core.manifest import AgentManifest, RegisteredAgent
         import asyncio
+
+        from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 
         async def dummy_fn(state):
             return state
@@ -169,6 +171,7 @@ class TestPromptManager:
 
     def test_load_and_get(self, tmp_path):
         import json
+
         from agentomatic.prompts.manager import PromptManager
 
         prompts = {
@@ -195,6 +198,7 @@ class TestCircuitBreaker:
 
     def test_opens_after_threshold(self):
         import asyncio
+
         from agentomatic.observability.concurrency import (
             CircuitBreaker,
             CircuitBreakerOpen,
@@ -223,6 +227,7 @@ class TestMemoryStore:
 
     def test_thread_lifecycle(self):
         import asyncio
+
         from agentomatic.storage.memory import MemoryStore
 
         store = MemoryStore()
@@ -249,8 +254,6 @@ class TestMetrics:
     def test_dummy_metrics(self):
         """Metrics should work even without prometheus_client."""
         from agentomatic.observability.metrics import (
-            REQUEST_COUNT,
-            AGENT_DURATION,
             ACTIVE_REQUESTS,
         )
 

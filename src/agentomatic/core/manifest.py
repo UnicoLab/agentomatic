@@ -1,13 +1,14 @@
 """Agent manifest and registered agent types."""
+
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional, TYPE_CHECKING
-
-from loguru import logger
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import APIRouter
+
     from agentomatic.prompts.manager import PromptManager
 
 
@@ -53,9 +54,9 @@ class RegisteredAgent:
     module_path: str = ""
 
     # Optional enhancements (populated during discovery)
-    router: Optional["APIRouter"] = None
+    router: APIRouter | None = None
     config: Any = None
-    prompt_manager: Optional["PromptManager"] = None
+    prompt_manager: PromptManager | None = None
 
     @property
     def name(self) -> str:
@@ -94,8 +95,6 @@ class RegisteredAgent:
         result["has_config"] = self.config is not None
         # Overall status
         result["status"] = (
-            "healthy"
-            if result.get("node_fn_ready") or result.get("graph_ready")
-            else "degraded"
+            "healthy" if result.get("node_fn_ready") or result.get("graph_ready") else "degraded"
         )
         return result

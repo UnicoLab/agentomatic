@@ -5,6 +5,7 @@ Strategies:
 - FewShotBootstrap: Auto-selects best few-shot examples
 - ChainOfThought: Adds/optimizes reasoning steps
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -77,9 +78,7 @@ class IterativeRewrite(OptimizationStrategy):
         iteration: int,
     ) -> str:
         # Sort by score ascending (worst first)
-        failures = sorted(eval_results, key=lambda r: r.get("avg_score", 0))[
-            : self.max_failures
-        ]
+        failures = sorted(eval_results, key=lambda r: r.get("avg_score", 0))[: self.max_failures]
         successes = sorted(eval_results, key=lambda r: r.get("avg_score", 0), reverse=True)[:3]
 
         failure_analysis = "\n".join(
@@ -120,7 +119,9 @@ class IterativeRewrite(OptimizationStrategy):
         """Call LLM for prompt rewriting."""
         import httpx
 
-        model_name = self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+        model_name = (
+            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+        )
         try:
             async with httpx.AsyncClient(timeout=60) as client:
                 resp = await client.post(
@@ -212,9 +213,7 @@ class ChainOfThought(OptimizationStrategy):
         iteration: int,
     ) -> str:
         # Analyze which queries need step-by-step reasoning
-        failures = [
-            r for r in eval_results if r.get("avg_score", 0) < 0.7
-        ]
+        failures = [r for r in eval_results if r.get("avg_score", 0) < 0.7]
 
         query_types = set()
         for f in failures[:5]:
@@ -239,13 +238,9 @@ class ChainOfThought(OptimizationStrategy):
         )
 
         if "comparisons" in query_types:
-            cot_instruction += (
-                "\nFor comparisons, explicitly list similarities and differences.\n"
-            )
+            cot_instruction += "\nFor comparisons, explicitly list similarities and differences.\n"
         if "procedures" in query_types:
-            cot_instruction += (
-                "\nFor procedures, provide numbered step-by-step instructions.\n"
-            )
+            cot_instruction += "\nFor procedures, provide numbered step-by-step instructions.\n"
         if "explanations" in query_types:
             cot_instruction += (
                 "\nFor explanations, start with a summary then provide supporting details.\n"
@@ -305,9 +300,7 @@ class MIPRO(OptimizationStrategy):
 
         # Generate N candidate prompts in parallel
         tasks = [
-            self._generate_candidate(
-                current_prompt, failure_summary, dataset_sample, i, iteration
-            )
+            self._generate_candidate(current_prompt, failure_summary, dataset_sample, i, iteration)
             for i in range(self.n_candidates)
         ]
         candidates = await asyncio.gather(*tasks)
@@ -358,13 +351,10 @@ class MIPRO(OptimizationStrategy):
         )
         return await self._call_llm(prompt)
 
-    async def _fuse_candidates(
-        self, candidates: list[str], original: str, failures: str
-    ) -> str:
+    async def _fuse_candidates(self, candidates: list[str], original: str, failures: str) -> str:
         """Fuse multiple candidate prompts into one optimal prompt."""
         candidates_text = "\n\n---\n\n".join(
-            f"### Candidate {i + 1}\n```\n{c}\n```"
-            for i, c in enumerate(candidates)
+            f"### Candidate {i + 1}\n```\n{c}\n```" for i, c in enumerate(candidates)
         )
 
         prompt = (
@@ -382,9 +372,7 @@ class MIPRO(OptimizationStrategy):
         import httpx
 
         model_name = (
-            self.model.replace("ollama/", "")
-            if self.model.startswith("ollama/")
-            else self.model
+            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
         )
         try:
             async with httpx.AsyncClient(timeout=60) as client:
@@ -436,10 +424,7 @@ class BootstrapRandomSearch(OptimizationStrategy):
         import random
 
         # Get scored examples
-        scored = [
-            r for r in eval_results
-            if r.get("avg_score", 0) > 0.3 and r.get("response")
-        ]
+        scored = [r for r in eval_results if r.get("avg_score", 0) > 0.3 and r.get("response")]
         if len(scored) < self.k_examples:
             scored = eval_results[: self.k_examples]
 
@@ -531,10 +516,7 @@ class EnsembleOptimizer(OptimizationStrategy):
         candidates = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter valid results
-        valid = [
-            c for c in candidates
-            if isinstance(c, str) and c and c != current_prompt
-        ]
+        valid = [c for c in candidates if isinstance(c, str) and c and c != current_prompt]
 
         if not valid:
             return current_prompt
@@ -548,8 +530,7 @@ class EnsembleOptimizer(OptimizationStrategy):
     async def _fuse(self, candidates: list[str], original: str) -> str:
         """Fuse strategy outputs into one optimal prompt."""
         parts = "\n\n---\n\n".join(
-            f"Strategy {i + 1}:\n```\n{c[:500]}\n```"
-            for i, c in enumerate(candidates)
+            f"Strategy {i + 1}:\n```\n{c[:500]}\n```" for i, c in enumerate(candidates)
         )
 
         prompt = (
@@ -561,9 +542,7 @@ class EnsembleOptimizer(OptimizationStrategy):
         )
 
         model_name = (
-            self.model.replace("ollama/", "")
-            if self.model.startswith("ollama/")
-            else self.model
+            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
         )
         try:
             import httpx
@@ -607,9 +586,5 @@ def resolve_strategy(
     if isinstance(name, OptimizationStrategy):
         return name
     if name not in _STRATEGIES:
-        raise ValueError(
-            f"Unknown strategy: '{name}'. "
-            f"Available: {list(_STRATEGIES.keys())}"
-        )
+        raise ValueError(f"Unknown strategy: '{name}'. Available: {list(_STRATEGIES.keys())}")
     return _STRATEGIES[name](model=model)
-

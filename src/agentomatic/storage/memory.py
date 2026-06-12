@@ -1,7 +1,8 @@
 """In-memory storage backend for development and testing."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from .base import BaseStore
@@ -29,7 +30,7 @@ class MemoryStore(BaseStore):
         title: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         thread = {
             "id": thread_id,
             "user_id": user_id,
@@ -70,12 +71,14 @@ class MemoryStore(BaseStore):
         return False
 
     async def update_thread(
-        self, thread_id: str, **updates: Any,
+        self,
+        thread_id: str,
+        **updates: Any,
     ) -> dict[str, Any] | None:
         thread = self._threads.get(thread_id)
         if thread:
             thread.update(updates)
-            thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+            thread["updated_at"] = datetime.now(UTC).isoformat()
             return thread
         return None
 
@@ -93,14 +96,14 @@ class MemoryStore(BaseStore):
             "role": role,
             "content": content,
             "metadata": metadata or {},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         if thread_id not in self._messages:
             self._messages[thread_id] = []
         self._messages[thread_id].append(msg)
         if thread_id in self._threads:
             self._threads[thread_id]["message_count"] += 1
-            self._threads[thread_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._threads[thread_id]["updated_at"] = datetime.now(UTC).isoformat()
         return msg
 
     async def get_messages(
@@ -133,7 +136,7 @@ class MemoryStore(BaseStore):
             "comment": comment,
             "message_id": message_id,
             "feedback_type": feedback_type,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         self._feedback.append(fb)
         return fb

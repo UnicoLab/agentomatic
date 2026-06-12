@@ -1,7 +1,7 @@
 """Tests for agentomatic CLI and template engine."""
+
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from agentomatic.cli.templates import TEMPLATES, get_template_files
-
 
 # =========================================================================
 # Template Engine Tests
@@ -186,6 +185,7 @@ class TestScaffolding:
 
     def test_prompts_json_valid(self):
         import json
+
         for template in TEMPLATES:
             files = get_template_files(template, "test")
             if "prompts.json" in files:
@@ -195,6 +195,7 @@ class TestScaffolding:
 
     def test_langgraph_json_valid(self):
         import json
+
         for template in ["basic", "full", "rag", "chatbot"]:
             files = get_template_files(template, "test")
             if "langgraph.json" in files:
@@ -210,15 +211,19 @@ class TestScaffolding:
 class TestUIModule:
     def test_is_available_returns_bool(self):
         from agentomatic.ui import is_available
+
         result = is_available()
         assert isinstance(result, bool)
 
     def test_mount_without_chainlit(self):
         """Mount should gracefully handle missing Chainlit."""
         from agentomatic.ui import is_available
+
         if not is_available():
             # This should not raise
-            from agentomatic.ui import mount
             from fastapi import FastAPI
+
+            from agentomatic.ui import mount
+
             app = FastAPI()
             mount(app)  # Should log warning but not crash

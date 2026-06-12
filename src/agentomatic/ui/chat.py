@@ -8,6 +8,7 @@ It provides:
 - Intermediate step display
 - Feedback collection
 """
+
 from __future__ import annotations
 
 import json
@@ -16,15 +17,17 @@ from typing import Any
 
 try:
     import chainlit as cl
+
     HAS_CHAINLIT = True
 except ImportError:
     HAS_CHAINLIT = False
 
 if HAS_CHAINLIT:
-    import httpx
-
     # Default API base — overridden by AGENTOMATIC_API_URL env var
     import os
+
+    import httpx
+
     API_BASE = os.getenv("AGENTOMATIC_API_URL", "http://localhost:8000")
     API_PREFIX = os.getenv("AGENTOMATIC_API_PREFIX", "/api/v1")
 
@@ -35,7 +38,9 @@ if HAS_CHAINLIT:
             resp.raise_for_status()
             return resp.json().get("agents", {})
 
-    async def _invoke_agent(agent_name: str, query: str, thread_id: str | None = None) -> dict[str, Any]:
+    async def _invoke_agent(
+        agent_name: str, query: str, thread_id: str | None = None
+    ) -> dict[str, Any]:
         """Invoke an agent via the platform API."""
         async with httpx.AsyncClient(base_url=API_BASE, timeout=60) as client:
             payload = {

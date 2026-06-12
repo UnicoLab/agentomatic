@@ -1,10 +1,12 @@
 """AgentPlatform — the main entry point for agentomatic."""
+
 from __future__ import annotations
 
 import sys
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Awaitable, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -196,9 +198,7 @@ class AgentPlatform:
             **kwargs,
         )
         self._registry._agents[manifest.name] = agent  # noqa: SLF001
-        logger.info(
-            f"  ✅ Programmatically registered: {manifest.name} ({manifest.slug})"
-        )
+        logger.info(f"  ✅ Programmatically registered: {manifest.name} ({manifest.slug})")
 
     # ------------------------------------------------------------------
     # Lifecycle hooks
@@ -331,17 +331,20 @@ class AgentPlatform:
         # Logging
         if self._enable_logging:
             from agentomatic.middleware.logging import LoggingMiddleware
+
             app.add_middleware(LoggingMiddleware)
 
         # Auth
         if self._enable_auth and self._auth_api_key:
             from agentomatic.middleware.auth import AuthMiddleware
+
             app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
             logger.info("🔒 Auth middleware enabled")
 
         # Rate limiting
         if self._enable_rate_limit:
             from agentomatic.middleware.rate_limit import RateLimitMiddleware
+
             app.add_middleware(
                 RateLimitMiddleware,
                 max_requests=self._rate_limit_requests,
@@ -354,6 +357,7 @@ class AgentPlatform:
         # Metrics
         if self._enable_metrics:
             from agentomatic.middleware.metrics import MetricsMiddleware
+
             app.add_middleware(MetricsMiddleware)
             logger.info("📊 Metrics middleware enabled")
 
@@ -364,6 +368,7 @@ class AgentPlatform:
         # Feedback collector
         if self._enable_feedback:
             from agentomatic.middleware.feedback import FeedbackCollector, set_collector
+
             collector = FeedbackCollector(store=self._store)
             set_collector(collector)
             logger.info("📝 Feedback collection enabled")
@@ -372,6 +377,7 @@ class AgentPlatform:
         if self._enable_telemetry:
             try:
                 from agentomatic.observability.telemetry import setup_telemetry
+
                 setup_telemetry(app)
             except Exception as exc:
                 logger.debug(f"Telemetry setup skipped: {exc}")
@@ -472,6 +478,7 @@ class AgentPlatform:
 
         # Storage stats
         if self._store:
+
             @app.get(f"{self.api_prefix}/storage/stats")
             async def storage_stats() -> dict[str, Any]:
                 """Storage backend statistics."""
@@ -488,8 +495,11 @@ class AgentPlatform:
             ) -> dict[str, Any]:
                 """Submit feedback."""
                 return await self._store.add_feedback(
-                    thread_id, user_id, agent_name,
-                    rating=rating, comment=comment,
+                    thread_id,
+                    user_id,
+                    agent_name,
+                    rating=rating,
+                    comment=comment,
                 )
 
             @app.get(f"{self.api_prefix}/feedback")
@@ -499,7 +509,8 @@ class AgentPlatform:
             ) -> dict[str, Any]:
                 """List collected feedback."""
                 items = await self._store.get_feedback(
-                    agent_name=agent_name, limit=limit,
+                    agent_name=agent_name,
+                    limit=limit,
                 )
                 return {"feedback": items, "count": len(items)}
 

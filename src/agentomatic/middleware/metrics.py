@@ -3,6 +3,7 @@
 Enabled via ``FEATURES__ENABLE_METRICS=true``.
 Automatically tracks request count, latency histogram, and active requests.
 """
+
 from __future__ import annotations
 
 import time
@@ -12,7 +13,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
@@ -51,9 +53,11 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Serve /metrics endpoint
             if request.url.path == "/metrics" and HAS_PROMETHEUS:
                 from starlette.responses import Response as StarletteResponse
+
                 body = generate_latest()
                 return StarletteResponse(
-                    content=body, media_type=CONTENT_TYPE_LATEST,
+                    content=body,
+                    media_type=CONTENT_TYPE_LATEST,
                 )
             return await call_next(request)
 
@@ -69,8 +73,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         # Collapse UUIDs and hex IDs to reduce cardinality
         parts = path.split("/")
         normalized = "/".join(
-            "{id}" if (len(p) > 8 and any(c.isdigit() for c in p)) else p
-            for p in parts
+            "{id}" if (len(p) > 8 and any(c.isdigit() for c in p)) else p for p in parts
         )
 
         if self._requests:

@@ -14,19 +14,21 @@ Provides:
 DeepEval integration is handled via dynamic imports.  All DeepEval
 classes degrade gracefully when deepeval is not installed.
 """
+
 from __future__ import annotations
 
 import difflib
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from loguru import logger
-
 
 # =====================================================================
 # Result container
 # =====================================================================
+
 
 @dataclass
 class EvalResult:
@@ -41,6 +43,7 @@ class EvalResult:
 # =====================================================================
 # Abstract base
 # =====================================================================
+
 
 class BaseMetric(ABC):
     """Abstract base for all evaluation metrics.
@@ -76,6 +79,7 @@ class BaseMetric(ABC):
 # Simple built-in metrics (no DeepEval required)
 # =====================================================================
 
+
 class ExactMatchMetric(BaseMetric):
     """Simple string matching — no LLM required."""
 
@@ -93,8 +97,9 @@ class ExactMatchMetric(BaseMetric):
         context: list[str] | None = None,
     ) -> EvalResult:
         if expected is None:
-            return EvalResult(metric_name=self.name, score=0.0,
-                              reason="No expected answer provided")
+            return EvalResult(
+                metric_name=self.name, score=0.0, reason="No expected answer provided"
+            )
 
         if self.fuzzy:
             ratio = difflib.SequenceMatcher(
@@ -127,8 +132,7 @@ class ContainsMetric(BaseMetric):
         context: list[str] | None = None,
     ) -> EvalResult:
         if expected is None:
-            return EvalResult(metric_name=self.name, score=0.0,
-                              reason="No expected answer")
+            return EvalResult(metric_name=self.name, score=0.0, reason="No expected answer")
 
         resp_lower = response.lower()
         keywords = [kw.strip() for kw in expected.lower().split(",")]
@@ -144,6 +148,7 @@ class ContainsMetric(BaseMetric):
 # =====================================================================
 # LLM-based metrics
 # =====================================================================
+
 
 class LLMJudgeMetric(BaseMetric):
     """LLM-as-judge with custom evaluation criteria.
@@ -181,8 +186,11 @@ class LLMJudgeMetric(BaseMetric):
         return await self._eval_llm(query, response, expected, context)
 
     async def _eval_deepeval(
-        self, query: str, response: str,
-        expected: str | None, context: list[str] | None,
+        self,
+        query: str,
+        response: str,
+        expected: str | None,
+        context: list[str] | None,
     ) -> EvalResult:
         from deepeval.metrics import GEval
         from deepeval.test_case import LLMTestCase, LLMTestCaseParams
@@ -209,11 +217,13 @@ class LLMJudgeMetric(BaseMetric):
             reason=metric.reason or "",
         )
 
-    async def _eval_llm(self, query: str, response: str,
-                        expected: str | None, context: list[str] | None) -> EvalResult:
+    async def _eval_llm(
+        self, query: str, response: str, expected: str | None, context: list[str] | None
+    ) -> EvalResult:
         """Fallback LLM-based evaluation without deepeval."""
         try:
             import httpx
+
             prompt = (
                 f"You are an evaluation judge. Score the following response on a scale of 0.0 to 1.0.\n\n"
                 f"CRITERIA: {self.criteria}\n\n"
@@ -222,17 +232,22 @@ class LLMJudgeMetric(BaseMetric):
             )
             if expected:
                 prompt += f"EXPECTED ANSWER: {expected}\n\n"
-            prompt += "Reply with ONLY a JSON object: {\"score\": 0.X, \"reason\": \"...\"}\n"
+            prompt += 'Reply with ONLY a JSON object: {"score": 0.X, "reason": "..."}\n'
 
             # Try Ollama API
             async with httpx.AsyncClient(timeout=30) as client:
-                model_name = self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+                model_name = (
+                    self.model.replace("ollama/", "")
+                    if self.model.startswith("ollama/")
+                    else self.model
+                )
                 resp = await client.post(
                     "http://localhost:11434/api/generate",
                     json={"model": model_name, "prompt": prompt, "stream": False},
                 )
                 if resp.status_code == 200:
                     import json as json_mod
+
                     text = resp.json().get("response", "")
                     # Try to parse JSON from response
                     for line in text.split("\n"):
@@ -248,7 +263,8 @@ class LLMJudgeMetric(BaseMetric):
             logger.warning(f"LLM judge fallback failed: {exc}")
 
         return EvalResult(
-            metric_name=self.name, score=0.5,
+            metric_name=self.name,
+            score=0.5,
             reason="Could not evaluate — defaulting to 0.5",
         )
 
@@ -281,9 +297,7 @@ class CustomMetric(BaseMetric):
         if inspect.iscoroutinefunction(self.fn):
             score = await self.fn(query, response, expected, context)
         else:
-            score = await asyncio.to_thread(
-                self.fn, query, response, expected, context
-            )
+            score = await asyncio.to_thread(self.fn, query, response, expected, context)
 
         return EvalResult(
             metric_name=self.name,
@@ -295,6 +309,7 @@ class CustomMetric(BaseMetric):
 # =====================================================================
 # DeepEval-native metrics
 # =====================================================================
+
 
 class GEvalMetric(BaseMetric):
     """DeepEval GEval — LLM-as-judge with custom criteria.
@@ -363,8 +378,7 @@ class GEvalMetric(BaseMetric):
             )
         except ImportError:
             logger.debug(
-                "deepeval not installed — falling back to raw LLM judge "
-                "for GEvalMetric '%s'",
+                "deepeval not installed — falling back to raw LLM judge for GEvalMetric '%s'",
                 self.name,
             )
             return await self._fallback_eval(query, response, expected)
@@ -448,7 +462,8 @@ class DeepEvalMetric(BaseMetric):
     def __init__(self, deepeval_metric: Any, name: str | None = None):
         self._metric = deepeval_metric
         self.name = name or getattr(
-            deepeval_metric, "name",
+            deepeval_metric,
+            "name",
             type(deepeval_metric).__name__,
         )
 
@@ -505,8 +520,12 @@ class RedTeamMetric(BaseMetric):
         self.name = name
         self.model = model
         self.harm_keywords = harm_keywords or [
-            "i cannot", "i can't", "i'm sorry", "as an ai",
-            "i am not able", "i must refuse",
+            "i cannot",
+            "i can't",
+            "i'm sorry",
+            "as an ai",
+            "i am not able",
+            "i must refuse",
         ]
 
     async def evaluate(
@@ -519,9 +538,7 @@ class RedTeamMetric(BaseMetric):
         try:
             return await self._eval_deepeval(query, response, expected, context)
         except ImportError:
-            logger.debug(
-                "deepeval not installed — using keyword heuristic for RedTeamMetric"
-            )
+            logger.debug("deepeval not installed — using keyword heuristic for RedTeamMetric")
             return self._eval_heuristic(response)
 
     async def _eval_deepeval(
@@ -616,8 +633,7 @@ def _make_deepeval_metric(name: str, model: str, **kwargs: Any) -> BaseMetric:
         from deepeval import metrics as de_metrics
     except ImportError:
         raise ImportError(
-            f"DeepEval is required for metric '{name}'. "
-            "Install: pip install agentomatic[optimize]"
+            f"DeepEval is required for metric '{name}'. Install: pip install agentomatic[optimize]"
         )
 
     # Special case: geval via GEvalMetric (supports criteria / steps)
@@ -737,7 +753,7 @@ def _resolve_single(name: str, model: str) -> BaseMetric:
 
     # ── geval:criteria shorthand ─────────────────────────────────
     if name.startswith("geval:"):
-        criteria = name[len("geval:"):].strip()
+        criteria = name[len("geval:") :].strip()
         return GEvalMetric(criteria=criteria, model=model)
 
     # ── red_team ──────────────────────────────────────────────────

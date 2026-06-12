@@ -1,7 +1,6 @@
 """Platform settings with feature flags and nested configuration."""
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class LLMSettings(BaseModel):
     """LLM provider configuration."""
+
     provider: str = Field("ollama", description="LLM provider: ollama|azure|openai|vertex|dummy")
     model: str = Field("mistral:7b", description="Model name")
     temperature: float = Field(0.1, ge=0.0, le=2.0)
@@ -25,6 +25,7 @@ class LLMSettings(BaseModel):
 
 class EmbeddingSettings(BaseModel):
     """Embedding provider configuration."""
+
     provider: str = Field("dummy", description="Embedding provider: ollama|dummy")
     model: str = Field("nomic-embed-text")
     dimension: int = Field(768)
@@ -32,6 +33,7 @@ class EmbeddingSettings(BaseModel):
 
 class DatabaseSettings(BaseModel):
     """Database configuration."""
+
     url: str = Field("sqlite+aiosqlite:///data/platform.db")
     pool_size: int = Field(10, ge=1)
     max_overflow: int = Field(20, ge=0)
@@ -41,6 +43,7 @@ class DatabaseSettings(BaseModel):
 
 class FeatureSettings(BaseModel):
     """Feature flags for the platform."""
+
     enable_streaming: bool = Field(True, description="Enable SSE streaming endpoints")
     enable_a2a: bool = Field(True, description="Enable A2A protocol")
     enable_metrics: bool = Field(True, description="Enable Prometheus metrics")
@@ -58,11 +61,13 @@ class FeatureSettings(BaseModel):
 
 class AuthSettings(BaseModel):
     """Authentication configuration."""
+
     api_key: str = Field("", description="API key for authentication")
 
 
 class RateLimitSettings(BaseModel):
     """Rate limiting configuration."""
+
     requests: int = Field(100, ge=1)
     window_seconds: int = Field(60, ge=1)
 
@@ -73,6 +78,7 @@ class PlatformSettings(BaseSettings):
     Priority: env vars > .env > YAML > defaults.
     Nested delimiter: __ (double underscore).
     """
+
     app_name: str = Field("Agentomatic Platform")
     app_env: str = Field("development")
     log_level: str = Field("INFO")

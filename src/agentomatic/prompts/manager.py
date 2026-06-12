@@ -1,4 +1,5 @@
 """JSON-based prompt version manager."""
+
 from __future__ import annotations
 
 import json

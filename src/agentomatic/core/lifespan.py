@@ -1,10 +1,12 @@
 """Application lifespan management."""
+
 from __future__ import annotations
 
 import sys
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -42,7 +44,7 @@ async def create_lifespan(
     settings: Any,
     on_startup: list[Callable[..., Any]] | None = None,
     on_shutdown: list[Callable[..., Any]] | None = None,
-) -> AsyncIterator[Callable[["FastAPI"], Any]]:
+) -> AsyncIterator[Callable[[FastAPI], Any]]:
     """Create a FastAPI lifespan context manager.
 
     Startup sequence:
@@ -65,7 +67,7 @@ async def create_lifespan(
         A lifespan callable suitable for :class:`~fastapi.FastAPI`.
     """
 
-    async def _lifespan(app: "FastAPI") -> AsyncIterator[None]:
+    async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         # --- Startup ---
         configure_logging(getattr(settings, "log_level", "INFO"))
         logger.info("🚀 Agentomatic platform starting...")

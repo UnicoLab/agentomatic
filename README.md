@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+  <img src="assets/logo.png" width="300" alt="agentomatic">
+</p>
+
 # ⚡ Agentomatic
 
 ### Drop agents, not code

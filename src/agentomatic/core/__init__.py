@@ -1,4 +1,5 @@
 """Agentomatic core — platform, registry, manifest, state."""
+
 from __future__ import annotations
 
 from .lifespan import configure_logging, create_lifespan
