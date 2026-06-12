@@ -531,3 +531,265 @@ class TestReport:
         path = tmp_path / ".optimize" / "test_agent" / "report.html"
         result_path = generate_html_report(r, output_path=path)
         assert Path(result_path).exists()
+
+
+# =====================================================================
+# Feedback Tests
+# =====================================================================
+
+
+class TestFeedbackCollector:
+    @pytest.fixture
+    def collector(self):
+        from agentomatic.middleware.feedback import FeedbackCollector
+        return FeedbackCollector()
+
+    @pytest.mark.asyncio
+    async def test_record_feedback(self, collector):
+        record = await collector.record(
+            agent_name="test_agent",
+            user_id="user1",
+            query="What is PTO?",
+            response="PTO is paid time off.",
+            rating=5,
+            feedback_type="thumbs",
+        )
+        assert record.feedback_id
+        assert record.agent_name == "test_agent"
+        assert record.rating == 5
+        assert record.timestamp
+
+    @pytest.mark.asyncio
+    async def test_get_feedback(self, collector):
+        await collector.record(
+            agent_name="bot1", user_id="u1",
+            query="Q1", response="A1", rating=5,
+        )
+        await collector.record(
+            agent_name="bot2", user_id="u2",
+            query="Q2", response="A2", rating=1,
+        )
+        # All
+        all_fb = await collector.get_feedback()
+        assert len(all_fb) == 2
+        # Filtered
+        bot1_fb = await collector.get_feedback(agent_name="bot1")
+        assert len(bot1_fb) == 1
+        assert bot1_fb[0]["agent_name"] == "bot1"
+
+    @pytest.mark.asyncio
+    async def test_export_jsonl(self, collector):
+        await collector.record(
+            agent_name="bot", user_id="u1",
+            query="How to reset password?",
+            response="Go to settings.",
+            rating=4,
+        )
+        jsonl = await collector.export_jsonl(agent_name="bot")
+        assert "How to reset password?" in jsonl
+        parsed = json.loads(jsonl.strip().split("\n")[0])
+        assert parsed["query"] == "How to reset password?"
+
+    @pytest.mark.asyncio
+    async def test_export_with_correction(self, collector):
+        await collector.record(
+            agent_name="bot", user_id="u1",
+            query="What is PTO?",
+            response="PTO is paid time off.",
+            correction="PTO is Paid Time Off — each employee gets 25 days/year.",
+            rating=2,
+            feedback_type="correction",
+        )
+        jsonl = await collector.export_jsonl()
+        parsed = json.loads(jsonl.strip())
+        # Correction should be used as expected_answer
+        assert "25 days/year" in parsed["expected_answer"]
+
+    @pytest.mark.asyncio
+    async def test_buffer_limit(self, collector):
+        collector._buffer_size = 5
+        for i in range(10):
+            await collector.record(
+                agent_name="bot", user_id="u1",
+                query=f"Q{i}", response=f"A{i}",
+            )
+        assert len(collector._buffer) <= 5
+
+    @pytest.mark.asyncio
+    async def test_record_with_store_backend(self):
+        from agentomatic.middleware.feedback import FeedbackCollector
+
+        mock_store = AsyncMock()
+        mock_store.add_feedback = AsyncMock(return_value={"status": "stored"})
+        collector = FeedbackCollector(store=mock_store)
+
+        await collector.record(
+            agent_name="bot", user_id="u1",
+            query="Q", response="A", rating=5,
+        )
+        mock_store.add_feedback.assert_called_once()
+
+    def test_collect_feedback_decorator(self):
+        from agentomatic.middleware.feedback import collect_feedback
+
+        @collect_feedback(store=False, log=False)
+        async def my_agent(state):
+            return {"response": "Hello"}
+
+        assert my_agent.__name__ == "my_agent"
+
+    def test_singleton_pattern(self):
+        from agentomatic.middleware.feedback import (
+            get_collector, set_collector, FeedbackCollector,
+        )
+        c = FeedbackCollector()
+        set_collector(c)
+        assert get_collector() is c
+
+
+class TestFeedbackRecord:
+    def test_to_dict_filters_empty(self):
+        from agentomatic.middleware.feedback import FeedbackRecord
+        r = FeedbackRecord(agent_name="bot", rating=5)
+        d = r.to_dict()
+        assert "agent_name" in d
+        assert "rating" in d
+        assert "comment" not in d  # None filtered
+        assert "query" not in d     # "" filtered
+
+
+# =====================================================================
+# Telemetry Tests
+# =====================================================================
+
+
+class TestTelemetry:
+    def test_import_without_otel(self):
+        """Module should import cleanly even without opentelemetry."""
+        from agentomatic.observability.telemetry import (
+            setup_telemetry, traced, get_tracer,
+        )
+        assert callable(setup_telemetry)
+        assert callable(traced)
+        assert callable(get_tracer)
+
+    def test_noop_tracer(self):
+        from agentomatic.observability.telemetry import _NoOpTracer, _NoOpSpan
+        tracer = _NoOpTracer()
+        span = tracer.start_as_current_span("test")
+        assert isinstance(span, _NoOpSpan)
+        # Should not raise
+        with span as s:
+            s.set_attribute("key", "value")
+            s.set_status("OK")
+
+    def test_traced_decorator_sync(self):
+        from agentomatic.observability.telemetry import traced
+
+        @traced("test.operation")
+        def my_func(x, y):
+            return x + y
+
+        result = my_func(2, 3)
+        assert result == 5
+
+    @pytest.mark.asyncio
+    async def test_traced_decorator_async(self):
+        from agentomatic.observability.telemetry import traced
+
+        @traced("test.async_op")
+        async def my_func(x):
+            return x * 2
+
+        result = await my_func(5)
+        assert result == 10
+
+    def test_get_tracer_returns_noop_without_otel(self):
+        from agentomatic.observability.telemetry import get_tracer, _NoOpTracer
+        tracer = get_tracer("test")
+        # Should always return something usable
+        assert hasattr(tracer, "start_as_current_span")
+
+    def test_setup_telemetry_without_otel(self):
+        from agentomatic.observability.telemetry import setup_telemetry, HAS_OTEL
+        # Should not raise even without OTEL
+        result = setup_telemetry(app=None)
+        if not HAS_OTEL:
+            assert result is None
+
+
+# =====================================================================
+# Runner Context Tests
+# =====================================================================
+
+
+class TestRunnerContext:
+    def test_run_result_has_context_fields(self):
+        r = RunResult(
+            query="test",
+            response="answer",
+            retrieval_context=["doc1", "doc2"],
+            tool_calls=[{"name": "search", "result": "found"}],
+            reasoning="I looked up the docs...",
+        )
+        assert r.retrieval_context == ["doc1", "doc2"]
+        assert len(r.tool_calls) == 1
+        assert r.reasoning == "I looked up the docs..."
+
+    def test_runner_has_optimize_endpoint_flag(self):
+        runner = AgentRunner(agent="test", use_optimize_endpoint=True)
+        assert runner.use_optimize_endpoint is True
+        assert runner._optimize_available is None  # auto-detect
+
+    def test_runner_disable_optimize_endpoint(self):
+        runner = AgentRunner(agent="test", use_optimize_endpoint=False)
+        assert runner.use_optimize_endpoint is False
+
+
+# =====================================================================
+# Router Models Tests
+# =====================================================================
+
+
+class TestRouterModels:
+    def test_optimize_invoke_request(self):
+        from agentomatic.core.router_factory import OptimizeInvokeRequest
+        req = OptimizeInvokeRequest(query="test")
+        assert req.query == "test"
+        assert req.include_retrieval_context is True
+        assert req.include_steps is True
+        assert req.system_prompt_override is None
+        assert req.user_id == "optimizer"
+
+    def test_optimize_invoke_response(self):
+        from agentomatic.core.router_factory import OptimizeInvokeResponse
+        resp = OptimizeInvokeResponse(
+            response="Hello",
+            retrieval_context=["doc1"],
+            tool_calls=[{"name": "search"}],
+            steps_taken=["retrieve", "generate"],
+            reasoning="I retrieved relevant docs...",
+        )
+        assert resp.response == "Hello"
+        assert len(resp.retrieval_context) == 1
+        assert resp.reasoning
+
+    def test_feedback_request(self):
+        from agentomatic.core.router_factory import FeedbackRequest
+        req = FeedbackRequest(
+            rating=5,
+            query="What is PTO?",
+            response="Paid time off.",
+        )
+        assert req.rating == 5
+        assert req.feedback_type == "thumbs"
+
+    def test_feedback_request_with_correction(self):
+        from agentomatic.core.router_factory import FeedbackRequest
+        req = FeedbackRequest(
+            rating=2,
+            correction="PTO = 25 days/year.",
+            feedback_type="correction",
+        )
+        assert req.correction == "PTO = 25 days/year."
+

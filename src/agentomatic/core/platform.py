@@ -68,6 +68,8 @@ class AgentPlatform:
         rate_limit_requests: int = 100,
         rate_limit_window: int = 60,
         enable_metrics: bool = False,
+        enable_feedback: bool = True,
+        enable_telemetry: bool = True,
         # --- Custom middleware ---
         middleware: list[tuple[type, dict[str, Any]]] | None = None,
     ) -> None:
@@ -91,6 +93,8 @@ class AgentPlatform:
             rate_limit_requests: Max requests per window.
             rate_limit_window: Window duration in seconds.
             enable_metrics: Add Prometheus metrics middleware.
+            enable_feedback: Auto-add feedback endpoints per agent (default ``True``).
+            enable_telemetry: Auto-configure OpenTelemetry tracing (default ``True``).
             middleware: Custom middleware list ``[(MiddlewareClass, {kwargs}), ...]``.
         """
         self.agents_dir = Path(agents_dir).resolve()
@@ -114,6 +118,8 @@ class AgentPlatform:
         self._rate_limit_requests = rate_limit_requests
         self._rate_limit_window = rate_limit_window
         self._enable_metrics = enable_metrics
+        self._enable_feedback = enable_feedback
+        self._enable_telemetry = enable_telemetry
         self._custom_middleware = middleware or []
 
         # Internal
@@ -354,6 +360,21 @@ class AgentPlatform:
         # Custom middleware
         for mw_cls, mw_kwargs in self._custom_middleware:
             app.add_middleware(mw_cls, **mw_kwargs)
+
+        # Feedback collector
+        if self._enable_feedback:
+            from agentomatic.middleware.feedback import FeedbackCollector, set_collector
+            collector = FeedbackCollector(store=self._store)
+            set_collector(collector)
+            logger.info("📝 Feedback collection enabled")
+
+        # OpenTelemetry auto-instrumentation
+        if self._enable_telemetry:
+            try:
+                from agentomatic.observability.telemetry import setup_telemetry
+                setup_telemetry(app)
+            except Exception as exc:
+                logger.debug(f"Telemetry setup skipped: {exc}")
 
         # ------------------------------------------------------------------
         # Mount routers for PRE-REGISTERED (programmatic) agents immediately

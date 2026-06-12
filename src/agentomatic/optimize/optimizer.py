@@ -622,7 +622,11 @@ class PromptOptimizer:
                         query=run_result.query,
                         response=run_result.response,
                         expected=run_result.expected,
-                        context=run_result.context or None,
+                        context=(
+                            run_result.retrieval_context
+                            or run_result.context
+                            or None
+                        ),
                     )
                     all_scores[metric.name].append(eval_result.score)
                     point_scores.append(eval_result.score)

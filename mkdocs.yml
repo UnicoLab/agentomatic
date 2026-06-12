@@ -89,6 +89,7 @@ nav:
     - Storage Backends: guide/storage.md
     - Middleware: guide/middleware.md
     - Prompt Optimization: guide/optimization.md
+    - Telemetry & Feedback: guide/telemetry.md
     - Debug UI: guide/debug-ui.md
   - CLI Reference:
     - Commands: cli/commands.md

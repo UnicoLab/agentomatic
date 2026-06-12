@@ -59,6 +59,44 @@ class A2ATaskRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class OptimizeInvokeRequest(BaseModel):
+    """Optimization-specific invocation — returns full pipeline context."""
+
+    query: str = Field(..., description="User query")
+    system_prompt_override: str | None = Field(None, description="System prompt to inject")
+    user_id: str = Field("optimizer", description="User ID")
+    context: dict[str, Any] = Field(default_factory=dict)
+    include_retrieval_context: bool = Field(True, description="Return RAG context")
+    include_steps: bool = Field(True, description="Return execution steps")
+
+
+class OptimizeInvokeResponse(BaseModel):
+    """Full pipeline response for optimization."""
+
+    response: str = Field("", description="Final agent response")
+    retrieval_context: list[str] = Field(default_factory=list, description="RAG documents used")
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list, description="Tool invocations")
+    steps_taken: list[str] = Field(default_factory=list, description="Execution steps")
+    reasoning: str = Field("", description="Chain-of-thought")
+    citations: list[dict[str, Any]] = Field(default_factory=list, description="Source citations")
+    duration_ms: float = Field(0.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class FeedbackRequest(BaseModel):
+    """User feedback on an agent response."""
+
+    user_id: str = Field("anonymous")
+    rating: int | None = Field(None, ge=1, le=5, description="1-5 star rating")
+    comment: str | None = Field(None)
+    correction: str | None = Field(None, description="Correct answer")
+    feedback_type: str = Field("thumbs", description="thumbs|rating|correction|comment")
+    query: str = Field("", description="Original query")
+    response: str = Field("", description="Agent response being rated")
+    thread_id: str | None = Field(None)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 # ---------------------------------------------------------------------------
 # Router Factory
 # ---------------------------------------------------------------------------
@@ -72,18 +110,22 @@ def create_default_router(
     """Create a full set of auto-generated endpoints for an agent.
 
     Generates:
-      POST /invoke          — sync invocation
-      POST /invoke/stream   — SSE streaming
-      POST /chat            — session-aware chat
-      GET  /health          — per-agent health
-      GET  /config          — agent configuration
-      GET  /prompts         — available prompt versions
-      GET  /card            — A2A agent card
-      POST /a2a/tasks       — A2A task submission
-      GET  /a2a/tasks/{id}  — A2A task status
-      GET  /threads         — list threads
-      GET  /threads/{id}    — get thread
+      POST /invoke              — sync invocation
+      POST /invoke/stream       — SSE streaming
+      POST /chat                — session-aware chat
+      GET  /health              — per-agent health
+      GET  /config              — agent configuration
+      GET  /prompts             — available prompt versions
+      GET  /card                — A2A agent card
+      POST /a2a/tasks           — A2A task submission
+      GET  /a2a/tasks/{id}      — A2A task status
+      GET  /threads             — list threads
+      GET  /threads/{id}        — get thread
       GET  /threads/{id}/messages — get messages
+      POST /optimize/invoke     — optimization invocation (full context)
+      POST /feedback            — submit user feedback
+      GET  /feedback            — list agent feedback
+      GET  /feedback/export     — export feedback as JSONL
 
     Args:
         agent_name: Unique name of the agent.
@@ -366,6 +408,108 @@ def create_default_router(
             "thread_id": thread_id,
             "messages": [],
             "message": "Thread storage not configured",
+        }
+
+    # ── POST /optimize/invoke ─────────────────────────────────────
+    @router.post("/optimize/invoke", response_model=OptimizeInvokeResponse)
+    async def optimize_invoke(request: OptimizeInvokeRequest) -> OptimizeInvokeResponse:
+        """Invoke agent for optimization — returns full pipeline context.
+
+        Unlike /invoke, this endpoint returns retrieval context,
+        tool calls, reasoning steps, and citations — everything
+        needed for DeepEval metrics (faithfulness, contextual_relevancy, etc.).
+        """
+        agent = _get_agent()
+        state = {
+            "current_query": request.query,
+            "user_id": request.user_id,
+            "thread_id": f"opt_{uuid.uuid4().hex[:12]}",
+            "messages": [],
+            "metadata": {
+                **request.context,
+                "_optimize": True,
+                "_include_retrieval_context": request.include_retrieval_context,
+                "_include_steps": request.include_steps,
+            },
+            "steps_taken": [],
+            "response": "",
+            "retrieval_context": [],
+            "tool_calls": [],
+            "reasoning": "",
+        }
+
+        # Inject prompt override
+        if request.system_prompt_override:
+            state["metadata"]["system_prompt_override"] = request.system_prompt_override
+
+        t0 = time.perf_counter()
+        try:
+            if agent.graph_fn:
+                result = await agent.graph_fn().ainvoke(state)
+            elif agent.node_fn:
+                result = await agent.node_fn(state)
+            else:
+                raise HTTPException(500, f"Agent '{agent_name}' has no callable")
+
+            duration_ms = (time.perf_counter() - t0) * 1000
+
+            return OptimizeInvokeResponse(
+                response=result.get("response", str(result)),
+                retrieval_context=result.get("retrieval_context", result.get("context_documents", [])),
+                tool_calls=result.get("tool_calls", result.get("tools_used", [])),
+                steps_taken=result.get("steps_taken", []),
+                reasoning=result.get("reasoning", result.get("chain_of_thought", "")),
+                citations=result.get("citations", []),
+                duration_ms=duration_ms,
+                metadata={k: v for k, v in result.items() if k not in ("response", "retrieval_context", "tool_calls", "steps_taken", "reasoning", "citations")},
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Optimize invoke for {agent_name} failed: {exc}")
+            raise HTTPException(500, f"Optimize invoke failed: {exc}") from exc
+
+    # ── POST /feedback ────────────────────────────────────────────
+    @router.post("/feedback")
+    async def submit_feedback(request: FeedbackRequest) -> dict[str, Any]:
+        """Submit user feedback on an agent response."""
+        from agentomatic.middleware.feedback import get_collector
+        collector = get_collector()
+        record = await collector.record(
+            agent_name=agent_name,
+            user_id=request.user_id,
+            query=request.query,
+            response=request.response,
+            rating=request.rating,
+            comment=request.comment,
+            correction=request.correction,
+            feedback_type=request.feedback_type,
+            thread_id=request.thread_id,
+            metadata=request.metadata,
+        )
+        return {"status": "recorded", "feedback_id": record.feedback_id}
+
+    # ── GET /feedback ─────────────────────────────────────────────
+    @router.get("/feedback")
+    async def list_feedback(limit: int = 50) -> dict[str, Any]:
+        """List feedback for this agent."""
+        from agentomatic.middleware.feedback import get_collector
+        collector = get_collector()
+        records = await collector.get_feedback(agent_name=agent_name, limit=limit)
+        return {"agent": agent_name, "feedback": records, "count": len(records)}
+
+    # ── GET /feedback/export ──────────────────────────────────────
+    @router.get("/feedback/export")
+    async def export_feedback() -> dict[str, Any]:
+        """Export feedback as JSONL for optimization datasets."""
+        from agentomatic.middleware.feedback import get_collector
+        collector = get_collector()
+        jsonl = await collector.export_jsonl(agent_name=agent_name)
+        return {
+            "agent": agent_name,
+            "format": "jsonl",
+            "data": jsonl,
+            "count": len(jsonl.strip().split("\n")) if jsonl.strip() else 0,
         }
 
     return router
