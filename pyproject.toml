@@ -42,7 +42,9 @@ vertex = ["langchain-google-vertexai>=2.0"]
 metrics = ["prometheus-client>=0.21"]
 db = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.20"]
 db-postgres = ["sqlalchemy[asyncio]>=2.0", "asyncpg>=0.30", "psycopg[binary]>=3.2"]
-all = ["agentomatic[langgraph,ollama,metrics,db]"]
+cli = ["rich>=13.0", "questionary>=2.0"]
+ui = ["chainlit>=2.0"]
+all = ["agentomatic[langgraph,ollama,metrics,db,cli]"]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",

@@ -1,0 +1,14 @@
+[project]
+name = "Agentomatic Debug UI"
+enable_telemetry = false
+
+[UI]
+name = "Agentomatic"
+default_theme = "dark"
+
+[UI.theme]
+    [UI.theme.dark]
+    background = "#1a1a2e"
+    paper = "#16213e"
+    primary = "#e94560"
+    secondary = "#0f3460"
