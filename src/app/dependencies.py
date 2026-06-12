@@ -2,7 +2,7 @@
 
 import importlib
 from pathlib import Path
-from typing import Dict, Optional
+
 from loguru import logger
 
 from ..common.base_agent import BaseAgent
@@ -14,8 +14,8 @@ class AgentRegistry:
     """Registry for discovering and managing agents."""
 
     def __init__(self):
-        self._agents: Dict[str, BaseAgent] = {}
-        self._agent_configs: Dict[str, LLMConfig] = {}
+        self._agents: dict[str, BaseAgent] = {}
+        self._agent_configs: dict[str, LLMConfig] = {}
 
     def discover_agents(self) -> None:
         """Discover all agents in the agents package automatically."""
@@ -108,7 +108,7 @@ class AgentRegistry:
                 max_tokens=config.default_max_tokens,
                 streaming=config.enable_streaming,
                 timeout=config.default_timeout,
-                base_url=config.ollama_base_url
+                base_url=config.ollama_base_url,
             )
         elif config.default_llm_provider == LLMProvider.GEMINI:
             return LLMConfig(
@@ -119,7 +119,7 @@ class AgentRegistry:
                 streaming=config.enable_streaming,
                 timeout=config.default_timeout,
                 project_id=config.gemini_project_id,
-                location=config.gemini_location
+                location=config.gemini_location,
             )
         else:
             raise ValueError(f"Unsupported LLM provider: {config.default_llm_provider}")
@@ -145,23 +145,27 @@ class AgentRegistry:
         else:
             # Try old pattern
             old_pattern_dir = agents_dir / f"agent_{agent_name}"
-            if old_pattern_dir.exists() and old_pattern_dir.is_dir() and (old_pattern_dir / "__init__.py").exists():
+            if (
+                old_pattern_dir.exists()
+                and old_pattern_dir.is_dir()
+                and (old_pattern_dir / "__init__.py").exists()
+            ):
                 self._discover_agent_old_pattern(agent_name, old_pattern_dir)
             else:
                 logger.error(f"Agent directory not found for: {agent_name}")
 
-    def get_agent(self, agent_name: str) -> Optional[BaseAgent]:
+    def get_agent(self, agent_name: str) -> BaseAgent | None:
         """Get an agent by name."""
         return self._agents.get(agent_name)
 
-    def list_agents(self) -> Dict[str, Dict[str, str]]:
+    def list_agents(self) -> dict[str, dict[str, str]]:
         """List all registered agents with their information."""
         return {
             name: {
                 "class": agent.__class__.__name__,
                 "llm_provider": agent.llm.config.provider.value,
                 "model": agent.llm.config.model_name,
-                "status": "registered"
+                "status": "registered",
             }
             for name, agent in self._agents.items()
         }
@@ -170,17 +174,14 @@ class AgentRegistry:
         """Get the number of registered agents."""
         return len(self._agents)
 
-    def health_check_all(self) -> Dict[str, Dict]:
+    def health_check_all(self) -> dict[str, dict]:
         """Run health checks on all agents."""
         results = {}
         for name, agent in self._agents.items():
             try:
                 results[name] = agent.health_check()
             except Exception as e:
-                results[name] = {
-                    "status": "error",
-                    "error": str(e)
-                }
+                results[name] = {"status": "error", "error": str(e)}
         return results
 
 

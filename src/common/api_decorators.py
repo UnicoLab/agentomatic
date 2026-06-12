@@ -3,11 +3,13 @@ API decorators for FastAPI endpoints with comprehensive error handling.
 """
 
 import asyncio
-import time
 import functools
+import time
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Dict, Optional, Union
-from fastapi import HTTPException, Request, Response, status
+from typing import Any
+
+from fastapi import HTTPException, status
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
@@ -15,35 +17,37 @@ from pydantic import BaseModel
 
 class APIResponse(BaseModel):
     """Standard API response model."""
+
     success: bool = True
     data: Any = None
     message: str = ""
     timestamp: float = None
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
     def __init__(self, **kwargs):
-        if 'timestamp' not in kwargs:
-            kwargs['timestamp'] = time.time()
+        if "timestamp" not in kwargs:
+            kwargs["timestamp"] = time.time()
         super().__init__(**kwargs)
 
 
 class AgentQueue:
     """Simple queue for agent requests."""
+
     def __init__(self, max_size: int = 100):
         self.queue = asyncio.Queue(maxsize=max_size)
         self.processing = set()
 
-    async def add_request(self, request_data: Dict[str, Any]) -> str:
+    async def add_request(self, request_data: dict[str, Any]) -> str:
         """Add request to queue."""
         request_id = f"req_{int(time.time() * 1000)}"
         await self.queue.put({"id": request_id, "data": request_data})
         return request_id
 
-    async def get_request(self) -> Optional[Dict[str, Any]]:
+    async def get_request(self) -> dict[str, Any] | None:
         """Get next request from queue."""
         try:
             return await asyncio.wait_for(self.queue.get(), timeout=1.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
 
@@ -53,6 +57,7 @@ agent_queue = AgentQueue()
 
 def handle_api_errors(func: Callable) -> Callable:
     """Decorator to handle API errors gracefully."""
+
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         try:
@@ -63,13 +68,15 @@ def handle_api_errors(func: Callable) -> Callable:
             logger.error(f"API error in {func.__name__}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Internal server error: {str(e)}"
+                detail=f"Internal server error: {str(e)}",
             )
+
     return wrapper
 
 
 def log_api_call(func: Callable) -> Callable:
     """Decorator to log API calls."""
+
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -82,6 +89,7 @@ def log_api_call(func: Callable) -> Callable:
             duration = time.time() - start_time
             logger.error(f"API call {func.__name__} failed in {duration:.3f}s: {str(e)}")
             raise
+
     return wrapper
 
 
@@ -100,50 +108,49 @@ def rate_limit(max_calls: int = 100, window_seconds: int = 60) -> Callable:
 
             # Clean old entries
             call_history[client_ip] = [
-                call_time for call_time in call_history[client_ip]
+                call_time
+                for call_time in call_history[client_ip]
                 if current_time - call_time < window_seconds
             ]
 
             # Check rate limit
             if len(call_history[client_ip]) >= max_calls:
                 raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Rate limit exceeded"
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
                 )
 
             call_history[client_ip].append(current_time)
             return await func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 def validate_streaming_support(func: Callable) -> Callable:
     """Decorator to validate streaming support."""
+
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         return await func(*args, **kwargs)
+
     return wrapper
 
 
 async def create_streaming_response(
-    data: Any,
-    agent_name: str,
-    media_type: str = "text/plain"
+    data: Any, agent_name: str, media_type: str = "text/plain"
 ) -> StreamingResponse:
     """Create streaming response."""
+
     async def generate():
-        if hasattr(data, '__aiter__'):
+        if hasattr(data, "__aiter__"):
             async for chunk in data:
                 yield f"data: {chunk}\n\n"
         else:
             yield f"data: {data}\n\n"
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(
-        generate(),
-        media_type=media_type,
-        headers={"X-Agent": agent_name}
-    )
+    return StreamingResponse(generate(), media_type=media_type, headers={"X-Agent": agent_name})
 
 
 @asynccontextmanager
@@ -166,5 +173,5 @@ __all__ = [
     "rate_limit",
     "validate_streaming_support",
     "create_streaming_response",
-    "agent_context"
+    "agent_context",
 ]

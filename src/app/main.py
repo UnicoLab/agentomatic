@@ -1,18 +1,19 @@
 """Main FastAPI application factory."""
 
+import os
+import sys
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
 from loguru import logger
-import sys
-import os
 
-from .settings import config
+from ..common.api_decorators import APIResponse
 from .api import create_api_router
 from .dependencies import agent_registry
-from ..common.api_decorators import APIResponse
+from .settings import config
 
 
 @asynccontextmanager
@@ -59,7 +60,7 @@ def create_app() -> FastAPI:
     logger.add(
         sys.stdout,
         level=config.log_level,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     )
 
     # Get agent name for the app title
@@ -94,8 +95,8 @@ def create_app() -> FastAPI:
                 success=False,
                 error="Validation error",
                 data={"details": exc.errors()},
-                message="Request validation failed"
-            ).model_dump()
+                message="Request validation failed",
+            ).model_dump(),
         )
 
     @app.exception_handler(Exception)
@@ -105,10 +106,8 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=APIResponse(
-                success=False,
-                error=str(exc),
-                message="Internal server error"
-            ).model_dump()
+                success=False, error=str(exc), message="Internal server error"
+            ).model_dump(),
         )
 
     # Root endpoint
@@ -123,9 +122,9 @@ def create_app() -> FastAPI:
                 "description": "Multi-agent architecture with LangGraph and FastAPI",
                 "docs_url": "/docs",
                 "health_url": "/healthz",
-                "agents_url": f"/api/{config.api_version}/agents"
+                "agents_url": f"/api/{config.api_version}/agents",
             },
-            message="Welcome to Vision Backend API"
+            message="Welcome to Vision Backend API",
         )
 
     # Health check endpoint
@@ -143,15 +142,13 @@ def create_app() -> FastAPI:
                     health_info = await agent.health_check()
                     agent_health[agent_name] = health_info
                 except Exception as e:
-                    agent_health[agent_name] = {
-                        "status": "unhealthy",
-                        "error": str(e)
-                    }
+                    agent_health[agent_name] = {"status": "unhealthy", "error": str(e)}
 
-            overall_status = "healthy" if all(
-                info.get("status") == "healthy"
-                for info in agent_health.values()
-            ) else "degraded"
+            overall_status = (
+                "healthy"
+                if all(info.get("status") == "healthy" for info in agent_health.values())
+                else "degraded"
+            )
 
             return APIResponse(
                 data={
@@ -162,20 +159,18 @@ def create_app() -> FastAPI:
                         "default_llm_provider": config.default_llm_provider.value,
                         "streaming_enabled": config.enable_streaming,
                         "queue_enabled": config.enable_queue,
-                        "max_queue_size": config.max_queue_size
-                    }
+                        "max_queue_size": config.max_queue_size,
+                    },
                 },
-                message="Health check completed"
+                message="Health check completed",
             )
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content=APIResponse(
-                    success=False,
-                    error=str(e),
-                    message="Health check failed"
-                ).model_dump()
+                    success=False, error=str(e), message="Health check failed"
+                ).model_dump(),
             )
 
     # Healthz endpoint (alternate endpoint for compatibility)
@@ -186,7 +181,7 @@ def create_app() -> FastAPI:
             "status": "healthy",
             "message": "Service is healthy",
             "timestamp": "2025-06-18T00:00:00Z",  # Mock timestamp for tests
-            "version": "0.1.0"
+            "version": "0.1.0",
         }
 
     # Metrics endpoint for monitoring
@@ -200,19 +195,17 @@ def create_app() -> FastAPI:
                     "total_agents": len(agents_info),
                     "agents": list(agents_info.keys()),
                     "api_version": config.api_version,
-                    "uptime": "healthy"
+                    "uptime": "healthy",
                 },
-                message="Metrics retrieved successfully"
+                message="Metrics retrieved successfully",
             )
         except Exception as e:
             logger.error(f"Metrics collection failed: {e}")
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content=APIResponse(
-                    success=False,
-                    error=str(e),
-                    message="Metrics collection failed"
-                ).model_dump()
+                    success=False, error=str(e), message="Metrics collection failed"
+                ).model_dump(),
             )
 
     # Include API router
@@ -228,6 +221,7 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "src.app.main:app",
         host=config.host,

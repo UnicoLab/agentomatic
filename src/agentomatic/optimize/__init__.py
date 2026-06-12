@@ -33,6 +33,14 @@ Synthetic data::
 from __future__ import annotations
 
 from agentomatic.optimize.dataset import DataPoint, Dataset
+from agentomatic.optimize.loop import (
+    AVAILABLE_STRATEGIES,
+    LoopResult,
+    PromptOptimizationLoop,
+    StepResult,
+    contains_score,
+    keyword_overlap,
+)
 from agentomatic.optimize.metrics import (
     BaseMetric,
     ContainsMetric,
@@ -63,11 +71,19 @@ from agentomatic.optimize.synthesizer import (
 )
 
 __all__ = [
-    # Core
+    # Core — local-first optimization loop
+    "PromptOptimizationLoop",
+    "LoopResult",
+    "StepResult",
+    "AVAILABLE_STRATEGIES",
+    # Core — HTTP-based optimizer
     "PromptOptimizer",
     "OptimizationResult",
     "Dataset",
     "DataPoint",
+    # Built-in scorers
+    "keyword_overlap",
+    "contains_score",
     # Metrics
     "BaseMetric",
     "ContainsMetric",

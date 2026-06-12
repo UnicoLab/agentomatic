@@ -1,8 +1,7 @@
 """Application settings and configuration."""
 
+
 from pydantic_settings import BaseSettings
-from typing import Optional
-from enum import Enum
 
 from ..common.llm_factory import LLMProvider
 
@@ -51,7 +50,7 @@ class AppConfig(BaseSettings):
 
     # Security
     cors_origins: list[str] = ["*"]
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
     class Config:
         env_prefix = "VISION_"

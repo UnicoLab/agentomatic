@@ -2,61 +2,76 @@
 
 import importlib
 import pkgutil
-from typing import Any, Dict, Optional, Union
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Path, status
-from pydantic import BaseModel, Field, ValidationError
-from loguru import logger
+from typing import Any, Union
 
-from .settings import config
-from .dependencies import agent_registry
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, status
+from loguru import logger
+from pydantic import BaseModel, Field, ValidationError
+
 from ..common.api_decorators import (
-    handle_api_errors, log_api_call, rate_limit, validate_streaming_support,
-    create_streaming_response, agent_context, APIResponse
+    APIResponse,
+    agent_context,
+    create_streaming_response,
+    handle_api_errors,
+    log_api_call,
+    rate_limit,
+    validate_streaming_support,
 )
+from .dependencies import agent_registry
+from .settings import config
 
 
 class UniversalAgentInput(BaseModel):
     """Universal input model that can handle any agent's input format."""
-    payload: Dict[str, Any] = Field(..., description="Agent-specific input payload")
+
+    payload: dict[str, Any] = Field(..., description="Agent-specific input payload")
     streaming: bool = Field(default=False, description="Enable streaming response")
     prompt_version: str = Field(default="v1", description="Prompt version to use")
-    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0, description="LLM temperature override")
-    max_tokens: Optional[int] = Field(default=None, ge=1, description="Maximum tokens override")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    temperature: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="LLM temperature override"
+    )
+    max_tokens: int | None = Field(default=None, ge=1, description="Maximum tokens override")
+    metadata: dict[str, Any] | None = Field(default=None, description="Additional metadata")
 
 
 class UniversalAgentResponse(BaseModel):
     """Universal response model for any agent."""
+
     output: Any = Field(..., description="Agent-specific output")
     agent: str = Field(..., description="Agent name that processed the request")
     prompt_version: str = Field(..., description="Prompt version used")
     streaming: bool = Field(default=False, description="Whether response was streamed")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
-    validation_info: Optional[Dict[str, Any]] = Field(default=None, description="Input validation details")
+    metadata: dict[str, Any] | None = Field(default=None, description="Additional metadata")
+    validation_info: dict[str, Any] | None = Field(
+        default=None, description="Input validation details"
+    )
 
 
 class AgentRequest(BaseModel):
     """Base request model for agent interactions."""
+
     input: str
-    context: Optional[str] = ""
+    context: str | None = ""
     streaming: bool = False
     prompt_version: str = "v1"
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    metadata: Optional[Dict[str, Any]] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class AgentResponse(BaseModel):
     """Base response model for agent interactions."""
+
     output: str
     agent: str
     prompt_version: str
     streaming: bool = False
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class PromptInfo(BaseModel):
     """Information about a prompt version."""
+
     version: str
     description: str
     author: str
@@ -72,7 +87,7 @@ def create_api_router() -> APIRouter:
         """Get the proper tag name for an agent."""
         return agent_name.title()
 
-    def validate_agent_input(agent_name: str, payload: Dict[str, Any]) -> Any:
+    def validate_agent_input(agent_name: str, payload: dict[str, Any]) -> Any:
         """Dynamically validate input payload against agent's schema."""
         try:
             # Try to import the agent's schema module
@@ -102,14 +117,14 @@ def create_api_router() -> APIRouter:
                     "error": "Input validation failed",
                     "agent": agent_name,
                     "validation_errors": e.errors(),
-                    "expected_schema": f"{agent_name.title()}Input"
-                }
+                    "expected_schema": f"{agent_name.title()}Input",
+                },
             )
         except Exception as e:
             logger.error(f"Unexpected error validating input for {agent_name}: {e}")
             return payload
 
-    def get_agent_schema_info(agent_name: str) -> Dict[str, Any]:
+    def get_agent_schema_info(agent_name: str) -> dict[str, Any]:
         """Get schema information for an agent."""
         try:
             schema_module = importlib.import_module(f"src.agents.{agent_name}.schemas")
@@ -121,7 +136,7 @@ def create_api_router() -> APIRouter:
                 schema_info = {
                     "schema_class": input_class_name,
                     "fields": {},
-                    "model_config": getattr(input_class, "model_config", {})
+                    "model_config": getattr(input_class, "model_config", {}),
                 }
 
                 # Get field information
@@ -130,7 +145,7 @@ def create_api_router() -> APIRouter:
                         schema_info["fields"][field_name] = {
                             "type": str(field_info.annotation),
                             "required": field_info.is_required(),
-                            "description": getattr(field_info, "description", "")
+                            "description": getattr(field_info, "description", ""),
                         }
 
                 return schema_info
@@ -144,22 +159,21 @@ def create_api_router() -> APIRouter:
 
     # === SYSTEM ENDPOINTS ===
 
-    @router.get(f"/api/{config.api_version}/agents",
-                summary="List all agents",
-                tags=["Agents Management"])
+    @router.get(
+        f"/api/{config.api_version}/agents", summary="List all agents", tags=["Agents Management"]
+    )
     @handle_api_errors
     @log_api_call
     async def list_agents():
         """List all registered agents with their information."""
         agents_info = agent_registry.list_agents()
-        return APIResponse(
-            data=agents_info,
-            message=f"Found {len(agents_info)} registered agents"
-        )
+        return APIResponse(data=agents_info, message=f"Found {len(agents_info)} registered agents")
 
-    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/health",
-                summary="Agent health check",
-                tags=["Agents Management"])
+    @router.get(
+        f"/api/{config.api_version}/agents/{{agent_name}}/health",
+        summary="Agent health check",
+        tags=["Agents Management"],
+    )
     @handle_api_errors
     @log_api_call
     async def agent_health_check(agent_name: str = Path(..., description="Agent name")):
@@ -167,16 +181,17 @@ def create_api_router() -> APIRouter:
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         health_info = await agent.health_check()
         return APIResponse(data=health_info, message="Health check completed")
 
-    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/schema",
-                summary="Get agent input schema",
-                tags=["Agents Management"])
+    @router.get(
+        f"/api/{config.api_version}/agents/{{agent_name}}/schema",
+        summary="Get agent input schema",
+        tags=["Agents Management"],
+    )
     @handle_api_errors
     @log_api_call
     async def get_agent_schema(agent_name: str = Path(..., description="Agent name")):
@@ -184,19 +199,19 @@ def create_api_router() -> APIRouter:
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         schema_info = get_agent_schema_info(agent_name)
         return APIResponse(
-            data=schema_info,
-            message=f"Schema information for agent '{agent_name}'"
+            data=schema_info, message=f"Schema information for agent '{agent_name}'"
         )
 
-    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/prompts",
-                summary="List agent prompts",
-                tags=["Prompts Management"])
+    @router.get(
+        f"/api/{config.api_version}/agents/{{agent_name}}/prompts",
+        summary="List agent prompts",
+        tags=["Prompts Management"],
+    )
     @handle_api_errors
     @log_api_call
     async def list_agent_prompts(agent_name: str = Path(..., description="Agent name")):
@@ -204,8 +219,7 @@ def create_api_router() -> APIRouter:
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         versions = agent.prompt_manager.list_versions()
@@ -214,41 +228,41 @@ def create_api_router() -> APIRouter:
         for version in versions:
             prompt_info = agent.prompt_manager.get_prompt_info(version)
             if prompt_info:
-                prompts_info.append(PromptInfo(
-                    version=prompt_info.version,
-                    description=prompt_info.description,
-                    author=prompt_info.author,
-                    tags=prompt_info.tags,
-                    created_at=prompt_info.created_at.isoformat()
-                ))
+                prompts_info.append(
+                    PromptInfo(
+                        version=prompt_info.version,
+                        description=prompt_info.description,
+                        author=prompt_info.author,
+                        tags=prompt_info.tags,
+                        created_at=prompt_info.created_at.isoformat(),
+                    )
+                )
 
-        return APIResponse(
-            data=prompts_info,
-            message=f"Found {len(prompts_info)} prompt versions"
-        )
+        return APIResponse(data=prompts_info, message=f"Found {len(prompts_info)} prompt versions")
 
-    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/prompts/{{version}}",
-                summary="Get specific prompt",
-                tags=["Prompts Management"])
+    @router.get(
+        f"/api/{config.api_version}/agents/{{agent_name}}/prompts/{{version}}",
+        summary="Get specific prompt",
+        tags=["Prompts Management"],
+    )
     @handle_api_errors
     @log_api_call
     async def get_agent_prompt(
         agent_name: str = Path(..., description="Agent name"),
-        version: str = Path(..., description="Prompt version")
+        version: str = Path(..., description="Prompt version"),
     ):
         """Get a specific prompt version content."""
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         prompt_content = agent.get_prompt(version)
         if not prompt_content:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Prompt version '{version}' not found for agent '{agent_name}'"
+                detail=f"Prompt version '{version}' not found for agent '{agent_name}'",
             )
 
         prompt_info = agent.prompt_manager.get_prompt_info(version)
@@ -260,31 +274,33 @@ def create_api_router() -> APIRouter:
                     description=prompt_info.description,
                     author=prompt_info.author,
                     tags=prompt_info.tags,
-                    created_at=prompt_info.created_at.isoformat()
-                ) if prompt_info else None
+                    created_at=prompt_info.created_at.isoformat(),
+                )
+                if prompt_info
+                else None,
             },
-            message=f"Retrieved prompt version '{version}'"
+            message=f"Retrieved prompt version '{version}'",
         )
 
     # === UNIVERSAL AGENT ENDPOINTS ===
 
-    @router.post(f"/api/{config.api_version}/agents/{{agent_name}}/invoke",
-                 summary="Universal agent invocation with dynamic validation",
-                 tags=["Agents"],
-                 response_model=UniversalAgentResponse)
+    @router.post(
+        f"/api/{config.api_version}/agents/{{agent_name}}/invoke",
+        summary="Universal agent invocation with dynamic validation",
+        tags=["Agents"],
+        response_model=UniversalAgentResponse,
+    )
     @handle_api_errors
     @log_api_call
     @rate_limit(max_calls=config.rate_limit_calls, window_seconds=config.rate_limit_window)
     async def invoke_agent_universal(
-        agent_name: str = Path(..., description="Agent name"),
-        request: UniversalAgentInput = ...
+        agent_name: str = Path(..., description="Agent name"), request: UniversalAgentInput = ...
     ):
         """Universal endpoint that can invoke any agent with proper input validation."""
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         async with agent_context(agent_name):
@@ -296,7 +312,7 @@ def create_api_router() -> APIRouter:
             except Exception as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Input validation error for agent '{agent_name}': {str(e)}"
+                    detail=f"Input validation error for agent '{agent_name}': {str(e)}",
                 )
 
             # Execute the agent with validated input
@@ -311,37 +327,36 @@ def create_api_router() -> APIRouter:
                     metadata=request.metadata,
                     validation_info={
                         "input_schema": f"{agent_name.title()}Input",
-                        "validation_passed": True
-                    }
+                        "validation_passed": True,
+                    },
                 )
             except Exception as e:
                 logger.error(f"Agent {agent_name} execution failed: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Agent execution failed: {str(e)}"
+                    detail=f"Agent execution failed: {str(e)}",
                 )
 
     # === AGENT INTERACTION ENDPOINTS ===
 
-    @router.post(f"/api/{config.api_version}/agents/{{agent_name}}/chat",
-                 summary="Chat with agent",
-                 tags=["Agents"],
-                 response_model=Union[AgentResponse, APIResponse])
+    @router.post(
+        f"/api/{config.api_version}/agents/{{agent_name}}/chat",
+        summary="Chat with agent",
+        tags=["Agents"],
+        response_model=Union[AgentResponse, APIResponse],
+    )
     @handle_api_errors
     @log_api_call
     @rate_limit(max_calls=config.rate_limit_calls, window_seconds=config.rate_limit_window)
     @validate_streaming_support
     async def chat_with_agent(
-        agent_name: str,
-        request: AgentRequest,
-        background_tasks: BackgroundTasks
+        agent_name: str, request: AgentRequest, background_tasks: BackgroundTasks
     ):
         """Chat with a specific agent with support for streaming."""
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         async with agent_context(agent_name):
@@ -350,39 +365,33 @@ def create_api_router() -> APIRouter:
                 version=request.prompt_version,
                 input=request.input,
                 context=request.context or "",
-                history=""  # Could be expanded to include conversation history
+                history="",  # Could be expanded to include conversation history
             )
 
             if not formatted_prompt:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Prompt version '{request.prompt_version}' not available"
+                    detail=f"Prompt version '{request.prompt_version}' not available",
                 )
 
             # Override LLM config with request parameters
             generation_kwargs = {}
             if request.temperature is not None:
-                generation_kwargs['temperature'] = request.temperature
+                generation_kwargs["temperature"] = request.temperature
             if request.max_tokens is not None:
-                generation_kwargs['max_tokens'] = request.max_tokens
+                generation_kwargs["max_tokens"] = request.max_tokens
 
             # Generate response
             if request.streaming:
                 response_generator = await agent.generate_response(
-                    formatted_prompt,
-                    streaming=True,
-                    **generation_kwargs
+                    formatted_prompt, streaming=True, **generation_kwargs
                 )
                 return await create_streaming_response(
-                    response_generator,
-                    agent_name,
-                    media_type="text/event-stream"
+                    response_generator, agent_name, media_type="text/event-stream"
                 )
             else:
                 response_content = await agent.generate_response(
-                    formatted_prompt,
-                    streaming=False,
-                    **generation_kwargs
+                    formatted_prompt, streaming=False, **generation_kwargs
                 )
 
                 return APIResponse(
@@ -391,16 +400,18 @@ def create_api_router() -> APIRouter:
                         agent=agent_name,
                         prompt_version=request.prompt_version,
                         streaming=False,
-                        metadata=request.metadata
+                        metadata=request.metadata,
                     ),
-                    message="Response generated successfully"
+                    message="Response generated successfully",
                 )
 
     # === AGENT CAPABILITIES ENDPOINTS ===
 
-    @router.get(f"/api/{config.api_version}/agents/{{agent_name}}/capabilities",
-                summary="Get agent capabilities",
-                tags=["Agents Management"])
+    @router.get(
+        f"/api/{config.api_version}/agents/{{agent_name}}/capabilities",
+        summary="Get agent capabilities",
+        tags=["Agents Management"],
+    )
     @handle_api_errors
     @log_api_call
     async def get_agent_capabilities(agent_name: str = Path(..., description="Agent name")):
@@ -408,36 +419,33 @@ def create_api_router() -> APIRouter:
         agent = agent_registry.get_agent(agent_name)
         if not agent:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent '{agent_name}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Agent '{agent_name}' not found"
             )
 
         # Get basic agent information
         capabilities = {
             "name": agent_name,
             "type": type(agent).__name__,
-            "streaming_supported": hasattr(agent, 'supports_streaming') and agent.supports_streaming,
+            "streaming_supported": hasattr(agent, "supports_streaming")
+            and agent.supports_streaming,
             "prompt_versions": [],
             "input_schema": get_agent_schema_info(agent_name),
             "features": {
-                "batch_processing": hasattr(agent, 'process_batch'),
+                "batch_processing": hasattr(agent, "process_batch"),
                 "async_execution": True,
                 "context_aware": True,
-                "configurable": hasattr(agent, 'config')
-            }
+                "configurable": hasattr(agent, "config"),
+            },
         }
 
         # Get available prompt versions if available
         try:
-            if hasattr(agent, 'prompt_manager'):
+            if hasattr(agent, "prompt_manager"):
                 capabilities["prompt_versions"] = agent.prompt_manager.list_versions()
         except Exception:
             capabilities["prompt_versions"] = ["v1"]  # Default
 
-        return APIResponse(
-            data=capabilities,
-            message=f"Capabilities for agent '{agent_name}'"
-        )
+        return APIResponse(data=capabilities, message=f"Capabilities for agent '{agent_name}'")
 
     # === UTILITY FUNCTIONS ===
 
@@ -465,8 +473,7 @@ def _include_agent_routers(main_router: APIRouter) -> None:
 
         # Walk through all agent modules (both old and new patterns)
         for _, module_name, _ in pkgutil.iter_modules(
-            agents_package.__path__,
-            agents_package.__name__ + "."
+            agents_package.__path__, agents_package.__name__ + "."
         ):
             agent_name = module_name.split(".")[-1]
 
@@ -487,9 +494,7 @@ def _include_agent_routers(main_router: APIRouter) -> None:
                     agent_tag = actual_agent_name.title()
 
                     main_router.include_router(
-                        api_module.router,
-                        prefix=route_prefix,
-                        tags=[agent_tag]
+                        api_module.router, prefix=route_prefix, tags=[agent_tag]
                     )
                     logger.info(f"Included API router for agent: {actual_agent_name}")
 

@@ -1,16 +1,17 @@
 """Beta Agent - Simplified implementation with reasoning focus."""
 
-from typing import Dict, Any
-from langgraph.graph import StateGraph, END
-from langgraph.types import Command
+from typing import Any
+
 from langchain_core.messages import HumanMessage
+from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 
 from ...common.base_agent import BaseAgent
-from ...common.llm_factory import LLMFactory, LLMConfig, LLMProvider
-from .state import AgentState  # Use local state
+from ...common.llm_factory import LLMConfig, LLMFactory, LLMProvider
 from ...common.prompt_manager import PromptManager
 from .config import BetaConfig
 from .schemas import BetaOutput
+from .state import AgentState  # Use local state
 
 
 class BetaAgent(BaseAgent):
@@ -25,18 +26,14 @@ class BetaAgent(BaseAgent):
             temperature=agent_config.temperature,
             max_tokens=agent_config.max_tokens,
             timeout=agent_config.timeout,
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
         )
 
         # Create LLM and prompt manager
         llm = LLMFactory.create_llm_sync(llm_config)
         prompt_manager = PromptManager("beta")
 
-        super().__init__(
-            name="beta",
-            llm=llm,
-            prompt_manager=prompt_manager
-        )
+        super().__init__(name="beta", llm=llm, prompt_manager=prompt_manager)
 
         self.config = agent_config
 
@@ -56,10 +53,7 @@ class BetaAgent(BaseAgent):
         graph.add_conditional_edges(
             "classify",
             self._route_processing,
-            {
-                "simple": "process_simple",
-                "complex": "process_complex"
-            }
+            {"simple": "process_simple", "complex": "process_complex"},
         )
 
         # Connect to end
@@ -68,7 +62,7 @@ class BetaAgent(BaseAgent):
 
         return graph.compile()
 
-    async def _classify_node(self, state: Dict[str, Any]) -> Command:
+    async def _classify_node(self, state: dict[str, Any]) -> Command:
         """Classify input complexity."""
         try:
             messages = state.get("messages", [])
@@ -78,48 +72,50 @@ class BetaAgent(BaseAgent):
             user_input = messages[-1].content
 
             # Simple classification logic
-            complexity = "complex" if len(user_input.split()) > 20 or "analyze" in user_input.lower() else "simple"
-
-            return Command(
-                update={"classification": complexity},
-                goto=complexity
+            complexity = (
+                "complex"
+                if len(user_input.split()) > 20 or "analyze" in user_input.lower()
+                else "simple"
             )
+
+            return Command(update={"classification": complexity}, goto=complexity)
 
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
 
-    def _route_processing(self, state: Dict[str, Any]) -> str:
+    def _route_processing(self, state: dict[str, Any]) -> str:
         """Route based on classification."""
         return state.get("classification", "simple")
 
-    async def _process_simple_node(self, state: Dict[str, Any]) -> Command:
+    async def _process_simple_node(self, state: dict[str, Any]) -> Command:
         """Process simple inputs."""
         try:
             messages = state.get("messages", [])
             user_input = messages[-1].content
 
-            prompt = self.format_prompt("simple_processing", input=user_input, context=state.get("context", ""))
+            prompt = self.format_prompt(
+                "simple_processing", input=user_input, context=state.get("context", "")
+            )
             if not prompt:
                 prompt = f"You are Beta, an analytical AI assistant. Process this simple request: {user_input}"
 
             response = await self.generate_response(prompt)
 
-            return Command(
-                update={"output": response, "completed": True},
-                goto=END
-            )
+            return Command(update={"output": response, "completed": True}, goto=END)
 
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
 
-    async def _process_complex_node(self, state: Dict[str, Any]) -> Command:
+    async def _process_complex_node(self, state: dict[str, Any]) -> Command:
         """Process complex inputs with detailed analysis."""
         try:
             messages = state.get("messages", [])
             user_input = messages[-1].content
 
             # Multi-step processing for complex inputs
-            analysis_prompt = self.format_prompt("analysis", problem=user_input, context=state.get("context", ""))
+            analysis_prompt = self.format_prompt(
+                "analysis", problem=user_input, context=state.get("context", "")
+            )
             if not analysis_prompt:
                 analysis_prompt = f"Analyze this complex problem step by step: {user_input}"
 
@@ -133,10 +129,7 @@ class BetaAgent(BaseAgent):
 
             final_response = f"Analysis: {analysis}\n\nSolution: {solution}"
 
-            return Command(
-                update={"output": final_response, "completed": True},
-                goto=END
-            )
+            return Command(update={"output": final_response, "completed": True}, goto=END)
 
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
@@ -144,7 +137,7 @@ class BetaAgent(BaseAgent):
     async def run(self, input_data, streaming: bool = False):
         """Run the Beta agent."""
         # Convert input to proper format
-        if hasattr(input_data, 'problem'):
+        if hasattr(input_data, "problem"):
             problem = input_data.problem
             context = f"Domain: {getattr(input_data, 'domain', '')}"
         else:
@@ -160,7 +153,7 @@ class BetaAgent(BaseAgent):
             output=None,
             completed=False,
             error=None,
-            metadata={}
+            metadata={},
         )
 
         if streaming:
@@ -183,7 +176,7 @@ class BetaAgent(BaseAgent):
                 risk_assessment="Low risk",
                 confidence=0.85,
                 tokens_used=len(output) if output else 0,
-                processing_time=0.0
+                processing_time=0.0,
             )
         except Exception as e:
             # Return error response
@@ -195,7 +188,7 @@ class BetaAgent(BaseAgent):
                 risk_assessment="High risk - execution failed",
                 confidence=0.0,
                 tokens_used=len(error_msg),
-                processing_time=0.0
+                processing_time=0.0,
             )
 
     async def _stream_response(self, initial_state):

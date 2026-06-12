@@ -1,12 +1,14 @@
 """Base agent class for all LangGraph agents."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Union, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
+
 from langgraph.graph import StateGraph
 from loguru import logger
 from pydantic import BaseModel
 
-from .llm_factory import LLMFactory, LLMConfig, LLMProvider, BaseLLMWrapper
+from .llm_factory import BaseLLMWrapper
 from .prompt_manager import PromptManager
 
 
@@ -34,13 +36,13 @@ class BaseAgent(ABC):
         self.name = name
         self.llm = llm
         self.prompt_manager = prompt_manager
-        self.graph: Optional[StateGraph] = None
+        self.graph: StateGraph | None = None
 
         # Build the graph after initialization
         self.graph = self.build_graph()
         logger.info(f"Initialized {name} agent")
 
-    def get_prompt(self, version: str = "v1") -> Optional[str]:
+    def get_prompt(self, version: str = "v1") -> str | None:
         """Get a prompt template string by version.
 
         Args:
@@ -51,7 +53,7 @@ class BaseAgent(ABC):
         """
         return self.prompt_manager.get_prompt(version)
 
-    def format_prompt(self, version: str = "v1", **kwargs) -> Optional[str]:
+    def format_prompt(self, version: str = "v1", **kwargs) -> str | None:
         """Format a prompt with given variables.
 
         Args:
@@ -64,11 +66,8 @@ class BaseAgent(ABC):
         return self.prompt_manager.format_prompt(version, **kwargs)
 
     async def generate_response(
-        self,
-        prompt: str,
-        streaming: bool = False,
-        **kwargs
-    ) -> Union[str, AsyncIterator[str]]:
+        self, prompt: str, streaming: bool = False, **kwargs
+    ) -> str | AsyncIterator[str]:
         """Generate a response using the configured LLM.
 
         Args:
@@ -81,7 +80,7 @@ class BaseAgent(ABC):
         """
         return await self.llm.generate(prompt, streaming=streaming, **kwargs)
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check agent health including LLM and prompt availability.
 
         Returns:
@@ -98,15 +97,11 @@ class BaseAgent(ABC):
                 "llm_provider": self.llm.config.provider.value,
                 "model_name": self.llm.config.model_name,
                 "prompt_versions": prompt_versions,
-                "graph_ready": self.graph is not None
+                "graph_ready": self.graph is not None,
             }
         except Exception as e:
             logger.error(f"Health check failed for {self.name}: {e}")
-            return {
-                "agent": self.name,
-                "status": "unhealthy",
-                "error": str(e)
-            }
+            return {"agent": self.name, "status": "unhealthy", "error": str(e)}
 
     @abstractmethod
     def build_graph(self) -> StateGraph:
@@ -119,10 +114,8 @@ class BaseAgent(ABC):
 
     @abstractmethod
     async def run(
-        self,
-        input_data: BaseModel,
-        streaming: bool = False
-    ) -> Union[BaseModel, AsyncIterator[str]]:
+        self, input_data: BaseModel, streaming: bool = False
+    ) -> BaseModel | AsyncIterator[str]:
         """Run the agent with the given input.
 
         Args:

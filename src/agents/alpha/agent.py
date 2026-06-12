@@ -1,16 +1,17 @@
 """Alpha Agent - Simplified implementation."""
 
 from typing import Any
-from langgraph.graph import StateGraph, END
-from langgraph.types import Command
+
 from langchain_core.messages import HumanMessage
+from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 
 from ...common.base_agent import BaseAgent
-from ...common.llm_factory import LLMFactory, LLMConfig, LLMProvider
-from .state import AgentState  # Use local state
+from ...common.llm_factory import LLMConfig, LLMFactory, LLMProvider
 from ...common.prompt_manager import PromptManager
 from .config import AlphaConfig
 from .schemas import AlphaOutput
+from .state import AgentState  # Use local state
 
 
 class AlphaAgent(BaseAgent):
@@ -25,18 +26,14 @@ class AlphaAgent(BaseAgent):
             temperature=agent_config.temperature,
             max_tokens=agent_config.max_tokens,
             timeout=agent_config.timeout,
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
         )
 
         # Create LLM and prompt manager
         llm = LLMFactory.create_llm_sync(llm_config)
         prompt_manager = PromptManager("alpha")
 
-        super().__init__(
-            name="alpha",
-            llm=llm,
-            prompt_manager=prompt_manager
-        )
+        super().__init__(name="alpha", llm=llm, prompt_manager=prompt_manager)
 
         self.config = agent_config
 
@@ -58,10 +55,7 @@ class AlphaAgent(BaseAgent):
         try:
             messages = state.get("messages", [])
             if not messages:
-                return Command(
-                    update={"error": "No input provided"},
-                    goto=END
-                )
+                return Command(update={"error": "No input provided"}, goto=END)
 
             user_input = messages[-1].content
 
@@ -73,26 +67,17 @@ class AlphaAgent(BaseAgent):
 
             response = await self.generate_response(prompt)
 
-            return Command(
-                update={
-                    "output": response,
-                    "completed": True
-                },
-                goto=END
-            )
+            return Command(update={"output": response, "completed": True}, goto=END)
 
         except Exception as e:
-            return Command(
-                update={"error": str(e)},
-                goto=END
-            )
+            return Command(update={"error": str(e)}, goto=END)
 
     async def run(self, input_data, streaming: bool = False) -> AlphaOutput:
         """Run the Alpha agent."""
         # Convert input to proper format
-        if hasattr(input_data, 'query'):
+        if hasattr(input_data, "query"):
             query = input_data.query
-            context = getattr(input_data, 'context', "")
+            context = getattr(input_data, "context", "")
         else:
             query = str(input_data)
             context = ""
@@ -106,7 +91,7 @@ class AlphaAgent(BaseAgent):
             output=None,
             completed=False,
             error=None,
-            metadata={}
+            metadata={},
         )
 
         if streaming:
@@ -127,7 +112,7 @@ class AlphaAgent(BaseAgent):
                 confidence=0.8,  # Default confidence
                 tokens_used=len(output) if output else 0,
                 processing_time=0.0,  # Could be tracked
-                prompt_version="v1"
+                prompt_version="v1",
             )
         except Exception as e:
             # Return error response
@@ -137,7 +122,7 @@ class AlphaAgent(BaseAgent):
                 confidence=0.0,
                 tokens_used=len(error_msg),
                 processing_time=0.0,
-                prompt_version="v1"
+                prompt_version="v1",
             )
 
     async def _stream_response(self, initial_state):

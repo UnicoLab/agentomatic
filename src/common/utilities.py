@@ -1,11 +1,13 @@
 """Common utilities for the application."""
 
 import asyncio
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+
 from loguru import logger
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
@@ -22,6 +24,7 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
             # May fail sometimes
             pass
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         async def async_wrapper(*args, **kwargs) -> T:
@@ -37,10 +40,14 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
                 except Exception as e:
                     last_exception = e
                     if attempt == max_attempts - 1:
-                        logger.error(f"Function {func.__name__} failed after {max_attempts} attempts: {e}")
+                        logger.error(
+                            f"Function {func.__name__} failed after {max_attempts} attempts: {e}"
+                        )
                         raise
 
-                    logger.warning(f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {current_delay}s...")
+                    logger.warning(
+                        f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {current_delay}s..."
+                    )
                     await asyncio.sleep(current_delay)
                     current_delay *= backoff
 
@@ -57,11 +64,16 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
                 except Exception as e:
                     last_exception = e
                     if attempt == max_attempts - 1:
-                        logger.error(f"Function {func.__name__} failed after {max_attempts} attempts: {e}")
+                        logger.error(
+                            f"Function {func.__name__} failed after {max_attempts} attempts: {e}"
+                        )
                         raise
 
-                    logger.warning(f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {current_delay}s...")
+                    logger.warning(
+                        f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {current_delay}s..."
+                    )
                     import time
+
                     time.sleep(current_delay)
                     current_delay *= backoff
 
@@ -90,6 +102,7 @@ def validate_json(data: Any) -> bool:
     """
     try:
         import json
+
         json.dumps(data)
         return True
     except (TypeError, ValueError):
@@ -109,9 +122,10 @@ def sanitize_agent_name(name: str) -> str:
         clean_name = sanitize_agent_name("Agent Alpha!")  # "agent_alpha"
     """
     import re
+
     # Convert to lowercase and replace non-alphanumeric chars with underscores
-    sanitized = re.sub(r'[^a-zA-Z0-9]', '_', name.lower())
+    sanitized = re.sub(r"[^a-zA-Z0-9]", "_", name.lower())
     # Remove multiple consecutive underscores
-    sanitized = re.sub(r'_+', '_', sanitized)
+    sanitized = re.sub(r"_+", "_", sanitized)
     # Remove leading/trailing underscores
-    return sanitized.strip('_')
+    return sanitized.strip("_")

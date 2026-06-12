@@ -1,23 +1,24 @@
 """Common agent state management."""
 
-from typing import Dict, Any, List, Optional
-from typing_extensions import TypedDict
+from typing import Any
+
 from langchain_core.messages import BaseMessage
+from typing_extensions import TypedDict
 
 
 class AgentState(TypedDict):
     """Common state schema for all agents."""
 
     # Core fields
-    messages: List[BaseMessage]
+    messages: list[BaseMessage]
     context: str
     agent_name: str
 
     # Processing fields
-    classification: Optional[str]
-    output: Optional[str]
+    classification: str | None
+    output: str | None
     completed: bool
-    error: Optional[str]
+    error: str | None
 
     # Metadata
-    metadata: Optional[Dict[str, Any]]
+    metadata: dict[str, Any] | None

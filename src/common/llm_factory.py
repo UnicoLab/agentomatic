@@ -1,22 +1,24 @@
 """LLM factory for creating different LLM providers with unified interface."""
 
-from enum import Enum
-from typing import Optional, Dict, Any, AsyncGenerator, Union
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-import asyncio
+from enum import Enum
+from typing import Any
+
 from loguru import logger
 
 try:
-    from langchain_ollama import ChatOllama
-    from langchain_google_vertexai import ChatVertexAI
     from langchain_core.messages import HumanMessage
+    from langchain_google_vertexai import ChatVertexAI
+    from langchain_ollama import ChatOllama
 except ImportError as e:
     logger.warning(f"Some LLM dependencies not installed: {e}")
 
 
 class LLMProvider(Enum):
     """Supported LLM providers."""
+
     OLLAMA = "ollama"
     GEMINI = "gemini"
 
@@ -24,6 +26,7 @@ class LLMProvider(Enum):
 @dataclass
 class LLMConfig:
     """Configuration for LLM instances."""
+
     provider: LLMProvider
     model_name: str
     temperature: float = 0.7
@@ -32,12 +35,12 @@ class LLMConfig:
     timeout: int = 30
 
     # Provider-specific configs
-    base_url: Optional[str] = None  # For Ollama
-    project_id: Optional[str] = None  # For Gemini
-    location: Optional[str] = None    # For Gemini
-    api_key: Optional[str] = None     # For any provider that needs it
+    base_url: str | None = None  # For Ollama
+    project_id: str | None = None  # For Gemini
+    location: str | None = None  # For Gemini
+    api_key: str | None = None  # For any provider that needs it
 
-    def model_dump(self) -> Dict[str, Any]:
+    def model_dump(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "provider": self.provider.value,
@@ -49,7 +52,7 @@ class LLMConfig:
             "base_url": self.base_url,
             "api_key": "***" if self.api_key else None,
             "project_id": self.project_id,
-            "location": self.location
+            "location": self.location,
         }
 
 
@@ -68,11 +71,8 @@ class BaseLLMWrapper(ABC):
 
     @abstractmethod
     async def generate(
-        self,
-        prompt: str,
-        streaming: bool = False,
-        **kwargs
-    ) -> Union[str, AsyncGenerator[str, None]]:
+        self, prompt: str, streaming: bool = False, **kwargs
+    ) -> str | AsyncGenerator[str, None]:
         """Generate response from the LLM."""
         pass
 
@@ -98,7 +98,7 @@ class OllamaWrapper(BaseLLMWrapper):
                 base_url=self.config.base_url or "http://localhost:11434",
                 temperature=self.config.temperature,
                 num_predict=self.config.max_tokens,
-                timeout=self.config.timeout
+                timeout=self.config.timeout,
             )
             self._initialized = True
             logger.info(f"Initialized Ollama with model: {self.config.model_name}")
@@ -107,11 +107,8 @@ class OllamaWrapper(BaseLLMWrapper):
             raise
 
     async def generate(
-        self,
-        prompt: str,
-        streaming: bool = False,
-        **kwargs
-    ) -> Union[str, AsyncGenerator[str, None]]:
+        self, prompt: str, streaming: bool = False, **kwargs
+    ) -> str | AsyncGenerator[str, None]:
         """Generate response from Ollama."""
         await self.ensure_initialized()
 
@@ -132,7 +129,7 @@ class OllamaWrapper(BaseLLMWrapper):
         """Stream generate responses from Ollama."""
         try:
             async for chunk in self._llm.astream([message]):
-                if hasattr(chunk, 'content') and chunk.content:
+                if hasattr(chunk, "content") and chunk.content:
                     yield chunk.content
         except Exception as e:
             logger.error(f"Ollama streaming failed: {e}")
@@ -161,7 +158,7 @@ class GeminiWrapper(BaseLLMWrapper):
                 project=self.config.project_id,
                 location=self.config.location or "us-central1",
                 temperature=self.config.temperature,
-                max_output_tokens=self.config.max_tokens
+                max_output_tokens=self.config.max_tokens,
             )
             self._initialized = True
             logger.info(f"Initialized Gemini with model: {self.config.model_name}")
@@ -170,11 +167,8 @@ class GeminiWrapper(BaseLLMWrapper):
             raise
 
     async def generate(
-        self,
-        prompt: str,
-        streaming: bool = False,
-        **kwargs
-    ) -> Union[str, AsyncGenerator[str, None]]:
+        self, prompt: str, streaming: bool = False, **kwargs
+    ) -> str | AsyncGenerator[str, None]:
         """Generate response from Gemini."""
         await self.ensure_initialized()
 
@@ -195,7 +189,7 @@ class GeminiWrapper(BaseLLMWrapper):
         """Stream generate responses from Gemini."""
         try:
             async for chunk in self._llm.astream([message]):
-                if hasattr(chunk, 'content') and chunk.content:
+                if hasattr(chunk, "content") and chunk.content:
                     yield chunk.content
         except Exception as e:
             logger.error(f"Gemini streaming failed: {e}")
@@ -216,7 +210,7 @@ class GeminiWrapper(BaseLLMWrapper):
 class LLMFactory:
     """Factory for creating LLM instances."""
 
-    _instances: Dict[str, BaseLLMWrapper] = {}
+    _instances: dict[str, BaseLLMWrapper] = {}
 
     @classmethod
     async def create_llm(cls, config: LLMConfig) -> BaseLLMWrapper:
@@ -262,7 +256,7 @@ class LLMFactory:
         return instance
 
     @classmethod
-    def get_instance(cls, config: LLMConfig) -> Optional[BaseLLMWrapper]:
+    def get_instance(cls, config: LLMConfig) -> BaseLLMWrapper | None:
         """Get cached LLM instance without creating new one."""
         cache_key = f"{config.provider.value}:{config.model_name}:{config.base_url or ''}"
         return cls._instances.get(cache_key)
@@ -274,13 +268,13 @@ class LLMFactory:
         logger.info("Cleared LLM factory cache")
 
     @classmethod
-    def list_instances(cls) -> Dict[str, Dict[str, Any]]:
+    def list_instances(cls) -> dict[str, dict[str, Any]]:
         """List all cached LLM instances."""
         return {
             key: {
                 "provider": instance.config.provider.value,
                 "model_name": instance.config.model_name,
-                "initialized": instance._initialized
+                "initialized": instance._initialized,
             }
             for key, instance in cls._instances.items()
         }
