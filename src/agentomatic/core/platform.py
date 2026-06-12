@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,9 @@ from .lifespan import configure_logging
 from .manifest import AgentManifest, RegisteredAgent
 from .registry import AgentRegistry
 from .router_factory import create_default_router
+
+if TYPE_CHECKING:
+    from agentomatic.storage.base import BaseStore
 
 
 class AgentPlatform:
@@ -26,6 +29,21 @@ class AgentPlatform:
         platform = AgentPlatform.from_folder("agents/")
         app = platform.build()
         # uvicorn main:app --reload
+
+    With storage + middleware::
+
+        from agentomatic import AgentPlatform
+        from agentomatic.storage import MemoryStore
+
+        platform = AgentPlatform.from_folder(
+            "agents/",
+            store=MemoryStore(),
+            enable_auth=True,
+            auth_api_key="secret",
+            enable_rate_limit=True,
+            enable_metrics=True,
+        )
+        app = platform.build()
     """
 
     def __init__(
@@ -40,6 +58,18 @@ class AgentPlatform:
         cors_origins: list[str] | None = None,
         log_level: str = "INFO",
         settings: Any = None,
+        # --- Storage ---
+        store: BaseStore | None = None,
+        # --- Middleware toggles ---
+        enable_logging: bool = True,
+        enable_auth: bool = False,
+        auth_api_key: str = "",
+        enable_rate_limit: bool = False,
+        rate_limit_requests: int = 100,
+        rate_limit_window: int = 60,
+        enable_metrics: bool = False,
+        # --- Custom middleware ---
+        middleware: list[tuple[type, dict[str, Any]]] | None = None,
     ) -> None:
         """Initialise the platform.
 
@@ -52,7 +82,16 @@ class AgentPlatform:
             package_prefix: Python import prefix for agents.
             cors_origins: Allowed CORS origins (default ``["*"]``).
             log_level: Root log level.
-            settings: Optional settings object forwarded to hooks.
+            settings: Optional :class:`PlatformSettings` object.
+            store: Pluggable storage backend (``BaseStore`` subclass).
+            enable_logging: Add request-logging middleware.
+            enable_auth: Add API-key auth middleware.
+            auth_api_key: API key (required when ``enable_auth=True``).
+            enable_rate_limit: Add rate-limiting middleware.
+            rate_limit_requests: Max requests per window.
+            rate_limit_window: Window duration in seconds.
+            enable_metrics: Add Prometheus metrics middleware.
+            middleware: Custom middleware list ``[(MiddlewareClass, {kwargs}), ...]``.
         """
         self.agents_dir = Path(agents_dir).resolve()
         self.title = title
@@ -64,6 +103,20 @@ class AgentPlatform:
         self.log_level = log_level
         self.settings = settings
 
+        # Storage
+        self._store = store
+
+        # Middleware config
+        self._enable_logging = enable_logging
+        self._enable_auth = enable_auth
+        self._auth_api_key = auth_api_key
+        self._enable_rate_limit = enable_rate_limit
+        self._rate_limit_requests = rate_limit_requests
+        self._rate_limit_window = rate_limit_window
+        self._enable_metrics = enable_metrics
+        self._custom_middleware = middleware or []
+
+        # Internal
         self._registry = AgentRegistry()
         self._on_startup: list[Callable[..., Any]] = []
         self._on_shutdown: list[Callable[..., Any]] = []
@@ -99,6 +152,16 @@ class AgentPlatform:
     def registry(self) -> AgentRegistry:
         """Access the agent registry."""
         return self._registry
+
+    @property
+    def store(self) -> BaseStore | None:
+        """Access the storage backend."""
+        return self._store
+
+    @store.setter
+    def store(self, value: BaseStore) -> None:
+        """Set the storage backend."""
+        self._store = value
 
     # ------------------------------------------------------------------
     # Programmatic registration
@@ -136,26 +199,12 @@ class AgentPlatform:
     # ------------------------------------------------------------------
 
     def on_startup(self, fn: Callable[..., Any]) -> Callable[..., Any]:
-        """Register a startup hook (decorator).
-
-        Args:
-            fn: Callable to run during application startup.
-
-        Returns:
-            The original callable (unchanged).
-        """
+        """Register a startup hook (decorator)."""
         self._on_startup.append(fn)
         return fn
 
     def on_shutdown(self, fn: Callable[..., Any]) -> Callable[..., Any]:
-        """Register a shutdown hook (decorator).
-
-        Args:
-            fn: Callable to run during application shutdown.
-
-        Returns:
-            The original callable (unchanged).
-        """
+        """Register a shutdown hook (decorator)."""
         self._on_shutdown.append(fn)
         return fn
 
@@ -164,14 +213,7 @@ class AgentPlatform:
     # ------------------------------------------------------------------
 
     def include_router(self, router: Any, prefix: str = "", **kwargs: Any) -> None:
-        """Add a custom router to the platform.
-
-        Args:
-            router: A :class:`~fastapi.APIRouter` instance.
-            prefix: URL prefix.
-            **kwargs: Extra arguments forwarded to
-                :meth:`~fastapi.FastAPI.include_router`.
-        """
+        """Add a custom router to the platform."""
         self._extra_routers.append((prefix, router, kwargs))
 
     # ------------------------------------------------------------------
@@ -183,10 +225,11 @@ class AgentPlatform:
 
         This is the main method.  It:
           1. Creates the FastAPI app with lifespan
-          2. Adds middleware (CORS, etc.)
+          2. Adds middleware (CORS, auth, rate-limit, metrics, logging)
           3. Discovers agents from the folder
           4. Auto-generates endpoints per agent
-          5. Mounts everything
+          5. Wires storage into routers
+          6. Mounts everything
 
         Returns:
             Configured :class:`~fastapi.FastAPI` application.
@@ -203,6 +246,11 @@ class AgentPlatform:
             configure_logging(platform.log_level)
             logger.info(f"🚀 {platform.title} starting...")
             logger.info(f"📂 Agents directory: {platform.agents_dir}")
+
+            # Initialize storage if configured
+            if platform._store:
+                await platform._store.initialize()
+                logger.info("🗄️ Storage backend initialized")
 
             # Ensure agents directory is importable
             parent = str(platform.agents_dir.parent)
@@ -221,6 +269,7 @@ class AgentPlatform:
                     agent.router = create_default_router(
                         agent_name=name,
                         registry=platform._registry,
+                        thread_store=platform._store,
                     )
                     logger.debug(f"  📌 Auto-generated router for {name}")
                 if agent.router and agent.manifest.is_subagent:
@@ -241,6 +290,11 @@ class AgentPlatform:
             yield
 
             # --- Shutdown ---
+            # Close storage
+            if platform._store:
+                await platform._store.close()
+                logger.info("🗄️ Storage backend closed")
+
             for hook in platform._on_shutdown:
                 result = hook()
                 if hasattr(result, "__await__"):
@@ -255,7 +309,11 @@ class AgentPlatform:
             lifespan=lifespan,
         )
 
-        # CORS middleware
+        # ------------------------------------------------------------------
+        # Middleware pipeline (added in reverse order — last added = first run)
+        # ------------------------------------------------------------------
+
+        # CORS (always)
         app.add_middleware(
             CORSMiddleware,
             allow_origins=self.cors_origins,
@@ -263,6 +321,39 @@ class AgentPlatform:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+        # Logging
+        if self._enable_logging:
+            from agentomatic.middleware.logging import LoggingMiddleware
+            app.add_middleware(LoggingMiddleware)
+
+        # Auth
+        if self._enable_auth and self._auth_api_key:
+            from agentomatic.middleware.auth import AuthMiddleware
+            app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
+            logger.info("🔒 Auth middleware enabled")
+
+        # Rate limiting
+        if self._enable_rate_limit:
+            from agentomatic.middleware.rate_limit import RateLimitMiddleware
+            app.add_middleware(
+                RateLimitMiddleware,
+                max_requests=self._rate_limit_requests,
+                window_seconds=self._rate_limit_window,
+            )
+            logger.info(
+                f"🚦 Rate limit: {self._rate_limit_requests} req/{self._rate_limit_window}s"
+            )
+
+        # Metrics
+        if self._enable_metrics:
+            from agentomatic.middleware.metrics import MetricsMiddleware
+            app.add_middleware(MetricsMiddleware)
+            logger.info("📊 Metrics middleware enabled")
+
+        # Custom middleware
+        for mw_cls, mw_kwargs in self._custom_middleware:
+            app.add_middleware(mw_cls, **mw_kwargs)
 
         # ------------------------------------------------------------------
         # Mount routers for PRE-REGISTERED (programmatic) agents immediately
@@ -272,6 +363,7 @@ class AgentPlatform:
                 agent.router = create_default_router(
                     agent_name=name,
                     registry=self._registry,
+                    thread_store=self._store,
                 )
             if agent.router and agent.manifest.is_subagent:
                 app.include_router(
@@ -286,13 +378,22 @@ class AgentPlatform:
 
         @app.get("/health")
         async def health() -> dict[str, Any]:
-            """Aggregate health across all agents."""
+            """Aggregate health across all agents + storage."""
             agents: dict[str, Any] = {}
             for name, agent in self._registry.all().items():
                 try:
                     agents[name] = await agent.health_check()
                 except Exception as exc:  # noqa: BLE001
                     agents[name] = {"status": "error", "error": str(exc)}
+
+            # Storage health
+            storage_health: dict[str, Any] = {"status": "not_configured"}
+            if self._store:
+                try:
+                    storage_health = await self._store.health_check()
+                except Exception as exc:  # noqa: BLE001
+                    storage_health = {"status": "unhealthy", "error": str(exc)}
+
             overall = (
                 "healthy"
                 if all(a.get("status") == "healthy" for a in agents.values())
@@ -302,6 +403,7 @@ class AgentPlatform:
                 "status": overall,
                 "agents": agents,
                 "agent_count": len(agents),
+                "storage": storage_health,
             }
 
         @app.get("/readiness")
@@ -346,6 +448,39 @@ class AgentPlatform:
                     for name, a in self._registry.all().items()
                 }
             }
+
+        # Storage stats
+        if self._store:
+            @app.get(f"{self.api_prefix}/storage/stats")
+            async def storage_stats() -> dict[str, Any]:
+                """Storage backend statistics."""
+                return await self._store.get_stats()
+
+            # Feedback endpoint
+            @app.post(f"{self.api_prefix}/feedback")
+            async def submit_feedback(
+                thread_id: str,
+                user_id: str,
+                agent_name: str,
+                rating: int | None = None,
+                comment: str | None = None,
+            ) -> dict[str, Any]:
+                """Submit feedback."""
+                return await self._store.add_feedback(
+                    thread_id, user_id, agent_name,
+                    rating=rating, comment=comment,
+                )
+
+            @app.get(f"{self.api_prefix}/feedback")
+            async def list_feedback(
+                agent_name: str | None = None,
+                limit: int = 50,
+            ) -> dict[str, Any]:
+                """List collected feedback."""
+                items = await self._store.get_feedback(
+                    agent_name=agent_name, limit=limit,
+                )
+                return {"feedback": items, "count": len(items)}
 
         # Root
         @app.get("/")

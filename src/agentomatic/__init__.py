@@ -11,6 +11,19 @@ Usage::
     app = platform.build()
 
     # Run: uvicorn main:app --reload
+
+With storage::
+
+    from agentomatic import AgentPlatform
+    from agentomatic.storage import MemoryStore, SQLAlchemyStore
+
+    platform = AgentPlatform.from_folder(
+        "agents/",
+        store=MemoryStore(),  # or SQLAlchemyStore("postgresql+asyncpg://...")
+        enable_metrics=True,
+        enable_auth=True,
+        auth_api_key="secret",
+    )
 """
 from __future__ import annotations
 
