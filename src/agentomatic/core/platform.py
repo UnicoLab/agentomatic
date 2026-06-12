@@ -193,6 +193,9 @@ class AgentPlatform:
         """
         platform = self  # capture for closure
 
+        # Track which agents are already pre-registered (programmatic)
+        _pre_registered = set(platform._registry.list_names())
+
         @asynccontextmanager
         async def lifespan(app: FastAPI):  # noqa: ARG001
             """Manage startup / shutdown lifecycle."""
@@ -206,21 +209,20 @@ class AgentPlatform:
             if parent not in sys.path:
                 sys.path.insert(0, parent)
 
-            # Auto-discover agents
+            # Auto-discover agents from folder (skips already-registered)
             prefix = platform.package_prefix or platform.agents_dir.name
             platform._registry.discover(platform.agents_dir, prefix)
 
-            # Auto-generate routers for agents without custom routers
+            # Auto-generate + mount routers for NEWLY discovered agents
             for name, agent in platform._registry.all().items():
+                if name in _pre_registered:
+                    continue  # already mounted at build-time
                 if agent.router is None and agent.manifest.is_subagent:
                     agent.router = create_default_router(
                         agent_name=name,
                         registry=platform._registry,
                     )
                     logger.debug(f"  📌 Auto-generated router for {name}")
-
-            # Mount agent routers
-            for name, agent in platform._registry.all().items():
                 if agent.router and agent.manifest.is_subagent:
                     app.include_router(
                         agent.router,
@@ -261,6 +263,22 @@ class AgentPlatform:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+        # ------------------------------------------------------------------
+        # Mount routers for PRE-REGISTERED (programmatic) agents immediately
+        # ------------------------------------------------------------------
+        for name, agent in self._registry.all().items():
+            if agent.router is None and agent.manifest.is_subagent:
+                agent.router = create_default_router(
+                    agent_name=name,
+                    registry=self._registry,
+                )
+            if agent.router and agent.manifest.is_subagent:
+                app.include_router(
+                    agent.router,
+                    prefix=f"{self.api_prefix}/{name}",
+                    tags=[name.title()],
+                )
 
         # ------------------------------------------------------------------
         # Platform-level endpoints
