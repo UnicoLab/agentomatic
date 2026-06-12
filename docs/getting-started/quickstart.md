@@ -1,5 +1,9 @@
 # Quick Start
 
+Get a multi-agent API running in under 60 seconds.
+
+---
+
 ## 1. Install
 
 ```bash
@@ -12,7 +16,7 @@ pip install agentomatic[all]
 agentomatic init hello_world --template basic
 ```
 
-This creates:
+This scaffolds a ready-to-run agent:
 
 ```
 agents/hello_world/
@@ -25,22 +29,30 @@ agents/hello_world/
 └── README.md        # Agent docs
 ```
 
-## 3. Create `main.py`
+## 3. Run
 
-```python
-from agentomatic import AgentPlatform
+=== "CLI (recommended)"
+    ```bash
+    agentomatic run
+    # → Platform running at http://localhost:8000
+    # → Swagger UI at http://localhost:8000/docs
+    ```
 
-platform = AgentPlatform.from_folder("agents/")
-app = platform.build()
-```
+=== "Python"
+    ```python
+    # main.py
+    from agentomatic import AgentPlatform
 
-## 4. Run
+    platform = AgentPlatform.from_folder("agents/")
+    app = platform.build()
+    ```
+    ```bash
+    uvicorn main:app --reload
+    ```
 
-```bash
-uvicorn main:app --reload
-```
+---
 
-## 5. Test
+## 4. Test Your Agent
 
 === "curl"
     ```bash
@@ -52,6 +64,7 @@ uvicorn main:app --reload
 === "Python"
     ```python
     import httpx
+
     resp = httpx.post(
         "http://localhost:8000/api/v1/hello_world/invoke",
         json={"query": "Hello!"},
@@ -64,9 +77,23 @@ uvicorn main:app --reload
     agentomatic test hello_world
     ```
 
+Expected response:
+
+```json
+{
+  "response": "Hello! How can I help you today?",
+  "agent_type": "agent-hello_world",
+  "thread_id": "t-abc123",
+  "suggestions": ["Tell me more", "What can you do?"],
+  "duration_ms": 142.5
+}
+```
+
+---
+
 ## Auto-Generated Endpoints
 
-Every agent gets these endpoints automatically:
+Every agent gets these endpoints automatically — zero configuration:
 
 | Method | Path | Description |
 |---|---|---|
@@ -81,3 +108,17 @@ Every agent gets these endpoints automatically:
 | `GET` | `/api/v1/{agent}/threads` | List threads |
 | `GET` | `/api/v1/{agent}/threads/{id}` | Get thread |
 | `GET` | `/api/v1/{agent}/threads/{id}/messages` | Thread messages |
+| `POST` | `/api/v1/{agent}/feedback` | Submit feedback |
+| `GET` | `/api/v1/{agent}/feedback` | List feedback |
+
+!!! tip "Interactive API docs"
+    Visit `http://localhost:8000/docs` for a full Swagger UI where you can test all endpoints interactively.
+
+---
+
+## What's Next?
+
+- **[Your First Agent](first-agent.md)** — Build a production-ready agent from scratch
+- **[Templates](../guide/templates.md)** — Explore all 5 scaffolding templates
+- **[Prompt Optimization](../guide/optimization.md)** — Auto-tune your prompts with DSPy-inspired strategies
+- **[CLI Reference](../cli/commands.md)** — Full command documentation

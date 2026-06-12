@@ -63,7 +63,7 @@ def _generate_holysheet_report(
     Raises ``ImportError`` if *holysheet* is not installed so the caller
     can fall back transparently.
     """
-    from holysheet import (  # noqa: WPS433 – conditional import by design
+    from holysheet import (  # noqa: F811
         KPI,
         DataTable,
         Divider,

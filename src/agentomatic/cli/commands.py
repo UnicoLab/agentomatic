@@ -105,7 +105,9 @@ def cli():
 
 @cli.command()
 @click.argument("name")
-@click.option("--dir", "-d", "agents_dir", default="agents", help="Agents directory (default: agents)")
+@click.option(
+    "--dir", "-d", "agents_dir", default="agents", help="Agents directory (default: agents)"
+)
 @click.option(
     "--template",
     "-t",
@@ -552,9 +554,7 @@ def doctor(agents_dir: str) -> None:
         for check_name, ok, detail in checks:
             status = "[green]✅[/green]" if ok else "[red]❌[/red]"
             style = "" if ok else "dim"
-            table.add_row(
-                check_name, status, f"[{style}]{detail}[/{style}]" if style else detail
-            )
+            table.add_row(check_name, status, f"[{style}]{detail}[/{style}]" if style else detail)
 
         console.print(table)
 
