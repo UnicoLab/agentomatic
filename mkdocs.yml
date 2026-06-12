@@ -1,0 +1,98 @@
+site_name: Agentomatic
+site_description: Drop agents, not code — Zero-code multi-agent API platform framework
+site_author: UnicoLab
+site_url: https://unicolab.github.io/agentomatic
+repo_url: https://github.com/UnicoLab/agentomatic
+repo_name: UnicoLab/agentomatic
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2024-2026 UnicoLab
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: pink
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: pink
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mike:
+      alias_type: symlink
+      canonical_version: latest
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.snippets
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/UnicoLab/agentomatic
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/agentomatic/
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Your First Agent: getting-started/first-agent.md
+  - User Guide:
+    - Agent Structure: guide/agent-structure.md
+    - Templates: guide/templates.md
+    - Configuration: guide/configuration.md
+    - Storage Backends: guide/storage.md
+    - Middleware: guide/middleware.md
+    - Debug UI: guide/debug-ui.md
+  - CLI Reference:
+    - Commands: cli/commands.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - API Reference: architecture/api-reference.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md

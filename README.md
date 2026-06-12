@@ -1,336 +1,252 @@
-<p align="center">
-  <img src="docs/assets/logo.png" width="200" alt="Agentomatic Logo">
-  <h1 align="center">🤖 Agentomatic</h1>
-  <p align="center"><em>Drop agents, not code.</em></p>
-  <p align="center">
-    <a href="#installation">Installation</a> •
-    <a href="#quick-start">Quick Start</a> •
-    <a href="#architecture">Architecture</a> •
-    <a href="#configuration">Configuration</a> •
-    <a href="#api-reference">API Reference</a>
-  </p>
-</p>
+<div align="center">
+
+# ⚡ Agentomatic
+
+### Drop agents, not code
+
+[![CI](https://github.com/UnicoLab/agentomatic/actions/workflows/ci.yml/badge.svg)](https://github.com/UnicoLab/agentomatic/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/agentomatic.svg)](https://pypi.org/project/agentomatic/)
+[![Python](https://img.shields.io/pypi/pyversions/agentomatic.svg)](https://pypi.org/project/agentomatic/)
+[![License](https://img.shields.io/github/license/UnicoLab/agentomatic.svg)](https://github.com/UnicoLab/agentomatic/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://unicolab.github.io/agentomatic)
+
+**Zero-code multi-agent API platform framework.**
+Create production-ready AI agent APIs with auto-discovery, auto-routing, streaming, A2A protocol, and full observability — in 3 lines of code.
+
+[Documentation](https://unicolab.github.io/agentomatic) · [Quick Start](#-quick-start) · [CLI Reference](#-cli) · [Templates](#-templates) · [Contributing](CONTRIBUTING.md)
+
+</div>
 
 ---
-
-**Agentomatic** is a zero-code multi-agent API platform framework for Python. Create an agent folder, drop in your logic, and get 12+ production-ready REST endpoints automatically — including streaming, A2A protocol, health checks, and thread management.
 
 ## ✨ Features
 
 | Feature | Description |
-|---------|-------------|
-| 🔍 **Auto-Discovery** | Agents are discovered from folder structure — no registration code |
-| 🔌 **12+ Endpoints Per Agent** | invoke, stream, chat, health, config, prompts, A2A, threads |
-| 🧩 **Framework-Agnostic** | LangGraph, LangChain, or plain async functions |
-| ⚡ **Production-Ready** | Circuit breakers, metrics, rate limiting, auth, concurrency control |
-| 📊 **Observability** | Prometheus metrics, structured logging, request tracing |
-| 🔄 **A2A Protocol** | Agent-to-Agent communication with auto-generated agent cards |
-| 🗄️ **Pluggable Storage** | In-memory (dev) or SQLAlchemy (production) |
-| 🎛️ **Feature Flags** | Toggle streaming, auth, metrics, A2A, DB — all via env vars |
-| 📝 **Prompt Versioning** | JSON-based prompt management with hot-reload |
-| 🖥️ **CLI** | `agentomatic init`, `agentomatic run`, `agentomatic list` |
+|---|---|
+| 🔍 **Auto-Discovery** | Drop an agent folder → endpoints appear automatically |
+| 🚀 **12+ Endpoints Per Agent** | invoke, stream, chat, A2A, health, config, threads |
+| 🗄️ **Pluggable Storage** | MemoryStore, SQLAlchemy, or bring your own |
+| 🔐 **Middleware Pipeline** | Auth, rate limiting, Prometheus metrics — all toggleable |
+| 🎨 **Built-in Debug UI** | ChatGPT-like interface via Chainlit |
+| 📦 **5 Scaffolding Templates** | basic, full, rag, chatbot, custom |
+| 🤖 **A2A Protocol** | Agent-to-agent communication out of the box |
+| 🔌 **Framework Agnostic** | LangGraph, LangChain, or raw Python |
+| 🩺 **Rich CLI** | Beautiful terminal experience with doctor, inspect, test |
 
-## Installation
+## 🚀 Quick Start
+
+### Install
 
 ```bash
-# Core (minimal)
-pip install agentomatic
-
-# With LangGraph support (recommended)
-pip install agentomatic[langgraph]
-
-# With Ollama LLM
-pip install agentomatic[langgraph,ollama]
-
-# With Prometheus metrics
-pip install agentomatic[langgraph,metrics]
-
-# Everything
 pip install agentomatic[all]
-
-# For development
-pip install agentomatic[all,dev]
 ```
 
-### Optional Extras
-
-| Extra | Packages Added |
-|-------|----------------|
-| `langgraph` | langgraph, langchain-core |
-| `langchain` | langchain, langchain-core, langchain-community |
-| `ollama` | langchain-ollama, ollama |
-| `openai` | langchain-openai |
-| `azure` | langchain-openai |
-| `vertex` | langchain-google-vertexai |
-| `metrics` | prometheus-client |
-| `db` | sqlalchemy[asyncio], aiosqlite |
-| `db-postgres` | sqlalchemy[asyncio], asyncpg, psycopg |
-| `all` | langgraph + ollama + metrics + db |
-
-## Quick Start
-
-### 1. Create your project
+### Create an Agent
 
 ```bash
-mkdir my-platform && cd my-platform
-agentomatic init hello --dir agents
+agentomatic init my_agent --template basic
 ```
 
-This creates:
-```
-my-platform/
-└── agents/
-    └── hello/
-        ├── __init__.py   # AgentManifest + node_fn
-        ├── graph.py       # LangGraph StateGraph
-        └── nodes.py       # Node functions
-```
-
-### 2. Write `main.py` — 3 lines!
+### Build & Run
 
 ```python
+# main.py
 from agentomatic import AgentPlatform
 
-platform = AgentPlatform.from_folder("agents/", package_prefix="agents")
+platform = AgentPlatform.from_folder("agents/")
 app = platform.build()
-
-# Run: uvicorn main:app --reload
 ```
-
-### 3. Start the server
 
 ```bash
 uvicorn main:app --reload
 ```
 
-### 4. Test it!
+### Test
 
 ```bash
-# Health check
-curl http://localhost:8000/health
+# CLI
+agentomatic test my_agent
 
-# Invoke the agent
-curl -X POST http://localhost:8000/api/v1/hello/invoke \
+# curl
+curl -X POST http://localhost:8000/api/v1/my_agent/invoke \
   -H "Content-Type: application/json" \
-  -d '{"query": "Hello world!"}'
-
-# Chat with the agent
-curl -X POST http://localhost:8000/api/v1/hello/chat \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Tell me a joke"}'
-
-# Stream response
-curl -X POST http://localhost:8000/api/v1/hello/invoke/stream \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Stream this!"}'
-
-# Get agent card (A2A)
-curl http://localhost:8000/api/v1/hello/card
-
-# List all agents
-curl http://localhost:8000/api/v1/agents
+  -d '{"query": "Hello!"}'
 ```
 
-## Architecture
-
-### Agent Folder Structure
-
-Every agent is a Python package in the agents directory:
+## 🏗️ Architecture
 
 ```
-agents/
-├── holidays/                 # Agent folder name = agent name
-│   ├── __init__.py          # REQUIRED: manifest + node_fn
-│   ├── graph.py             # Optional: LangGraph StateGraph
-│   ├── nodes.py             # Optional: Node functions
-│   ├── config.py            # Optional: Agent-specific config
-│   ├── schemas.py           # Optional: Pydantic I/O models
-│   ├── prompts.json         # Optional: Versioned prompts
-│   ├── tools.py             # Optional: LangChain tools
-│   └── api.py               # Optional: Custom FastAPI router
+┌─────────────────────────────────────────────────────────────┐
+│                    AgentPlatform                            │
+│                                                             │
+│  ┌──────────┐  ┌──────────────┐  ┌───────────────────────┐ │
+│  │ Registry │  │ Middleware   │  │ Storage               │ │
+│  │          │  │ ├─ Auth      │  │ ├─ MemoryStore        │ │
+│  │ agent_a  │  │ ├─ RateLimit │  │ ├─ SQLAlchemyStore   │ │
+│  │ agent_b  │  │ ├─ Metrics   │  │ └─ YourStore(ABC)    │ │
+│  │ agent_c  │  │ └─ Logging   │  │                       │ │
+│  └──────────┘  └──────────────┘  └───────────────────────┘ │
+│                                                             │
+│  Per Agent: POST /invoke, /stream, /chat, /a2a/tasks ...   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Minimal Agent (`__init__.py`)
+## 📂 Agent Structure
 
-```python
-from agentomatic import AgentManifest
+Only `__init__.py` is required. Everything else is optional overrides:
 
-manifest = AgentManifest(
-    name="holidays",
-    slug="my-platform-holidays",
-    description="Manages holiday requests",
-    intent_keywords=["holiday", "vacation", "leave"],
-)
-
-async def node_fn(state):
-    from .graph import get_graph
-    return await get_graph().ainvoke(state)
+```
+agents/my_agent/
+├── __init__.py      ← REQUIRED: manifest + node_fn
+├── graph.py         ← Optional: LangGraph StateGraph
+├── nodes.py         ← Optional: node functions
+├── config.py        ← Optional: Pydantic config
+├── schemas.py       ← Optional: custom request/response models
+├── tools.py         ← Optional: LangChain tools
+├── api.py           ← Optional: custom router (REPLACES auto-gen)
+├── prompts.json     ← Optional: versioned prompt templates
+├── langgraph.json   ← Optional: LangGraph Studio config
+├── .env.example     ← Optional: environment variables
+└── README.md        ← Optional: agent documentation
 ```
 
-### Auto-Generated Endpoints
-
-For every discovered agent, Agentomatic generates:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/{agent}/invoke` | Synchronous invocation |
-| `POST` | `/api/v1/{agent}/invoke/stream` | SSE streaming |
-| `POST` | `/api/v1/{agent}/chat` | Session-aware chat |
-| `GET` | `/api/v1/{agent}/health` | Per-agent health check |
-| `GET` | `/api/v1/{agent}/config` | Agent configuration |
-| `GET` | `/api/v1/{agent}/prompts` | Prompt versions |
-| `GET` | `/api/v1/{agent}/card` | A2A agent card |
-| `POST` | `/api/v1/{agent}/a2a/tasks` | A2A task submission |
-| `GET` | `/api/v1/{agent}/a2a/tasks/{id}` | A2A task status |
-| `GET` | `/api/v1/{agent}/threads` | List threads |
-| `GET` | `/api/v1/{agent}/threads/{id}` | Get thread |
-| `GET` | `/api/v1/{agent}/threads/{id}/messages` | Get messages |
-
-### Platform Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | Platform info |
-| `GET` | `/health` | Overall health |
-| `GET` | `/readiness` | Readiness probe |
-| `GET` | `/api/v1/agents` | List all agents |
-| `GET` | `/.well-known/agent.json` | A2A discovery |
-
-## Configuration
-
-### Environment Variables
-
-All settings use double-underscore nesting:
+## 📦 Templates
 
 ```bash
-# LLM
-LLM__PROVIDER=ollama
-LLM__MODEL=mistral:7b
-LLM__TEMPERATURE=0.1
-
-# Features
-FEATURES__ENABLE_STREAMING=true
-FEATURES__ENABLE_METRICS=true
-FEATURES__ENABLE_A2A=true
-FEATURES__MAX_CONCURRENT_AGENTS=10
-
-# Database
-DB__URL=postgresql+asyncpg://user:pass@localhost:5432/mydb
+agentomatic init my_agent --template <template>
 ```
 
-See [`.env.example`](.env.example) for all options.
+| Template | Files | Description |
+|----------|-------|-------------|
+| `basic` | 7 | Minimal agent — quick start |
+| `full` | 11 | All override files — config, schemas, api, tools |
+| `rag` | 9 | Retrieve → Generate pipeline |
+| `chatbot` | 8 | Conversational with memory |
+| `custom` | 4 | Framework-agnostic — no LangGraph |
 
-### Programmatic Configuration
+## 🖥️ CLI
+
+```
+⚡ Agentomatic — Drop agents, not code
+
+  init <name>      Scaffold a new agent from template
+  run              Start the platform server
+  list             List discovered agents (Rich table)
+  test <name>      Interactive terminal testing
+  inspect <name>   Show agent structure + config
+  doctor           Environment health check
+  ui               Launch Chainlit debug UI
+```
+
+## ⚙️ Configuration
 
 ```python
 from agentomatic import AgentPlatform
-from agentomatic.config.settings import PlatformSettings
-
-settings = PlatformSettings(
-    llm={"provider": "openai", "model": "gpt-4"},
-    features={"enable_metrics": True},
-)
+from agentomatic.storage import MemoryStore  # or SQLAlchemyStore
 
 platform = AgentPlatform.from_folder(
     "agents/",
-    title="My Platform",
-    settings=settings,
+    # Storage
+    store=MemoryStore(),
+    # Auth
+    enable_auth=True,
+    auth_api_key="your-secret-key",
+    # Rate limiting
+    enable_rate_limit=True,
+    rate_limit_requests=100,
+    rate_limit_window=60,
+    # Prometheus metrics
+    enable_metrics=True,
+    # Custom middleware
+    middleware=[(MyMiddleware, {"arg": "value"})],
 )
-```
-
-## Advanced Usage
-
-### Custom Endpoints (Override)
-
-Create `api.py` in your agent folder:
-
-```python
-from fastapi import APIRouter, UploadFile
-router = APIRouter()
-
-@router.post("/upload")
-async def upload_document(file: UploadFile):
-    return {"filename": file.filename, "status": "processed"}
-```
-
-### Programmatic Agent Registration
-
-```python
-from agentomatic import AgentPlatform, AgentManifest
-
-platform = AgentPlatform()
-
-async def my_agent(state):
-    return {"response": f"Got: {state['current_query']}"}
-
-platform.register_agent(
-    manifest=AgentManifest(name="dynamic", slug="dynamic-agent"),
-    node_fn=my_agent,
-)
-
 app = platform.build()
 ```
 
-### Lifecycle Hooks
+## 🗄️ Storage Backends
 
 ```python
-platform = AgentPlatform.from_folder("agents/")
+# Development
+from agentomatic.storage import MemoryStore
+store = MemoryStore()
 
-@platform.on_startup
-async def init_database():
-    print("Database connected!")
+# Production (PostgreSQL)
+from agentomatic.storage import SQLAlchemyStore
+store = SQLAlchemyStore("postgresql+asyncpg://user:pass@localhost/db")
 
-@platform.on_shutdown
-async def cleanup():
-    print("Cleaning up...")
-
-app = platform.build()
+# Custom
+from agentomatic.storage import BaseStore
+class RedisStore(BaseStore):
+    async def create_thread(self, ...): ...
+    async def get_thread(self, ...): ...
 ```
 
-### LangGraph Studio Integration
+## 🎨 Debug UI
 
-Create `langgraph.json` per agent:
-
-```json
-{
-  "dependencies": ["."],
-  "graphs": {
-    "agent": "./agents/holidays/graph.py:get_graph"
-  }
-}
-```
-
-## CLI Reference
+Built-in ChatGPT-like interface powered by Chainlit:
 
 ```bash
-# Scaffold a new agent
-agentomatic init my_agent --dir agents
-
-# Run the platform
-agentomatic run --agents-dir agents --port 8000 --reload
-
-# List discovered agents
-agentomatic list --agents-dir agents
+pip install agentomatic[ui]
+agentomatic run --with-ui
+# → http://localhost:8000/chat
 ```
 
-## Project Structure
+Features: agent selector, streaming, tool call visualization, chain-of-thought, feedback collection.
 
+## 📊 Auto-Generated Endpoints
+
+Every agent gets 12+ endpoints automatically:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/{agent}/invoke` | Synchronous invocation |
+| `POST` | `/api/v1/{agent}/invoke/stream` | SSE streaming |
+| `POST` | `/api/v1/{agent}/chat` | Session-aware chat |
+| `GET` | `/api/v1/{agent}/health` | Per-agent health |
+| `GET` | `/api/v1/{agent}/card` | A2A agent card |
+| `POST` | `/api/v1/{agent}/a2a/tasks` | A2A task submission |
+| `GET` | `/api/v1/{agent}/threads` | List threads |
+| ... | ... | + config, prompts, thread messages |
+
+## 🛠️ Development
+
+```bash
+# Install
+git clone https://github.com/UnicoLab/agentomatic.git
+cd agentomatic
+make dev  # Installs all deps + pre-commit hooks
+
+# Quality
+make lint          # Ruff linter
+make format        # Auto-format
+make typecheck     # Mypy
+make test          # All tests
+make test-cov      # With coverage
+make check-all     # lint + typecheck + test
+
+# Docs
+make docs-serve    # Local docs server
+make docs-build    # Build static site
+
+# Build
+make build         # Package
+make publish       # PyPI
 ```
-src/agentomatic/
-├── __init__.py          # Public API
-├── _version.py          # Version
-├── core/                # Platform, Registry, Manifest
-├── config/              # Settings system
-├── providers/           # LLM/Embedding factories
-├── middleware/           # Logging, CORS, Auth
-├── observability/       # Metrics, Concurrency
-├── storage/             # Memory, SQLAlchemy
-├── prompts/             # Prompt versioning
-├── protocols/           # A2A, Decorators
-├── cli/                 # CLI commands
-└── templates/           # Scaffolding
-```
 
-## License
+## 📜 License
 
-MIT © Piotr Laczkowski
+MIT — see [LICENSE](LICENSE).
+
+## 👥 Authors
+
+**[UnicoLab](https://github.com/UnicoLab)** — Building the future of AI agent platforms.
+
+---
+
+<div align="center">
+
+**[⭐ Star us on GitHub](https://github.com/UnicoLab/agentomatic)** — it helps!
+
+Made with ❤️ by UnicoLab
+
+</div>

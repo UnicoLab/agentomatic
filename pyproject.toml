@@ -5,7 +5,7 @@ description = "Drop agents, not code — zero-code multi-agent API platform fram
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
-authors = [{name = "Piotr Laczkowski"}]
+authors = [{name = "UnicoLab", email = "contact@unicolab.com"}]
 keywords = ["agents", "langgraph", "langchain", "fastapi", "multi-agent", "a2a", "framework"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -45,6 +45,11 @@ db-postgres = ["sqlalchemy[asyncio]>=2.0", "asyncpg>=0.30", "psycopg[binary]>=3.
 cli = ["rich>=13.0", "questionary>=2.0"]
 ui = ["chainlit>=2.0"]
 all = ["agentomatic[langgraph,ollama,metrics,db,cli]"]
+docs = [
+    "mkdocs-material>=9.5",
+    "mike>=2.1",
+    "pymdown-extensions>=10.0",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
@@ -52,16 +57,20 @@ dev = [
     "pytest-mock>=3.14",
     "ruff>=0.8",
     "mypy>=1.13",
+    "pre-commit>=4.0",
+    "build>=1.0",
+    "twine>=6.0",
 ]
 
 [project.scripts]
 agentomatic = "agentomatic.cli.commands:main"
 
 [project.urls]
-Homepage = "https://github.com/piotrlaczkowski/agentomatic"
-Documentation = "https://github.com/piotrlaczkowski/agentomatic#readme"
-Repository = "https://github.com/piotrlaczkowski/agentomatic"
-Issues = "https://github.com/piotrlaczkowski/agentomatic/issues"
+Homepage = "https://github.com/UnicoLab/agentomatic"
+Documentation = "https://unicolab.github.io/agentomatic"
+Repository = "https://github.com/UnicoLab/agentomatic"
+Issues = "https://github.com/UnicoLab/agentomatic/issues"
+Changelog = "https://github.com/UnicoLab/agentomatic/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -70,6 +79,29 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentomatic"]
 
+# ---------------------------------------------------------------------------
+# Semantic Release
+# ---------------------------------------------------------------------------
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/agentomatic/_version.py:__version__"]
+branch = "main"
+commit_message = "chore(release): v{version}"
+build_command = "python -m build"
+upload_to_pypi = true
+
+[tool.semantic_release.changelog]
+template_dir = "templates"
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["feat", "fix", "docs", "chore", "test", "ci", "refactor", "perf", "style", "build"]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+
+# ---------------------------------------------------------------------------
+# Ruff
+# ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 99
 target-version = "py311"
@@ -81,6 +113,9 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 known-first-party = ["agentomatic"]
 
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"
@@ -91,10 +126,25 @@ markers = [
     "integration: integration tests",
 ]
 
+# ---------------------------------------------------------------------------
+# Coverage
+# ---------------------------------------------------------------------------
 [tool.coverage.run]
 source = ["src/agentomatic"]
 omit = ["*/tests/*", "*/__pycache__/*"]
 
+[tool.coverage.report]
+show_missing = true
+fail_under = 60
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__",
+]
+
+# ---------------------------------------------------------------------------
+# Mypy
+# ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true

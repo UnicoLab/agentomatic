@@ -40,5 +40,8 @@ coverage.xml
 .pytest_cache/
 .mypy_cache/
 
-# Poetry
+# Docs
+site/
+
+# Poetry (legacy)
 poetry.lock
