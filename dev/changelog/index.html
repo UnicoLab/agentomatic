@@ -1169,12 +1169,12 @@
   <a href="#010-2026-06-12" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [0.1.0] - 2026-06-12
+        0.1.0 - 2026-06-12
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[0.1.0] - 2026-06-12">
+    <nav class="md-nav" aria-label="0.1.0 - 2026-06-12">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1231,12 +1231,12 @@
   <a href="#010-2026-06-12" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [0.1.0] - 2026-06-12
+        0.1.0 - 2026-06-12
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[0.1.0] - 2026-06-12">
+    <nav class="md-nav" aria-label="0.1.0 - 2026-06-12">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1276,23 +1276,88 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<p>All notable changes are documented here. This project uses <a href="https://semver.org/">Semantic Versioning</a>.</p>
-<h2 id="010-2026-06-12">[0.1.0] - 2026-06-12<a class="headerlink" href="#010-2026-06-12" title="Permanent link">&para;</a></h2>
+<p>All notable changes to this project will be documented in this file.
+This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</p>
+<h2 id="010-2026-06-12"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.1.0">0.1.0</a> - 2026-06-12<a class="headerlink" href="#010-2026-06-12" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Initial release of agentomatic framework</li>
-<li>AgentPlatform with auto-discovery and auto-routing</li>
-<li>12+ auto-generated endpoints per agent</li>
-<li>5 scaffolding templates (basic, full, rag, chatbot, custom)</li>
-<li>Rich CLI with 7 commands (init, run, list, test, inspect, doctor, ui)</li>
-<li>Pluggable storage (MemoryStore, SQLAlchemyStore)</li>
-<li>Middleware pipeline (auth, rate limiting, metrics, logging)</li>
-<li>A2A protocol support</li>
-<li>Chainlit debug UI integration</li>
-<li>MkDocs Material documentation with mike versioning</li>
-<li>CI/CD with semantic release, PyPI publishing, docs deployment</li>
-<li>Pre-commit hooks (ruff, mypy, conventional commits)</li>
-<li>88 tests passing</li>
+<li><strong>Core Framework</strong></li>
+<li><code>AgentPlatform</code> class for zero-code multi-agent API creation</li>
+<li>Auto-discovery: drop agent folder → 12+ REST endpoints generated</li>
+<li>Agent manifest system with <code>MANIFEST</code> dict or <code>@agent</code> decorator</li>
+<li><code>BaseAgentState</code> for typed agent state management</li>
+<li>
+<p>Pluggable storage: <code>MemoryStore</code>, <code>SQLAlchemyStore</code>, custom via <code>BaseStore</code></p>
+</li>
+<li>
+<p><strong>CLI</strong> (click-based)</p>
+</li>
+<li><code>agentomatic init &lt;name&gt;</code> — scaffold from 5 templates (basic, full, rag, chatbot, custom)</li>
+<li><code>agentomatic run</code> — start platform server with uvicorn</li>
+<li><code>agentomatic list</code> — rich table of discovered agents</li>
+<li><code>agentomatic test &lt;name&gt;</code> — interactive agent testing</li>
+<li><code>agentomatic inspect &lt;name&gt;</code> — show agent structure &amp; config</li>
+<li><code>agentomatic doctor</code> — environment health check</li>
+<li>
+<p><code>agentomatic ui</code> — launch Chainlit debug interface</p>
+</li>
+<li>
+<p><strong>Prompt Optimization</strong> (DSPy-inspired)</p>
+</li>
+<li>7 optimization strategies: IterativeRewrite, FewShotBootstrap, ChainOfThought, MIPRO, BootstrapRandomSearch, EnsembleOptimizer</li>
+<li>8 metric types: DeepEval, LLMJudge, GEval, Contains, ExactMatch, Custom, RedTeam</li>
+<li><code>DataSynthesizer</code> for generating/augmenting eval datasets</li>
+<li>HTML report generation with interactive dashboards (HolySheet or SVG fallback)</li>
+<li>Red team adversarial testing (PII, bias, prompt injection)</li>
+<li>
+<p>Experiment tracking via <code>.optimize/{agent}/experiments.json</code></p>
+</li>
+<li>
+<p><strong>Middleware Pipeline</strong></p>
+</li>
+<li>API key authentication with configurable header</li>
+<li>Token bucket rate limiting (per-IP or global)</li>
+<li>Prometheus metrics (request counts, latencies, error rates)</li>
+<li>Structured request/response logging</li>
+<li>
+<p>Feedback collection endpoint</p>
+</li>
+<li>
+<p><strong>A2A Protocol</strong></p>
+</li>
+<li>Auto-generated agent cards (model cards)</li>
+<li>Task submission and status endpoints</li>
+<li>
+<p>Inter-agent communication</p>
+</li>
+<li>
+<p><strong>Observability</strong></p>
+</li>
+<li>OpenTelemetry tracing integration</li>
+<li>Prometheus metrics exporter</li>
+<li><code>CircuitBreaker</code> for external service protection</li>
+<li><code>AgentSemaphore</code> for concurrency control</li>
+<li>
+<p><code>track_agent_invocation</code> context manager</p>
+</li>
+<li>
+<p><strong>Providers</strong></p>
+</li>
+<li>Ollama, OpenAI, Azure, Vertex AI LLM support</li>
+<li>Configurable embedding providers</li>
+<li>
+<p>LiteLLM integration for 100+ models</p>
+</li>
+<li>
+<p><strong>Developer Experience</strong></p>
+</li>
+<li>MkDocs Material documentation site with mike versioning</li>
+<li>Comprehensive test suite (161 tests)</li>
+<li>CI/CD with GitHub Actions (lint, test matrix, typecheck)</li>
+<li>Semantic release for automated versioning</li>
+<li>Ruff linting + formatting</li>
+<li><code>py.typed</code> marker for mypy/pyright support</li>
+<li>Pre-commit hooks support</li>
 </ul>
 
 
