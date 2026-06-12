@@ -8,6 +8,7 @@ Commands:
     agentomatic inspect <name>  Show agent details
     agentomatic doctor          Check environment health
     agentomatic ui              Launch debug UI standalone
+    agentomatic optimize <name> Run prompt optimization
 
 Requires: pip install agentomatic[cli]
 Fallback: works with basic output if Rich is not installed.
@@ -525,6 +526,70 @@ def cmd_ui(args: argparse.Namespace) -> None:
 
 
 # =====================================================================
+# OPTIMIZE — Prompt optimization
+# =====================================================================
+
+def cmd_optimize(args: argparse.Namespace) -> None:
+    """Handle optimize command."""
+    import asyncio
+    try:
+        from rich.console import Console
+        console = Console()
+    except ImportError:
+        console = None
+
+    try:
+        from agentomatic.optimize import PromptOptimizer, Dataset
+    except ImportError:
+        print("ERROR: Optimization module not available.")
+        print("Install: pip install agentomatic[optimize]")
+        return
+
+    # Load dataset
+    dataset_path = args.dataset
+    if dataset_path.endswith(".csv"):
+        dataset = Dataset.from_csv(dataset_path)
+    else:
+        dataset = Dataset.from_jsonl(dataset_path)
+
+    if console:
+        console.print(f"[bold]Dataset:[/bold] {len(dataset)} points from {dataset_path}")
+
+    # Parse metrics
+    metrics = [m.strip() for m in args.metrics.split(",")]
+
+    # Create optimizer
+    optimizer = PromptOptimizer(
+        agent=args.agent,
+        metrics=metrics,
+        llm=args.llm,
+        rewrite_llm=args.rewrite_llm,
+        eval_llm=args.eval_llm,
+        strategy=args.strategy,
+        api_base=args.host,
+        auto_report=not args.no_report,
+    )
+
+    # Run optimization
+    result = asyncio.run(optimizer.optimize(
+        dataset=dataset,
+        initial_prompt=args.prompt,
+        max_iterations=args.max_iterations,
+        target_score=args.target_score,
+        patience=args.patience,
+    ))
+
+    # Print report
+    print(result.report())
+
+    # Auto-apply if requested
+    if args.apply:
+        version = result.apply()
+        if console:
+            console.print(f"\n[bold green]✅ Applied as '{version}'[/bold green]")
+
+
+# =====================================================================
 # Main CLI entry point
 # =====================================================================
 
@@ -545,6 +610,7 @@ Examples:
   agentomatic test my_agent                    # Interactive test
   agentomatic inspect my_agent                 # Show details
   agentomatic doctor                           # Check environment
+  agentomatic optimize my_agent -d qa.jsonl    # Optimize prompts
         """,
     )
     sub = parser.add_subparsers(dest="command", help="Available commands")
@@ -600,6 +666,25 @@ Examples:
     p_ui.add_argument("--port", type=int, default=8000, help="Platform API port")
     p_ui.add_argument("--ui-port", type=int, default=8001, help="UI port")
 
+    # --- optimize ---
+    p_optimize = sub.add_parser("optimize", help="Run prompt optimization")
+    p_optimize.add_argument("agent", help="Agent name to optimize")
+    p_optimize.add_argument("--dataset", "-d", required=True, help="Path to JSONL/CSV dataset")
+    p_optimize.add_argument("--metrics", "-m", default="exact_match", help="Comma-separated metrics")
+    p_optimize.add_argument("--strategy", "-s", default="iterative_rewrite",
+                            choices=["iterative_rewrite", "few_shot", "chain_of_thought"],
+                            help="Optimization strategy")
+    p_optimize.add_argument("--max-iterations", type=int, default=10, help="Max iterations")
+    p_optimize.add_argument("--target-score", type=float, default=0.9, help="Target score")
+    p_optimize.add_argument("--rewrite-llm", default=None, help="LLM for prompt rewriting")
+    p_optimize.add_argument("--eval-llm", default=None, help="LLM for evaluation")
+    p_optimize.add_argument("--llm", default="ollama/mistral:7b", help="Default LLM")
+    p_optimize.add_argument("--patience", type=int, default=3, help="Early stopping patience")
+    p_optimize.add_argument("--prompt", default=None, help="Initial prompt (overrides prompts.json)")
+    p_optimize.add_argument("--no-report", action="store_true", help="Skip HTML report generation")
+    p_optimize.add_argument("--apply", action="store_true", help="Auto-apply best prompt")
+    p_optimize.add_argument("--host", default="http://localhost:8000", help="Platform API base")
+
     args = parser.parse_args()
 
     commands = {
@@ -610,6 +695,7 @@ Examples:
         "inspect": cmd_inspect,
         "doctor": cmd_doctor,
         "ui": cmd_ui,
+        "optimize": cmd_optimize,
     }
 
     if args.command in commands:

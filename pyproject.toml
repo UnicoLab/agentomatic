@@ -44,7 +44,8 @@ db = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.20"]
 db-postgres = ["sqlalchemy[asyncio]>=2.0", "asyncpg>=0.30", "psycopg[binary]>=3.2"]
 cli = ["rich>=13.0", "questionary>=2.0"]
 ui = ["chainlit>=2.0"]
-all = ["agentomatic[langgraph,ollama,metrics,db,cli]"]
+optimize = ["deepeval>=2.0"]
+all = ["agentomatic[langgraph,ollama,metrics,db,cli,optimize]"]
 docs = [
     "mkdocs-material>=9.5",
     "mike>=2.1",

@@ -32,6 +32,9 @@ Create production-ready AI agent APIs with auto-discovery, auto-routing, streami
 | 🤖 **A2A Protocol** | Agent-to-agent communication out of the box |
 | 🔌 **Framework Agnostic** | LangGraph, LangChain, or raw Python |
 | 🩺 **Rich CLI** | Beautiful terminal experience with doctor, inspect, test |
+| ⚡ **Prompt Optimizer** | DSPy-inspired prompt optimization (7 strategies) |
+| 🧪 **Data Synthesizer** | Auto-generate & augment eval datasets via LLM |
+| 📊 **HTML Reports** | SVG charts, prompt diffs, experiment tracking |
 
 ## 🚀 Quick Start
 
