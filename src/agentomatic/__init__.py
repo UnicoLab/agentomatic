@@ -36,6 +36,7 @@ from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 from agentomatic.core.platform import AgentPlatform
 from agentomatic.core.registry import AgentRegistry
 from agentomatic.core.state import BaseAgentState
+from agentomatic.prompts import PromptManager
 
 # Protocols
 from agentomatic.protocols.decorators import APIResponse, handle_api_errors, log_api_call
@@ -51,6 +52,8 @@ __all__ = [
     "APIResponse",
     "handle_api_errors",
     "log_api_call",
+    # Prompts
+    "PromptManager",
     # Version
     "__version__",
 ]

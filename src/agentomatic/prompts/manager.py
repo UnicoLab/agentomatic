@@ -12,9 +12,11 @@ from loguru import logger
 class PromptManager:
     """Manages versioned prompt templates loaded from JSON files."""
 
-    def __init__(self, agent_name: str) -> None:
+    def __init__(self, agent_name: str, prompts_file: Path | str | None = None) -> None:
         self.agent_name = agent_name
-        self._prompts: dict[str, dict[str, str]] = {}
+        self._prompts: dict[str, dict[str, Any]] = {}
+        if prompts_file:
+            self.load_from_file(Path(prompts_file))
 
     def load_from_file(self, path: Path) -> None:
         """Load prompts from a JSON file."""
