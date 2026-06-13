@@ -270,6 +270,23 @@ Add `prompt_ab_tests` with fractional weights inside your agent's config setting
 3. Your agent nodes can read `prompt_version` from the state to load the correct prompt template.
 4. The chosen version is returned in the response metadata (`metadata.prompt_version`) so that you can trace and analyze performance.
 
+### Telemetry & Feedback Correlation
+
+To measure the performance and quality of different prompt variants:
+1. **Response Tracking**: Read `metadata.prompt_version` from the `/invoke` or `/chat` JSON response payload.
+2. **Feedback Logging**: When calling the `POST /api/v1/{agent}/feedback` endpoint, pass the active prompt version in the request metadata payload:
+   ```json
+   {
+     "thread_id": "thread_123",
+     "rating": 5,
+     "comment": "Highly accurate answer!",
+     "metadata": {
+       "prompt_version": "v2"
+     }
+   }
+   ```
+   This associates ratings and comments directly with each version, allowing you to run analytical breakdowns of user satisfaction metrics per prompt variant.
+
 > [!NOTE]
 > Clients can explicitly override the A/B router by passing a specific `prompt_version` parameter in the invoke request (e.g. `{"prompt_version": "v2"}`).
 
