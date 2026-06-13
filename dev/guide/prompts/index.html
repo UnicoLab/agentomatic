@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/storage/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/prompts/">
       
       
-        <link rel="prev" href="../configuration/">
+        <link rel="prev" href="../agent-structure/">
       
       
-        <link rel="next" href="../middleware/">
+        <link rel="next" href="../templates/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Storage Backends - Agentomatic</title>
+        <title>Prompt Management - Agentomatic</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#storage-backends" class="md-skip">
+        <a href="#prompt-management" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Storage Backends
+              Prompt Management
             
           </span>
         </div>
@@ -672,10 +672,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../prompts/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt Management
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -691,6 +718,165 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-promptsjson-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📂 The prompts.json file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📂 The prompts.json file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#programmatic-access-via-promptmanager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚙️ Programmatic Access via PromptManager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚙️ Programmatic Access via PromptManager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retrieving-raw-prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieving Raw Prompts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting-prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting Prompts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listing-available-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Listing Available Versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hot-reloading-from-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hot-Reloading from Disk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-custom-routers-and-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔌 Integration with Custom Routers and Nodes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔌 Integration with Custom Routers and Nodes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-custom-router-apipy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Custom Router (api.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-langgraph-nodes-nodespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. LangGraph Nodes (nodes.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -756,37 +942,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Storage Backends
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
         
   
   
@@ -802,87 +961,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#built-in-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Built-in Backends
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Built-in Backends">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#memorystore-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MemoryStore (Development)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sqlalchemystore-production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SQLAlchemyStore (Production)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#custom-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Custom Backend
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#storage-protocol" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Storage Protocol
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1294,33 +1372,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#built-in-backends" class="md-nav__link">
+  <a href="#the-promptsjson-file" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Built-in Backends
+        📂 The prompts.json file
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Built-in Backends">
+    <nav class="md-nav" aria-label="📂 The prompts.json file">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#memorystore-development" class="md-nav__link">
+  <a href="#example-structure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MemoryStore (Development)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sqlalchemystore-production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SQLAlchemyStore (Production)
+        Example Structure
       
     </span>
   </a>
@@ -1333,24 +1400,113 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#custom-backend" class="md-nav__link">
+  <a href="#programmatic-access-via-promptmanager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Custom Backend
+        ⚙️ Programmatic Access via PromptManager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚙️ Programmatic Access via PromptManager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#storage-protocol" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#retrieving-raw-prompts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Storage Protocol
+        Retrieving Raw Prompts
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting-prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting Prompts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listing-available-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Listing Available Versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hot-reloading-from-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hot-Reloading from Disk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-custom-routers-and-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔌 Integration with Custom Routers and Nodes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔌 Integration with Custom Routers and Nodes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-custom-router-apipy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Custom Router (api.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-langgraph-nodes-nodespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. LangGraph Nodes (nodes.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1374,106 +1530,119 @@
   
 
 
-<h1 id="storage-backends">Storage Backends<a class="headerlink" href="#storage-backends" title="Permanent link">&para;</a></h1>
-<p>Agentomatic uses a pluggable storage system. All backends implement the <code>BaseStore</code> ABC.</p>
-<h2 id="built-in-backends">Built-in Backends<a class="headerlink" href="#built-in-backends" title="Permanent link">&para;</a></h2>
-<h3 id="memorystore-development">MemoryStore (Development)<a class="headerlink" href="#memorystore-development" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemoryStore</span><span class="p">()</span>
+<h1 id="prompt-management">Prompt Management<a class="headerlink" href="#prompt-management" title="Permanent link">&para;</a></h1>
+<p>Agentomatic provides native, JSON-based prompt versioning and template management out of the box. Instead of hardcoding prompts in Python files, you can define them in <code>prompts.json</code> within your agent's directory and load/format them dynamically using <code>PromptManager</code>.</p>
+<hr />
+<h2 id="the-promptsjson-file">📂 The <code>prompts.json</code> file<a class="headerlink" href="#the-promptsjson-file" title="Permanent link">&para;</a></h2>
+<p>The <code>prompts.json</code> file is located in your agent's directory (e.g., <code>agents/my_agent/prompts.json</code>). It follows a simple nested structure:</p>
+<ul>
+<li><strong>Top-level keys</strong>: Version tags (e.g., <code>"v1"</code>, <code>"v2"</code>, <code>"v1_formal"</code>).</li>
+<li><strong>Nested keys</strong>: Prompt types (e.g., <code>"system"</code>, <code>"user_template"</code>, <code>"chat_template"</code>).</li>
+</ul>
+<h3 id="example-structure">Example Structure<a class="headerlink" href="#example-structure" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;v1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;system&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a helpful assistant. Keep your answers concise.&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;user_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Question: {query}\n\nContext: {context}&quot;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">&quot;v2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">&quot;system&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a friendly assistant. Format your response using bullet points.&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">&quot;user_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Hello! Here is a request from {username}: {query}&quot;</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
 </code></pre></div>
-<h3 id="sqlalchemystore-production">SQLAlchemyStore (Production)<a class="headerlink" href="#sqlalchemystore-production" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># PostgreSQL</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s2">&quot;postgresql+asyncpg://user:pass@localhost/db&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">pool_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">max_overflow</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># SQLite</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;sqlite+aiosqlite:///data/app.db&quot;</span><span class="p">)</span>
+<hr />
+<h2 id="programmatic-access-via-promptmanager">⚙️ Programmatic Access via <code>PromptManager</code><a class="headerlink" href="#programmatic-access-via-promptmanager" title="Permanent link">&para;</a></h2>
+<p>You can import and use the <code>PromptManager</code> class directly from the root of <code>agentomatic</code>. It reads the <code>prompts.json</code> file, parses the templates, and provides helper methods to access and format them.</p>
+<h3 id="initialization">Initialization<a class="headerlink" href="#initialization" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptManager</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Load prompts for an agent</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">prompts_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;agents/my_agent/prompts.json&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">manager</span> <span class="o">=</span> <span class="n">PromptManager</span><span class="p">(</span><span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;my_agent&quot;</span><span class="p">,</span> <span class="n">prompts_file</span><span class="o">=</span><span class="n">prompts_file</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="custom-backend">Custom Backend<a class="headerlink" href="#custom-backend" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseStore</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">RedisStore</span><span class="p">(</span><span class="n">BaseStore</span><span class="p">):</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">redis</span> <span class="o">=</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">from_url</span><span class="p">(</span><span class="s2">&quot;redis://localhost&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">create_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">agent_name</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">hset</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;thread:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="p">{</span><span class="o">...</span><span class="p">})</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">return</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">):</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">hgetall</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;thread:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="k">if</span> <span class="n">data</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="c1"># ... implement remaining abstract methods</span>
+<h3 id="retrieving-raw-prompts">Retrieving Raw Prompts<a class="headerlink" href="#retrieving-raw-prompts" title="Permanent link">&para;</a></h3>
+<p>Use the <code>get_prompt()</code> method to get the raw, unformatted prompt template:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Returns: &quot;You are a helpful assistant. Keep your answers concise.&quot;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">system_prompt</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">get_prompt</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">prompt_type</span><span class="o">=</span><span class="s2">&quot;system&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Returns None if the version or prompt_type doesn&#39;t exist</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">missing_prompt</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">get_prompt</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="s2">&quot;v3&quot;</span><span class="p">,</span> <span class="n">prompt_type</span><span class="o">=</span><span class="s2">&quot;system&quot;</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="storage-protocol">Storage Protocol<a class="headerlink" href="#storage-protocol" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Method</th>
-<th>Required</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>create_thread()</code></td>
-<td>✅</td>
-<td>Create conversation thread</td>
-</tr>
-<tr>
-<td><code>get_thread()</code></td>
-<td>✅</td>
-<td>Get thread by ID</td>
-</tr>
-<tr>
-<td><code>list_threads()</code></td>
-<td>✅</td>
-<td>List threads with filters</td>
-</tr>
-<tr>
-<td><code>add_message()</code></td>
-<td>✅</td>
-<td>Add message to thread</td>
-</tr>
-<tr>
-<td><code>get_messages()</code></td>
-<td>✅</td>
-<td>Get thread messages</td>
-</tr>
-<tr>
-<td><code>delete_thread()</code></td>
-<td>Optional</td>
-<td>Delete thread + messages</td>
-</tr>
-<tr>
-<td><code>add_feedback()</code></td>
-<td>Optional</td>
-<td>Store user feedback</td>
-</tr>
-<tr>
-<td><code>get_feedback()</code></td>
-<td>Optional</td>
-<td>Retrieve feedback</td>
-</tr>
-<tr>
-<td><code>health_check()</code></td>
-<td>Optional</td>
-<td>Backend health info</td>
-</tr>
-<tr>
-<td><code>get_stats()</code></td>
-<td>Optional</td>
-<td>Backend statistics</td>
-</tr>
-</tbody>
-</table>
+<h3 id="formatting-prompts">Formatting Prompts<a class="headerlink" href="#formatting-prompts" title="Permanent link">&para;</a></h3>
+<p>Use the <code>format_prompt()</code> method to format variables into a template:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Formats variables into the &#39;user_template&#39; template</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">user_prompt</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">format_prompt</span><span class="p">(</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">prompt_type</span><span class="o">=</span><span class="s2">&quot;user_template&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">query</span><span class="o">=</span><span class="s2">&quot;What is the weather today?&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">context</span><span class="o">=</span><span class="s2">&quot;Location: Paris, France&quot;</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># Output:</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Question: What is the weather today?</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1">#</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1"># Context: Location: Paris, France</span>
+</code></pre></div>
+<h3 id="listing-available-versions">Listing Available Versions<a class="headerlink" href="#listing-available-versions" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Returns: [&quot;v1&quot;, &quot;v2&quot;]</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">versions</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">list_versions</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="hot-reloading-from-disk">Hot-Reloading from Disk<a class="headerlink" href="#hot-reloading-from-disk" title="Permanent link">&para;</a></h3>
+<p>If you update the <code>prompts.json</code> file at runtime, you can reload the prompts:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">manager</span><span class="o">.</span><span class="n">reload</span><span class="p">(</span><span class="n">prompts_file</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="integration-with-custom-routers-and-nodes">🔌 Integration with Custom Routers and Nodes<a class="headerlink" href="#integration-with-custom-routers-and-nodes" title="Permanent link">&para;</a></h2>
+<h3 id="1-custom-router-apipy">1. Custom Router (<code>api.py</code>)<a class="headerlink" href="#1-custom-router-apipy" title="Permanent link">&para;</a></h3>
+<p>If you write a custom router using <code>api.py</code> and want to load prompt templates dynamically:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIRouter</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIResponse</span><span class="p">,</span> <span class="n">handle_api_errors</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rac.agents._registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_registry</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">router</span> <span class="o">=</span> <span class="n">APIRouter</span><span class="p">()</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="nd">@router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/custom-chat&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="nd">@handle_api_errors</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">custom_chat</span><span class="p">(</span><span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">APIResponse</span><span class="p">:</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="c1"># Retrieve the agent instance from the registry</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">agent</span> <span class="o">=</span> <span class="n">get_registry</span><span class="p">()</span><span class="o">.</span><span class="n">get_agent</span><span class="p">(</span><span class="s2">&quot;my_agent&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="c1"># Format user prompt</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="n">user_prompt</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">prompt_manager</span><span class="o">.</span><span class="n">format_prompt</span><span class="p">(</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>        <span class="n">version</span><span class="o">=</span><span class="n">agent</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">prompt_version</span><span class="p">,</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        <span class="n">prompt_type</span><span class="o">=</span><span class="s2">&quot;user_template&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>        <span class="n">query</span><span class="o">=</span><span class="n">query</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="p">)</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="k">return</span> <span class="n">APIResponse</span><span class="p">(</span><span class="n">success</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;prompt_used&quot;</span><span class="p">:</span> <span class="n">user_prompt</span><span class="p">})</span>
+</code></pre></div>
+<h3 id="2-langgraph-nodes-nodespy">2. LangGraph Nodes (<code>nodes.py</code>)<a class="headerlink" href="#2-langgraph-nodes-nodespy" title="Permanent link">&para;</a></h3>
+<p>You can access the <code>PromptManager</code> from within your LangGraph processing nodes:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptManager</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Load prompts helper</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">prompts_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;prompts.json&quot;</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">pm</span> <span class="o">=</span> <span class="n">PromptManager</span><span class="p">(</span><span class="s2">&quot;my_agent&quot;</span><span class="p">,</span> <span class="n">prompts_path</span><span class="p">)</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">generate_response</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">query</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;current_query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="c1"># Format prompt templates dynamically</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">system_msg</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">get_prompt</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">prompt_type</span><span class="o">=</span><span class="s2">&quot;system&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">user_msg</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">format_prompt</span><span class="p">(</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>        <span class="n">version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>        <span class="n">prompt_type</span><span class="o">=</span><span class="s2">&quot;user_template&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>        <span class="n">query</span><span class="o">=</span><span class="n">query</span><span class="p">,</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>        <span class="n">context</span><span class="o">=</span><span class="s2">&quot;No context&quot;</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="p">)</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>    <span class="c1"># Call your LLM model here using prompt templates...</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="s2">&quot;Processed output&quot;</span><span class="p">}</span>
+</code></pre></div>
 
 
 
