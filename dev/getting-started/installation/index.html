@@ -606,10 +606,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-installation" class="md-nav__link">
+  <a href="#development-installation-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Development Installation
+        Development Installation (From Source)
       
     </span>
   </a>
@@ -624,6 +624,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Verify Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expected-diagnostic-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Diagnostic Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1343,10 +1360,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-installation" class="md-nav__link">
+  <a href="#development-installation-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Development Installation
+        Development Installation (From Source)
       
     </span>
   </a>
@@ -1361,6 +1378,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Verify Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expected-diagnostic-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Diagnostic Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1385,10 +1419,16 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
+<div align="center">
+  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <h3>Getting Started Stack</h3>
+</div>
+
+<hr />
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Python 3.11+</strong> (3.12 and 3.13 also supported)</li>
-<li><strong>pip</strong>, <strong>uv</strong>, or <strong>poetry</strong> as package manager</li>
+<li><strong>Python 3.11+</strong> (Python 3.12 and 3.13 are fully supported).</li>
+<li><strong>Package Manager</strong>: <code>pip</code>, <code>uv</code>, or <code>poetry</code>.</li>
 </ul>
 <div class="admonition tip">
 <p class="admonition-title">Check your Python version</p>
@@ -1413,105 +1453,116 @@
 </div>
 </div>
 </div>
+<hr />
 <h2 id="full-install-recommended">Full Install (Recommended)<a class="headerlink" href="#full-install-recommended" title="Permanent link">&para;</a></h2>
-<p>Install with all optional extras for the complete experience:</p>
+<p>To enable all production features (including prompt optimization, database persistence, OpenTelemetry tracing, and the graphical Chainlit chat playground), install with the <code>all</code> extras flag:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>all<span class="o">]</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Or with uv</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>uv<span class="w"> </span>add<span class="w"> </span>agentomatic<span class="w"> </span>--extra<span class="w"> </span>all
 </code></pre></div>
 <hr />
 <h2 id="optional-extras">Optional Extras<a class="headerlink" href="#optional-extras" title="Permanent link">&para;</a></h2>
-<p>Install only what you need:</p>
+<p>If you prefer a lightweight install, you can select only the modules and dependencies you need:</p>
 <table>
 <thead>
 <tr>
-<th>Extra</th>
-<th>Command</th>
-<th>What It Adds</th>
+<th>Extra Flag</th>
+<th>Install Command</th>
+<th>What It Enables</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>langgraph</code></td>
 <td><code>pip install agentomatic[langgraph]</code></td>
-<td>LangGraph agent support</td>
+<td>Direct support for LangGraph StateGraphs</td>
 </tr>
 <tr>
 <td><code>ollama</code></td>
 <td><code>pip install agentomatic[ollama]</code></td>
-<td>Ollama LLM provider</td>
+<td>Local Ollama LLM provider integrations</td>
 </tr>
 <tr>
 <td><code>openai</code></td>
 <td><code>pip install agentomatic[openai]</code></td>
-<td>OpenAI LLM provider</td>
+<td>OpenAI API provider integrations</td>
 </tr>
 <tr>
 <td><code>metrics</code></td>
 <td><code>pip install agentomatic[metrics]</code></td>
-<td>Prometheus metrics</td>
+<td>Prometheus exporter metrics</td>
 </tr>
 <tr>
 <td><code>db</code></td>
 <td><code>pip install agentomatic[db]</code></td>
-<td>SQLAlchemy + SQLite storage</td>
+<td>SQLAlchemy engines + local SQLite support</td>
 </tr>
 <tr>
 <td><code>db-postgres</code></td>
 <td><code>pip install agentomatic[db-postgres]</code></td>
-<td>PostgreSQL support</td>
+<td>SQLAlchemy async PostgreSQL client driver</td>
 </tr>
 <tr>
 <td><code>cli</code></td>
 <td><code>pip install agentomatic[cli]</code></td>
-<td>Rich CLI + interactive prompts</td>
+<td>Rich terminal formatting + interactive select prompt controls</td>
 </tr>
 <tr>
 <td><code>ui</code></td>
 <td><code>pip install agentomatic[ui]</code></td>
-<td>Chainlit debug UI</td>
+<td>Graphical Chainlit chat debug console</td>
 </tr>
 <tr>
 <td><code>optimize</code></td>
 <td><code>pip install agentomatic[optimize]</code></td>
-<td>Prompt optimization + DeepEval</td>
+<td>DSPy-style optimizer loop + DeepEval validation</td>
 </tr>
 <tr>
 <td><code>telemetry</code></td>
 <td><code>pip install agentomatic[telemetry]</code></td>
-<td>OpenTelemetry tracing</td>
+<td>OpenTelemetry APM tracing exporters</td>
 </tr>
 <tr>
 <td><code>all</code></td>
 <td><code>pip install agentomatic[all]</code></td>
-<td>Everything above</td>
+<td>Installs all components and drivers above</td>
 </tr>
 </tbody>
 </table>
 <div class="admonition note">
 <p class="admonition-title">Combining extras</p>
-<p>You can combine multiple extras in a single install:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>langgraph,ollama,db,metrics<span class="o">]</span>
+<p>You can combine multiple extras in a single install command:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>langgraph,db,metrics<span class="o">]</span>
 </code></pre></div></p>
 </div>
 <hr />
-<h2 id="development-installation">Development Installation<a class="headerlink" href="#development-installation" title="Permanent link">&para;</a></h2>
-<p>Clone and install from source for contributing or local development:</p>
+<h2 id="development-installation-from-source">Development Installation (From Source)<a class="headerlink" href="#development-installation-from-source" title="Permanent link">&para;</a></h2>
+<p>To contribute to the framework or run custom builds:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">pip</label><label for="__tabbed_2_2">uv</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/UnicoLab/agentomatic.git
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>agentomatic
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all,dev]&quot;</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>pre-commit<span class="w"> </span>install<span class="w">  </span><span class="c1"># Set up commit hooks</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>pre-commit<span class="w"> </span>install<span class="w">  </span><span class="c1"># Installs git commit linter hooks</span>
 </code></pre></div>
-<p>Or with <strong>uv</strong>:</p>
+</div>
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/UnicoLab/agentomatic.git
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd</span><span class="w"> </span>agentomatic
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>uv<span class="w"> </span>sync<span class="w"> </span>--all-extras
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>pre-commit<span class="w"> </span>install
 </code></pre></div>
+</div>
+</div>
+</div>
 <hr />
 <h2 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h2>
-<p>Run the built-in health check to confirm everything is working:</p>
+<p>Verify your local environment health, connectivity, and dependencies using the built-in diagnostic test:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>agentomatic<span class="w"> </span>doctor
 </code></pre></div>
-<p>Expected output:</p>
+<h3 id="expected-diagnostic-output">Expected Diagnostic Output<a class="headerlink" href="#expected-diagnostic-output" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>╭──────────────────── Agentomatic Doctor ────────────────────╮
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>│ ✅ Python         3.12.0                                   │
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>│ ✅ agentomatic    0.1.0                                    │
@@ -1529,7 +1580,7 @@
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Next Step</p>
-<p>Ready to go? Head to the <a href="../quickstart/">Quick Start</a> guide.</p>
+<p>Now that the installation is complete, proceed to the <a href="../quickstart/">Quick Start</a> guide!</p>
 </div>
 
 
