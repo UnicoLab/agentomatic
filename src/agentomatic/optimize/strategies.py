@@ -32,6 +32,8 @@ class OptimizationStrategy(ABC):
 
     name: str = "base"
 
+    def __init__(self, **kwargs: Any) -> None: ...
+
     @abstractmethod
     async def step(
         self,
@@ -129,7 +131,7 @@ class IterativeRewrite(OptimizationStrategy):
                     json={"model": model_name, "prompt": prompt, "stream": False},
                 )
                 if resp.status_code == 200:
-                    return resp.json().get("response", "").strip()
+                    return str(resp.json().get("response", "")).strip()
         except Exception as exc:
             logger.warning(f"LLM call failed: {exc}")
 
@@ -381,7 +383,7 @@ class MIPRO(OptimizationStrategy):
                     json={"model": model_name, "prompt": prompt, "stream": False},
                 )
                 if resp.status_code == 200:
-                    return resp.json().get("response", "").strip()
+                    return str(resp.json().get("response", "")).strip()
         except Exception as exc:
             logger.warning(f"MIPRO LLM call failed: {exc}")
         return ""
@@ -441,7 +443,7 @@ class BootstrapRandomSearch(OptimizationStrategy):
                 total_w = sum(weights)
                 weights = [w / total_w for w in weights]
 
-                indices = set()
+                indices: set[int] = set()
                 while len(indices) < self.k_examples and len(indices) < len(scored):
                     idx = random.choices(range(len(scored)), weights=weights, k=1)[0]
                     indices.add(idx)
@@ -553,7 +555,7 @@ class EnsembleOptimizer(OptimizationStrategy):
                     json={"model": model_name, "prompt": prompt, "stream": False},
                 )
                 if resp.status_code == 200:
-                    return resp.json().get("response", "").strip()
+                    return str(resp.json().get("response", "")).strip()
         except Exception:
             pass
 

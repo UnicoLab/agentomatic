@@ -272,7 +272,7 @@ def create_default_router(
     async def health() -> dict[str, Any]:
         """Per-agent health check."""
         agent = _get_agent()
-        return await agent.health_check()
+        return dict(await agent.health_check())
 
     # ── GET /config ───────────────────────────────────────────────
     @router.get("/config")
@@ -389,7 +389,7 @@ def create_default_router(
         if thread_store:
             thread = await thread_store.get_thread(thread_id)
             if thread:
-                return thread
+                return dict(thread)
             raise HTTPException(404, f"Thread '{thread_id}' not found")
         return {"thread_id": thread_id, "message": "Thread storage not configured"}
 
@@ -440,7 +440,7 @@ def create_default_router(
 
         # Inject prompt override
         if request.system_prompt_override:
-            state["metadata"]["system_prompt_override"] = request.system_prompt_override
+            state["metadata"]["system_prompt_override"] = request.system_prompt_override  # type: ignore[index]
 
         t0 = time.perf_counter()
         try:

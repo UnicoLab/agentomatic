@@ -19,7 +19,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         """Process request with logging and timing."""
         if request.url.path in _SKIP_PATHS:
-            return await call_next(request)
+            response: Response = await call_next(request)
+            return response
 
         request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])
         t0 = time.perf_counter()

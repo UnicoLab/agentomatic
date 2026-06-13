@@ -1,0 +1,46 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-quality:
+    name: PR Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check PR title (conventional commits)
+        uses: Slashgear/action-check-pr-title@main
+        with:
+          regexp: '(break|build|ci|docs|feat|fix|perf|refactor|style|test|chore|ops|hotfix)(\([a-zA-Z0-9\-\_\/\:]+\))?(!)?:\s.+'
+
+      - name: Get changed files
+        id: files
+        uses: jitterbit/get-changed-files@v1
+
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pre-commit
+
+      - name: Run pre-commit on changed files
+        run: |
+          echo "Changed files: ${{ steps.files.outputs.all }}"
+          pre-commit run -v --files ${{ steps.files.outputs.all }}
+        shell: bash

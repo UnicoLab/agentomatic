@@ -1,0 +1,65 @@
+name: "Manual PyPI Publish"
+
+on:
+  workflow_dispatch:
+    inputs:
+      RELEASE_VERSION:
+        required: true
+        type: string
+        description: "Release version to publish to PyPI (e.g. 0.2.0)"
+
+permissions:
+  contents: write
+
+jobs:
+  pypi-publish:
+    name: Publish v${{ inputs.RELEASE_VERSION }} to PyPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set version
+        run: |
+          echo "Setting package version to ${{ inputs.RELEASE_VERSION }}"
+          # Update version in pyproject.toml
+          sed -i "s/^version = \".*\"/version = \"${{ inputs.RELEASE_VERSION }}\"/" pyproject.toml
+          # Update version in _version.py
+          sed -i "s/__version__ = \".*\"/__version__ = \"${{ inputs.RELEASE_VERSION }}\"/" src/agentomatic/_version.py
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        id: publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+        continue-on-error: true
+
+      - name: Retry PyPI publish on failure
+        if: steps.publish.outcome == 'failure'
+        run: |
+          echo "First attempt failed, retrying..."
+          sleep 10
+          rm -rf dist/
+          uv build
+
+      - name: Retry publish action
+        if: steps.publish.outcome == 'failure'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}

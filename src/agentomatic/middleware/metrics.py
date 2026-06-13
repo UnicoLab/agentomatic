@@ -27,6 +27,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app, *, prefix: str = "agentomatic") -> None:
         super().__init__(app)
+        self._requests: Counter | None = None
+        self._duration: Histogram | None = None
+        self._active: Gauge | None = None
         if HAS_PROMETHEUS:
             self._requests = Counter(
                 f"{prefix}_http_requests_total",
@@ -43,10 +46,6 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 f"{prefix}_http_requests_active",
                 "Active HTTP requests",
             )
-        else:
-            self._requests = None
-            self._duration = None
-            self._active = None
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.url.path in _SKIP_PATHS:
@@ -59,7 +58,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                     content=body,
                     media_type=CONTENT_TYPE_LATEST,
                 )
-            return await call_next(request)
+            response: Response = await call_next(request)
+            return response
 
         if self._active:
             self._active.inc()

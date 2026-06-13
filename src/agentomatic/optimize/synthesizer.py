@@ -428,7 +428,7 @@ class DataSynthesizer:
                     },
                 )
                 if resp.status_code == 200:
-                    return resp.json().get("response", "")
+                    return str(resp.json().get("response", ""))
         except Exception as exc:
             logger.warning(f"LLM call failed: {exc}")
 
@@ -528,7 +528,7 @@ class DataSynthesizer:
             Dataset with adversarial DataPoints.
         """
         try:
-            from deepeval.red_teaming import RedTeamer
+            from deepeval.red_teaming import RedTeamer  # type: ignore[attr-defined]
 
             red_teamer = RedTeamer(
                 target_purpose=agent_description,
@@ -595,7 +595,7 @@ class DataSynthesizer:
             from deepeval.dataset import EvaluationDataset, Golden
 
             goldens = [
-                Golden(
+                Golden(  # type: ignore[call-arg]
                     input=p.query,
                     expected_output=p.expected_answer or "",
                     context=p.context or [],

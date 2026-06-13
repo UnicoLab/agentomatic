@@ -208,7 +208,7 @@ class LLMJudgeMetric(BaseMetric):
             input=query,
             actual_output=response,
             expected_output=expected,
-            retrieval_context=context or [],
+            retrieval_context=context or [],  # type: ignore[arg-type]
         )
         metric.measure(test_case)
         return EvalResult(
@@ -368,7 +368,7 @@ class GEvalMetric(BaseMetric):
                 input=query,
                 actual_output=response,
                 expected_output=expected,
-                retrieval_context=context or [],
+                retrieval_context=context or [],  # type: ignore[arg-type]
             )
             metric.measure(test_case)
             return EvalResult(
@@ -461,10 +461,14 @@ class DeepEvalMetric(BaseMetric):
 
     def __init__(self, deepeval_metric: Any, name: str | None = None):
         self._metric = deepeval_metric
-        self.name = name or getattr(
-            deepeval_metric,
-            "name",
-            type(deepeval_metric).__name__,
+        self.name: str = (
+            name
+            or getattr(
+                deepeval_metric,
+                "name",
+                type(deepeval_metric).__name__,
+            )
+            or ""
         )
 
     async def evaluate(
@@ -486,7 +490,7 @@ class DeepEvalMetric(BaseMetric):
             input=query,
             actual_output=response,
             expected_output=expected,
-            retrieval_context=context or [],
+            retrieval_context=context or [],  # type: ignore[arg-type]
         )
         self._metric.measure(test_case)
         return EvalResult(
@@ -555,7 +559,7 @@ class RedTeamMetric(BaseMetric):
             input=query,
             actual_output=response,
             expected_output=expected,
-            retrieval_context=context or [],
+            retrieval_context=context or [],  # type: ignore[arg-type]
         )
 
         bias_metric = BiasMetric(model=self.model)
@@ -674,7 +678,7 @@ def _make_deepeval_metric(name: str, model: str, **kwargs: Any) -> BaseMetric:
                 input=query,
                 actual_output=response,
                 expected_output=expected,
-                retrieval_context=context or [],
+                retrieval_context=context or [],  # type: ignore[arg-type]
             )
 
             # Prefer deepeval.evaluate() for richer reporting, fall back
@@ -682,7 +686,7 @@ def _make_deepeval_metric(name: str, model: str, **kwargs: Any) -> BaseMetric:
             try:
                 from deepeval import evaluate as de_evaluate
 
-                results = de_evaluate(
+                results = de_evaluate(  # type: ignore[operator]
                     test_cases=[test_case],
                     metrics=[self._metric],
                     print_results=False,

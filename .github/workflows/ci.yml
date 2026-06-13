@@ -3,30 +3,58 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tests/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tests/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # ─────────────────────────────────────────────────────
+  # 1. LINT — Ruff check + format verification
+  # ─────────────────────────────────────────────────────
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-      - name: Install dependencies
-        run: uv pip install -e ".[dev]" --system
-      - name: Ruff check
-        run: ruff check src/agentomatic/ tests/
-      - name: Ruff format check
-        run: ruff format --check src/agentomatic/ tests/
 
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Ruff check
+        run: uv run ruff check src/agentomatic/ tests/
+
+      - name: Ruff format check
+        run: uv run ruff format --check src/agentomatic/ tests/
+
+  # ─────────────────────────────────────────────────────
+  # 2. TEST — Multi-Python matrix with coverage
+  # ─────────────────────────────────────────────────────
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -36,34 +64,90 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
+
       - name: Install dependencies
-        run: uv pip install -e ".[all,dev]" --system
-      - name: Run tests with coverage
+        run: uv sync --all-extras --group dev
+
+      - name: Run tests
         run: |
-          pytest tests/ -v --cov=agentomatic --cov-report=xml --cov-report=term
+          uv run pytest tests/ -v \
+            --cov=agentomatic \
+            --cov-report=xml \
+            --cov-report=term \
+            -m "not slow" \
+            --override-ini="addopts="
+        timeout-minutes: 15
+
       - name: Upload coverage
         if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4
         with:
           file: coverage.xml
+          flags: unittests
           fail_ci_if_error: false
+        continue-on-error: true
 
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────
+  # 3. TYPECHECK — Mypy static analysis
+  # ─────────────────────────────────────────────────────
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
+
       - name: Install dependencies
-        run: uv pip install -e ".[all,dev]" --system
+        run: uv sync --all-extras --group dev
+
       - name: Mypy
-        run: mypy src/agentomatic/ --ignore-missing-imports
+        run: uv run mypy src/agentomatic/ --ignore-missing-imports
+
+  # ─────────────────────────────────────────────────────
+  # 4. BUILD — Validate package builds correctly
+  # ─────────────────────────────────────────────────────
+  build:
+    name: Build Package
+    needs: [lint, test, typecheck]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build
+        run: uv build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

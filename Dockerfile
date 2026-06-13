@@ -1,42 +1,38 @@
-# Multi-stage Docker build for Vision Backend
-# Optimized for quick builds, smaller image size, and Poetry dependency management
+# Multi-stage Docker build for Agentomatic
+# Optimized for quick builds using uv package manager
 
 # Build stage
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
-# Set environment variables for optimal Python behavior
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VENV_IN_PROJECT=1 \
-    POETRY_CACHE_DIR=/tmp/poetry_cache
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-# Install system dependencies and Poetry
+# Install system dependencies and uv
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install poetry==1.8.5
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
 
-# Copy Poetry configuration files
-COPY pyproject.toml poetry.lock* ./
+# Copy dependency files first for cache efficiency
+COPY pyproject.toml uv.lock ./
 
-# Configure Poetry and install dependencies
-RUN poetry config virtualenvs.create true \
-    && poetry config virtualenvs.in-project true \
-    && poetry install --only=main --no-dev --no-root \
-    && rm -rf $POETRY_CACHE_DIR
+# Install dependencies (without the project itself)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
 
-# Copy source code and install the package
+# Copy source code and install the project
 COPY src/ ./src/
-RUN poetry install --only-root
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Production stage
 FROM python:3.12-slim
@@ -55,7 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get autoremove -y \
     && apt-get clean
 
-# Create non-root user early
+# Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Set working directory
@@ -69,18 +65,18 @@ COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser pyproject.toml ./
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/tmp \
+RUN mkdir -p /app/logs /app/tmp /app/agents \
     && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
 
-# Health check with proper endpoint
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["python", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application using the CLI
+CMD ["agentomatic", "run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]

@@ -693,11 +693,11 @@ class PromptOptimizer:
                 # Get the first available version
                 for version in ["v1", "default"]:
                     if version in data and "system" in data[version]:
-                        return data[version]["system"]
+                        return str(data[version]["system"])
                 # Fallback: first entry
                 for key, val in data.items():
                     if isinstance(val, dict) and "system" in val:
-                        return val["system"]
+                        return str(val["system"])
 
         return "You are a helpful AI assistant."
 

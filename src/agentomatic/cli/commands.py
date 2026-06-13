@@ -36,7 +36,7 @@ try:
 except ImportError:
     HAS_RICH = False
 
-console = Console() if HAS_RICH else None
+console: Console = Console() if HAS_RICH else None  # type: ignore[assignment]
 
 
 # =====================================================================
@@ -671,7 +671,7 @@ def optimize(
     # Create optimizer
     optimizer = PromptOptimizer(
         agent=agent,
-        metrics=metric_list,
+        metrics=metric_list,  # type: ignore[arg-type]
         llm=llm,
         rewrite_llm=rewrite_llm,
         eval_llm=eval_llm,

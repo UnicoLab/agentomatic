@@ -46,8 +46,21 @@ try:
     from opentelemetry.sdk.trace.export import (
         BatchSpanProcessor,
         ConsoleSpanExporter,
+        SpanExporter,
+        SpanExportResult,
     )
     from opentelemetry.trace import StatusCode
+
+    class SafeConsoleSpanExporter(ConsoleSpanExporter):
+        """ConsoleSpanExporter that catches I/O errors when stdout is closed during exit."""
+
+        def export(self, spans: Any) -> SpanExportResult:
+            try:
+                if self.out and getattr(self.out, "closed", False):
+                    return SpanExportResult.SUCCESS
+                return super().export(spans)
+            except (ValueError, OSError):
+                return SpanExportResult.SUCCESS
 
     HAS_OTEL = True
 except ImportError:
@@ -119,7 +132,7 @@ def setup_telemetry(
         logger.debug("OpenTelemetry not installed — tracing disabled")
         return None
 
-    svc_name = service_name or os.getenv("OTEL_SERVICE_NAME", "agentomatic")
+    svc_name: str = service_name or os.getenv("OTEL_SERVICE_NAME") or "agentomatic"
     resource = Resource.create(
         {
             "service.name": svc_name,
@@ -138,7 +151,7 @@ def setup_telemetry(
                 OTLPSpanExporter,
             )
 
-            exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+            exporter: SpanExporter = OTLPSpanExporter(endpoint=otlp_endpoint)
             provider.add_span_processor(BatchSpanProcessor(exporter))
             logger.info(f"📡 OTEL traces → {otlp_endpoint}")
         except ImportError:
@@ -155,7 +168,7 @@ def setup_telemetry(
                 enable_console = True
 
     if enable_console or not otlp_endpoint:
-        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+        provider.add_span_processor(BatchSpanProcessor(SafeConsoleSpanExporter()))
 
     trace.set_tracer_provider(provider)
     _tracer = trace.get_tracer("agentomatic")

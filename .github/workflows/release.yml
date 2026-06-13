@@ -1,19 +1,31 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      DRY_RUN:
+        required: false
+        default: false
+        type: boolean
+        description: "Run in dry-run mode (no actual release)"
 
 permissions:
   contents: write
+  pages: write
   id-token: write
 
 jobs:
-  release:
+  # ─────────────────────────────────────────────────────────────
+  # 1. SEMANTIC RELEASE — Bump version, tag, create GitHub release
+  # ─────────────────────────────────────────────────────────────
+  semantic-release:
     name: Semantic Release
     runs-on: ubuntu-latest
     concurrency: release
     if: github.repository_owner == 'UnicoLab'
+    outputs:
+      new_version: ${{ steps.release.outputs.version }}
+      released: ${{ steps.release.outputs.released }}
 
     steps:
       - uses: actions/checkout@v4
@@ -29,29 +41,141 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv pip install -e ".[all,dev]" --system
-
-      - name: Run tests
-        run: pytest tests/ -v
+        run: uv sync --group dev
 
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@v9
         with:
           github_token: ${{ secrets.GH_TOKEN }}
+          root_options: ${{ inputs.DRY_RUN && '--noop' || '' }}
+
+      - name: Show release info
+        run: |
+          echo "Released: ${{ steps.release.outputs.released }}"
+          echo "Version: ${{ steps.release.outputs.version }}"
+
+      - name: Save recovery version
+        if: steps.release.outputs.released == 'true'
+        run: |
+          mkdir -p .github/recovery
+          echo "${{ steps.release.outputs.version }}" > .github/recovery/last_release_version.txt
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. PYPI PUBLISH — Build and publish to PyPI
+  # ─────────────────────────────────────────────────────────────
+  pypi-publish:
+    name: Publish to PyPI
+    needs: [semantic-release]
+    if: needs.semantic-release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
       - name: Build package
-        if: steps.release.outputs.released == 'true'
-        run: python -m build
+        run: uv build
 
       - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
+        id: publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+        continue-on-error: true
+
+      - name: Retry PyPI publish on failure
+        if: steps.publish.outcome == 'failure'
+        run: |
+          echo "First attempt failed, retrying..."
+          sleep 10
+          rm -rf dist/
+          uv build
+        # Second attempt
+      - name: Retry publish
+        if: steps.publish.outcome == 'failure'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
 
+  # ─────────────────────────────────────────────────────────────
+  # 3. GITHUB RELEASE — Create GitHub release with assets
+  # ─────────────────────────────────────────────────────────────
+  github-release:
+    name: Publish GitHub Release
+    needs: [semantic-release]
+    if: needs.semantic-release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
       - name: Publish GitHub Release
-        if: steps.release.outputs.released == 'true'
         uses: python-semantic-release/publish-action@v9
         with:
           github_token: ${{ secrets.GH_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. DEPLOY DOCS — Build and deploy versioned documentation
+  # ─────────────────────────────────────────────────────────────
+  deploy-docs:
+    name: Deploy Release Docs
+    needs: [semantic-release, pypi-publish]
+    if: needs.semantic-release.outputs.released == 'true' && !failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install docs dependencies
+        run: uv sync --group docs
+
+      - name: Configure git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Fetch gh-pages branch
+        run: |
+          git fetch origin gh-pages:gh-pages || echo "No gh-pages branch exists yet — mike will create it"
+
+      - name: Deploy versioned docs
+        id: deploy_docs
+        run: |
+          VERSION="${{ needs.semantic-release.outputs.new_version }}"
+          echo "Deploying documentation for version $VERSION"
+          uv run mike deploy --push --update-aliases "$VERSION" latest
+          uv run mike set-default --push latest
+          echo "✓ Deployed docs v${VERSION} (aliased as 'latest')"
+        continue-on-error: true
+
+      - name: Retry docs deployment on failure
+        if: steps.deploy_docs.outcome == 'failure'
+        run: |
+          VERSION="${{ needs.semantic-release.outputs.new_version }}"
+          echo "Retrying documentation deployment..."
+          git fetch origin gh-pages:gh-pages --force
+          uv run mike deploy --push --update-aliases --force "$VERSION" latest
+          uv run mike set-default --push latest

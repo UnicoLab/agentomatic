@@ -255,7 +255,7 @@ class AgentRunner:
                         "feedback_type": "correction" if correction else "thumbs",
                     },
                 )
-                return resp.json()
+                return dict(resp.json())
         except Exception as exc:
             logger.warning(f"Failed to submit feedback: {exc}")
             return {"status": "error", "error": str(exc)}

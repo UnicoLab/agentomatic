@@ -36,7 +36,7 @@ if HAS_CHAINLIT:
         async with httpx.AsyncClient(base_url=API_BASE, timeout=10) as client:
             resp = await client.get(f"{API_PREFIX}/agents")
             resp.raise_for_status()
-            return resp.json().get("agents", {})
+            return dict(resp.json().get("agents", {}))
 
     async def _invoke_agent(
         agent_name: str, query: str, thread_id: str | None = None
@@ -53,7 +53,7 @@ if HAS_CHAINLIT:
                 json=payload,
             )
             resp.raise_for_status()
-            return resp.json()
+            return dict(resp.json())
 
     @cl.on_chat_start
     async def on_start():
@@ -78,7 +78,7 @@ if HAS_CHAINLIT:
 
         # Let user pick an agent
         settings = await cl.ChatSettings(
-            [
+            [  # type: ignore[arg-type]
                 cl.input_widget.Select(
                     id="agent",
                     label="🤖 Agent",

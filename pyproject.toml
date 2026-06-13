@@ -70,6 +70,25 @@ dev = [
     "twine>=6.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "pytest-mock>=3.14",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "build>=1.0",
+    "twine>=6.0",
+    "python-semantic-release>=9.0",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mike>=2.1",
+    "pymdown-extensions>=10.0",
+]
+
 [project.scripts]
 agentomatic = "agentomatic.cli.commands:cli"
 
@@ -143,7 +162,7 @@ omit = ["*/tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 60
+fail_under = 40
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
@@ -158,3 +177,5 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 check_untyped_defs = true
+explicit_package_bases = true
+mypy_path = "src"

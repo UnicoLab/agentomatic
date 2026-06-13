@@ -28,7 +28,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from loguru import logger
 
@@ -130,9 +130,12 @@ class FeedbackCollector:
     ) -> list[dict[str, Any]]:
         """Get stored feedback."""
         if self._store and hasattr(self._store, "get_feedback"):
-            return await self._store.get_feedback(
-                agent_name=agent_name,
-                limit=limit,
+            return cast(
+                list[dict[str, Any]],
+                await self._store.get_feedback(
+                    agent_name=agent_name,
+                    limit=limit,
+                ),
             )
         # Fall back to buffer
         async with self._lock:

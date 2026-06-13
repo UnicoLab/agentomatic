@@ -1,0 +1,81 @@
+name: "Manual Documentation Publish"
+
+on:
+  workflow_dispatch:
+    inputs:
+      RELEASE_VERSION:
+        required: true
+        type: string
+        description: "Release version for documentation (e.g. 0.2.0)"
+      UPDATE_LATEST:
+        required: true
+        type: boolean
+        default: true
+        description: "Update the 'latest' alias to point to this version"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-docs:
+    name: Deploy Docs (v${{ inputs.RELEASE_VERSION }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install docs dependencies
+        run: uv sync --group docs
+
+      - name: Configure git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Fetch gh-pages branch
+        run: |
+          git fetch origin gh-pages:gh-pages || echo "No gh-pages branch exists yet — mike will create it"
+
+      - name: Deploy versioned docs
+        id: deploy_docs
+        run: |
+          VERSION="${{ inputs.RELEASE_VERSION }}"
+          echo "Deploying documentation for version ${VERSION}"
+
+          if [[ "${{ inputs.UPDATE_LATEST }}" == "true" ]]; then
+            uv run mike deploy --push --update-aliases "$VERSION" latest
+            uv run mike set-default --push latest
+            echo "✓ Deployed v${VERSION} as 'latest'"
+          else
+            uv run mike deploy --push "$VERSION"
+            echo "✓ Deployed v${VERSION} (latest alias NOT updated)"
+          fi
+        continue-on-error: true
+
+      - name: Retry docs deployment on failure
+        if: steps.deploy_docs.outcome == 'failure'
+        run: |
+          VERSION="${{ inputs.RELEASE_VERSION }}"
+          echo "Retrying documentation deployment..."
+          git fetch origin gh-pages:gh-pages --force
+
+          if [[ "${{ inputs.UPDATE_LATEST }}" == "true" ]]; then
+            uv run mike deploy --push --update-aliases --force "$VERSION" latest
+            uv run mike set-default --push latest
+          else
+            uv run mike deploy --push --force "$VERSION"
+          fi
+
+      - name: List deployed versions
+        run: |
+          uv run mike list || echo "Could not list versions"

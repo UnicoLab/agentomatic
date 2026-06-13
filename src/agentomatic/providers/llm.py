@@ -113,4 +113,4 @@ async def invoke_with_retry(
                 logger.warning(f"LLM attempt {attempt + 1} failed: {exc}. Retrying in {delay}s...")
                 await asyncio.sleep(delay)
 
-    raise last_exc
+    raise last_exc  # type: ignore[misc]

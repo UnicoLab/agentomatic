@@ -38,7 +38,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.url.path in _SKIP_PATHS:
-            return await call_next(request)
+            response: Response = await call_next(request)
+            return response
 
         key = request.headers.get(self._header) or request.query_params.get(self._query)
         if not key or key != self._api_key:
@@ -46,4 +47,5 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 {"detail": "Invalid or missing API key"},
                 status_code=401,
             )
-        return await call_next(request)
+        response = await call_next(request)
+        return response

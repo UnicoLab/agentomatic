@@ -659,11 +659,11 @@ class PromptOptimizationLoop:
 
         # Raw async callable
         if callable(llm) and inspect.iscoroutinefunction(llm):
-            return await llm(system + "\n\n" + human)
+            return str(await llm(system + "\n\n" + human))
 
         # Raw sync callable
         if callable(llm):
-            return llm(system + "\n\n" + human)
+            return str(llm(system + "\n\n" + human))
 
         raise TypeError(
             f"rewrite_llm must implement ainvoke/invoke (LangChain) "
@@ -718,13 +718,15 @@ def _write_html_report(result: LoopResult, path: str) -> None:
             sign = "+" if diff >= 0 else ""
             delta_html = f"<span style='color:{color}'>{sign}{diff:.1%}</span>"
 
-        sc = "#34d399" if s.avg_score >= 0.7 else "#fbbf24" if s.avg_score >= 0.4 else "#f87171"
+        score_color = (
+            "#34d399" if s.avg_score >= 0.7 else "#fbbf24" if s.avg_score >= 0.4 else "#f87171"
+        )
         n_pass = sum(1 for r in s.results if r["score"] >= 0.5)
         n_fail = len(s.results) - n_pass
         step_rows.append(
             f"<tr>"
             f"<td>{s.step + 1} {marker}</td>"
-            f"<td style='color:{sc};font-weight:700'>{s.avg_score:.1%}</td>"
+            f"<td style='color:{score_color};font-weight:700'>{s.avg_score:.1%}</td>"
             f"<td>{s.accuracy:.0%}</td>"
             f"<td>{delta_html}</td>"
             f"<td>{n_pass}✅ / {n_fail}❌</td>"
@@ -744,7 +746,7 @@ def _write_html_report(result: LoopResult, path: str) -> None:
         pts, dots, labels = [], [], []
         for i, sc in enumerate(scores):
             x = i * x_step
-            y = h - ((sc - y_lo) / y_range) * h
+            y = h - ((float(sc) - y_lo) / y_range) * h
             pts.append(f"{x:.0f},{y:.0f}")
             fill = "#34d399" if i == result.best_step else "#818cf8"
             dots.append(f"<circle cx='{x:.0f}' cy='{y:.0f}' r='6' fill='{fill}'/>")

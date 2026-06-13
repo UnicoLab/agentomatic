@@ -185,15 +185,15 @@ def _generate_holysheet_report(
         delta = f"{it.avg_score - iterations[i - 1].avg_score:+.4f}" if i > 0 else "—"
         n_fail = len(it.failures) if hasattr(it, "failures") else 0
 
-        row: dict[str, Any] = {
+        row_data: dict[str, Any] = {
             "Iteration": label,
             "Avg Score": round(it.avg_score, 4),
             "Δ": delta,
         }
         for m in metric_names:
-            row[m] = round(it.per_metric_scores.get(m, 0.0), 4)
-        row["Failures"] = n_fail
-        table_data.append(row)
+            row_data[m] = round(it.per_metric_scores.get(m, 0.0), 4)
+        row_data["Failures"] = n_fail
+        table_data.append(row_data)
 
     report.add(DataTable(title="Full History", data=table_data))
 
@@ -417,7 +417,7 @@ def _generate_svg_chart(
 
     n = len(iterations)
     if n < 2:
-        x_step = chart_w
+        x_step = float(chart_w)
     else:
         x_step = chart_w / (n - 1)
 

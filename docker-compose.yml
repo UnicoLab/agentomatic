@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Alpha Agent
   alpha-agent:
@@ -12,11 +10,11 @@ services:
       - PORT=8000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-    command: ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["agentomatic", "run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
     volumes:
-      - .:/app
+      - ./agents:/app/agents
     networks:
-      - vision-network
+      - agentomatic-network
 
   # Beta Agent
   beta-agent:
@@ -29,16 +27,16 @@ services:
       - PORT=8000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-    command: ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["agentomatic", "run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
     volumes:
-      - .:/app
+      - ./agents:/app/agents
     networks:
-      - vision-network
+      - agentomatic-network
 
   # Nginx reverse proxy
   nginx:
     image: nginx:alpine
-    container_name: vision-proxy
+    container_name: agentomatic-proxy
     ports:
       - "80:80"
     volumes:
@@ -47,8 +45,8 @@ services:
       - alpha-agent
       - beta-agent
     networks:
-      - vision-network
+      - agentomatic-network
 
 networks:
-  vision-network:
+  agentomatic-network:
     driver: bridge

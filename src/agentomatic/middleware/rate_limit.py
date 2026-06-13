@@ -45,7 +45,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.url.path in _SKIP_PATHS:
-            return await call_next(request)
+            response: Response = await call_next(request)
+            return response
 
         key = self._client_key(request)
         now = time.monotonic()

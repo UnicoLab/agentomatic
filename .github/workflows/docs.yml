@@ -3,7 +3,10 @@ name: Docs
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
@@ -14,6 +17,7 @@ jobs:
   docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,21 +31,26 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install docs dependencies
-        run: uv pip install -e ".[dev]" mkdocs-material mike pymdown-extensions --system
+        run: uv sync --group docs
 
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Deploy docs (tagged release)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Fetch gh-pages branch
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          mike deploy --push --update-aliases $VERSION latest
-          mike set-default --push latest
+          git fetch origin gh-pages:gh-pages || echo "No gh-pages branch exists yet — mike will create it"
 
-      - name: Deploy docs (main branch)
-        if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+      - name: Deploy docs (main branch — dev alias)
+        id: deploy_dev
         run: |
-          mike deploy --push --update-aliases dev
+          uv run mike deploy --push --update-aliases dev
+        continue-on-error: true
+
+      - name: Retry docs deployment on failure
+        if: steps.deploy_dev.outcome == 'failure'
+        run: |
+          echo "Retrying documentation deployment..."
+          git fetch origin gh-pages:gh-pages --force
+          uv run mike deploy --push --update-aliases --force dev

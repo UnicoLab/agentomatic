@@ -84,12 +84,12 @@ class PlatformSettings(BaseSettings):
     log_level: str = Field("INFO")
     api_version: str = Field("v1")
 
-    llm: LLMSettings = Field(default_factory=LLMSettings)
-    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
-    db: DatabaseSettings = Field(default_factory=DatabaseSettings)
-    features: FeatureSettings = Field(default_factory=FeatureSettings)
-    auth: AuthSettings = Field(default_factory=AuthSettings)
-    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+    llm: LLMSettings = Field(default_factory=LLMSettings)  # type: ignore[arg-type]
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)  # type: ignore[arg-type]
+    db: DatabaseSettings = Field(default_factory=DatabaseSettings)  # type: ignore[arg-type]
+    features: FeatureSettings = Field(default_factory=FeatureSettings)  # type: ignore[arg-type]
+    auth: AuthSettings = Field(default_factory=AuthSettings)  # type: ignore[arg-type]
+    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)  # type: ignore[arg-type]
 
     model_config = SettingsConfigDict(
         env_prefix="",
@@ -107,7 +107,7 @@ def get_settings() -> PlatformSettings:
     """Get or create the singleton settings instance."""
     global _settings
     if _settings is None:
-        _settings = PlatformSettings()
+        _settings = PlatformSettings()  # type: ignore[call-arg]
     return _settings
 
 

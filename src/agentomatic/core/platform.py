@@ -363,7 +363,7 @@ class AgentPlatform:
 
         # Custom middleware
         for mw_cls, mw_kwargs in self._custom_middleware:
-            app.add_middleware(mw_cls, **mw_kwargs)
+            app.add_middleware(mw_cls, **mw_kwargs)  # type: ignore[arg-type]
 
         # Feedback collector
         if self._enable_feedback:
@@ -482,6 +482,7 @@ class AgentPlatform:
             @app.get(f"{self.api_prefix}/storage/stats")
             async def storage_stats() -> dict[str, Any]:
                 """Storage backend statistics."""
+                assert self._store is not None
                 return await self._store.get_stats()
 
             # Feedback endpoint
@@ -494,6 +495,7 @@ class AgentPlatform:
                 comment: str | None = None,
             ) -> dict[str, Any]:
                 """Submit feedback."""
+                assert self._store is not None
                 return await self._store.add_feedback(
                     thread_id,
                     user_id,
@@ -508,6 +510,7 @@ class AgentPlatform:
                 limit: int = 50,
             ) -> dict[str, Any]:
                 """List collected feedback."""
+                assert self._store is not None
                 items = await self._store.get_feedback(
                     agent_name=agent_name,
                     limit=limit,

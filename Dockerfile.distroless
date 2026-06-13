@@ -1,76 +1,58 @@
-# Ultra-minimal distroless Docker build for Vision Backend
-# Optimized for production deployment with minimal attack surface
+# Distroless Docker build for Agentomatic
+# Minimal attack surface using Google's distroless base
 
 # Build stage
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
-# Set environment variables for optimal Python behavior
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VENV_IN_PROJECT=1 \
-    POETRY_CACHE_DIR=/tmp/poetry_cache
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-# Install system dependencies and Poetry
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install poetry==1.8.5
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
 
-# Copy Poetry configuration files
-COPY pyproject.toml poetry.lock* ./
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
 
-# Configure Poetry and install dependencies
-RUN poetry config virtualenvs.create true \
-    && poetry config virtualenvs.in-project true \
-    && poetry install --only=main --no-dev --no-root \
-    && rm -rf $POETRY_CACHE_DIR
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
 
-# Copy source code and install the package
+# Copy source code and install
 COPY src/ ./src/
-RUN poetry install --only-root
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
-# Strip unnecessary files to minimize size
-RUN find /app/.venv -name "*.pyc" -delete \
-    && find /app/.venv -name "__pycache__" -type d -exec rm -rf {} + \
-    && find /app/.venv -name "*.pyo" -delete \
-    && find /app/.venv -name "*.egg-info" -type d -exec rm -rf {} + \
-    && find /app/.venv -name "test*" -type d -exec rm -rf {} + \
-    && find /app/.venv -name "tests" -type d -exec rm -rf {} +
-
-# Production stage - using distroless Python image
+# Production stage — distroless
 FROM gcr.io/distroless/python3-debian12
 
 # Set environment variables
-ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:/app" \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH" \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    VIRTUAL_ENV="/app/.venv"
 
-# Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Copy virtual environment and application from builder
 COPY --from=builder /app/.venv /app/.venv
-
-# Copy application code
-COPY src/ ./src/
-COPY pyproject.toml ./
+COPY --from=builder /app/src /app/src
+COPY --from=builder /app/pyproject.toml /app/
 
 # Expose port
 EXPOSE 8000
 
-# Run the application (distroless uses ENTRYPOINT format)
-ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn", "src.app.main:app"]
-CMD ["--host", "0.0.0.0", "--port", "8000"]
-
-# Run the application
-ENTRYPOINT ["python", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run via the venv python — distroless has no shell
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
+CMD ["agentomatic.core.platform:app", "--host", "0.0.0.0", "--port", "8000"]
