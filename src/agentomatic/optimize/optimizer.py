@@ -259,7 +259,7 @@ class OptimizationResult:
             else f"[green]{self.best_prompt}[/green]"
         )
 
-        return console.export_text()
+        return str(console.export_text())
 
     def _plain_report(self) -> str:
         """Plain text report."""

@@ -3,6 +3,7 @@
 Optional overwrite: define custom Pydantic models for your agent's
 API endpoints. These can be used in custom api.py routers.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class WeatherRequest(BaseModel):
     """Custom weather request."""
+
     location: str = Field(..., description="City name or coordinates")
     days: int = Field(1, ge=1, le=16, description="Forecast days")
     units: str = Field("metric", description="Temperature units")
@@ -18,6 +20,7 @@ class WeatherRequest(BaseModel):
 
 class WeatherForecast(BaseModel):
     """Weather forecast response."""
+
     location: str
     temperature: float
     conditions: str
@@ -28,6 +31,7 @@ class WeatherForecast(BaseModel):
 
 class WeatherResponse(BaseModel):
     """Full weather response."""
+
     location: str
     current: WeatherForecast
     forecasts: list[WeatherForecast] = []

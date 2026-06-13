@@ -307,11 +307,10 @@ def _set_safe_attributes(
     """
     span.set_attribute("code.function", fn.__qualname__)
     span.set_attribute("code.namespace", fn.__module__)
-
     for key, value in kwargs.items():
-        if isinstance(value, (str, int, float, bool)):
+        if isinstance(value, str | int | float | bool):
             span.set_attribute(f"arg.{key}", value)
-        elif isinstance(value, (list, tuple)) and all(
-            isinstance(v, (str, int, float, bool)) for v in value
+        elif isinstance(value, list | tuple) and all(
+            isinstance(v, str | int | float | bool) for v in value
         ):
             span.set_attribute(f"arg.{key}", list(value))

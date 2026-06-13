@@ -1,4 +1,5 @@
 """Weather Agent — demonstrates ALL agentomatic overwrite options."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -30,4 +31,5 @@ manifest = AgentManifest(
 async def node_fn(state: dict[str, Any]) -> dict[str, Any]:
     """Main entry point. Delegates to the graph."""
     from .graph import get_graph
+
     return await get_graph().ainvoke(state)

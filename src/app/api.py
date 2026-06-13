@@ -2,7 +2,7 @@
 
 import importlib
 import pkgutil
-from typing import Any, Union
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, status
 from loguru import logger
@@ -343,7 +343,7 @@ def create_api_router() -> APIRouter:
         f"/api/{config.api_version}/agents/{{agent_name}}/chat",
         summary="Chat with agent",
         tags=["Agents"],
-        response_model=Union[AgentResponse, APIResponse],
+        response_model=AgentResponse | APIResponse,
     )
     @handle_api_errors
     @log_api_call

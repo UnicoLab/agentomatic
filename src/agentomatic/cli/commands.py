@@ -17,6 +17,7 @@ Fallback: works with basic output if Rich is not installed.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import json
 import sys
 from pathlib import Path

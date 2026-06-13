@@ -2,6 +2,7 @@
 
 Each function receives and returns a state dict.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -30,7 +31,7 @@ async def get_forecast(state: dict[str, Any]) -> dict[str, Any]:
     query = state.get("current_query", "")
     return {
         "response": f"🌤️ Weather forecast for your query: '{query}'\n"
-                   f"Today: Sunny, 24°C | Tomorrow: Partly cloudy, 22°C",
+        f"Today: Sunny, 24°C | Tomorrow: Partly cloudy, 22°C",
         "metadata": {"source": "weather_api", "confidence": 0.95},
         "steps_taken": ["fetched_forecast"],
     }

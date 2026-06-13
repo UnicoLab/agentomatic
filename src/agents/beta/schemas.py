@@ -1,6 +1,5 @@
 """Simplified schemas for Beta agent."""
 
-
 from pydantic import BaseModel, Field, field_validator
 
 

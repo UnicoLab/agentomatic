@@ -23,6 +23,7 @@ Usage:
       -H 'Content-Type: application/json' \
       -d '{"location": "Paris", "days": 3}'
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter

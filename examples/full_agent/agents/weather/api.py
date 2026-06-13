@@ -7,11 +7,12 @@ full control over the agent's API.
 You can also ADD endpoints alongside the auto-generated ones by
 using a different approach (see platform.include_router()).
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .schemas import WeatherRequest, WeatherResponse, WeatherForecast
+from .schemas import WeatherForecast, WeatherRequest, WeatherResponse
 
 # NOTE: This router is discovered by the registry and REPLACES
 # the auto-generated router for this agent.

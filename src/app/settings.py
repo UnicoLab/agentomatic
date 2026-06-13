@@ -1,6 +1,5 @@
 """Application settings and configuration."""
 
-
 from pydantic_settings import BaseSettings
 
 from ..common.llm_factory import LLMProvider

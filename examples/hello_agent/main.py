@@ -10,6 +10,7 @@ Usage:
       -H "Content-Type: application/json" \
       -d '{"query": "Hi there!"}'
 """
+
 from agentomatic import AgentPlatform
 
 # One line to create the platform
