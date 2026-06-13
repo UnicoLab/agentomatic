@@ -120,7 +120,7 @@ platform = AgentPlatform.from_folder(
 Agentomatic standardizes console outputs using the `loguru` framework, printing clean, structured, and color-coded message lines:
 
 ```
-2026-06-13 22:16:10.123 | INFO     | agentomatic.middleware.logging:dispatch:18 - GET /api/v1/hr_agent/health - 200 OK - 4.21ms
+2026-06-13 22:16:10.123 | INFO     | agentomatic.middleware.logging:dispatch:18 - GET /api/v1/my_agent/health - 200 OK - 4.21ms
 2026-06-13 22:16:15.541 | ERROR    | agentomatic.middleware.logging:dispatch:24 - POST /api/v1/qa_agent/invoke - 500 Internal Error - exception: ConnectionRefusedError
 ```
 

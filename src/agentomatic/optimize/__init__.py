@@ -24,9 +24,9 @@ Synthetic data::
 
     synth = DataSynthesizer(model="ollama/mistral:7b")
     dataset = await synth.generate(
-        description="HR policy assistant",
+        description="Support assistant",
         n_samples=50,
-        categories=["leave", "benefits", "expenses"],
+        categories=["billing", "delivery", "refunds"],
     )
 """
 

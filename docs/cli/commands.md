@@ -118,7 +118,7 @@ Options:
 ╭────────────────────── Discovered Agents ──────────────────────╮
 │ Name         │ Framework  │ Version │ Endpoints │ Status      │
 ├──────────────┼────────────┼─────────┼───────────┼─────────────┤
-│ hr_bot       │ langgraph  │ 1.0.0   │ 12        │ Ready       │
+│ my_agent     │ langgraph  │ 1.0.0   │ 12        │ Ready       │
 │ rag_agent    │ langgraph  │ 1.0.0   │ 12        │ Ready       │
 │ classifier   │ custom     │ 0.1.0   │ 12        │ Ready       │
 ╰──────────────┴────────────┴─────────┴───────────┴─────────────╯
@@ -143,13 +143,13 @@ Options:
 
 ### Example Output
 ```text
-╭──────────────────── Agent: hr_bot ────────────────────╮
+╭──────────────────── Agent: my_agent ──────────────────╮
 │ Manifest                                              │
-│   name:        hr_bot                                 │
-│   slug:        hr-bot                                 │
+│   name:        my_agent                               │
+│   slug:        my-agent                               │
 │   framework:   langgraph                              │
 │   version:     1.0.0                                  │
-│   keywords:    hr, policy, benefits                   │
+│   keywords:    help, search, assistant                │
 │                                                       │
 │ Files                                                 │
 │   ✅ __init__.py    (manifest + entry)                │
@@ -181,10 +181,10 @@ Options:
 
 ### Example Session
 ```bash
-agentomatic test hr_bot
-# 🤖 Connected to hr_bot at http://localhost:8000
+agentomatic test my_agent
+# 🤖 Connected to my_agent at http://localhost:8000
 # You: Hello!
-# hr_bot: Hello! How can I assist you with HR policies today?
+# my_agent: Hello! How can I assist you today?
 # You: /quit
 ```
 
@@ -222,7 +222,7 @@ Options:
 ### Examples
 ```bash
 # Run basic optimization loop and auto-save the best prompt
-agentomatic optimize hr_bot \
+agentomatic optimize my_agent \
   --dataset eval_qa.jsonl \
   --metrics exact_match,contains \
   --strategy iterative_rewrite \

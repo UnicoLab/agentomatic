@@ -157,9 +157,9 @@ synth = DataSynthesizer(model="ollama/llama3:8b")
 
 # Generate 50 test cases covering specific categories
 dataset = await synth.generate(
-    description="HR policy agent answering questions about benefits and vacations",
+    description="Customer support assistant answering questions about orders and returns",
     n_samples=50,
-    categories=["vacations", "maternity", "healthcare"],
+    categories=["returns", "shipping", "refunds"],
 )
 
 # Save to disk

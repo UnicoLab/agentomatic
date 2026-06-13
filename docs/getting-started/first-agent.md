@@ -79,7 +79,7 @@ async def retrieve_context(state: dict[str, Any]) -> dict[str, Any]:
     # Mock retrieval docs (swap with a real VectorDB like Qdrant/Chroma)
     docs = [
         "Company policy: Employees get 25 days of paid time off per year.",
-        "Requesting leaves: Submit request in HR portal 2 weeks in advance."
+        "Requesting leaves: Submit request in employee portal 2 weeks in advance."
     ]
     return {
         "citations": [{"source": "company_handbook.pdf", "page": 10}],
