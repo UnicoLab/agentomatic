@@ -1001,6 +1001,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../platform-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Platform Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../optimization/" class="md-nav__link">
         
   
@@ -1723,8 +1751,51 @@
 <td>Optional</td>
 <td>Search feedback records</td>
 </tr>
+<tr>
+<td><code>async def save_suspended_state(...) -&gt; dict</code></td>
+<td>Optional</td>
+<td>Save execution state for human approval</td>
+</tr>
+<tr>
+<td><code>async def get_suspended_state(id) -&gt; dict \| None</code></td>
+<td>Optional</td>
+<td>Retrieve a suspended state</td>
+</tr>
+<tr>
+<td><code>async def list_suspended_states(...) -&gt; list[dict]</code></td>
+<td>Optional</td>
+<td>List all pending suspended states</td>
+</tr>
+<tr>
+<td><code>async def delete_suspended_state(id) -&gt; bool</code></td>
+<td>Optional</td>
+<td>Delete suspended state on completion</td>
+</tr>
+<tr>
+<td><code>async def fork_thread(...) -&gt; dict \| None</code></td>
+<td>Optional</td>
+<td>Fork a conversation history up to index</td>
+</tr>
+<tr>
+<td><code>async def save_checkpoint(...) -&gt; None</code></td>
+<td>Optional</td>
+<td>Save a LangGraph checkpoint state</td>
+</tr>
+<tr>
+<td><code>async def get_checkpoint(...) -&gt; dict \| None</code></td>
+<td>Optional</td>
+<td>Retrieve a LangGraph checkpoint state</td>
+</tr>
+<tr>
+<td><code>async def list_checkpoints(...) -&gt; list[dict]</code></td>
+<td>Optional</td>
+<td>List checkpoints for a thread namespace</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p>🚦 <em>For details on how checkpointer, thread forking, and human-in-the-loop suspension integrate with these storage methods, see the <a href="../platform-features/">Advanced Platform Features Guide</a>.</em></p>
+</blockquote>
 
 
 
