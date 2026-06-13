@@ -403,3 +403,220 @@ def test_state_level_dynamic_middleware_hooks(platform, client):
     assert called_hooks[0][0] == "before"
     assert called_hooks[0][1] == "hitl_agent"
     assert called_hooks[0][2] == "thread_hook_1"
+
+
+# =========================================================================
+# 8. Extra Edge Cases: Structured Fallbacks, Checkpointers & SQLAlchemy Store
+# =========================================================================
+
+
+class ComplexOutputModel(BaseModel):
+    name: str
+    num: float
+    flag: bool
+    items: list[int] = Field(default_factory=list)
+    mapping: dict[str, str] = Field(default_factory=dict)
+    maybe: str | None = None
+
+
+def test_structured_output_fallback_parsing_and_types():
+    """Verify StructuredOutputFallbackWrapper parses invalid JSON and handles all type annotations."""
+    from agentomatic.providers.llm import StructuredOutputFallbackWrapper
+
+    class FakeLLM:
+        def __init__(self, content):
+            self.content = content
+
+        def invoke(self, *args, **kwargs):
+            return self
+
+    # Case 1: Valid JSON response
+    wrapper_good = StructuredOutputFallbackWrapper(
+        FakeLLM('{"name": "test", "num": 1.2, "flag": true}'), ComplexOutputModel
+    )
+    res_good = wrapper_good.invoke("dummy query")
+    assert isinstance(res_good, ComplexOutputModel)
+    assert res_good.name == "test"
+    assert res_good.num == 1.2
+    assert res_good.flag is True
+
+    # Case 2: Invalid JSON response - triggers fallback parsing logic covering type defaults
+    wrapper_bad = StructuredOutputFallbackWrapper(
+        FakeLLM("invalid json string"), ComplexOutputModel
+    )
+    res_bad = wrapper_bad.invoke("dummy query")
+    assert isinstance(res_bad, ComplexOutputModel)
+    assert res_bad.name == "dummy_str"
+    assert res_bad.num == 0.0
+    assert res_bad.flag is False
+    assert res_bad.items == []
+    assert res_bad.mapping == {}
+    assert res_bad.maybe is None
+
+
+@pytest.mark.asyncio
+async def test_agentomatic_checkpointer_sync_wrappers_and_errors(store):
+    """Test sync wrappers and exception behaviors in AgentomaticCheckpointer."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    from agentomatic.storage.checkpointer import AgentomaticCheckpointer
+
+    checkpointer = AgentomaticCheckpointer(store)
+
+    config = {
+        "configurable": {
+            "thread_id": "thread_lg_sync",
+            "checkpoint_ns": "ns_sync",
+            "checkpoint_id": "cp_sync_1",
+        }
+    }
+    checkpoint = {"v": 1, "channel_values": {"x": 10}}
+    metadata = {"source": "sync", "step": 1}
+
+    # 1. Test aput requires thread_id
+    bad_config = {"configurable": {}}
+    with pytest.raises(ValueError, match="thread_id is required"):
+        await checkpointer.aput(bad_config, checkpoint, metadata, {})
+
+    # 2. Test get_tuple returns None when config is empty or missing thread_id
+    res_none = await checkpointer.aget_tuple(bad_config)
+    assert res_none is None
+
+    # 3. Test synchronous execution of put/get_tuple/list outside of running event loop
+    # We run inside an executor to simulate sync calling context (no active running loop in thread)
+    def run_sync_ops():
+        checkpointer.put(config, checkpoint, metadata, {})
+        ret = checkpointer.get_tuple(config)
+        all_cps = list(checkpointer.list(config))
+        return ret, all_cps
+
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        t_res, t_list = await loop.run_in_executor(executor, run_sync_ops)
+
+    assert t_res is not None
+    assert t_res.checkpoint["channel_values"]["x"] == 10
+    assert len(t_list) == 1
+    assert t_list[0].config["configurable"]["checkpoint_id"] == "cp_sync_1"
+
+
+@pytest.mark.asyncio
+async def test_sqlalchemy_store_all_features_edge_cases():
+    """Verify SQLAlchemyStore's implementation of feedback, stats, HITL states, checkpoints, and modifications."""
+    db_store = SQLAlchemyStore("sqlite+aiosqlite:///:memory:")
+    await db_store.initialize()
+    try:
+        # 1. Thread update and delete
+        await db_store.create_thread("thread_sqla", "user_sqla", "test_agent", title="Old Title")
+        thread = await db_store.get_thread("thread_sqla")
+        assert thread["title"] == "Old Title"
+
+        updated = await db_store.update_thread(
+            "thread_sqla", title="New Title", metadata_json={"foo": "bar"}
+        )
+        assert updated is not None
+        assert updated["title"] == "New Title"
+        assert updated["metadata"]["foo"] == "bar"
+
+        # 2. Feedback operations
+        fb = await db_store.add_feedback(
+            thread_id="thread_sqla",
+            user_id="user_sqla",
+            agent_name="test_agent",
+            rating=5,
+            comment="Awesome!",
+            feedback_type="stars",
+        )
+        assert fb["rating"] == 5
+        assert fb["comment"] == "Awesome!"
+
+        fbs = await db_store.get_feedback(agent_name="test_agent", user_id="user_sqla")
+        assert len(fbs) == 1
+        assert fbs[0]["comment"] == "Awesome!"
+
+        # 3. Stats verification
+        stats = await db_store.get_stats()
+        assert stats["threads"] == 1
+        assert stats["feedback"] == 1
+
+        # 4. Suspended state lifecycle (HITL)
+        suspended = await db_store.save_suspended_state(
+            approval_id="app_sqla",
+            thread_id="thread_sqla",
+            agent_name="test_agent",
+            node_name="test_node",
+            state_json={"val": 42},
+        )
+        assert suspended["id"] == "app_sqla"
+
+        pending = await db_store.list_suspended_states(
+            thread_id="thread_sqla", agent_name="test_agent"
+        )
+        assert len(pending) == 1
+        assert pending[0]["id"] == "app_sqla"
+
+        fetched = await db_store.get_suspended_state("app_sqla")
+        assert fetched is not None
+        assert fetched["state_snapshot"]["val"] == 42
+
+        deleted = await db_store.delete_suspended_state("app_sqla")
+        assert deleted is True
+        assert await db_store.get_suspended_state("app_sqla") is None
+
+        # 5. Checkpointer Operations
+        # Save first checkpoint
+        await db_store.save_checkpoint(
+            thread_id="thread_sqla",
+            checkpoint_ns="ns_sqla",
+            checkpoint_id="cp_sqla_1",
+            parent_checkpoint_id=None,
+            checkpoint={"step": 1},
+            metadata={"source": "test"},
+        )
+
+        # Get latest checkpoint (without checkpoint_id)
+        latest_cp = await db_store.get_checkpoint("thread_sqla", "ns_sqla", "")
+        assert latest_cp is not None
+        assert latest_cp["checkpoint_id"] == "cp_sqla_1"
+
+        # Overwrite/update checkpoint
+        await db_store.save_checkpoint(
+            thread_id="thread_sqla",
+            checkpoint_ns="ns_sqla",
+            checkpoint_id="cp_sqla_1",
+            parent_checkpoint_id="parent_id",
+            checkpoint={"step": 1.1},
+            metadata={"source": "test_update"},
+        )
+        updated_cp = await db_store.get_checkpoint("thread_sqla", "ns_sqla", "cp_sqla_1")
+        assert updated_cp["parent_checkpoint_id"] == "parent_id"
+        assert updated_cp["checkpoint"]["step"] == 1.1
+
+        # List checkpoints with filter limitations
+        await db_store.save_checkpoint(
+            thread_id="thread_sqla",
+            checkpoint_ns="ns_sqla",
+            checkpoint_id="cp_sqla_2",
+            parent_checkpoint_id="cp_sqla_1",
+            checkpoint={"step": 2},
+            metadata={"source": "test"},
+        )
+
+        cps_all = await db_store.list_checkpoints("thread_sqla", "ns_sqla")
+        assert len(cps_all) == 2
+
+        cps_limit = await db_store.list_checkpoints("thread_sqla", "ns_sqla", limit=1)
+        assert len(cps_limit) == 1
+
+        cps_before = await db_store.list_checkpoints("thread_sqla", "ns_sqla", before="cp_sqla_2")
+        assert len(cps_before) == 1
+        assert cps_before[0]["checkpoint_id"] == "cp_sqla_1"
+
+        # Clean up delete thread
+        is_deleted = await db_store.delete_thread("thread_sqla")
+        assert is_deleted is True
+        assert await db_store.get_thread("thread_sqla") is None
+
+    finally:
+        await db_store.close()
