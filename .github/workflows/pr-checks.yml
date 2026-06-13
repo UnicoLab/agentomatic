@@ -20,19 +20,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Check PR title (conventional commits)
-        uses: Slashgear/action-check-pr-title@main
-        with:
-          regexp: '(break|build|ci|docs|feat|fix|perf|refactor|style|test|chore|ops|hotfix)(\([a-zA-Z0-9\-\_\/\:]+\))?(!)?:\s.+'
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          REGEXP="^(break|build|ci|docs|feat|fix|perf|refactor|style|test|chore|ops|hotfix)(\([a-zA-Z0-9\-\_\/\:]+\))?(!)?:\s.+"
+          if [[ ! "$TITLE" =~ $REGEXP ]]; then
+            echo "Error: PR title '$TITLE' does not follow Conventional Commits format!"
+            exit 1
+          fi
+        shell: bash
 
       - name: Get changed files
         id: files
-        uses: jitterbit/get-changed-files@v1
+        run: |
+          git fetch origin main --depth=1
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | tr '\n' ' ')
+          echo "all=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
 
       - name: Install pre-commit
         run: |
@@ -42,5 +52,9 @@ jobs:
       - name: Run pre-commit on changed files
         run: |
           echo "Changed files: ${{ steps.files.outputs.all }}"
-          pre-commit run -v --files ${{ steps.files.outputs.all }}
+          if [ -n "${{ steps.files.outputs.all }}" ]; then
+            pre-commit run -v --files ${{ steps.files.outputs.all }}
+          else
+            echo "No changed files to check."
+          fi
         shell: bash

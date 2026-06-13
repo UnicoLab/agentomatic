@@ -106,6 +106,8 @@ def create_default_router(
     agent_name: str,
     registry: Any,
     thread_store: Any | None = None,
+    state_factory: Callable[[Any], dict[str, Any]] | None = None,
+    response_extractor: Callable[[dict[str, Any], str, float], Any] | None = None,
 ) -> APIRouter:
     """Create a full set of auto-generated endpoints for an agent.
 
@@ -128,12 +130,14 @@ def create_default_router(
       GET  /feedback/export     — export feedback as JSONL
 
     Args:
-        agent_name: Unique name of the agent.
-        registry: The :class:`AgentRegistry` instance.
-        thread_store: Optional thread-storage backend.
+      agent_name: Unique name of the agent.
+      registry: The :class:`AgentRegistry` instance.
+      thread_store: Optional thread-storage backend.
+      state_factory: Custom state builder callable.
+      response_extractor: Custom response extractor callable.
 
     Returns:
-        A fully-wired :class:`~fastapi.APIRouter`.
+      A fully-wired :class:`~fastapi.APIRouter`.
     """
     router = APIRouter()
 
@@ -146,6 +150,8 @@ def create_default_router(
 
     def _build_initial_state(request: AgentInvokeRequest) -> dict[str, Any]:
         """Build the initial state dict for graph invocation."""
+        if state_factory:
+            return state_factory(request)
         return {
             "current_query": request.query,
             "user_id": request.user_id,
@@ -162,8 +168,10 @@ def create_default_router(
         result: dict[str, Any],
         agent_slug: str,
         duration_ms: float,
-    ) -> AgentInvokeResponse:
+    ) -> Any:
         """Extract a standardised response from raw graph output."""
+        if response_extractor:
+            return response_extractor(result, agent_slug, duration_ms)
         return AgentInvokeResponse(
             response=result.get("response", str(result)),
             agent_type=result.get("agent_type", agent_slug),
