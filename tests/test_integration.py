@@ -617,6 +617,7 @@ class TestExtraRouters:
 class TestPlatformLifespanAndHooks:
     def test_platform_discovery_lifespan(self, tmp_path):
         import sys
+
         # Create an agent directory
         agent_dir = tmp_path / "my_lifespan_agent"
         agent_dir.mkdir()
@@ -632,7 +633,7 @@ async def node_fn(state):
         try:
             p = AgentPlatform(agents_dir=tmp_path)
             app = p.build()
-            
+
             with TestClient(app) as c:
                 resp = c.post("/api/v1/my_lifespan_agent/invoke", json={"query": "hello"})
                 assert resp.status_code == 200
@@ -644,18 +645,18 @@ async def node_fn(state):
     def test_platform_hooks(self):
         called = []
         p = AgentPlatform(agents_dir="/tmp/empty")
-        
+
         @p.on_startup
         def start():
             called.append("start")
-            
+
         @p.on_shutdown
         def stop():
             called.append("stop")
-            
+
         app = p.build()
         with TestClient(app):
             pass
-            
+
         assert "start" in called
         assert "stop" in called

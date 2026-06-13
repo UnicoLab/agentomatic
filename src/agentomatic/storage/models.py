@@ -127,3 +127,57 @@ class FeedbackModel(Base):
             "feedback_type": self.feedback_type,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class SuspendedStateModel(Base):
+    """Execution state suspended for Human-in-the-Loop approval."""
+
+    __tablename__ = "suspended_states"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # approval_id
+    thread_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("threads.id", ondelete="CASCADE"), index=True
+    )
+    agent_name: Mapped[str] = mapped_column(String(128))
+    node_name: Mapped[str] = mapped_column(String(128))
+    state_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "thread_id": self.thread_id,
+            "agent_name": self.agent_name,
+            "node_name": self.node_name,
+            "state_snapshot": self.state_json,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class CheckpointModel(Base):
+    """LangGraph execution checkpoint for thread state persistence."""
+
+    __tablename__ = "checkpoints"
+
+    thread_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    checkpoint_ns: Mapped[str] = mapped_column(String(128), primary_key=True, default="")
+    checkpoint_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    parent_checkpoint_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    checkpoint_json: Mapped[dict] = mapped_column(JSON)
+    metadata_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "thread_id": self.thread_id,
+            "checkpoint_ns": self.checkpoint_ns,
+            "checkpoint_id": self.checkpoint_id,
+            "parent_checkpoint_id": self.parent_checkpoint_id,
+            "checkpoint": self.checkpoint_json,
+            "metadata": self.metadata_json,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

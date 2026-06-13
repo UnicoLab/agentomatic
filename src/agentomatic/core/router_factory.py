@@ -98,6 +98,48 @@ class FeedbackRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AgentSuspendedException(Exception):
+    """Raised when an agent execution needs to be suspended for Human-in-the-Loop approval."""
+
+    def __init__(
+        self,
+        approval_id: str,
+        node_name: str,
+        state_snapshot: dict[str, Any],
+        message: str = "Execution suspended for approval",
+    ) -> None:
+        super().__init__(message)
+        self.approval_id = approval_id
+        self.node_name = node_name
+        self.state_snapshot = state_snapshot
+        self.message = message
+
+
+class ApproveSuspendedRequest(BaseModel):
+    """Request schema for approving suspended state."""
+
+    approval_id: str
+    approved: bool = True
+    context: dict[str, Any] = Field(
+        default_factory=dict, description="Additional context to merge into state"
+    )
+
+
+class RejectSuspendedRequest(BaseModel):
+    """Request schema for rejecting suspended state."""
+
+    approval_id: str
+    reason: str | None = None
+
+
+class ForkThreadRequest(BaseModel):
+    """Request schema for forking a thread."""
+
+    message_index: int
+    new_thread_id: str | None = None
+    title: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Router Factory
 # ---------------------------------------------------------------------------
@@ -185,8 +227,29 @@ def create_default_router(
 
     def _build_initial_state(request: Any) -> dict[str, Any]:
         """Build the initial state dict for graph invocation."""
+        agent = _get_agent()
         if state_factory:
-            return state_factory(request)
+            state = state_factory(request)
+            if "prompt_version" not in state:
+                chosen_version = None
+                if hasattr(request, "prompt_version") and request.prompt_version != "v1":
+                    chosen_version = request.prompt_version
+                else:
+                    ab_tests = (
+                        getattr(agent.config, "prompt_ab_tests", None)
+                        if (agent and agent.config)
+                        else None
+                    )
+                    if ab_tests and isinstance(ab_tests, dict):
+                        import random
+
+                        versions = list(ab_tests.keys())
+                        weights = [float(w) for w in ab_tests.values()]
+                        chosen_version = random.choices(versions, weights=weights, k=1)[0]
+                    else:
+                        chosen_version = getattr(request, "prompt_version", "v1")
+                state["prompt_version"] = chosen_version
+            return state
 
         # Extract fields from model or dictionary
         request_dict: dict[str, Any] = {}
@@ -216,6 +279,25 @@ def create_default_router(
         standard_keys = {"query", "current_query", "user_id", "thread_id", "context", "metadata"}
         extra_metadata = {k: v for k, v in request_dict.items() if k not in standard_keys}
 
+        # Resolve prompt version
+        chosen_version = None
+        if hasattr(request, "prompt_version") and request.prompt_version != "v1":
+            chosen_version = request.prompt_version
+        else:
+            ab_tests = (
+                getattr(agent.config, "prompt_ab_tests", None)
+                if (agent and agent.config)
+                else None
+            )
+            if ab_tests and isinstance(ab_tests, dict):
+                import random
+
+                versions = list(ab_tests.keys())
+                weights = [float(w) for w in ab_tests.values()]
+                chosen_version = random.choices(versions, weights=weights, k=1)[0]
+            else:
+                chosen_version = getattr(request, "prompt_version", "v1")
+
         return {
             "current_query": query,
             "user_id": user_id,
@@ -226,18 +308,26 @@ def create_default_router(
             "response": "",
             "suggestions": [],
             "citations": [],
+            "prompt_version": chosen_version,
         }
 
     def _extract_response(
         result: dict[str, Any],
         agent_slug: str,
         duration_ms: float,
+        prompt_version: str | None = None,
     ) -> Any:
         """Extract a standardised response from raw graph output."""
+        res_metadata = result.get("metadata") or {}
+        if prompt_version:
+            res_metadata["prompt_version"] = prompt_version
+
         if response_extractor:
             return response_extractor(result, agent_slug, duration_ms)
         if output_model != AgentInvokeResponse:
-            # Instantiate custom schema from output dictionary
+            # If it's a custom schema and has a metadata field, set prompt_version there
+            if hasattr(output_model, "metadata") or "metadata" in output_model.model_fields:
+                result["metadata"] = res_metadata
             return output_model(**result)
         return AgentInvokeResponse(
             response=result.get("response", str(result)),
@@ -246,7 +336,7 @@ def create_default_router(
             suggestions=result.get("suggestions", []),
             citations=result.get("citations", []),
             steps_taken=result.get("steps_taken", []),
-            metadata=result.get("metadata", {}),
+            metadata=res_metadata,
             duration_ms=duration_ms,
         )
 
@@ -255,6 +345,13 @@ def create_default_router(
         agent = _get_agent()
         state = _build_initial_state(request)
         t0 = time.perf_counter()
+
+        # Run before_node hooks
+        for hook in registry.before_node_hooks:
+            try:
+                hook(agent_name, state)
+            except Exception as hook_exc:
+                logger.warning(f"Error executing before_node hook: {hook_exc}")
 
         try:
             if agent.graph_fn:
@@ -266,7 +363,35 @@ def create_default_router(
                 raise HTTPException(500, f"Agent '{agent_name}' has no callable")
 
             duration_ms = (time.perf_counter() - t0) * 1000
-            return _extract_response(result, agent.slug, duration_ms)
+
+            # Run after_node hooks
+            for hook in registry.after_node_hooks:
+                try:
+                    hook(agent_name, result)
+                except Exception as hook_exc:
+                    logger.warning(f"Error executing after_node hook: {hook_exc}")
+
+            return _extract_response(
+                result, agent.slug, duration_ms, prompt_version=state.get("prompt_version")
+            )
+        except AgentSuspendedException as exc:
+            if thread_store:
+                await thread_store.save_suspended_state(
+                    approval_id=exc.approval_id,
+                    thread_id=state.get("thread_id") or "default_thread",
+                    agent_name=agent_name,
+                    node_name=exc.node_name,
+                    state_json=exc.state_snapshot,
+                )
+            raise HTTPException(
+                status_code=202,
+                detail={
+                    "status": "suspended",
+                    "approval_id": exc.approval_id,
+                    "node_name": exc.node_name,
+                    "message": exc.message,
+                },
+            )
         except HTTPException:
             raise
         except Exception as exc:
@@ -277,6 +402,13 @@ def create_default_router(
         """Invoke agent with SSE streaming."""
         agent = _get_agent()
         state = _build_initial_state(request)
+
+        # Run before_node hooks
+        for hook in registry.before_node_hooks:
+            try:
+                hook(agent_name, state)
+            except Exception as hook_exc:
+                logger.warning(f"Error executing before_node hook: {hook_exc}")
 
         async def event_stream():
             """Yield SSE frames from graph or node execution."""
@@ -289,6 +421,16 @@ def create_default_router(
                     result = await agent.node_fn(state)
                     yield f"data: {json.dumps(result, default=str)}\n\n"
                 yield "data: [DONE]\n\n"
+            except AgentSuspendedException as exc:
+                if thread_store:
+                    await thread_store.save_suspended_state(
+                        approval_id=exc.approval_id,
+                        thread_id=state.get("thread_id") or "default_thread",
+                        agent_name=agent_name,
+                        node_name=exc.node_name,
+                        state_json=exc.state_snapshot,
+                    )
+                yield f"data: {json.dumps({'status': 'suspended', 'approval_id': exc.approval_id, 'node_name': exc.node_name, 'message': exc.message})}\n\n"
             except Exception as exc:
                 yield f"data: {json.dumps({'error': str(exc)})}\n\n"
 
@@ -332,6 +474,26 @@ def create_default_router(
             "steps_taken": [],
         }
 
+        # Handle A/B Test Prompt Routing for chat
+        ab_tests = (
+            getattr(agent.config, "prompt_ab_tests", None) if (agent and agent.config) else None
+        )
+        if ab_tests and isinstance(ab_tests, dict):
+            import random
+
+            versions = list(ab_tests.keys())
+            weights = [float(w) for w in ab_tests.values()]
+            state["prompt_version"] = random.choices(versions, weights=weights, k=1)[0]
+        else:
+            state["prompt_version"] = "v1"
+
+        # Run before_node hooks
+        for hook in registry.before_node_hooks:
+            try:
+                hook(agent_name, state)
+            except Exception as hook_exc:
+                logger.warning(f"Error executing before_node hook: {hook_exc}")
+
         t0 = time.perf_counter()
         try:
             if agent.graph_fn:
@@ -342,6 +504,17 @@ def create_default_router(
                 raise HTTPException(500, f"Agent '{agent_name}' has no callable")
 
             duration_ms = (time.perf_counter() - t0) * 1000
+
+            # Run after_node hooks
+            for hook in registry.after_node_hooks:
+                try:
+                    hook(agent_name, result)
+                except Exception as hook_exc:
+                    logger.warning(f"Error executing after_node hook: {hook_exc}")
+
+            res_meta = result.get("metadata") or {}
+            res_meta["prompt_version"] = state["prompt_version"]
+
             return {
                 "response": result.get("response", str(result)),
                 "thread_id": thread_id,
@@ -349,7 +522,26 @@ def create_default_router(
                 "suggestions": result.get("suggestions", []),
                 "citations": result.get("citations", []),
                 "duration_ms": round(duration_ms, 2),
+                "metadata": res_meta,
             }
+        except AgentSuspendedException as exc:
+            if thread_store:
+                await thread_store.save_suspended_state(
+                    approval_id=exc.approval_id,
+                    thread_id=thread_id,
+                    agent_name=agent_name,
+                    node_name=exc.node_name,
+                    state_json=exc.state_snapshot,
+                )
+            raise HTTPException(
+                status_code=202,
+                detail={
+                    "status": "suspended",
+                    "approval_id": exc.approval_id,
+                    "node_name": exc.node_name,
+                    "message": exc.message,
+                },
+            )
         except HTTPException:
             raise
         except Exception as exc:
@@ -617,5 +809,109 @@ def create_default_router(
             "data": jsonl,
             "count": len(jsonl.strip().split("\n")) if jsonl.strip() else 0,
         }
+
+    # ── GET /threads/{thread_id}/pending ──────────────────────────
+    @router.get("/threads/{thread_id}/pending")
+    async def get_pending_approvals(thread_id: str) -> dict[str, Any]:
+        """Get pending human-in-the-loop approvals for a thread."""
+        if thread_store:
+            states = await thread_store.list_suspended_states(
+                thread_id=thread_id, agent_name=agent_name
+            )
+            return {"thread_id": thread_id, "pending": states, "count": len(states)}
+        return {"thread_id": thread_id, "pending": [], "message": "Thread storage not configured"}
+
+    # ── POST /threads/{thread_id}/approve ─────────────────────────
+    @router.post("/threads/{thread_id}/approve")
+    async def approve_suspended_state(thread_id: str, request: ApproveSuspendedRequest) -> Any:
+        """Approve a suspended state and resume graph execution."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        suspended = await thread_store.get_suspended_state(request.approval_id)
+        if not suspended:
+            raise HTTPException(
+                404, f"Suspended state with approval_id '{request.approval_id}' not found"
+            )
+
+        # Delete the state now that we are resuming
+        await thread_store.delete_suspended_state(request.approval_id)
+
+        # Reconstruct the execution context
+        state = suspended.get("state_snapshot") or {}
+        # Apply human context updates
+        if "metadata" not in state:
+            state["metadata"] = {}
+        state["metadata"].update(request.context)
+        state.update(request.context)
+        # Mark as approved in metadata
+        state["metadata"]["hitl_approved"] = True
+        state["metadata"]["approval_id"] = request.approval_id
+
+        # Resume execution
+        agent = _get_agent()
+        t0 = time.perf_counter()
+        try:
+            if agent.graph_fn:
+                result = await agent.graph_fn().ainvoke(state)
+            elif agent.node_fn:
+                result = await agent.node_fn(state)
+            else:
+                raise HTTPException(500, f"Agent '{agent_name}' has no callable")
+
+            duration_ms = (time.perf_counter() - t0) * 1000
+            return _extract_response(
+                result, agent.slug, duration_ms, prompt_version=state.get("prompt_version")
+            )
+        except AgentSuspendedException as exc:
+            # Re-suspend if another HITL node is encountered
+            await thread_store.save_suspended_state(
+                approval_id=exc.approval_id,
+                thread_id=thread_id,
+                agent_name=agent_name,
+                node_name=exc.node_name,
+                state_json=exc.state_snapshot,
+            )
+            raise HTTPException(
+                status_code=202,
+                detail={
+                    "status": "suspended",
+                    "approval_id": exc.approval_id,
+                    "node_name": exc.node_name,
+                    "message": exc.message,
+                },
+            )
+
+    # ── POST /threads/{thread_id}/reject ──────────────────────────
+    @router.post("/threads/{thread_id}/reject")
+    async def reject_suspended_state(
+        thread_id: str, request: RejectSuspendedRequest
+    ) -> dict[str, Any]:
+        """Reject suspended state and discard execution context."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        suspended = await thread_store.get_suspended_state(request.approval_id)
+        if not suspended:
+            raise HTTPException(
+                404, f"Suspended state with approval_id '{request.approval_id}' not found"
+            )
+        await thread_store.delete_suspended_state(request.approval_id)
+        return {"status": "rejected", "approval_id": request.approval_id, "reason": request.reason}
+
+    # ── POST /threads/{thread_id}/fork ────────────────────────────
+    @router.post("/threads/{thread_id}/fork")
+    async def fork_thread(thread_id: str, request: ForkThreadRequest) -> dict[str, Any]:
+        """Fork a conversation thread up to a specific message index."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        new_id = request.new_thread_id or f"thread_{uuid.uuid4().hex[:12]}"
+        forked = await thread_store.fork_thread(
+            parent_thread_id=thread_id,
+            message_index=request.message_index,
+            new_thread_id=new_id,
+            title=request.title,
+        )
+        if not forked:
+            raise HTTPException(404, f"Thread '{thread_id}' not found")
+        return forked  # type: ignore[no-any-return]
 
     return router

@@ -9,7 +9,7 @@ from loguru import logger
 _llm_instance: Any = None
 
 
-def get_llm(provider: str = "ollama", **kwargs: Any) -> Any:
+def get_llm(provider: str = "ollama", fallbacks: list[str] | None = None, **kwargs: Any) -> Any:
     """Get or create a singleton LLM instance.
 
     Supports: ollama, azure, openai, vertex, dummy.
@@ -19,7 +19,17 @@ def get_llm(provider: str = "ollama", **kwargs: Any) -> Any:
         return _llm_instance
 
     try:
-        _llm_instance = _build_llm(provider, **kwargs)
+        primary = _build_llm(provider, **kwargs)
+        if fallbacks:
+            fallback_models = []
+            for fb in fallbacks:
+                try:
+                    fallback_models.append(_build_llm(fb, **kwargs))
+                except Exception as exc:
+                    logger.warning(f"Failed to build fallback LLM {fb}: {exc}")
+            if fallback_models:
+                primary = primary.with_fallbacks(fallback_models)
+        _llm_instance = primary
     except Exception as exc:
         logger.warning(f"Failed to build {provider} LLM: {exc}. Falling back to dummy.")
         _llm_instance = _build_dummy_llm()
@@ -114,3 +124,71 @@ async def invoke_with_retry(
                 await asyncio.sleep(delay)
 
     raise last_exc  # type: ignore[misc]
+
+
+class StructuredOutputFallbackWrapper:
+    """Fallback wrapper for models that don't support .with_structured_output natively (e.g. dummy/fake models in tests)."""
+
+    def __init__(self, llm: Any, response_model: type) -> None:
+        self.llm = llm
+        self.response_model = response_model
+
+    def invoke(self, *args: Any, **kwargs: Any) -> Any:
+        res = self.llm.invoke(*args, **kwargs)
+        return self._parse_to_model(res)
+
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> Any:
+        res = await self.llm.ainvoke(*args, **kwargs)
+        return self._parse_to_model(res)
+
+    def _parse_to_model(self, res: Any) -> Any:
+        content = res.content if hasattr(res, "content") else str(res)
+        import json
+
+        from pydantic import BaseModel
+        from pydantic_core import PydanticUndefined
+
+        if issubclass(self.response_model, BaseModel):
+            try:
+                data = json.loads(content)
+                return self.response_model.model_validate(data)
+            except Exception:
+                fields = {}
+                for name, field in self.response_model.model_fields.items():
+                    if field.default is not PydanticUndefined:
+                        fields[name] = field.default
+                    elif field.default_factory is not None:
+                        fields[name] = field.default_factory()  # type: ignore[call-arg]
+                    else:
+                        t = field.annotation
+                        if t is str:
+                            fields[name] = "dummy_str"
+                        elif t is int:
+                            fields[name] = 0
+                        elif t is float:
+                            fields[name] = 0.0
+                        elif t is bool:
+                            fields[name] = False
+                        elif t is list or getattr(t, "__origin__", None) is list:
+                            fields[name] = []
+                        elif t is dict or getattr(t, "__origin__", None) is dict:
+                            fields[name] = {}
+                        else:
+                            fields[name] = None
+                return self.response_model(**fields)
+        return content
+
+
+def get_structured_llm(
+    response_model: type,
+    provider: str = "ollama",
+    **kwargs: Any,
+) -> Any:
+    """Get an LLM instance bound to return a structured output matching response_model."""
+    llm = _build_llm(provider, **kwargs)
+    if hasattr(llm, "with_structured_output"):
+        try:
+            return llm.with_structured_output(response_model)
+        except NotImplementedError:
+            return StructuredOutputFallbackWrapper(llm, response_model)
+    return StructuredOutputFallbackWrapper(llm, response_model)

@@ -190,3 +190,94 @@ class BaseStore(ABC):
     async def get_stats(self) -> dict[str, Any]:
         """Return backend statistics."""
         return {"backend": self.__class__.__name__}
+
+    # ------------------------------------------------------------------
+    # Suspended State (HITL) operations
+    # ------------------------------------------------------------------
+
+    async def save_suspended_state(
+        self,
+        approval_id: str,
+        thread_id: str,
+        agent_name: str,
+        node_name: str,
+        state_json: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Save suspended execution state for human approval."""
+        return {}
+
+    async def get_suspended_state(self, approval_id: str) -> dict[str, Any] | None:
+        """Retrieve suspended state by approval ID."""
+        return None
+
+    async def list_suspended_states(
+        self,
+        *,
+        thread_id: str | None = None,
+        agent_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List suspended states, optionally filtered by thread or agent."""
+        return []
+
+    async def delete_suspended_state(self, approval_id: str) -> bool:
+        """Delete suspended state by approval ID.
+
+        Returns:
+            ``True`` if deleted, ``False`` if not found.
+        """
+        return False
+
+    # ------------------------------------------------------------------
+    # Forking operations
+    # ------------------------------------------------------------------
+
+    async def fork_thread(
+        self,
+        parent_thread_id: str,
+        message_index: int,
+        new_thread_id: str,
+        *,
+        title: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Fork a thread at a specific message index (0-indexed relative to parent's chronological messages).
+
+        Copies thread information and all messages up to and including the message_index.
+        Returns the new thread dict, or None if the parent thread is not found.
+        """
+        return None
+
+    # ------------------------------------------------------------------
+    # Checkpointer operations
+    # ------------------------------------------------------------------
+
+    async def get_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        checkpoint_id: str,
+    ) -> dict[str, Any] | None:
+        """Retrieve a LangGraph checkpoint by thread, namespace, and checkpoint ID."""
+        return None
+
+    async def save_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        checkpoint_id: str,
+        parent_checkpoint_id: str | None,
+        checkpoint: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> None:
+        """Save a LangGraph execution checkpoint."""
+        pass
+
+    async def list_checkpoints(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        *,
+        before: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """List checkpoints for a thread/namespace chronologically."""
+        return []

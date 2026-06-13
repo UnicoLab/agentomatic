@@ -171,6 +171,14 @@ class AgentPlatform:
         """Set the storage backend."""
         self._store = value
 
+    def register_before_node_hook(self, hook: Callable[[str, dict[str, Any]], None]) -> None:
+        """Register a hook to execute before any agent node/graph runs."""
+        self._registry.before_node_hooks.append(hook)
+
+    def register_after_node_hook(self, hook: Callable[[str, dict[str, Any]], None]) -> None:
+        """Register a hook to execute after any agent node/graph runs."""
+        self._registry.after_node_hooks.append(hook)
+
     # ------------------------------------------------------------------
     # Programmatic registration
     # ------------------------------------------------------------------

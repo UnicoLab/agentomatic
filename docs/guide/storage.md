@@ -192,3 +192,13 @@ Every storage adapter implements the following async interface methods:
 | `async def get_messages(id) -> list[dict]` | **Required** | Fetch chronological chat histories |
 | `async def add_feedback(...) -> dict` | Optional | Save user scores and comment metrics |
 | `async def list_feedback(...) -> list[dict]` | Optional | Search feedback records |
+| `async def save_suspended_state(...) -> dict` | Optional | Save execution state for human approval |
+| `async def get_suspended_state(id) -> dict \| None` | Optional | Retrieve a suspended state |
+| `async def list_suspended_states(...) -> list[dict]` | Optional | List all pending suspended states |
+| `async def delete_suspended_state(id) -> bool` | Optional | Delete suspended state on completion |
+| `async def fork_thread(...) -> dict \| None` | Optional | Fork a conversation history up to index |
+| `async def save_checkpoint(...) -> None` | Optional | Save a LangGraph checkpoint state |
+| `async def get_checkpoint(...) -> dict \| None` | Optional | Retrieve a LangGraph checkpoint state |
+| `async def list_checkpoints(...) -> list[dict]` | Optional | List checkpoints for a thread namespace |
+
+> 🚦 *For details on how checkpointer, thread forking, and human-in-the-loop suspension integrate with these storage methods, see the [Advanced Platform Features Guide](platform-features.md).*

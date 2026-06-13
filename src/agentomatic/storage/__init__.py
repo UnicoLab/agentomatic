@@ -28,13 +28,17 @@ from __future__ import annotations
 from .base import BaseStore
 from .memory import MemoryStore
 
-__all__ = ["BaseStore", "MemoryStore"]
+__all__ = ["BaseStore", "MemoryStore", "AgentomaticCheckpointer"]
 
 
-# Lazy import for optional SQLAlchemy dependency
+# Lazy import for optional dependencies
 def __getattr__(name: str):
     if name == "SQLAlchemyStore":
         from .sqlalchemy import SQLAlchemyStore
 
         return SQLAlchemyStore
+    if name == "AgentomaticCheckpointer":
+        from .checkpointer import AgentomaticCheckpointer
+
+        return AgentomaticCheckpointer
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

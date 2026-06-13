@@ -289,7 +289,7 @@ class TestVersion:
     def test_version_exists(self):
         from agentomatic import __version__
 
-        assert __version__ == "0.1.0"
+        assert __version__ == "0.1.1"
 
 
 class TestAgentRegistryDiscovery:
@@ -297,7 +297,7 @@ class TestAgentRegistryDiscovery:
 
     def test_discover_agents(self, tmp_path):
         import sys
-        from pathlib import Path
+
         sys.path.insert(0, str(tmp_path))
         try:
             # Create agent_a (minimal)
@@ -333,6 +333,7 @@ class AgentBConfig(BaseModel):
             (agent_b_dir / "prompts.json").write_text('{"v1": {"system": "hello"}}')
 
             from agentomatic.core.registry import AgentRegistry
+
             reg = AgentRegistry()
             reg.discover(tmp_path)
 
@@ -355,7 +356,7 @@ class AgentBConfig(BaseModel):
 
             assert "agent_b" in reg.get_subagents()
             assert "agent_a" not in reg.get_subagents()
-            
+
             routers = reg.get_agent_routers()
             assert len(routers) == 1
             assert routers[0][0] == "agent_b"
@@ -388,6 +389,7 @@ class TestStateReducers:
 
     def test_add_messages(self):
         from langchain_core.messages import AIMessage, HumanMessage
+
         from agentomatic.core.state import add_messages
 
         msg1 = HumanMessage(content="hello")
@@ -400,7 +402,6 @@ class TestPromptManagerExtras:
     """Test PromptManager edge cases and reload functionality."""
 
     def test_instantiation_with_file(self, tmp_path):
-        import json
         from agentomatic.prompts.manager import PromptManager
 
         f = tmp_path / "prompts.json"
@@ -414,7 +415,7 @@ class TestPromptManagerExtras:
 
         pm = PromptManager("test")
         pm._prompts = {"v1": {"user_template": "Hello {name}!"}}
-        
+
         # Test formatting fallback when key is missing (should return template as-is or format error fallback)
         res = pm.format_prompt("v1", "user_template", age=25)
         assert res == "Hello {name}!"
@@ -426,7 +427,6 @@ class TestPromptManagerExtras:
         assert pm.format_prompt("v1", "nonexistent") is None
 
     def test_reload(self, tmp_path):
-        import json
         from agentomatic.prompts.manager import PromptManager
 
         f = tmp_path / "prompts.json"
@@ -458,7 +458,7 @@ class TestHealthCheckErrors:
         from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 
         m = AgentManifest(name="test", slug="test-agent")
-        
+
         def fail_graph():
             raise ValueError("graph error")
 
@@ -470,7 +470,6 @@ class TestHealthCheckErrors:
 
     @pytest.mark.asyncio
     async def test_health_check_with_prompts(self, tmp_path):
-        import json
         from agentomatic.core.manifest import AgentManifest, RegisteredAgent
         from agentomatic.prompts.manager import PromptManager
 

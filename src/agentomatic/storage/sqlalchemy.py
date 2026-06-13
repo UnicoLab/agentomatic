@@ -33,7 +33,14 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from .base import BaseStore
-from .models import Base, FeedbackModel, MessageModel, ThreadModel
+from .models import (
+    Base,
+    CheckpointModel,
+    FeedbackModel,
+    MessageModel,
+    SuspendedStateModel,
+    ThreadModel,
+)
 
 
 class SQLAlchemyStore(BaseStore):
@@ -315,3 +322,234 @@ class SQLAlchemyStore(BaseStore):
                 "messages": msg_count.scalar_one(),
                 "feedback": fb_count.scalar_one(),
             }
+
+    # ------------------------------------------------------------------
+    # Suspended State (HITL) operations
+    # ------------------------------------------------------------------
+
+    async def save_suspended_state(
+        self,
+        approval_id: str,
+        thread_id: str,
+        agent_name: str,
+        node_name: str,
+        state_json: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Save suspended state for human approval."""
+        async with self._session() as session:
+            suspended = SuspendedStateModel(
+                id=approval_id,
+                thread_id=thread_id,
+                agent_name=agent_name,
+                node_name=node_name,
+                state_json=state_json,
+            )
+            session.add(suspended)
+            await session.commit()
+            await session.refresh(suspended)
+            return suspended.to_dict()
+
+    async def get_suspended_state(self, approval_id: str) -> dict[str, Any] | None:
+        """Retrieve suspended state by approval ID."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(SuspendedStateModel).where(SuspendedStateModel.id == approval_id)
+            )
+            suspended = result.scalar_one_or_none()
+            return suspended.to_dict() if suspended else None
+
+    async def list_suspended_states(
+        self,
+        *,
+        thread_id: str | None = None,
+        agent_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List suspended states, optionally filtered."""
+        async with self._session() as session:
+            stmt = select(SuspendedStateModel).order_by(SuspendedStateModel.created_at.desc())
+            if thread_id:
+                stmt = stmt.where(SuspendedStateModel.thread_id == thread_id)
+            if agent_name:
+                stmt = stmt.where(SuspendedStateModel.agent_name == agent_name)
+            result = await session.execute(stmt)
+            return [s.to_dict() for s in result.scalars().all()]
+
+    async def delete_suspended_state(self, approval_id: str) -> bool:
+        """Delete suspended state by approval ID."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(SuspendedStateModel).where(SuspendedStateModel.id == approval_id)
+            )
+            suspended = result.scalar_one_or_none()
+            if suspended:
+                await session.delete(suspended)
+                await session.commit()
+                return True
+            return False
+
+    # ------------------------------------------------------------------
+    # Forking operations
+    # ------------------------------------------------------------------
+
+    async def fork_thread(
+        self,
+        parent_thread_id: str,
+        message_index: int,
+        new_thread_id: str,
+        *,
+        title: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Fork a thread at a specific message index."""
+        async with self._session() as session:
+            # 1. Get parent thread
+            result = await session.execute(
+                select(ThreadModel).where(ThreadModel.id == parent_thread_id)
+            )
+            parent = result.scalar_one_or_none()
+            if not parent:
+                return None
+
+            # 2. Get parent messages chronologically
+            msg_result = await session.execute(
+                select(MessageModel)
+                .where(MessageModel.thread_id == parent_thread_id)
+                .order_by(MessageModel.created_at.asc())
+            )
+            parent_messages = msg_result.scalars().all()
+
+            # 3. Create the new forked thread
+            new_title = title or f"Fork of {parent.title or parent_thread_id}"
+            parent_meta = parent.metadata_json or {}
+            new_metadata = {**parent_meta, "parent_thread_id": parent_thread_id}
+
+            forked_thread = ThreadModel(
+                id=new_thread_id,
+                user_id=parent.user_id,
+                agent_name=parent.agent_name,
+                title=new_title,
+                metadata_json=new_metadata,
+            )
+            session.add(forked_thread)
+
+            # 4. Clone messages up to message_index
+            forked_count = 0
+            for i, msg in enumerate(parent_messages):
+                if i <= message_index:
+                    new_msg = MessageModel(
+                        thread_id=new_thread_id,
+                        role=msg.role,
+                        content=msg.content,
+                        metadata_json=msg.metadata_json or {},
+                    )
+                    session.add(new_msg)
+                    forked_count += 1
+
+            forked_thread.message_count = forked_count
+            await session.commit()
+            await session.refresh(forked_thread)
+            return forked_thread.to_dict()
+
+    # ------------------------------------------------------------------
+    # Checkpointer operations
+    # ------------------------------------------------------------------
+
+    async def get_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        checkpoint_id: str,
+    ) -> dict[str, Any] | None:
+        """Retrieve a checkpoint."""
+        async with self._session() as session:
+            if not checkpoint_id:
+                stmt = (
+                    select(CheckpointModel)
+                    .where(
+                        CheckpointModel.thread_id == thread_id,
+                        CheckpointModel.checkpoint_ns == checkpoint_ns,
+                    )
+                    .order_by(CheckpointModel.created_at.desc())
+                    .limit(1)
+                )
+                result = await session.execute(stmt)
+                cp = result.scalar_one_or_none()
+                return cp.to_dict() if cp else None
+
+            stmt = select(CheckpointModel).where(
+                CheckpointModel.thread_id == thread_id,
+                CheckpointModel.checkpoint_ns == checkpoint_ns,
+                CheckpointModel.checkpoint_id == checkpoint_id,
+            )
+            result = await session.execute(stmt)
+            cp = result.scalar_one_or_none()
+            return cp.to_dict() if cp else None
+
+    async def save_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        checkpoint_id: str,
+        parent_checkpoint_id: str | None,
+        checkpoint: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> None:
+        """Save a checkpoint."""
+        async with self._session() as session:
+            stmt = select(CheckpointModel).where(
+                CheckpointModel.thread_id == thread_id,
+                CheckpointModel.checkpoint_ns == checkpoint_ns,
+                CheckpointModel.checkpoint_id == checkpoint_id,
+            )
+            result = await session.execute(stmt)
+            cp = result.scalar_one_or_none()
+            if cp:
+                cp.parent_checkpoint_id = parent_checkpoint_id
+                cp.checkpoint_json = checkpoint
+                cp.metadata_json = metadata
+                cp.created_at = datetime.now(UTC)
+            else:
+                cp = CheckpointModel(
+                    thread_id=thread_id,
+                    checkpoint_ns=checkpoint_ns,
+                    checkpoint_id=checkpoint_id,
+                    parent_checkpoint_id=parent_checkpoint_id,
+                    checkpoint_json=checkpoint,
+                    metadata_json=metadata,
+                )
+                session.add(cp)
+            await session.commit()
+
+    async def list_checkpoints(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        *,
+        before: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """List checkpoints."""
+        async with self._session() as session:
+            stmt = (
+                select(CheckpointModel)
+                .where(
+                    CheckpointModel.thread_id == thread_id,
+                    CheckpointModel.checkpoint_ns == checkpoint_ns,
+                )
+                .order_by(CheckpointModel.created_at.desc())
+            )
+            if before:
+                before_stmt = select(CheckpointModel).where(
+                    CheckpointModel.thread_id == thread_id,
+                    CheckpointModel.checkpoint_ns == checkpoint_ns,
+                    CheckpointModel.checkpoint_id == before,
+                )
+                before_result = await session.execute(before_stmt)
+                before_cp = before_result.scalar_one_or_none()
+                if before_cp:
+                    stmt = stmt.where(CheckpointModel.created_at < before_cp.created_at)
+
+            if limit is not None:
+                stmt = stmt.limit(limit)
+
+            result = await session.execute(stmt)
+            return [c.to_dict() for c in result.scalars().all()]

@@ -20,6 +20,8 @@ class MemoryStore(BaseStore):
         self._threads: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, list[dict[str, Any]]] = {}
         self._feedback: list[dict[str, Any]] = []
+        self._suspended_states: dict[str, dict[str, Any]] = {}
+        self._checkpoints: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     async def create_thread(
         self,
@@ -165,3 +167,163 @@ class MemoryStore(BaseStore):
 
     async def health_check(self) -> dict[str, Any]:
         return {"status": "healthy", "backend": "MemoryStore", "threads": len(self._threads)}
+
+    # ------------------------------------------------------------------
+    # Suspended State (HITL) operations
+    # ------------------------------------------------------------------
+
+    async def save_suspended_state(
+        self,
+        approval_id: str,
+        thread_id: str,
+        agent_name: str,
+        node_name: str,
+        state_json: dict[str, Any],
+    ) -> dict[str, Any]:
+        suspended = {
+            "id": approval_id,
+            "thread_id": thread_id,
+            "agent_name": agent_name,
+            "node_name": node_name,
+            "state_snapshot": state_json,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self._suspended_states[approval_id] = suspended
+        return suspended
+
+    async def get_suspended_state(self, approval_id: str) -> dict[str, Any] | None:
+        return self._suspended_states.get(approval_id)
+
+    async def list_suspended_states(
+        self,
+        *,
+        thread_id: str | None = None,
+        agent_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        states = list(self._suspended_states.values())
+        if thread_id:
+            states = [s for s in states if s.get("thread_id") == thread_id]
+        if agent_name:
+            states = [s for s in states if s.get("agent_name") == agent_name]
+        return states
+
+    async def delete_suspended_state(self, approval_id: str) -> bool:
+        if approval_id in self._suspended_states:
+            del self._suspended_states[approval_id]
+            return True
+        return False
+
+    # ------------------------------------------------------------------
+    # Forking operations
+    # ------------------------------------------------------------------
+
+    async def fork_thread(
+        self,
+        parent_thread_id: str,
+        message_index: int,
+        new_thread_id: str,
+        *,
+        title: str | None = None,
+    ) -> dict[str, Any] | None:
+        parent_thread = self._threads.get(parent_thread_id)
+        if not parent_thread:
+            return None
+
+        now = datetime.now(UTC).isoformat()
+        forked_thread = {
+            "id": new_thread_id,
+            "user_id": parent_thread["user_id"],
+            "agent_name": parent_thread["agent_name"],
+            "title": title or f"Fork of {parent_thread.get('title') or parent_thread_id}",
+            "metadata": {
+                **parent_thread.get("metadata", {}),
+                "parent_thread_id": parent_thread_id,
+            },
+            "created_at": now,
+            "updated_at": now,
+            "message_count": 0,
+        }
+        self._threads[new_thread_id] = forked_thread
+
+        parent_messages = self._messages.get(parent_thread_id, [])
+        forked_messages: list[dict[str, Any]] = []
+        for i, msg in enumerate(parent_messages):
+            if i <= message_index:
+                forked_msg = {
+                    **msg,
+                    "id": len(forked_messages) + 1,
+                    "thread_id": new_thread_id,
+                }
+                forked_messages.append(forked_msg)
+
+        self._messages[new_thread_id] = forked_messages
+        forked_thread["message_count"] = len(forked_messages)
+        return forked_thread
+
+    # ------------------------------------------------------------------
+    # Checkpointer operations
+    # ------------------------------------------------------------------
+
+    async def get_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        checkpoint_id: str,
+    ) -> dict[str, Any] | None:
+        if not checkpoint_id:
+            thread_checkpoints = [
+                cp
+                for cp in self._checkpoints.values()
+                if cp["thread_id"] == thread_id and cp["checkpoint_ns"] == checkpoint_ns
+            ]
+            if not thread_checkpoints:
+                return None
+            thread_checkpoints.sort(key=lambda x: x["created_at"], reverse=True)
+            return thread_checkpoints[0]
+        return self._checkpoints.get((thread_id, checkpoint_ns, checkpoint_id))
+
+    async def save_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        checkpoint_id: str,
+        parent_checkpoint_id: str | None,
+        checkpoint: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> None:
+        key = (thread_id, checkpoint_ns, checkpoint_id)
+        self._checkpoints[key] = {
+            "thread_id": thread_id,
+            "checkpoint_ns": checkpoint_ns,
+            "checkpoint_id": checkpoint_id,
+            "parent_checkpoint_id": parent_checkpoint_id,
+            "checkpoint": checkpoint,
+            "metadata": metadata,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+
+    async def list_checkpoints(
+        self,
+        thread_id: str,
+        checkpoint_ns: str,
+        *,
+        before: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        cps = [
+            cp
+            for cp in self._checkpoints.values()
+            if cp["thread_id"] == thread_id and cp["checkpoint_ns"] == checkpoint_ns
+        ]
+        cps.sort(key=lambda x: x["created_at"], reverse=True)
+        if before:
+            found_idx = -1
+            for idx, cp in enumerate(cps):
+                if cp["checkpoint_id"] == before:
+                    found_idx = idx
+                    break
+            if found_idx != -1:
+                cps = cps[found_idx + 1 :]
+        if limit is not None:
+            cps = cps[:limit]
+        return cps

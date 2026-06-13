@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,8 @@ class AgentRegistry:
 
     def __init__(self) -> None:
         self._agents: dict[str, RegisteredAgent] = {}
+        self.before_node_hooks: list[Callable[[str, dict[str, Any]], None]] = []
+        self.after_node_hooks: list[Callable[[str, dict[str, Any]], None]] = []
 
     @property
     def count(self) -> int:
