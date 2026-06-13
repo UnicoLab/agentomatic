@@ -99,8 +99,7 @@ If you write a custom router using `api.py` and want to load prompt templates dy
 
 ```python
 from fastapi import APIRouter
-from agentomatic import APIResponse, handle_api_errors
-from rac.agents._registry import get_registry
+from agentomatic import APIResponse, handle_api_errors, AgentRegistry
 
 router = APIRouter()
 
@@ -108,8 +107,10 @@ router = APIRouter()
 @handle_api_errors
 async def custom_chat(query: str) -> APIResponse:
     # Retrieve the agent instance from the registry
-    agent = get_registry().get_agent("my_agent")
-    
+    agent = AgentRegistry().get("my_agent")
+    if not agent:
+        return APIResponse(success=False, message="Agent not found")
+        
     # Format user prompt
     user_prompt = agent.prompt_manager.format_prompt(
         version=agent.config.prompt_version,

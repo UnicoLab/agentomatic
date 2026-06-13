@@ -86,7 +86,8 @@ def app(platform):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 # =========================================================================
@@ -607,7 +608,54 @@ class TestExtraRouters:
         p.register_agent(manifest=AgentManifest(name="x", slug="x"), node_fn=fn)
 
         app = p.build()
-        c = TestClient(app)
-        resp = c.get("/custom/ping")
-        assert resp.status_code == 200
-        assert resp.json()["pong"] is True
+        with TestClient(app) as c:
+            resp = c.get("/custom/ping")
+            assert resp.status_code == 200
+            assert resp.json()["pong"] is True
+
+
+class TestPlatformLifespanAndHooks:
+    def test_platform_discovery_lifespan(self, tmp_path):
+        import sys
+        # Create an agent directory
+        agent_dir = tmp_path / "my_lifespan_agent"
+        agent_dir.mkdir()
+        (agent_dir / "__init__.py").write_text("""
+from agentomatic.core.manifest import AgentManifest
+manifest = AgentManifest(name="my_lifespan_agent", slug="lifespan-agent")
+async def node_fn(state):
+    return {"response": "lifespan"}
+""")
+
+        # Set up system path so the module is importable
+        sys.path.insert(0, str(tmp_path))
+        try:
+            p = AgentPlatform(agents_dir=tmp_path)
+            app = p.build()
+            
+            with TestClient(app) as c:
+                resp = c.post("/api/v1/my_lifespan_agent/invoke", json={"query": "hello"})
+                assert resp.status_code == 200
+                assert resp.json()["response"] == "lifespan"
+        finally:
+            sys.path.remove(str(tmp_path))
+            sys.modules.pop("my_lifespan_agent", None)
+
+    def test_platform_hooks(self):
+        called = []
+        p = AgentPlatform(agents_dir="/tmp/empty")
+        
+        @p.on_startup
+        def start():
+            called.append("start")
+            
+        @p.on_shutdown
+        def stop():
+            called.append("stop")
+            
+        app = p.build()
+        with TestClient(app):
+            pass
+            
+        assert "start" in called
+        assert "stop" in called
