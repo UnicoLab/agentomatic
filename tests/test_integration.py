@@ -412,6 +412,57 @@ class TestPlatformFactory:
         resp = c.post("/custom/v2/x/invoke", json={"query": "test"})
         assert resp.status_code == 200
 
+    def test_custom_schemas_route(self):
+        import sys
+        from types import ModuleType
+        from pydantic import BaseModel, Field
+
+        class MockRequest(BaseModel):
+            custom_query: str = Field(..., description="custom query field")
+            custom_param: int = Field(0)
+
+        class MockResponse(BaseModel):
+            custom_answer: str
+            custom_score: float
+
+        schemas_mod = ModuleType("tests.test_agent_schemas.schemas")
+        schemas_mod.CustomInvokeRequest = MockRequest
+        schemas_mod.CustomInvokeResponse = MockResponse
+        sys.modules["tests.test_agent_schemas.schemas"] = schemas_mod
+
+        p = AgentPlatform(agents_dir="/tmp/empty")
+        async def fn(state):
+            return {
+                "custom_answer": f"processed: {state.get('current_query')}",
+                "custom_score": 0.95
+            }
+
+        p.register_agent(
+            manifest=AgentManifest(name="schema_test", slug="schema_test"),
+            node_fn=fn,
+        )
+        agent = p._registry.get("schema_test")
+        # Manually inject module path to route builder
+        agent.module_path = "tests.test_agent_schemas"
+
+        app = p.build()
+        c = TestClient(app)
+
+        # Test validation error (missing required custom_query)
+        bad_resp = c.post("/api/v1/schema_test/invoke", json={"query": "test"})
+        assert bad_resp.status_code == 422
+
+        # Test valid custom schema payload
+        good_resp = c.post("/api/v1/schema_test/invoke", json={"custom_query": "hello", "custom_param": 42})
+        assert good_resp.status_code == 200
+        data = good_resp.json()
+        assert data["custom_answer"] == "processed: hello"
+        assert data["custom_score"] == 0.95
+
+        # Clean module reference
+        if "tests.test_agent_schemas.schemas" in sys.modules:
+            del sys.modules["tests.test_agent_schemas.schemas"]
+
 
 # =========================================================================
 # Lifecycle hooks

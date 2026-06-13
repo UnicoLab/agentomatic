@@ -130,6 +130,8 @@ class CustomInvokeResponse(BaseModel):
     success: bool = Field(True)
 ```
 
+> 📚 For a complete reference on naming conventions, validation error handling, and runtime behavior, see the [Input & Output Schemas Guide](schemas.md).
+
 ### 4. `prompts.json` (Versioned Prompt Templates)
 Decouples prompt text from code, enabling hot-reloads and A/B version testing.
 

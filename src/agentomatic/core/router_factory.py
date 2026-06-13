@@ -140,6 +140,31 @@ def create_default_router(
     Returns:
       A fully-wired :class:`~fastapi.APIRouter`.
     """
+    # Check for custom schemas in the agent's package
+    input_model: type[BaseModel] = AgentInvokeRequest
+    output_model: type[BaseModel] = AgentInvokeResponse
+
+    agent = registry.get(agent_name)
+    if agent and agent.module_path:
+        try:
+            import importlib
+            schemas_mod = importlib.import_module(f"{agent.module_path}.schemas")
+
+            # Look for CustomInvokeRequest or {AgentName}Request
+            title_camel = agent_name.title().replace("_", "")
+            for name_candidate in ["CustomInvokeRequest", f"{title_camel}Request", "AgentInvokeRequest"]:
+                if hasattr(schemas_mod, name_candidate):
+                    input_model = getattr(schemas_mod, name_candidate)
+                    break
+
+            # Look for CustomInvokeResponse or {AgentName}Response
+            for name_candidate in ["CustomInvokeResponse", f"{title_camel}Response", "AgentInvokeResponse"]:
+                if hasattr(schemas_mod, name_candidate):
+                    output_model = getattr(schemas_mod, name_candidate)
+                    break
+        except ImportError:
+            pass
+
     router = APIRouter()
 
     def _get_agent():
@@ -149,16 +174,45 @@ def create_default_router(
             raise HTTPException(404, f"Agent '{agent_name}' not found")
         return agent
 
-    def _build_initial_state(request: AgentInvokeRequest) -> dict[str, Any]:
+    def _build_initial_state(request: Any) -> dict[str, Any]:
         """Build the initial state dict for graph invocation."""
         if state_factory:
             return state_factory(request)
+
+        # Extract fields from model or dictionary
+        request_dict: dict[str, Any] = {}
+        if hasattr(request, "model_dump"):
+            request_dict = request.model_dump()
+        elif hasattr(request, "__dict__"):
+            request_dict = request.__dict__
+        elif isinstance(request, dict):
+            request_dict = request
+
+        # Resolve query/current_query or any field ending in _query
+        query = request_dict.get("query") or request_dict.get("current_query") or ""
+        if not query:
+            for k, v in request_dict.items():
+                if k.endswith("_query") and isinstance(v, str):
+                    query = v
+                    break
+
+        user_id = request_dict.get("user_id") or "default-user"
+        thread_id = request_dict.get("thread_id") or f"thread_{uuid.uuid4().hex[:12]}"
+
+        # Resolve context and metadata
+        context = request_dict.get("context") or {}
+        metadata = request_dict.get("metadata") or {}
+
+        # Capture other custom request parameters and merge them into metadata
+        standard_keys = {"query", "current_query", "user_id", "thread_id", "context", "metadata"}
+        extra_metadata = {k: v for k, v in request_dict.items() if k not in standard_keys}
+
         return {
-            "current_query": request.query,
-            "user_id": request.user_id,
-            "thread_id": request.thread_id or f"thread_{uuid.uuid4().hex[:12]}",
+            "current_query": query,
+            "user_id": user_id,
+            "thread_id": thread_id,
             "messages": [],
-            "metadata": {**request.context, **request.metadata},
+            "metadata": {**context, **metadata, **extra_metadata},
             "steps_taken": [],
             "response": "",
             "suggestions": [],
@@ -173,6 +227,9 @@ def create_default_router(
         """Extract a standardised response from raw graph output."""
         if response_extractor:
             return response_extractor(result, agent_slug, duration_ms)
+        if output_model != AgentInvokeResponse:
+            # Instantiate custom schema from output dictionary
+            return output_model(**result)
         return AgentInvokeResponse(
             response=result.get("response", str(result)),
             agent_type=result.get("agent_type", agent_slug),
@@ -184,9 +241,7 @@ def create_default_router(
             duration_ms=duration_ms,
         )
 
-    # ── POST /invoke ──────────────────────────────────────────────
-    @router.post("/invoke", response_model=AgentInvokeResponse)
-    async def invoke(request: AgentInvokeRequest) -> AgentInvokeResponse:
+    async def invoke(request: Any) -> Any:
         """Invoke agent synchronously."""
         agent = _get_agent()
         state = _build_initial_state(request)
@@ -202,16 +257,14 @@ def create_default_router(
                 raise HTTPException(500, f"Agent '{agent_name}' has no callable")
 
             duration_ms = (time.perf_counter() - t0) * 1000
-            return cast(AgentInvokeResponse, _extract_response(result, agent.slug, duration_ms))
+            return _extract_response(result, agent.slug, duration_ms)
         except HTTPException:
             raise
         except Exception as exc:
             logger.error(f"Agent {agent_name} invocation failed: {exc}")
             raise HTTPException(500, f"Agent invocation failed: {exc}") from exc
 
-    # ── POST /invoke/stream ───────────────────────────────────────
-    @router.post("/invoke/stream")
-    async def invoke_stream(request: AgentInvokeRequest) -> StreamingResponse:
+    async def invoke_stream(request: Any) -> StreamingResponse:
         """Invoke agent with SSE streaming."""
         agent = _get_agent()
         state = _build_initial_state(request)
@@ -235,6 +288,24 @@ def create_default_router(
             media_type="text/event-stream",
             headers={"X-Agent": agent_name, "Cache-Control": "no-cache"},
         )
+
+    # Apply annotations dynamically
+    invoke.__annotations__["request"] = input_model
+    invoke_stream.__annotations__["request"] = input_model
+
+    router.add_api_route(
+        "/invoke",
+        invoke,
+        methods=["POST"],
+        response_model=output_model,
+        summary="Invoke agent synchronously",
+    )
+    router.add_api_route(
+        "/invoke/stream",
+        invoke_stream,
+        methods=["POST"],
+        summary="Invoke agent with SSE streaming",
+    )
 
     # ── POST /chat ────────────────────────────────────────────────
     @router.post("/chat")
