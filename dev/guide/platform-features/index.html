@@ -1081,6 +1081,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#telemetry-feedback-correlation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry &amp; Feedback Correlation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1690,6 +1701,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#telemetry-feedback-correlation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry &amp; Feedback Correlation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1978,6 +2000,20 @@
 <li>Your agent nodes can read <code>prompt_version</code> from the state to load the correct prompt template.</li>
 <li>The chosen version is returned in the response metadata (<code>metadata.prompt_version</code>) so that you can trace and analyze performance.</li>
 </ol>
+<h3 id="telemetry-feedback-correlation">Telemetry &amp; Feedback Correlation<a class="headerlink" href="#telemetry-feedback-correlation" title="Permanent link">&para;</a></h3>
+<p>To measure the performance and quality of different prompt variants:
+1. <strong>Response Tracking</strong>: Read <code>metadata.prompt_version</code> from the <code>/invoke</code> or <code>/chat</code> JSON response payload.
+2. <strong>Feedback Logging</strong>: When calling the <code>POST /api/v1/{agent}/feedback</code> endpoint, pass the active prompt version in the request metadata payload:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">&quot;thread_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;thread_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">&quot;rating&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">&quot;comment&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Highly accurate answer!&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nt">&quot;prompt_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v2&quot;</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="p">}</span>
+</code></pre></div>
+   This associates ratings and comments directly with each version, allowing you to run analytical breakdowns of user satisfaction metrics per prompt variant.</p>
 <blockquote>
 <p>[!NOTE]
 Clients can explicitly override the A/B router by passing a specific <code>prompt_version</code> parameter in the invoke request (e.g. <code>{"prompt_version": "v2"}</code>).</p>
@@ -1987,35 +2023,35 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 <p>LLM APIs can suffer from outages, rate limiting (HTTP 429), or transient network errors. To ensure high availability, Agentomatic lets you define chainable fallback providers.</p>
 <h3 id="configuration_1">Configuration<a class="headerlink" href="#configuration_1" title="Permanent link">&para;</a></h3>
 <p>Pass a list of provider slugs in the <code>fallbacks</code> parameter of <code>get_llm()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;ollama&quot;</span><span class="p">]</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;ollama&quot;</span><span class="p">]</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">)</span>
 </code></pre></div>
 <p>If the primary provider (<code>openai</code>) raises an exception during execution, LangChain's fallback mechanism automatically routes the request to the next available backup in the list (<code>azure</code>, then <code>ollama</code>), shielding clients from upstream downtime.</p>
 <hr />
 <h2 id="7-state-level-hook-middleware-interceptors">🔌 7. State-Level Hook Middleware (Interceptors)<a class="headerlink" href="#7-state-level-hook-middleware-interceptors" title="Permanent link">&para;</a></h2>
 <p>For custom telemetry, audit logging, or real-time security scanning, you can register <strong>state-level node hooks</strong>. These are run instantly before and after every agent node invocation.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1"># 1. Register a before-node interceptor</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">audit_input_hook</span><span class="p">(</span><span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[Hook] Agent &#39;</span><span class="si">{</span><span class="n">agent_name</span><span class="si">}</span><span class="s2">&#39; is about to run. Query: </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;current_query&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="c1"># You can inspect or modify the state inline before execution starts</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">state</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;audit_logged&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
-<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>
-<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="n">platform</span><span class="o">.</span><span class="n">register_before_node_hook</span><span class="p">(</span><span class="n">audit_input_hook</span><span class="p">)</span>
-<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
-<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="c1"># 2. Register an after-node interceptor</span>
-<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">audit_output_hook</span><span class="p">(</span><span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
-<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[Hook] Agent &#39;</span><span class="si">{</span><span class="n">agent_name</span><span class="si">}</span><span class="s2">&#39; completed. Response snippet: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;response&#39;</span><span class="p">)[:</span><span class="mi">30</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>
-<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="n">platform</span><span class="o">.</span><span class="n">register_after_node_hook</span><span class="p">(</span><span class="n">audit_output_hook</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># 1. Register a before-node interceptor</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">audit_input_hook</span><span class="p">(</span><span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[Hook] Agent &#39;</span><span class="si">{</span><span class="n">agent_name</span><span class="si">}</span><span class="s2">&#39; is about to run. Query: </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;current_query&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="c1"># You can inspect or modify the state inline before execution starts</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="n">state</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;audit_logged&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="n">platform</span><span class="o">.</span><span class="n">register_before_node_hook</span><span class="p">(</span><span class="n">audit_input_hook</span><span class="p">)</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># 2. Register an after-node interceptor</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">audit_output_hook</span><span class="p">(</span><span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[Hook] Agent &#39;</span><span class="si">{</span><span class="n">agent_name</span><span class="si">}</span><span class="s2">&#39; completed. Response snippet: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;response&#39;</span><span class="p">)[:</span><span class="mi">30</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>
+<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="n">platform</span><span class="o">.</span><span class="n">register_after_node_hook</span><span class="p">(</span><span class="n">audit_output_hook</span><span class="p">)</span>
 </code></pre></div>
 
 
