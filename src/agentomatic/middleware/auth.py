@@ -30,14 +30,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
         api_key: str,
         header_name: str = "X-API-Key",
         query_param: str = "api_key",
+        skip_paths: set[str] | None = None,
     ) -> None:
         super().__init__(app)
         self._api_key = api_key
         self._header = header_name
         self._query = query_param
+        self._skip_paths = skip_paths if skip_paths is not None else _SKIP_PATHS
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path in _SKIP_PATHS:
+        if request.url.path in self._skip_paths:
             response: Response = await call_next(request)
             return response
 
