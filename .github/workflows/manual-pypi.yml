@@ -1,5 +1,8 @@
 name: "Manual PyPI Publish"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   workflow_dispatch:
     inputs:
@@ -48,6 +51,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+          attestations: false
         continue-on-error: true
 
       - name: Retry PyPI publish on failure
@@ -63,3 +67,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+          attestations: false
