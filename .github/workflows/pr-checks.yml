@@ -28,6 +28,7 @@ jobs:
           python-version: "3.12"
 
       - name: Check PR title (conventional commits)
+        if: github.event_name == 'pull_request'
         run: |
           TITLE="${{ github.event.pull_request.title }}"
           REGEXP="^(break|build|ci|docs|feat|fix|perf|refactor|style|test|chore|ops|hotfix)(\([a-zA-Z0-9\-\_\/\:]+\))?(!)?:\s.+"

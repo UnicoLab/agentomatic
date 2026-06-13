@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -201,7 +202,7 @@ def create_default_router(
                 raise HTTPException(500, f"Agent '{agent_name}' has no callable")
 
             duration_ms = (time.perf_counter() - t0) * 1000
-            return _extract_response(result, agent.slug, duration_ms)
+            return cast(AgentInvokeResponse, _extract_response(result, agent.slug, duration_ms))
         except HTTPException:
             raise
         except Exception as exc:
