@@ -1,9 +1,16 @@
 # Installation
 
+<div align="center">
+  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <h3>Getting Started Stack</h3>
+</div>
+
+---
+
 ## Requirements
 
-- **Python 3.11+** (3.12 and 3.13 also supported)
-- **pip**, **uv**, or **poetry** as package manager
+- **Python 3.11+** (Python 3.12 and 3.13 are fully supported).
+- **Package Manager**: `pip`, `uv`, or `poetry`.
 
 !!! tip "Check your Python version"
     ```bash
@@ -29,75 +36,80 @@
     poetry add agentomatic
     ```
 
+---
+
 ## Full Install (Recommended)
 
-Install with all optional extras for the complete experience:
+To enable all production features (including prompt optimization, database persistence, OpenTelemetry tracing, and the graphical Chainlit chat playground), install with the `all` extras flag:
 
 ```bash
 pip install agentomatic[all]
+
+# Or with uv
+uv add agentomatic --extra all
 ```
 
 ---
 
 ## Optional Extras
 
-Install only what you need:
+If you prefer a lightweight install, you can select only the modules and dependencies you need:
 
-| Extra | Command | What It Adds |
+| Extra Flag | Install Command | What It Enables |
 |---|---|---|
-| `langgraph` | `pip install agentomatic[langgraph]` | LangGraph agent support |
-| `ollama` | `pip install agentomatic[ollama]` | Ollama LLM provider |
-| `openai` | `pip install agentomatic[openai]` | OpenAI LLM provider |
-| `metrics` | `pip install agentomatic[metrics]` | Prometheus metrics |
-| `db` | `pip install agentomatic[db]` | SQLAlchemy + SQLite storage |
-| `db-postgres` | `pip install agentomatic[db-postgres]` | PostgreSQL support |
-| `cli` | `pip install agentomatic[cli]` | Rich CLI + interactive prompts |
-| `ui` | `pip install agentomatic[ui]` | Chainlit debug UI |
-| `optimize` | `pip install agentomatic[optimize]` | Prompt optimization + DeepEval |
-| `telemetry` | `pip install agentomatic[telemetry]` | OpenTelemetry tracing |
-| `all` | `pip install agentomatic[all]` | Everything above |
+| `langgraph` | `pip install agentomatic[langgraph]` | Direct support for LangGraph StateGraphs |
+| `ollama` | `pip install agentomatic[ollama]` | Local Ollama LLM provider integrations |
+| `openai` | `pip install agentomatic[openai]` | OpenAI API provider integrations |
+| `metrics` | `pip install agentomatic[metrics]` | Prometheus exporter metrics |
+| `db` | `pip install agentomatic[db]` | SQLAlchemy engines + local SQLite support |
+| `db-postgres` | `pip install agentomatic[db-postgres]` | SQLAlchemy async PostgreSQL client driver |
+| `cli` | `pip install agentomatic[cli]` | Rich terminal formatting + interactive select prompt controls |
+| `ui` | `pip install agentomatic[ui]` | Graphical Chainlit chat debug console |
+| `optimize` | `pip install agentomatic[optimize]` | DSPy-style optimizer loop + DeepEval validation |
+| `telemetry` | `pip install agentomatic[telemetry]` | OpenTelemetry APM tracing exporters |
+| `all` | `pip install agentomatic[all]` | Installs all components and drivers above |
 
 !!! note "Combining extras"
-    You can combine multiple extras in a single install:
+    You can combine multiple extras in a single install command:
     ```bash
-    pip install agentomatic[langgraph,ollama,db,metrics]
+    pip install agentomatic[langgraph,db,metrics]
     ```
 
 ---
 
-## Development Installation
+## Development Installation (From Source)
 
-Clone and install from source for contributing or local development:
+To contribute to the framework or run custom builds:
 
-```bash
-git clone https://github.com/UnicoLab/agentomatic.git
-cd agentomatic
-pip install -e ".[all,dev]"
-pre-commit install  # Set up commit hooks
-```
+=== "pip"
+    ```bash
+    git clone https://github.com/UnicoLab/agentomatic.git
+    cd agentomatic
+    pip install -e ".[all,dev]"
+    pre-commit install  # Installs git commit linter hooks
+    ```
 
-Or with **uv**:
-
-```bash
-git clone https://github.com/UnicoLab/agentomatic.git
-cd agentomatic
-uv sync --all-extras
-pre-commit install
-```
+=== "uv"
+    ```bash
+    git clone https://github.com/UnicoLab/agentomatic.git
+    cd agentomatic
+    uv sync --all-extras
+    pre-commit install
+    ```
 
 ---
 
 ## Verify Installation
 
-Run the built-in health check to confirm everything is working:
+Verify your local environment health, connectivity, and dependencies using the built-in diagnostic test:
 
 ```bash
 agentomatic doctor
 ```
 
-Expected output:
+### Expected Diagnostic Output
 
-```
+```text
 ╭──────────────────── Agentomatic Doctor ────────────────────╮
 │ ✅ Python         3.12.0                                   │
 │ ✅ agentomatic    0.1.0                                    │
@@ -115,4 +127,4 @@ Expected output:
 ```
 
 !!! tip "Next Step"
-    Ready to go? Head to the [Quick Start](quickstart.md) guide.
+    Now that the installation is complete, proceed to the [Quick Start](quickstart.md) guide!

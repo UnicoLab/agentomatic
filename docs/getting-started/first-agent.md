@@ -1,89 +1,135 @@
 # Your First Agent
 
-This tutorial walks through creating a production-ready agent from scratch.
+<div align="center">
+  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <h3>Step-by-Step RAG Agent Tutorial</h3>
+</div>
 
-## Step 1: Choose a Template
+---
+
+This tutorial walks through building a production-ready **Retrieval-Augmented Generation (RAG)** search agent from scratch using Agentomatic.
+
+---
+
+## Step 1: Scaffold the Agent Folder
+
+Use the `full` scaffolding template to include all optional configuration files and overrides:
 
 ```bash
-agentomatic init weather_bot --template full
+agentomatic init search_bot --template full
 ```
 
-The `full` template includes ALL override files:
+This creates a dedicated directory containing:
 
+```text
+agents/search_bot/
+├── __init__.py      # Required: agent manifest declaration and entry point
+├── graph.py         # Optional: LangGraph orchestration flow
+├── nodes.py         # Optional: node execution logic
+├── config.py        # Optional: agent settings schema (Pydantic)
+├── schemas.py       # Optional: custom request/response validation schemas
+├── tools.py         # Optional: LangChain tools
+├── api.py           # Optional: custom routers (overrides auto-generated endpoints)
+├── prompts.json     # Optional: versioned prompt templates
+├── langgraph.json   # Optional: local developer environment settings
+├── .env.example     # Optional: environment blueprint
+└── README.md        # Optional: agent readme documentation
 ```
-agents/weather_bot/
-├── __init__.py      # Manifest + entry
-├── graph.py         # State graph
-├── nodes.py         # Processing logic
-├── config.py        # Agent config (Pydantic)
-├── schemas.py       # Custom request/response models
-├── tools.py         # LangChain tools
-├── api.py           # Custom router (replaces auto-gen)
-├── prompts.json     # Versioned prompts
-├── langgraph.json   # Studio config
-├── .env.example     # Env vars
-└── README.md        # Agent docs
-```
 
-## Step 2: Implement Your Logic
+---
 
-Edit `nodes.py` — this is where your agent logic lives:
+## Step 2: Declare the Agent Manifest
+
+Open `agents/search_bot/__init__.py`. Define your manifest properties:
 
 ```python
-async def process(state: dict[str, Any]) -> dict[str, Any]:
+from agentomatic import AgentManifest
+from .graph import get_graph
+
+manifest = AgentManifest(
+    name="search_bot",
+    slug="search-bot",
+    description="Knowledge base search assistant utilizing LangGraph and Vector Stores.",
+    intent_keywords=["search", "find", "document", "knowledge"],
+    version="1.0.0",
+    framework="langgraph",
+)
+
+def graph_fn():
+    """Retrieve the LangGraph compiled state graph."""
+    return get_graph()
+```
+
+---
+
+## Step 3: Implement RAG Nodes
+
+Open `agents/search_bot/nodes.py`. Define your document retrieval and answer generation logic:
+
+```python
+from typing import Any
+from langchain_ollama import ChatOllama
+from langchain_core.messages import HumanMessage
+
+async def retrieve_context(state: dict[str, Any]) -> dict[str, Any]:
+    """Mock document retriever node."""
     query = state.get("current_query", "")
-
-    # Your LLM call here
-    from langchain_ollama import ChatOllama
-    llm = ChatOllama(model="mistral:7b")
-    response = await llm.ainvoke(query)
-
+    logger_info = f"Querying KB: {query}"
+    
+    # Mock retrieval docs (swap with a real VectorDB like Qdrant/Chroma)
+    docs = [
+        "Company policy: Employees get 25 days of paid time off per year.",
+        "Requesting leaves: Submit request in HR portal 2 weeks in advance."
+    ]
     return {
-        "response": response.content,
-        "agent_type": "agent-weather_bot",
-        "suggestions": ["Check forecast", "Weather alerts"],
+        "citations": [{"source": "company_handbook.pdf", "page": 10}],
+        "metadata": {"retrieved_docs": docs},
+        "steps_taken": ["retrieve_docs"],
+    }
+
+async def generate_response(state: dict[str, Any]) -> dict[str, Any]:
+    """Generates the final response based on retrieved docs."""
+    query = state.get("current_query", "")
+    context = state.get("metadata", {}).get("retrieved_docs", [])
+    
+    # Format a prompt template and query the LLM
+    llm = ChatOllama(model="mistral:7b", temperature=0.1)
+    prompt = f"Context:\n" + "\n".join(context) + f"\n\nQuestion: {query}"
+    
+    result = await llm.ainvoke([HumanMessage(content=prompt)])
+    
+    return {
+        "response": result.content,
+        "suggestions": ["How to request leaves?", "PTO balance check"],
+        "steps_taken": ["generate_response"],
     }
 ```
 
-## Step 3: Configure
+---
 
-Edit `config.py` for agent-specific settings:
+## Step 4: Configure Settings Schema
 
-```python
-class WeatherBotConfig(BaseModel):
-    prompt_version: str = "v1"
-    temperature: float = 0.1
-    max_tokens: int = 2048
-    api_key: str = Field("", description="Weather API key")
-```
-
-## Step 4: Add Storage & Middleware
+Open `agents/search_bot/config.py`. Define default agent settings and hyper-parameters using Pydantic:
 
 ```python
-from agentomatic import AgentPlatform
-from agentomatic.storage import MemoryStore
+from pydantic import BaseModel, Field
 
-platform = AgentPlatform.from_folder(
-    "agents/",
-    store=MemoryStore(),
-    enable_auth=True,
-    auth_api_key="my-secret-key",
-    enable_rate_limit=True,
-    enable_metrics=True,
-)
-app = platform.build()
+class SearchBotConfig(BaseModel):
+    prompt_version: str = Field("v1", description="Default prompt version")
+    temperature: float = Field(0.2, description="Sampling temperature")
+    max_tokens: int = Field(2048, description="Maximum completion tokens")
+    vector_store_url: str = Field("http://localhost:6333", description="Vector database URL")
 ```
 
-## Step 5: Test with Debug UI
+---
+
+## Step 5: Test the Agent
+
+Start the platform server locally, loading your newly created agent:
 
 ```bash
-pip install agentomatic[ui]
-agentomatic run --with-ui
-# Open http://localhost:8000/chat
+agentomatic run --reload --with-ui
 ```
 
-!!! tip "LangGraph Studio"
-    Each agent's `langgraph.json` lets you debug with LangGraph Studio:
-    ```bash
-    langgraph dev agents/weather_bot/langgraph.json
-    ```
+1. **REST API endpoints**: Go to `http://localhost:8000/docs` to test `/api/v1/search_bot/invoke` interactively.
+2. **Graphical Sandbox**: Go to `http://localhost:8000/chat` to test token-by-token streaming and rating collection.

@@ -1,62 +1,79 @@
 # Quick Start
 
-Get a multi-agent API running in under 60 seconds.
+<div align="center">
+  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <h3>API Platform in 60 Seconds</h3>
+</div>
 
 ---
 
-## 1. Install
+## 1. Install dependencies
+
+Install Agentomatic with all features:
 
 ```bash
 pip install agentomatic[all]
 ```
 
-## 2. Create an Agent
+---
+
+## 2. Scaffold a chatbot agent
+
+Generate a functional basic chatbot agent using the CLI:
 
 ```bash
-agentomatic init hello_world --template basic
+agentomatic init my_chatbot --template basic
 ```
 
-This scaffolds a ready-to-run agent:
+This scaffolds a directory structure under `agents/`:
 
+```text
+agents/my_chatbot/
+├── __init__.py      # Manifest declaration + route hook entry
+├── graph.py         # LangGraph state graph definition
+├── nodes.py         # Node logic functions
+├── prompts.json     # Dynamic system and user prompt templates
+├── langgraph.json   # LangGraph Studio local developer settings
+├── .env.example     # Environment variables blueprint
+└── README.md        # Agent documentation markdown
 ```
-agents/hello_world/
-├── __init__.py      # Agent manifest + entry point
-├── graph.py         # LangGraph state graph
-├── nodes.py         # Processing functions
-├── prompts.json     # Prompt templates
-├── langgraph.json   # LangGraph Studio config
-├── .env.example     # Environment variables
-└── README.md        # Agent docs
-```
 
-## 3. Run
+---
 
-=== "CLI (recommended)"
+## 3. Run the API server
+
+=== "CLI Launcher (recommended)"
     ```bash
-    agentomatic run
-    # → Platform running at http://localhost:8000
-    # → Swagger UI at http://localhost:8000/docs
+    # Starts the web server and embeds the graphical Chat UI at /chat
+    agentomatic run --with-ui --reload
     ```
+    - **FastAPI application running at**: `http://localhost:8000`
+    - **OpenAPI Swagger documentation at**: `http://localhost:8000/docs`
+    - **Chainlit chat playground at**: `http://localhost:8000/chat`
 
-=== "Python"
+=== "Python Entry Point"
+    Create a `main.py` file to customize the platform stack:
     ```python
     # main.py
     from agentomatic import AgentPlatform
 
     platform = AgentPlatform.from_folder("agents/")
     app = platform.build()
-    ```
+```
+    Run with uvicorn:
     ```bash
     uvicorn main:app --reload
     ```
 
 ---
 
-## 4. Test Your Agent
+## 4. Query the endpoints
 
-=== "curl"
+You can interact with your newly deployed agent using Curl, Python, or the CLI.
+
+=== "curl (REST API)"
     ```bash
-    curl -X POST http://localhost:8000/api/v1/hello_world/invoke \
+    curl -X POST http://localhost:8000/api/v1/my_chatbot/invoke \
       -H "Content-Type: application/json" \
       -d '{"query": "Hello!"}'
     ```
@@ -65,60 +82,41 @@ agents/hello_world/
     ```python
     import httpx
 
-    resp = httpx.post(
-        "http://localhost:8000/api/v1/hello_world/invoke",
+    response = httpx.post(
+        "http://localhost:8000/api/v1/my_chatbot/invoke",
         json={"query": "Hello!"},
     )
-    print(resp.json())
+    print(response.json())
     ```
 
-=== "CLI"
+=== "Interactive CLI"
     ```bash
-    agentomatic test hello_world
+    # Opens a chat-like session inside your terminal
+    agentomatic test my_chatbot
     ```
 
-Expected response:
+### Expected JSON Response
 
 ```json
 {
-  "response": "Hello! How can I help you today?",
-  "agent_type": "agent-hello_world",
-  "thread_id": "t-abc123",
-  "suggestions": ["Tell me more", "What can you do?"],
-  "duration_ms": 142.5
+  "response": "Hello! How can I assist you today?",
+  "agent_type": "agent-my_chatbot",
+  "thread_id": "thread_abc123",
+  "suggestions": ["Introduce yourself", "What can you do?"],
+  "citations": [],
+  "steps_taken": ["greeting_node"],
+  "metadata": {},
+  "duration_ms": 114.2
 }
 ```
 
 ---
 
-## Auto-Generated Endpoints
+## 🧭 Explore Further
 
-Every agent gets these endpoints automatically — zero configuration:
+Now that you have your first API microservice running, here is where to look next:
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/{agent}/invoke` | Synchronous invocation |
-| `POST` | `/api/v1/{agent}/invoke/stream` | SSE streaming |
-| `POST` | `/api/v1/{agent}/chat` | Session-aware chat |
-| `GET` | `/api/v1/{agent}/health` | Per-agent health |
-| `GET` | `/api/v1/{agent}/config` | Agent configuration |
-| `GET` | `/api/v1/{agent}/prompts` | Prompt versions |
-| `GET` | `/api/v1/{agent}/card` | A2A agent card |
-| `POST` | `/api/v1/{agent}/a2a/tasks` | A2A task submission |
-| `GET` | `/api/v1/{agent}/threads` | List threads |
-| `GET` | `/api/v1/{agent}/threads/{id}` | Get thread |
-| `GET` | `/api/v1/{agent}/threads/{id}/messages` | Thread messages |
-| `POST` | `/api/v1/{agent}/feedback` | Submit feedback |
-| `GET` | `/api/v1/{agent}/feedback` | List feedback |
-
-!!! tip "Interactive API docs"
-    Visit `http://localhost:8000/docs` for a full Swagger UI where you can test all endpoints interactively.
-
----
-
-## What's Next?
-
-- **[Your First Agent](first-agent.md)** — Build a production-ready agent from scratch
-- **[Templates](../guide/templates.md)** — Explore all 5 scaffolding templates
-- **[Prompt Optimization](../guide/optimization.md)** — Auto-tune your prompts with DSPy-inspired strategies
-- **[CLI Reference](../cli/commands.md)** — Full command documentation
+- **[Your First Agent](first-agent.md)** — Step-by-step tutorial building a production-ready RAG agent.
+- **[Agent Structure](../guide/agent-structure.md)** — Understand directory conventions and how overrides work.
+- **[Prompt Optimization](../guide/optimization.md)** — Auto-tune your system prompts using machine learning.
+- **[Storage Backends](../guide/storage.md)** — Configure PostgreSQL or custom Redis adapters.

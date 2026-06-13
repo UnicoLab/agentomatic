@@ -1,17 +1,23 @@
-# CLI Commands
+# CLI Reference
 
-Agentomatic ships with a **click-based CLI** for scaffolding, running, testing, and inspecting agents.
-
-!!! tip "Install CLI extras for the best experience"
-    ```bash
-    pip install agentomatic[cli]   # Rich tables + interactive prompts
-    ```
+<div align="center">
+  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <h3>Interactive Command-Line Toolchain</h3>
+</div>
 
 ---
 
-## `agentomatic --help`
+Agentomatic ships with a robust, click-based CLI for scaffolding, serving, listing, inspecting, testing, and optimizing your agents.
 
+---
+
+## ⚡ Global Help Overview
+
+```bash
+agentomatic --help
 ```
+
+```text
 Usage: agentomatic [OPTIONS] COMMAND [ARGS]...
 
   Agentomatic — Drop agents, not code ⚡
@@ -21,169 +27,122 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  init     Scaffold a new agent from a template.
-  run      Start the platform server.
-  list     List discovered agents.
-  test     Interactive agent testing.
-  inspect  Show agent structure and configuration.
-  doctor   Check environment health.
-  ui       Launch the Chainlit debug UI.
+  init      Scaffold a new agent from a template.
+  run       Start the platform server.
+  list      List discovered agents.
+  test      Interactive agent testing in the console.
+  inspect   Show agent folder structure and configs.
+  doctor    Verify environment health and packages.
+  ui        Launch the Chainlit debug UI.
+  optimize  Run automatic prompt tuning loops.
 ```
 
 ---
 
-## `agentomatic init`
+## 🏗️ `agentomatic init`
 
-Scaffold a new agent from a template.
+Scaffold a new agent directory from one of our 5 pre-built conventions.
 
-```
+### Usage
+```text
 Usage: agentomatic init [OPTIONS] NAME
-
-  Scaffold a new agent from a template.
 
 Arguments:
   NAME  Agent name (snake_case)  [required]
 
 Options:
   -t, --template [basic|full|rag|chatbot|custom]
-                          Template to use (interactive if omitted)
-  --dir TEXT              Agents directory  [default: agents]
-  -f, --force             Overwrite existing agent
-  --help                  Show this message and exit.
+                          Template to use (interactive list if omitted)
+  --dir TEXT              Agents parent directory  [default: agents]
+  -f, --force             Overwrite existing agent directory
 ```
 
-**Examples:**
-
+### Examples
 ```bash
-# Interactive template selection (requires questionary)
-agentomatic init my_agent
+# Select templates interactively (requires pip install questionary)
+agentomatic init support_agent
 
-# Non-interactive with specific template
-agentomatic init hr_bot --template rag
+# Standard scaffolding (basic template)
+agentomatic init helper_bot --template basic
 
-# Force overwrite existing agent
-agentomatic init hr_bot --template full --force
-
-# Custom agents directory
-agentomatic init my_agent --template basic --dir src/agents
+# RAG template forced overwrite
+agentomatic init knowledge_bot --template rag --force
 ```
 
 ---
 
-## `agentomatic run`
+## 🚀 `agentomatic run`
 
-Start the platform server with uvicorn.
+Start the platform microservice. Runs a local `uvicorn` web server hosting the FastAPI routing stack.
 
-```
+### Usage
+```text
 Usage: agentomatic run [OPTIONS]
 
-  Start the platform server.
-
 Options:
-  --agents-dir TEXT  Agents directory  [default: agents]
+  --agents-dir TEXT  Agents folder to scan  [default: agents]
   --host TEXT        Bind address  [default: 0.0.0.0]
   --port INTEGER     Bind port  [default: 8000]
-  --reload           Auto-reload on file changes
-  --with-ui          Enable Chainlit debug UI at /chat
-  --help             Show this message and exit.
+  --reload           Auto-reload on code or config file changes
+  --with-ui          Mount the Chainlit chat UI at /chat
 ```
 
-**Examples:**
-
+### Examples
 ```bash
-# Basic start
+# Standard launch
 agentomatic run
 
-# Development with auto-reload + debug UI
+# Dev launch (live reload + debugging Chat UI at http://localhost:8000/chat)
 agentomatic run --reload --with-ui
 
-# Custom host and port
-agentomatic run --host 127.0.0.1 --port 9000
-
-# Different agents directory
-agentomatic run --agents-dir src/agents
+# Bound to specific port
+agentomatic run --port 9000
 ```
 
 ---
 
-## `agentomatic list`
+## 📊 `agentomatic list`
 
-List all discovered agents in a rich table.
+Scans your agents folder and prints a rich table of discovered agent packages and their statuses.
 
-```
+### Usage
+```text
 Usage: agentomatic list [OPTIONS]
 
-  List discovered agents.
-
 Options:
-  --agents-dir TEXT  Agents directory  [default: agents]
-  --help             Show this message and exit.
+  --agents-dir TEXT  Agents folder to scan  [default: agents]
 ```
 
-**Example output:**
-
-```
+### Example Output
+```text
 ╭────────────────────── Discovered Agents ──────────────────────╮
 │ Name         │ Framework  │ Version │ Endpoints │ Status      │
 ├──────────────┼────────────┼─────────┼───────────┼─────────────┤
-│ hr_bot       │ langgraph  │ 1.0.0   │ 12        │ ✅ Ready    │
-│ rag_agent    │ langgraph  │ 1.0.0   │ 12        │ ✅ Ready    │
-│ classifier   │ custom     │ 0.1.0   │ 12        │ ✅ Ready    │
+│ hr_bot       │ langgraph  │ 1.0.0   │ 12        │ Ready       │
+│ rag_agent    │ langgraph  │ 1.0.0   │ 12        │ Ready       │
+│ classifier   │ custom     │ 0.1.0   │ 12        │ Ready       │
 ╰──────────────┴────────────┴─────────┴───────────┴─────────────╯
 ```
 
 ---
 
-## `agentomatic test`
+## 🔍 `agentomatic inspect`
 
-Interactive agent testing in the terminal. Sends queries and displays responses in real-time.
+Validates your agent package structure, reading manifest properties and listing present/absent conventions.
 
-```
-Usage: agentomatic test [OPTIONS] NAME
-
-  Interactive agent testing.
-
-Arguments:
-  NAME  Agent name to test  [required]
-
-Options:
-  --host TEXT      Server host  [default: localhost]
-  --port INTEGER   Server port  [default: 8000]
-  --help           Show this message and exit.
-```
-
-**Example:**
-
-```bash
-agentomatic test hr_bot
-# 🤖 Connected to hr_bot at http://localhost:8000
-# You: What is our PTO policy?
-# hr_bot: Our PTO policy provides 25 days per year...
-# You: /quit
-```
-
----
-
-## `agentomatic inspect`
-
-Show detailed agent structure, manifest fields, and configuration.
-
-```
+### Usage
+```text
 Usage: agentomatic inspect [OPTIONS] NAME
-
-  Show agent structure and configuration.
 
 Arguments:
   NAME  Agent name to inspect  [required]
 
 Options:
-  --agents-dir TEXT  Agents directory  [default: agents]
-  --help             Show this message and exit.
+  --agents-dir TEXT  Agents parent folder  [default: agents]
 ```
 
-**Example output:**
-
-```
+### Example Output
+```text
 ╭──────────────────── Agent: hr_bot ────────────────────╮
 │ Manifest                                              │
 │   name:        hr_bot                                 │
@@ -204,23 +163,89 @@ Options:
 
 ---
 
-## `agentomatic doctor`
+## 💬 `agentomatic test`
 
-Check environment health — Python version, installed extras, connectivity.
+Interactive, chat-like terminal interface to test agent completions and streaming directly inside your shell.
 
-```
-Usage: agentomatic doctor [OPTIONS]
+### Usage
+```text
+Usage: agentomatic test [OPTIONS] NAME
 
-  Check environment health.
+Arguments:
+  NAME  Agent name to test  [required]
 
 Options:
-  --agents-dir TEXT  Agents directory  [default: agents]
-  --help             Show this message and exit.
+  --host TEXT      Server host address  [default: localhost]
+  --port INTEGER   Server host port  [default: 8000]
 ```
 
-**Example output:**
-
+### Example Session
+```bash
+agentomatic test hr_bot
+# 🤖 Connected to hr_bot at http://localhost:8000
+# You: Hello!
+# hr_bot: Hello! How can I assist you with HR policies today?
+# You: /quit
 ```
+
+---
+
+## 🎯 `agentomatic optimize`
+
+Executes the prompt optimization tuning loop over a dataset, evaluating outputs and saving improvements.
+
+### Usage
+```text
+Usage: agentomatic optimize [OPTIONS] AGENT
+
+Arguments:
+  AGENT  Agent name to optimize  [required]
+
+Options:
+  -d, --dataset TEXT      Path to evaluation dataset (JSONL/CSV)  [required]
+  -m, --metrics TEXT      Comma-separated metrics (e.g., exact_match,contains)  [required]
+  -s, --strategy [iterative_rewrite|few_shot|chain_of_thought]
+                          Optimization strategy  [default: iterative_rewrite]
+  --max-iterations INTEGER
+                          Maximum optimization steps  [default: 10]
+  --target-score FLOAT    Stop optimization once this average score is hit  [default: 0.9]
+  --rewrite-llm TEXT      Override LLM used to rewrite prompt instructions
+  --eval-llm TEXT         Override LLM used to grade responses
+  --llm TEXT              Default LLM to fallback on  [default: ollama/mistral:7b]
+  --patience INTEGER      Stop early if score doesn't improve for N steps  [default: 3]
+  --prompt TEXT           Initial system prompt override (bypasses prompts.json)
+  --no-report             Skip generating interactive HTML report logs
+  --apply                 Automatically save and promote the best-performing prompt
+  --host TEXT             Platform API base host url  [default: http://localhost:8000]
+```
+
+### Examples
+```bash
+# Run basic optimization loop and auto-save the best prompt
+agentomatic optimize hr_bot \
+  --dataset eval_qa.jsonl \
+  --metrics exact_match,contains \
+  --strategy iterative_rewrite \
+  --max-iterations 10 \
+  --apply
+```
+
+---
+
+## 🩺 `agentomatic doctor`
+
+Diagnostic diagnostic tool that audits your local Python virtualenv, installs, dependencies, package versions, and external service connections (Ollama / OpenAI).
+
+### Usage
+```text
+Usage: agentomatic doctor [OPTIONS]
+
+Options:
+  --agents-dir TEXT  Agents folder to inspect  [default: agents]
+```
+
+### Example Output
+```text
 ╭──────────────────── Agentomatic Doctor ────────────────────╮
 │ ✅ Python         3.12.0                                   │
 │ ✅ agentomatic    0.1.0                                    │
@@ -239,37 +264,22 @@ Options:
 
 ---
 
-## `agentomatic ui`
+## 🎨 `agentomatic ui`
 
-Launch the Chainlit debug UI as a standalone process.
+Launch the Chainlit debug Chat console as a standalone process (points to a running backend application).
 
-```
+### Usage
+```text
 Usage: agentomatic ui [OPTIONS]
 
-  Launch the Chainlit debug UI.
-
 Options:
-  --host TEXT        API server host  [default: localhost]
-  --port INTEGER     API server port  [default: 8000]
-  --ui-port INTEGER  Chainlit UI port  [default: 8001]
-  --help             Show this message and exit.
+  --host TEXT        FastAPI server address  [default: localhost]
+  --port INTEGER     FastAPI server port  [default: 8000]
+  --ui-port INTEGER  Chainlit UI port to bind  [default: 8001]
 ```
 
-**Example:**
-
+### Example
 ```bash
-# Launch UI pointing to running platform
-agentomatic ui
-# → Chainlit UI at http://localhost:8001
-# → Connecting to API at http://localhost:8000
-
-# Custom ports
-agentomatic ui --port 9000 --ui-port 9001
+# Launch standalone debug UI on port 9000
+agentomatic ui --port 8000 --ui-port 9000
 ```
-
-!!! note "Alternative: embedded mode"
-    You can also run the UI embedded in the platform server:
-    ```bash
-    agentomatic run --with-ui
-    # → UI available at http://localhost:8000/chat
-    ```
