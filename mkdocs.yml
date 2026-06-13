@@ -84,6 +84,7 @@ nav:
     - Your First Agent: getting-started/first-agent.md
   - User Guide:
     - Agent Structure: guide/agent-structure.md
+    - Prompt Management: guide/prompts.md
     - Templates: guide/templates.md
     - Configuration: guide/configuration.md
     - Storage Backends: guide/storage.md
