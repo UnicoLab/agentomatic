@@ -618,10 +618,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#step-1-choose-a-template" class="md-nav__link">
+  <a href="#step-1-scaffold-the-agent-folder" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Choose a Template
+        Step 1: Scaffold the Agent Folder
       
     </span>
   </a>
@@ -629,10 +629,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-implement-your-logic" class="md-nav__link">
+  <a href="#step-2-declare-the-agent-manifest" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Implement Your Logic
+        Step 2: Declare the Agent Manifest
       
     </span>
   </a>
@@ -640,10 +640,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-3-configure" class="md-nav__link">
+  <a href="#step-3-implement-rag-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Configure
+        Step 3: Implement RAG Nodes
       
     </span>
   </a>
@@ -651,10 +651,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-4-add-storage-middleware" class="md-nav__link">
+  <a href="#step-4-configure-settings-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Add Storage &amp; Middleware
+        Step 4: Configure Settings Schema
       
     </span>
   </a>
@@ -662,10 +662,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-5-test-with-debug-ui" class="md-nav__link">
+  <a href="#step-5-test-the-agent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 5: Test with Debug UI
+        Step 5: Test the Agent
       
     </span>
   </a>
@@ -1288,10 +1288,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#step-1-choose-a-template" class="md-nav__link">
+  <a href="#step-1-scaffold-the-agent-folder" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Choose a Template
+        Step 1: Scaffold the Agent Folder
       
     </span>
   </a>
@@ -1299,10 +1299,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-implement-your-logic" class="md-nav__link">
+  <a href="#step-2-declare-the-agent-manifest" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Implement Your Logic
+        Step 2: Declare the Agent Manifest
       
     </span>
   </a>
@@ -1310,10 +1310,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-3-configure" class="md-nav__link">
+  <a href="#step-3-implement-rag-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Configure
+        Step 3: Implement RAG Nodes
       
     </span>
   </a>
@@ -1321,10 +1321,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-4-add-storage-middleware" class="md-nav__link">
+  <a href="#step-4-configure-settings-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Add Storage &amp; Middleware
+        Step 4: Configure Settings Schema
       
     </span>
   </a>
@@ -1332,10 +1332,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-5-test-with-debug-ui" class="md-nav__link">
+  <a href="#step-5-test-the-agent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 5: Test with Debug UI
+        Step 5: Test the Agent
       
     </span>
   </a>
@@ -1363,73 +1363,111 @@
 
 
 <h1 id="your-first-agent">Your First Agent<a class="headerlink" href="#your-first-agent" title="Permanent link">&para;</a></h1>
-<p>This tutorial walks through creating a production-ready agent from scratch.</p>
-<h2 id="step-1-choose-a-template">Step 1: Choose a Template<a class="headerlink" href="#step-1-choose-a-template" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>agentomatic<span class="w"> </span>init<span class="w"> </span>weather_bot<span class="w"> </span>--template<span class="w"> </span>full
-</code></pre></div>
-<p>The <code>full</code> template includes ALL override files:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>agents/weather_bot/
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── __init__.py      # Manifest + entry
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── graph.py         # State graph
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── nodes.py         # Processing logic
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── config.py        # Agent config (Pydantic)
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── schemas.py       # Custom request/response models
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── tools.py         # LangChain tools
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>├── api.py           # Custom router (replaces auto-gen)
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>├── prompts.json     # Versioned prompts
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>├── langgraph.json   # Studio config
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>├── .env.example     # Env vars
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>└── README.md        # Agent docs
-</code></pre></div>
-<h2 id="step-2-implement-your-logic">Step 2: Implement Your Logic<a class="headerlink" href="#step-2-implement-your-logic" title="Permanent link">&para;</a></h2>
-<p>Edit <code>nodes.py</code> — this is where your agent logic lives:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">query</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;current_query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="c1"># Your LLM call here</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">langchain_ollama</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChatOllama</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">llm</span> <span class="o">=</span> <span class="n">ChatOllama</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;mistral:7b&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">llm</span><span class="o">.</span><span class="n">ainvoke</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">return</span> <span class="p">{</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="n">response</span><span class="o">.</span><span class="n">content</span><span class="p">,</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="s2">&quot;agent_type&quot;</span><span class="p">:</span> <span class="s2">&quot;agent-weather_bot&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="s2">&quot;suggestions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Check forecast&quot;</span><span class="p">,</span> <span class="s2">&quot;Weather alerts&quot;</span><span class="p">],</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="p">}</span>
-</code></pre></div>
-<h2 id="step-3-configure">Step 3: Configure<a class="headerlink" href="#step-3-configure" title="Permanent link">&para;</a></h2>
-<p>Edit <code>config.py</code> for agent-specific settings:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">WeatherBotConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">prompt_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;v1&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">max_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Weather API key&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2 id="step-4-add-storage-middleware">Step 4: Add Storage &amp; Middleware<a class="headerlink" href="#step-4-add-storage-middleware" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">(),</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;my-secret-key&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">)</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
-</code></pre></div>
-<h2 id="step-5-test-with-debug-ui">Step 5: Test with Debug UI<a class="headerlink" href="#step-5-test-with-debug-ui" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>ui<span class="o">]</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--with-ui
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Open http://localhost:8000/chat</span>
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">LangGraph Studio</p>
-<p>Each agent's <code>langgraph.json</code> lets you debug with LangGraph Studio:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>langgraph<span class="w"> </span>dev<span class="w"> </span>agents/weather_bot/langgraph.json
-</code></pre></div></p>
+<div align="center">
+  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <h3>Step-by-Step RAG Agent Tutorial</h3>
 </div>
+
+<hr />
+<p>This tutorial walks through building a production-ready <strong>Retrieval-Augmented Generation (RAG)</strong> search agent from scratch using Agentomatic.</p>
+<hr />
+<h2 id="step-1-scaffold-the-agent-folder">Step 1: Scaffold the Agent Folder<a class="headerlink" href="#step-1-scaffold-the-agent-folder" title="Permanent link">&para;</a></h2>
+<p>Use the <code>full</code> scaffolding template to include all optional configuration files and overrides:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>agentomatic<span class="w"> </span>init<span class="w"> </span>search_bot<span class="w"> </span>--template<span class="w"> </span>full
+</code></pre></div>
+<p>This creates a dedicated directory containing:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>agents/search_bot/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── __init__.py      # Required: agent manifest declaration and entry point
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── graph.py         # Optional: LangGraph orchestration flow
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── nodes.py         # Optional: node execution logic
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── config.py        # Optional: agent settings schema (Pydantic)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>├── schemas.py       # Optional: custom request/response validation schemas
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── tools.py         # Optional: LangChain tools
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>├── api.py           # Optional: custom routers (overrides auto-generated endpoints)
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>├── prompts.json     # Optional: versioned prompt templates
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>├── langgraph.json   # Optional: local developer environment settings
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>├── .env.example     # Optional: environment blueprint
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>└── README.md        # Optional: agent readme documentation
+</code></pre></div>
+<hr />
+<h2 id="step-2-declare-the-agent-manifest">Step 2: Declare the Agent Manifest<a class="headerlink" href="#step-2-declare-the-agent-manifest" title="Permanent link">&para;</a></h2>
+<p>Open <code>agents/search_bot/__init__.py</code>. Define your manifest properties:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentManifest</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_graph</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">manifest</span> <span class="o">=</span> <span class="n">AgentManifest</span><span class="p">(</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;search_bot&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">slug</span><span class="o">=</span><span class="s2">&quot;search-bot&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Knowledge base search assistant utilizing LangGraph and Vector Stores.&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">intent_keywords</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;search&quot;</span><span class="p">,</span> <span class="s2">&quot;find&quot;</span><span class="p">,</span> <span class="s2">&quot;document&quot;</span><span class="p">,</span> <span class="s2">&quot;knowledge&quot;</span><span class="p">],</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">framework</span><span class="o">=</span><span class="s2">&quot;langgraph&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">)</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">graph_fn</span><span class="p">():</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve the LangGraph compiled state graph.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">return</span> <span class="n">get_graph</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h2 id="step-3-implement-rag-nodes">Step 3: Implement RAG Nodes<a class="headerlink" href="#step-3-implement-rag-nodes" title="Permanent link">&para;</a></h2>
+<p>Open <code>agents/search_bot/nodes.py</code>. Define your document retrieval and answer generation logic:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">langchain_ollama</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChatOllama</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">langchain_core.messages</span><span class="w"> </span><span class="kn">import</span> <span class="n">HumanMessage</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">retrieve_context</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Mock document retriever node.&quot;&quot;&quot;</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">query</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;current_query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">logger_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Querying KB: </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="c1"># Mock retrieval docs (swap with a real VectorDB like Qdrant/Chroma)</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">docs</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="s2">&quot;Company policy: Employees get 25 days of paid time off per year.&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="s2">&quot;Requesting leaves: Submit request in HR portal 2 weeks in advance.&quot;</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="p">]</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="s2">&quot;citations&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;company_handbook.pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;page&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">}],</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;retrieved_docs&quot;</span><span class="p">:</span> <span class="n">docs</span><span class="p">},</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        <span class="s2">&quot;steps_taken&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;retrieve_docs&quot;</span><span class="p">],</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="p">}</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">generate_response</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates the final response based on retrieved docs.&quot;&quot;&quot;</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>    <span class="n">query</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;current_query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="n">context</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retrieved_docs&quot;</span><span class="p">,</span> <span class="p">[])</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>    <span class="c1"># Format a prompt template and query the LLM</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="n">llm</span> <span class="o">=</span> <span class="n">ChatOllama</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;mistral:7b&quot;</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>    <span class="n">prompt</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Context:</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">context</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">Question: </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">llm</span><span class="o">.</span><span class="n">ainvoke</span><span class="p">([</span><span class="n">HumanMessage</span><span class="p">(</span><span class="n">content</span><span class="o">=</span><span class="n">prompt</span><span class="p">)])</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>        <span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">content</span><span class="p">,</span>
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>        <span class="s2">&quot;suggestions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;How to request leaves?&quot;</span><span class="p">,</span> <span class="s2">&quot;PTO balance check&quot;</span><span class="p">],</span>
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>        <span class="s2">&quot;steps_taken&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;generate_response&quot;</span><span class="p">],</span>
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>    <span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="step-4-configure-settings-schema">Step 4: Configure Settings Schema<a class="headerlink" href="#step-4-configure-settings-schema" title="Permanent link">&para;</a></h2>
+<p>Open <code>agents/search_bot/config.py</code>. Define default agent settings and hyper-parameters using Pydantic:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">SearchBotConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">prompt_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Default prompt version&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Sampling temperature&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">max_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="mi">2048</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Maximum completion tokens&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">vector_store_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;http://localhost:6333&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Vector database URL&quot;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="step-5-test-the-agent">Step 5: Test the Agent<a class="headerlink" href="#step-5-test-the-agent" title="Permanent link">&para;</a></h2>
+<p>Start the platform server locally, loading your newly created agent:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--reload<span class="w"> </span>--with-ui
+</code></pre></div>
+<ol>
+<li><strong>REST API endpoints</strong>: Go to <code>http://localhost:8000/docs</code> to test <code>/api/v1/search_bot/invoke</code> interactively.</li>
+<li><strong>Graphical Sandbox</strong>: Go to <code>http://localhost:8000/chat</code> to test token-by-token streaming and rating collection.</li>
+</ol>
 
 
 
