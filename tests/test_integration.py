@@ -415,6 +415,7 @@ class TestPlatformFactory:
     def test_custom_schemas_route(self):
         import sys
         from types import ModuleType
+
         from pydantic import BaseModel, Field
 
         class MockRequest(BaseModel):
@@ -431,10 +432,11 @@ class TestPlatformFactory:
         sys.modules["tests.test_agent_schemas.schemas"] = schemas_mod
 
         p = AgentPlatform(agents_dir="/tmp/empty")
+
         async def fn(state):
             return {
                 "custom_answer": f"processed: {state.get('current_query')}",
-                "custom_score": 0.95
+                "custom_score": 0.95,
             }
 
         p.register_agent(
@@ -453,7 +455,9 @@ class TestPlatformFactory:
         assert bad_resp.status_code == 422
 
         # Test valid custom schema payload
-        good_resp = c.post("/api/v1/schema_test/invoke", json={"custom_query": "hello", "custom_param": 42})
+        good_resp = c.post(
+            "/api/v1/schema_test/invoke", json={"custom_query": "hello", "custom_param": 42}
+        )
         assert good_resp.status_code == 200
         data = good_resp.json()
         assert data["custom_answer"] == "processed: hello"

@@ -6,7 +6,7 @@ import json
 import time
 import uuid
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -148,17 +148,26 @@ def create_default_router(
     if agent and agent.module_path:
         try:
             import importlib
+
             schemas_mod = importlib.import_module(f"{agent.module_path}.schemas")
 
             # Look for CustomInvokeRequest or {AgentName}Request
             title_camel = agent_name.title().replace("_", "")
-            for name_candidate in ["CustomInvokeRequest", f"{title_camel}Request", "AgentInvokeRequest"]:
+            for name_candidate in [
+                "CustomInvokeRequest",
+                f"{title_camel}Request",
+                "AgentInvokeRequest",
+            ]:
                 if hasattr(schemas_mod, name_candidate):
                     input_model = getattr(schemas_mod, name_candidate)
                     break
 
             # Look for CustomInvokeResponse or {AgentName}Response
-            for name_candidate in ["CustomInvokeResponse", f"{title_camel}Response", "AgentInvokeResponse"]:
+            for name_candidate in [
+                "CustomInvokeResponse",
+                f"{title_camel}Response",
+                "AgentInvokeResponse",
+            ]:
                 if hasattr(schemas_mod, name_candidate):
                     output_model = getattr(schemas_mod, name_candidate)
                     break
