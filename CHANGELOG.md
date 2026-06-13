@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.1.1 (2026-06-13)
+
+### Bug Fixes
+
+- Resolve import block sorting and unused typing imports
+  ([`99c83ba`](https://github.com/UnicoLab/agentomatic/commit/99c83ba9c0170a29584db4dca316999f764a4c13))
+
+- **ci**: Force Node.js 24 runtime and disable PyPI attestations to remove warnings
+  ([`275a233`](https://github.com/UnicoLab/agentomatic/commit/275a2336cbfe8ca6860e95545172d02ff118234e))
+
+### Documentation
+
+- Add detailed input and output schemas guide and improve custom schema extraction
+  ([`4c5e079`](https://github.com/UnicoLab/agentomatic/commit/4c5e0790aeaf68cfcbe6f0f0c52963c9ce3bdffe))
+
+- Expand agent structure, customization overrides, and platform settings references
+  ([`5aa9956`](https://github.com/UnicoLab/agentomatic/commit/5aa9956f25f2a56abf27d364f56f086d4a105616))
+
+- Overhaul documentation with detailed guides, visual diagrams, and logo accents
+  ([`ef3de5a`](https://github.com/UnicoLab/agentomatic/commit/ef3de5adb9056184b4a66e7c7130c673c84088e6))
+
+- **agnostic**: Replace all remaining hr_bot references with project-agnostic placeholders
+  ([`4f868d6`](https://github.com/UnicoLab/agentomatic/commit/4f868d623362d6fa0e1e961cccf52440df4d4aa4))
+
+- **prompts**: Document versioned prompts and PromptManager usage
+  ([`f0fe872`](https://github.com/UnicoLab/agentomatic/commit/f0fe8726d73cafd935afa67724b427f452c6d33c))
+
+
 ## v0.1.0 (2026-06-13)
 
 ### Bug Fixes
