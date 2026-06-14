@@ -1,27 +1,90 @@
 # CHANGELOG
 
 
-## v0.2.0 (2026-06-14)
-
-### Documentation
-
-- Add telemetry and feedback correlation notes for A/B testing
-  ([`2c27a86`](https://github.com/UnicoLab/agentomatic/commit/2c27a86ac83b44a022e5d002d88316953f01ab35))
+## v0.3.0 (2026-06-14)
 
 ### Features
 
-- Implement advanced platform features (HITL, checkpointer, structured output, fork, A/B routing,
-  fallbacks, hooks) and update documentation
-  ([`c1a55c3`](https://github.com/UnicoLab/agentomatic/commit/c1a55c39b1efd24084f1453946df27a830d3d7ec))
+- **memory**: `ConversationMemoryManager` — automatic session memory with message windowing and LLM-powered summarization
+- **memory**: All `/chat`, `/invoke`, and `/invoke/stream` endpoints now auto-load conversation history from the store
+- **memory**: Automatic message persistence — every user/assistant turn is saved to the store after invocation
+- **memory**: Configurable `max_history_messages` and `summarize_after` thresholds on `AgentPlatform` and `create_default_router()`
+- **memory**: `include_history` and `max_history` fields on `AgentChatRequest` for per-request control
+- **memory**: `history_loaded` field in `/chat` response shows how many prior messages were loaded
+- **api**: `context` field on `AgentChatRequest` and `AgentInvokeRequest` — passes arbitrary data to agent as `state["context"]`
+- **api**: `messages` field on `AgentChatRequest` — frontends can supply their own message history (skips auto-loading)
+- **api**: `persist` field on `AgentChatRequest` — disable auto-persistence for preview/dry-run mode
+- **api**: `prompt_version` field on `AgentChatRequest` — explicit prompt version selection
+- **api**: `context` and `steps_taken` now returned in chat response and `AgentInvokeResponse`
+- **state**: `BaseAgentState` now includes `context` and `prompt_version` fields with proper reducers
+- **threads**: `POST /threads` — explicitly create conversation threads
+- **threads**: `DELETE /threads/{id}` — delete a thread and all its messages
+- **threads**: `PATCH /threads/{id}` — update thread title and metadata
+- **threads**: `DELETE /threads/{id}/messages` — clear messages but keep thread
+- **threads**: `GET /threads/{id}/summary` — generate or retrieve conversation summary
+- **threads**: `GET /threads/{id}/messages` now supports `limit` and `offset` pagination params
+- **models**: New `CreateThreadRequest` and `UpdateThreadRequest` Pydantic models
+- **exports**: `ConversationMemoryManager` exported from `agentomatic` and `agentomatic.core`
 
-- Increase core test coverage over 85% and enhance homepage aesthetics
-  ([`98f28f5`](https://github.com/UnicoLab/agentomatic/commit/98f28f56308b7540d642149aa2a7edc20b2eeafb))
+### Documentation
+
+- Updated `platform-features.md` (§9–§10) with full chat request/response schema, message override, and frontend integration guide
+- Updated `schemas.md` with default schema field reference for `AgentInvokeRequest`, `AgentInvokeResponse`, `AgentChatRequest`, and `BaseAgentState`
+- Updated `configuration.md` with memory configuration parameters (`max_history_messages`, `summarize_after`)
+- Updated `README.md` feature table (25+ endpoints, memory, summarization, thread CRUD, message persistence)
+- Updated `CHANGELOG.md` with complete v0.3.0 release notes
+
+### Tests
+
+- Added 29 new tests covering: memory manager unit tests (§15), chat memory integration (§16), thread CRUD (§17), message pagination (§18), conversation summary (§19), invoke memory integration (§20), API modularity & configurability (§21)
+- Total test count: **234 passing**
+
+## v0.2.0 (2026-06-14)
+
+### Features
+
+- **hitl**: Human-in-the-Loop (HITL) protocol with suspend/resume/approve/reject workflow
+- **hitl**: HITL TTL expiry — suspended states auto-expire after 7 days via `cleanup_expired_states()`
+- **threads**: Thread forking & cloning — `fork_thread()` duplicates conversations at any message index
+- **threads**: Thread lineage tracking with first-class `parent_thread_id` and `fork_message_index` columns
+- **threads**: `GET /threads/{id}/lineage` endpoint for ancestry/descendant tree traversal
+- **llm**: LLM failover telemetry — `record_failover()` and `get_failover_count()` for observability
+- **llm**: Failover chain catches all exceptions via `exceptions_to_handle=(Exception,)`
+- **checkpoint**: Safe checkpoint serialization via `_ensure_json_serializable()` (handles datetimes, bytes, custom classes)
+- **hooks**: State-level before/after node interceptor hooks for audit, telemetry, and security
+- **output**: Structured output enforcer with `get_structured_llm()` and fallback wrapper
+- **routing**: A/B test prompt router with weight-based prompt version selection
+- Increase core test coverage over 85% and enhance homepage aesthetics ([`98f28f5`](https://github.com/UnicoLab/agentomatic/commit/98f28f56308b7540d642149aa2a7edc20b2eeafb))
+
+### Bug Fixes
+
+- **storage**: Fix infinite loop risk in `MemoryStore.get_thread_lineage()` — added cycle guard (max 100 iterations)
+- **storage**: Fix `MemoryStore.create_thread()` returning inconsistent dict shape (missing `parent_thread_id`, `fork_message_index`)
+- **storage**: Fix `MemoryStore.delete_thread()` leaving orphaned suspended states
+- **storage**: Fix `MemoryStore.fork_thread()` accepting negative `message_index`
+- **storage**: Fix `SQLAlchemyStore.cleanup_expired_states()` loading all rows into memory — now uses bulk DELETE
+- Add `ForeignKey` to `ThreadModel.parent_thread_id` for referential integrity
+- Add `SQLAlchemyStore` to `storage/__init__.py` `__all__`
+- Export `AgentSuspendedException`, `ForkThreadRequest`, `ApproveSuspendedRequest`, `RejectSuspendedRequest` from `core/__init__.py`
+- Export `get_llm`, `get_failover_count`, `record_failover`, `get_structured_llm` from `providers/__init__.py`
+- Add error handling (try/except) to fork and lineage endpoints
+- Fix import ordering in `checkpointer.py`
+- Fix mypy `no-any-return` in lineage endpoint
+
+### Documentation
+
+- Add detailed platform-features.md sections 8–11 (serialization, TTL, lineage, failover)
+- Update README.md features table with all enterprise capabilities
+- Update README.md endpoints table with HITL, fork, lineage, and pending endpoints
+- Fix `list_feedback` → `get_feedback` typo in storage.md API reference table
+- Add `cleanup_expired_states`, `get_thread_lineage`, `get_stats` to storage.md API reference
+- Add telemetry and feedback correlation notes for A/B testing ([`2c27a86`](https://github.com/UnicoLab/agentomatic/commit/2c27a86ac83b44a022e5d002d88316953f01ab35))
 
 ### Testing
 
-- Enhance unit test coverage for sqlalchemy store, sync checkpointers, and structured fallbacks
-  ([`91ab042`](https://github.com/UnicoLab/agentomatic/commit/91ab04254a623fb4fbd108303265ad8d4b3aeba5))
-
+- Add 10+ new tests covering all production features (serialization, TTL, lineage, failover, edge cases)
+- Total: 198+ tests passing, lint/typecheck clean
+- Enhance unit test coverage for sqlalchemy store, sync checkpointers, and structured fallbacks ([`91ab042`](https://github.com/UnicoLab/agentomatic/commit/91ab04254a623fb4fbd108303265ad8d4b3aeba5))
 
 ## v0.1.1 (2026-06-13)
 

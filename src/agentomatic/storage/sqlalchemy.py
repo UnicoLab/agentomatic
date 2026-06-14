@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from loguru import logger
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -387,6 +387,26 @@ class SQLAlchemyStore(BaseStore):
                 return True
             return False
 
+    async def cleanup_expired_states(self) -> int:
+        """Delete expired suspended states from the database."""
+        async with self._session() as session:
+            now = datetime.now(UTC)
+            # Count expired first, then bulk delete
+            count_stmt = select(func.count(SuspendedStateModel.id)).where(
+                SuspendedStateModel.expires_at.isnot(None),
+                SuspendedStateModel.expires_at < now,
+            )
+            count_result = await session.execute(count_stmt)
+            count = count_result.scalar_one()
+            if count > 0:
+                del_stmt = delete(SuspendedStateModel).where(
+                    SuspendedStateModel.expires_at.isnot(None),
+                    SuspendedStateModel.expires_at < now,
+                )
+                await session.execute(del_stmt)
+                await session.commit()
+            return count
+
     # ------------------------------------------------------------------
     # Forking operations
     # ------------------------------------------------------------------
@@ -420,14 +440,15 @@ class SQLAlchemyStore(BaseStore):
             # 3. Create the new forked thread
             new_title = title or f"Fork of {parent.title or parent_thread_id}"
             parent_meta = parent.metadata_json or {}
-            new_metadata = {**parent_meta, "parent_thread_id": parent_thread_id}
 
             forked_thread = ThreadModel(
                 id=new_thread_id,
                 user_id=parent.user_id,
                 agent_name=parent.agent_name,
                 title=new_title,
-                metadata_json=new_metadata,
+                metadata_json=parent_meta,
+                parent_thread_id=parent_thread_id,
+                fork_message_index=message_index,
             )
             session.add(forked_thread)
 
@@ -448,6 +469,39 @@ class SQLAlchemyStore(BaseStore):
             await session.commit()
             await session.refresh(forked_thread)
             return forked_thread.to_dict()
+
+    async def get_thread_lineage(self, thread_id: str) -> dict[str, Any]:
+        """Get the full lineage tree for a thread."""
+        async with self._session() as session:
+            # Walk up to find ancestors
+            ancestors: list[dict[str, Any]] = []
+            current_id = thread_id
+            for _ in range(100):  # Guard against cycles
+                result = await session.execute(
+                    select(ThreadModel).where(ThreadModel.id == current_id)
+                )
+                current = result.scalar_one_or_none()
+                if not current or not current.parent_thread_id:
+                    break
+                parent_result = await session.execute(
+                    select(ThreadModel).where(ThreadModel.id == current.parent_thread_id)
+                )
+                parent = parent_result.scalar_one_or_none()
+                if parent:
+                    ancestors.insert(0, parent.to_dict())
+                current_id = current.parent_thread_id
+
+            # Find direct descendants
+            desc_result = await session.execute(
+                select(ThreadModel).where(ThreadModel.parent_thread_id == thread_id)
+            )
+            descendants = [t.to_dict() for t in desc_result.scalars().all()]
+
+            return {
+                "thread_id": thread_id,
+                "ancestors": ancestors,
+                "descendants": descendants,
+            }
 
     # ------------------------------------------------------------------
     # Checkpointer operations

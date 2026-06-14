@@ -33,6 +33,7 @@ from agentomatic._version import __version__
 
 # Core public API
 from agentomatic.core.manifest import AgentManifest, RegisteredAgent
+from agentomatic.core.memory_manager import ConversationMemoryManager
 from agentomatic.core.platform import AgentPlatform
 from agentomatic.core.registry import AgentRegistry
 from agentomatic.core.state import BaseAgentState
@@ -48,6 +49,7 @@ __all__ = [
     "RegisteredAgent",
     "AgentRegistry",
     "BaseAgentState",
+    "ConversationMemoryManager",
     # Protocols
     "APIResponse",
     "handle_api_errors",

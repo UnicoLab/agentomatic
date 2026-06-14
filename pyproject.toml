@@ -1,6 +1,6 @@
 [project]
 name = "agentomatic"
-version = "0.2.0"
+version = "0.3.0"
 description = "Drop agents, not code — zero-code multi-agent API platform framework"
 readme = "README.md"
 license = {text = "MIT"}

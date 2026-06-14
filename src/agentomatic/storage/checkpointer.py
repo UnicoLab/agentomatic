@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
@@ -19,6 +20,18 @@ from langgraph.checkpoint.base import (
 from agentomatic.storage.base import BaseStore
 
 
+def _ensure_json_serializable(obj: Any) -> Any:
+    """Round-trip through JSON to guarantee all values are JSON-serializable.
+
+    Non-serializable objects (custom classes, datetimes, bytes, etc.) are
+    converted to their string representation via ``default=str``.
+    """
+    try:
+        return json.loads(json.dumps(obj, default=str))
+    except (TypeError, ValueError):
+        return obj
+
+
 class AgentomaticCheckpointer(BaseCheckpointSaver):
     """Custom LangGraph checkpointer mapping checkpoints to Agentomatic BaseStore interfaces."""
 
@@ -31,7 +44,10 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
-            return loop.run_until_complete(self.aget_tuple(config))
+            try:
+                return loop.run_until_complete(self.aget_tuple(config))
+            finally:
+                loop.close()
 
         if loop.is_running():
             from concurrent.futures import ThreadPoolExecutor
@@ -87,7 +103,12 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
-            return loop.run_until_complete(self.aput(config, checkpoint, metadata, new_versions))
+            try:
+                return loop.run_until_complete(
+                    self.aput(config, checkpoint, metadata, new_versions)
+                )
+            finally:
+                loop.close()
 
         if loop.is_running():
             from concurrent.futures import ThreadPoolExecutor
@@ -124,8 +145,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
             checkpoint_ns=checkpoint_ns,
             checkpoint_id=checkpoint_id_str,
             parent_checkpoint_id=parent_id_str,
-            checkpoint=dict(checkpoint),
-            metadata=dict(metadata),
+            checkpoint=_ensure_json_serializable(dict(checkpoint)),
+            metadata=_ensure_json_serializable(dict(metadata)),
         )
 
         return {
@@ -148,11 +169,14 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
-            return iter(
-                loop.run_until_complete(
-                    self._alist_list(config, filter=filter, before=before, limit=limit)
+            try:
+                return iter(
+                    loop.run_until_complete(
+                        self._alist_list(config, filter=filter, before=before, limit=limit)
+                    )
                 )
-            )
+            finally:
+                loop.close()
 
         if loop.is_running():
             from concurrent.futures import ThreadPoolExecutor
@@ -226,5 +250,5 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
         limit: int | None = None,
     ) -> AsyncIterator[CheckpointTuple]:
         cps = await self._alist_list(config, filter=filter, before=before, limit=limit)
-        for cp in cps:  # type: ignore[attr-defined]
+        for cp in cps:
             yield cp

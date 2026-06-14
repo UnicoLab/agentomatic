@@ -289,7 +289,7 @@ class TestVersion:
     def test_version_exists(self):
         from agentomatic import __version__
 
-        assert __version__ == "0.1.1"
+        assert __version__ == "0.3.0"
 
 
 class TestAgentRegistryDiscovery:

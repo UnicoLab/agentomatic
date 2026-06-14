@@ -43,6 +43,73 @@ Agentomatic searches `schemas.py` for class definitions matching one of these na
 
 ---
 
+## 📋 Default Schema Reference
+
+### `AgentInvokeRequest` (default input)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `query` | `str` | *required* | User query or input |
+| `user_id` | `str` | `"default-user"` | User identifier |
+| `context` | `dict` | `{}` | Additional context — passed to agent as `state["context"]` |
+| `thread_id` | `str \| None` | `None` | Thread ID for conversation continuity |
+| `prompt_version` | `str` | `"v1"` | Prompt version to use |
+| `temperature` | `float \| None` | `None` | Temperature override (0.0–2.0) |
+| `max_tokens` | `int \| None` | `None` | Max tokens override |
+| `metadata` | `dict` | `{}` | Extra metadata |
+
+### `AgentInvokeResponse` (default output)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `response` | `str` | Agent response text |
+| `agent_type` | `str` | Agent slug |
+| `thread_id` | `str \| None` | Thread ID |
+| `suggestions` | `list[str]` | Follow-up suggestions |
+| `citations` | `list[dict]` | Source citations |
+| `steps_taken` | `list[str]` | Processing steps taken |
+| `context` | `Any` | Context data returned by the agent (RAG documents, etc.) |
+| `metadata` | `dict` | Response metadata (includes `prompt_version`) |
+| `duration_ms` | `float` | Processing time in milliseconds |
+
+### `AgentChatRequest` (chat endpoint)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `content` | `str` | *required* | User message |
+| `user_id` | `str` | `"default-user"` | User identifier |
+| `thread_id` | `str \| None` | `None` | Existing thread ID (auto-created if omitted) |
+| `context` | `dict` | `{}` | Arbitrary context dict for agent code to consume |
+| `metadata` | `dict` | `{}` | Extra metadata |
+| `messages` | `list[dict] \| None` | `None` | Override: supply your own message history (skips auto-loading) |
+| `include_history` | `bool` | `true` | Load conversation history from store |
+| `max_history` | `int \| None` | `None` | Max messages to load (overrides agent default) |
+| `persist` | `bool` | `true` | Auto-save messages to the store after invocation |
+| `prompt_version` | `str` | `"v1"` | Prompt version to use |
+
+### `BaseAgentState` (agent state dict)
+
+This is the TypedDict available in your agent's `node_fn(state)`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messages` | `list` | LangChain messages (auto-loaded or user-supplied) |
+| `thread_id` | `str` | Thread ID |
+| `user_id` | `str` | User identifier |
+| `current_query` | `str` | The current user query |
+| `context` | `dict` | Arbitrary context from the frontend/caller |
+| `metadata` | `dict` | Request metadata |
+| `prompt_version` | `str` | Resolved prompt version |
+| `response` | `str` | Agent response (set by your code) |
+| `agent_type` | `str` | Agent slug (set by your code) |
+| `suggestions` | `list[str]` | Follow-up suggestions |
+| `citations` | `list[dict]` | Source citations |
+| `steps_taken` | `list[str]` | Processing steps taken |
+| `routing_decision` | `str` | Routing decision (for orchestrators) |
+| `error` | `str \| None` | Error message if any |
+
+---
+
 ## 🛠️ Defining Custom Schemas
 
 To define custom models, simply import Pydantic's `BaseModel` and declare your fields using type annotations and metadata helpers like `Field`.

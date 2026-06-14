@@ -57,6 +57,10 @@ class BaseAgentState(TypedDict, total=False):
     # Routing (for orchestrators)
     routing_decision: Annotated[str, _last_value]
 
+    # Context — arbitrary data from frontend/caller for agent code to consume
+    context: Annotated[dict[str, Any], _merge_dicts]
+    prompt_version: Annotated[str, _last_value]
+
     # Processing
     steps_taken: Annotated[list[str], operator.add]
     metadata: Annotated[dict[str, Any], _merge_dicts]

@@ -74,6 +74,9 @@ class AgentPlatform:
         enable_telemetry: bool = True,
         # --- Custom middleware ---
         middleware: list[tuple[type, dict[str, Any]]] | None = None,
+        # --- Memory ---
+        max_history_messages: int = 50,
+        summarize_after: int = 30,
     ) -> None:
         """Initialise the platform.
 
@@ -123,6 +126,10 @@ class AgentPlatform:
         self._enable_feedback = enable_feedback
         self._enable_telemetry = enable_telemetry
         self._custom_middleware = middleware or []
+
+        # Memory config
+        self._max_history_messages = max_history_messages
+        self._summarize_after = summarize_after
 
         # Internal
         self._registry = AgentRegistry()
@@ -284,6 +291,8 @@ class AgentPlatform:
                         agent_name=name,
                         registry=platform._registry,
                         thread_store=platform._store,
+                        max_history_messages=platform._max_history_messages,
+                        summarize_after=platform._summarize_after,
                     )
                     logger.debug(f"  📌 Auto-generated router for {name}")
                 if agent.router and agent.manifest.is_subagent:
@@ -399,6 +408,8 @@ class AgentPlatform:
                     agent_name=name,
                     registry=self._registry,
                     thread_store=self._store,
+                    max_history_messages=self._max_history_messages,
+                    summarize_after=self._summarize_after,
                 )
             if agent.router and agent.manifest.is_subagent:
                 app.include_router(
@@ -486,12 +497,12 @@ class AgentPlatform:
 
         # Storage stats
         if self._store:
+            store = self._store  # local var for mypy narrowing across closures
 
             @app.get(f"{self.api_prefix}/storage/stats")
             async def storage_stats() -> dict[str, Any]:
                 """Storage backend statistics."""
-                assert self._store is not None
-                return await self._store.get_stats()
+                return await store.get_stats()
 
             # Feedback endpoint
             @app.post(f"{self.api_prefix}/feedback")
@@ -503,8 +514,7 @@ class AgentPlatform:
                 comment: str | None = None,
             ) -> dict[str, Any]:
                 """Submit feedback."""
-                assert self._store is not None
-                return await self._store.add_feedback(
+                return await store.add_feedback(
                     thread_id,
                     user_id,
                     agent_name,
@@ -518,8 +528,7 @@ class AgentPlatform:
                 limit: int = 50,
             ) -> dict[str, Any]:
                 """List collected feedback."""
-                assert self._store is not None
-                items = await self._store.get_feedback(
+                items = await store.get_feedback(
                     agent_name=agent_name,
                     limit=limit,
                 )

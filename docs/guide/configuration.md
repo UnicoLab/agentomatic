@@ -37,6 +37,8 @@ platform = AgentPlatform.from_folder(
     enable_metrics=True,
     enable_feedback=True,
     enable_telemetry=True,
+    max_history_messages=50,
+    summarize_after=30,
 )
 ```
 
@@ -62,9 +64,17 @@ platform = AgentPlatform.from_folder(
 
 ### 4. Storage Backend
 
-- **`store`** (type: `BaseStore | None`, default: `None`): Instance of a storage adapter (e.g. `MemoryStore` or `SQLAlchemyStore`) used to save message threads and rating logs.
+- **`store`** (type: `BaseStore | None`, default: `None`): Instance of a storage adapter (e.g. `MemoryStore` or `SQLAlchemyStore`) used to save message threads, conversation history, and rating logs.
 
-### 5. Security & Rate Limiting
+### 5. Memory & Conversation
+
+- **`max_history_messages`** (type: `int`, default: `50`): Maximum number of messages to load from the thread store into the agent's context window. When the conversation exceeds this limit, older messages are windowed out or summarised.
+- **`summarize_after`** (type: `int`, default: `30`): When the message count in a thread exceeds this threshold, older messages are automatically summarised using the configured LLM and prepended as a `[Conversation Summary]` system message.
+
+> [!TIP]
+> These values can also be overridden per-request using the `max_history` field on `AgentChatRequest`, giving frontends full control over how much context each invocation receives.
+
+### 6. Security & Rate Limiting
 
 - **`enable_auth`** (type: `bool`, default: `False`): If `True`, mounts Key Authentication middleware on all agent routes.
 - **`auth_api_key`** (type: `str`, default: `""`): The secret API key token required by clients when `enable_auth` is enabled.

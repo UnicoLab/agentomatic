@@ -337,3 +337,353 @@ def audit_output_hook(agent_name: str, result: dict):
 
 platform.register_after_node_hook(audit_output_hook)
 ```
+
+---
+
+## 🛡️ 8. Safe Checkpoint Serialization
+
+LangGraph checkpoints can contain non-JSON-serializable Python objects (datetimes, bytes, custom classes). The `AgentomaticCheckpointer` automatically handles this via a safe JSON round-trip:
+
+```python
+from agentomatic.storage.checkpointer import AgentomaticCheckpointer, _ensure_json_serializable
+
+# Objects like datetimes, bytes, and custom classes are safely converted
+data = _ensure_json_serializable({"ts": datetime.now(), "raw": b"bytes"})
+# → {"ts": "2026-06-14 12:00:00", "raw": "b'bytes'"}
+```
+
+This happens transparently inside `aput()` — no user configuration needed. All values are round-tripped through `json.dumps(obj, default=str)` → `json.loads()`.
+
+---
+
+## ⏰ 9. HITL TTL Expiry & Cleanup
+
+Suspended states automatically receive a 7-day TTL (`expires_at`). This prevents stale suspended states from accumulating in the database when humans forget to approve or reject them.
+
+### Automatic TTL
+
+When `save_suspended_state()` is called, the `expires_at` field defaults to `now + 7 days`:
+
+```python
+state = await store.save_suspended_state(
+    approval_id="app_xyz",
+    thread_id="thread_1",
+    agent_name="my_agent",
+    node_name="approval_node",
+    state_json={"action": "delete_account"},
+)
+print(state["expires_at"])  # 7 days from now
+```
+
+### Cleanup
+
+Call `cleanup_expired_states()` on a schedule (e.g. cron, background task) to purge expired states:
+
+```python
+# Clean up expired suspended states
+count = await store.cleanup_expired_states()
+print(f"Cleaned up {count} expired states")
+```
+
+This works identically on `MemoryStore` and `SQLAlchemyStore`.
+
+---
+
+## 🌳 10. Thread Lineage Tracking
+
+Forked threads now have **first-class lineage fields** instead of metadata-based tracking:
+
+| Field | Type | Description |
+|---|---|---|
+| `parent_thread_id` | `str \| None` | ID of the parent thread (null for root threads) |
+| `fork_message_index` | `int \| None` | Message index where the fork occurred |
+
+### Querying Lineage
+
+Use `get_thread_lineage()` to traverse the full ancestor/descendant tree:
+
+```python
+# Fork a thread
+forked = await store.fork_thread("root_thread", 2, "child_thread")
+print(forked["parent_thread_id"])  # "root_thread"
+
+# Get full lineage
+lineage = await store.get_thread_lineage("child_thread")
+print(lineage["ancestors"])    # [root_thread_dict]
+print(lineage["descendants"])  # []
+```
+
+### REST Endpoint
+
+```http
+GET /api/v1/{agent}/threads/{thread_id}/lineage
+```
+
+**Response:**
+```json
+{
+  "thread_id": "child_thread",
+  "ancestors": [{"id": "root_thread", ...}],
+  "descendants": [{"id": "grandchild_thread", ...}]
+}
+```
+
+---
+
+## 📊 11. LLM Failover Telemetry
+
+Track failover events for observability and alerting:
+
+```python
+from agentomatic.providers.llm import record_failover, get_failover_count, reset_llm
+
+# Record a failover event
+record_failover("openai", "azure", "RateLimitError")
+# Emits: 🔄 LLM failover #1: openai -> azure | Error: RateLimitError
+
+# Check current count
+print(get_failover_count())  # 1
+
+# Reset (typically in tests)
+reset_llm()  # Also resets failover counter
+```
+
+The failover chain now also passes `exceptions_to_handle=(Exception,)` to `with_fallbacks()`, ensuring **any** exception triggers the fallback chain, not just specific ones.
+
+---
+
+## 🧠 12. Conversation Memory & Session Management
+
+Agentomatic provides **automatic conversation memory** for all deployed agents. When a thread store is configured, every `/chat` and `/invoke` call automatically:
+
+1. **Loads prior conversation history** into the agent's `messages` state
+2. **Invokes the agent** with full conversational context
+3. **Persists** both user and assistant messages to the store
+4. **Summarises** older messages when the conversation grows long
+
+```
+          Frontend                    Agentomatic                    Store
+             │                            │                           │
+             │  POST /chat                │                           │
+             │  {content, thread_id}      │                           │
+             │───────────────────────────>│                           │
+             │                            │  get_messages(thread_id)  │
+             │                            │──────────────────────────>│
+             │                            │  [msg1, msg2, ...]        │
+             │                            │<──────────────────────────│
+             │                            │                           │
+             │                            │  ── Windowing ──          │
+             │                            │  ── Summarization ──      │
+             │                            │                           │
+             │                            │  ainvoke(state)           │
+             │                            │  (state.messages =        │
+             │                            │   history + current)      │
+             │                            │                           │
+             │                            │  add_message(user)        │
+             │                            │──────────────────────────>│
+             │                            │  add_message(assistant)   │
+             │                            │──────────────────────────>│
+             │                            │                           │
+             │  {response, thread_id,     │                           │
+             │   history_loaded: 12}      │                           │
+             │<───────────────────────────│                           │
+```
+
+### Configuration
+
+Memory is automatically enabled when a `store` is provided to `AgentPlatform`:
+
+```python
+from agentomatic import AgentPlatform
+from agentomatic.storage import MemoryStore
+
+platform = AgentPlatform.from_folder(
+    "agents/",
+    store=MemoryStore(),  # enables memory + thread management
+    max_history_messages=50,  # max messages in context window
+    summarize_after=30,       # summarize when exceeding this count
+)
+```
+
+### Chat Request with Memory
+
+```python
+# Frontend sends a message with thread_id
+POST /api/v1/my_agent/chat
+{
+    "content": "What's our PTO policy?",
+    "thread_id": "thread_abc123",   # reuse for multi-turn
+    "user_id": "user_42",
+    "context": {                    # arbitrary data for agent code
+        "user_role": "manager",
+        "department": "engineering"
+    },
+    "include_history": true,        # default: true
+    "max_history": 20,              # optional override
+    "persist": true,                # default: true — auto-save messages
+    "prompt_version": "v1"          # optional explicit prompt version
+}
+```
+
+#### Override: Supply Your Own Messages
+
+If the frontend manages its own conversation state, it can pass `messages` directly — this **skips** automatic history loading from the store:
+
+```python
+POST /api/v1/my_agent/chat
+{
+    "content": "Follow-up question",
+    "messages": [
+        {"role": "user", "content": "Previous question"},
+        {"role": "assistant", "content": "Previous answer"}
+    ],
+    "persist": false    # optional: don't save to store
+}
+```
+
+#### Response
+
+The response includes all agent output fields plus conversation metadata:
+
+```json
+{
+    "response": "Based on our company handbook...",
+    "thread_id": "thread_abc123",
+    "agent_type": "hr-agent",
+    "suggestions": ["Ask about sick days", "View calendar"],
+    "citations": [...],
+    "steps_taken": ["search_policy_db", "generate_response"],
+    "context": {"retrieved_documents": [...]},
+    "duration_ms": 234.5,
+    "metadata": {"prompt_version": "v1", "source": "mobile_app"},
+    "history_loaded": 12
+}
+```
+
+| Response Field | Description |
+|----------------|-------------|
+| `response` | Agent's text response |
+| `thread_id` | Thread ID (auto-created if not provided) |
+| `agent_type` | Agent slug identifier |
+| `suggestions` | Follow-up suggestions from agent |
+| `citations` | Source citations from agent |
+| `steps_taken` | Processing steps the agent took |
+| `context` | Context data returned by agent (RAG docs, search results, etc.) |
+| `metadata` | Merged metadata (request + agent + prompt_version) |
+| `history_loaded` | Number of prior messages loaded into context |
+| `duration_ms` | Processing time in milliseconds |
+
+### Windowing & Summarization
+
+When conversations grow long, agentomatic automatically:
+
+1. **Windows** — keeps only the latest `max_messages` in context
+2. **Summarises** — compresses older messages into a summary via the LLM
+3. **Prepends** — adds `[Conversation Summary]` as a system message
+
+```python
+# Example: After 50 messages, the agent receives:
+state["messages"] = [
+    SystemMessage("[Conversation Summary]\nUser discussed PTO policy..."),
+    HumanMessage("Question 48"),
+    AIMessage("Answer 48"),
+    HumanMessage("Question 49"),
+    AIMessage("Answer 49"),
+    HumanMessage("Current question"),  # ← latest
+]
+```
+
+If no LLM is available, a fallback summary is used (simple truncated concatenation).
+
+### Using `ConversationMemoryManager` Directly
+
+For advanced use cases, you can use the manager directly:
+
+```python
+from agentomatic.core.memory_manager import ConversationMemoryManager
+from agentomatic.storage import MemoryStore
+
+store = MemoryStore()
+mgr = ConversationMemoryManager(
+    store,
+    max_messages=50,
+    summarize_after=30,
+    summary_token_target=200,
+)
+
+# Load history
+thread_id = await mgr.get_or_create_thread("thread_123", "user_1", "my-agent")
+messages = await mgr.load_history(thread_id, "What's the weather?")
+
+# Save a turn
+await mgr.save_turn(thread_id, "What's the weather?", "It's sunny!", agent_name="weather-bot")
+
+# Get full conversation summary
+summary = await mgr.get_conversation_summary(thread_id)
+```
+
+---
+
+## 📋 13. Thread Management API
+
+Agentomatic provides a full CRUD API for conversation threads.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/threads` | Create a thread explicitly |
+| `GET` | `/threads` | List threads (filterable by `user_id`) |
+| `GET` | `/threads/{id}` | Get a specific thread |
+| `PATCH` | `/threads/{id}` | Update thread title/metadata |
+| `DELETE` | `/threads/{id}` | Delete thread and all messages |
+| `GET` | `/threads/{id}/messages` | Get messages with pagination |
+| `DELETE` | `/threads/{id}/messages` | Clear messages (keep thread) |
+| `GET` | `/threads/{id}/summary` | Generate conversation summary |
+| `POST` | `/threads/{id}/fork` | Fork thread at a message index |
+| `GET` | `/threads/{id}/lineage` | Get thread ancestry tree |
+
+### Examples
+
+```python
+# Create a thread
+POST /api/v1/my_agent/threads
+{"user_id": "user_42", "title": "Onboarding questions"}
+
+# Get paginated messages
+GET /api/v1/my_agent/threads/thread_abc/messages?limit=20&offset=0
+
+# Clear conversation history
+DELETE /api/v1/my_agent/threads/thread_abc/messages
+
+# Update thread title
+PATCH /api/v1/my_agent/threads/thread_abc
+{"title": "Updated title"}
+
+# Get conversation summary
+GET /api/v1/my_agent/threads/thread_abc/summary
+# → {"thread_id": "thread_abc", "summary": "User asked about..."}
+```
+
+### Frontend Integration Guide
+
+For frontend applications (React, Vue, mobile), here's the recommended flow:
+
+```
+1. Start Session
+   POST /threads → get thread_id
+
+2. Send Messages
+   POST /chat {content, thread_id} → get response
+
+3. Load History (on page reload)
+   GET /threads/{id}/messages?limit=50 → display messages
+
+4. Clear Conversation
+   DELETE /threads/{id}/messages → reset
+
+5. List User's Conversations
+   GET /threads?user_id=xxx → sidebar list
+```
+
+All thread data is persisted in the configured store (MemoryStore for dev, SQLAlchemyStore for production).

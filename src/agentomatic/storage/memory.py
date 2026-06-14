@@ -42,6 +42,8 @@ class MemoryStore(BaseStore):
             "created_at": now,
             "updated_at": now,
             "message_count": 0,
+            "parent_thread_id": None,
+            "fork_message_index": None,
         }
         self._threads[thread_id] = thread
         self._messages[thread_id] = []
@@ -69,6 +71,12 @@ class MemoryStore(BaseStore):
         if thread_id in self._threads:
             del self._threads[thread_id]
             self._messages.pop(thread_id, None)
+            # Clean up orphaned suspended states
+            orphan_ids = [
+                sid for sid, s in self._suspended_states.items() if s.get("thread_id") == thread_id
+            ]
+            for sid in orphan_ids:
+                del self._suspended_states[sid]
             return True
         return False
 
@@ -92,6 +100,8 @@ class MemoryStore(BaseStore):
         *,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        if thread_id not in self._threads:
+            raise ValueError(f"Thread '{thread_id}' does not exist")
         msg = {
             "id": len(self._messages.get(thread_id, [])) + 1,
             "thread_id": thread_id,
@@ -103,9 +113,8 @@ class MemoryStore(BaseStore):
         if thread_id not in self._messages:
             self._messages[thread_id] = []
         self._messages[thread_id].append(msg)
-        if thread_id in self._threads:
-            self._threads[thread_id]["message_count"] += 1
-            self._threads[thread_id]["updated_at"] = datetime.now(UTC).isoformat()
+        self._threads[thread_id]["message_count"] += 1
+        self._threads[thread_id]["updated_at"] = datetime.now(UTC).isoformat()
         return msg
 
     async def get_messages(
@@ -180,19 +189,31 @@ class MemoryStore(BaseStore):
         node_name: str,
         state_json: dict[str, Any],
     ) -> dict[str, Any]:
+        from datetime import timedelta
+
+        now = datetime.now(UTC)
         suspended = {
             "id": approval_id,
             "thread_id": thread_id,
             "agent_name": agent_name,
             "node_name": node_name,
             "state_snapshot": state_json,
-            "created_at": datetime.now(UTC).isoformat(),
+            "created_at": now.isoformat(),
+            "expires_at": (now + timedelta(days=7)).isoformat(),
         }
         self._suspended_states[approval_id] = suspended
         return suspended
 
     async def get_suspended_state(self, approval_id: str) -> dict[str, Any] | None:
-        return self._suspended_states.get(approval_id)
+        """Retrieve suspended state, returning None if expired."""
+        state = self._suspended_states.get(approval_id)
+        if state and state.get("expires_at"):
+            now = datetime.now(UTC).isoformat()
+            if state["expires_at"] < now:
+                # Auto-cleanup expired state
+                del self._suspended_states[approval_id]
+                return None
+        return state
 
     async def list_suspended_states(
         self,
@@ -213,6 +234,23 @@ class MemoryStore(BaseStore):
             return True
         return False
 
+    async def cleanup_expired_states(self) -> int:
+        """Delete expired suspended states from memory."""
+        now = datetime.now(UTC)
+        expired_ids = []
+        for sid, state in self._suspended_states.items():
+            expires_at = state.get("expires_at")
+            if expires_at:
+                try:
+                    exp_dt = datetime.fromisoformat(expires_at)
+                    if exp_dt < now:
+                        expired_ids.append(sid)
+                except (ValueError, TypeError):
+                    pass
+        for sid in expired_ids:
+            del self._suspended_states[sid]
+        return len(expired_ids)
+
     # ------------------------------------------------------------------
     # Forking operations
     # ------------------------------------------------------------------
@@ -228,6 +266,8 @@ class MemoryStore(BaseStore):
         parent_thread = self._threads.get(parent_thread_id)
         if not parent_thread:
             return None
+        if message_index < 0:
+            return None
 
         now = datetime.now(UTC).isoformat()
         forked_thread = {
@@ -237,11 +277,12 @@ class MemoryStore(BaseStore):
             "title": title or f"Fork of {parent_thread.get('title') or parent_thread_id}",
             "metadata": {
                 **parent_thread.get("metadata", {}),
-                "parent_thread_id": parent_thread_id,
             },
             "created_at": now,
             "updated_at": now,
             "message_count": 0,
+            "parent_thread_id": parent_thread_id,
+            "fork_message_index": message_index,
         }
         self._threads[new_thread_id] = forked_thread
 
@@ -259,6 +300,32 @@ class MemoryStore(BaseStore):
         self._messages[new_thread_id] = forked_messages
         forked_thread["message_count"] = len(forked_messages)
         return forked_thread
+
+    async def get_thread_lineage(self, thread_id: str) -> dict[str, Any]:
+        """Get the full lineage tree for a thread."""
+        # Walk up to find ancestors
+        ancestors: list[dict[str, Any]] = []
+        current_id = thread_id
+        for _ in range(100):  # Guard against cycles
+            current = self._threads.get(current_id)
+            if not current:
+                break
+            parent_id = current.get("parent_thread_id")
+            if not parent_id:
+                break
+            parent = self._threads.get(parent_id)
+            if parent:
+                ancestors.insert(0, parent)
+            current_id = parent_id
+
+        # Find direct descendants
+        descendants = [t for t in self._threads.values() if t.get("parent_thread_id") == thread_id]
+
+        return {
+            "thread_id": thread_id,
+            "ancestors": ancestors,
+            "descendants": descendants,
+        }
 
     # ------------------------------------------------------------------
     # Checkpointer operations

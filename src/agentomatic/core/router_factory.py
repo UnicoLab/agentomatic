@@ -40,17 +40,66 @@ class AgentInvokeResponse(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
     citations: list[dict[str, Any]] = Field(default_factory=list)
     steps_taken: list[str] = Field(default_factory=list)
+    context: Any = Field(
+        default_factory=dict,
+        description="Context data returned by the agent (retrieved documents, search results, etc.)",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
     duration_ms: float = Field(0.0, description="Processing time in ms")
 
 
 class AgentChatRequest(BaseModel):
-    """Session-aware chat request."""
+    """Session-aware chat request.
+
+    All fields are optional except ``content``. Frontends can:
+    - Supply their own ``messages`` to override automatic history loading
+    - Pass ``context`` dict that the agent code can consume
+    - Disable auto-persistence with ``persist=False``
+    - Control history loading with ``include_history`` and ``max_history``
+    """
 
     content: str = Field(..., description="User message")
     user_id: str = Field("default-user", description="User identifier")
     thread_id: str | None = Field(None, description="Existing thread ID")
+    context: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arbitrary context dict passed into state for agent code to consume",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
+    messages: list[dict[str, Any]] | None = Field(
+        None,
+        description=(
+            "Override: supply your own message history. "
+            "Each dict should have 'role' and 'content'. "
+            "When set, automatic history loading is skipped."
+        ),
+    )
+    include_history: bool = Field(
+        True, description="Load conversation history from store (ignored if messages is set)"
+    )
+    max_history: int | None = Field(
+        None, description="Max messages to load (overrides agent default)"
+    )
+    persist: bool = Field(
+        True, description="Auto-save user/assistant messages to the store after invocation"
+    )
+    prompt_version: str = Field("v1", description="Prompt version to use")
+
+
+class CreateThreadRequest(BaseModel):
+    """Request to explicitly create a thread."""
+
+    thread_id: str | None = Field(None, description="Custom thread ID (auto-generated if omitted)")
+    user_id: str = Field("default-user", description="User identifier")
+    title: str | None = Field(None, description="Thread title")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class UpdateThreadRequest(BaseModel):
+    """Request to update thread fields."""
+
+    title: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class A2ATaskRequest(BaseModel):
@@ -151,6 +200,9 @@ def create_default_router(
     thread_store: Any | None = None,
     state_factory: Callable[[Any], dict[str, Any]] | None = None,
     response_extractor: Callable[[dict[str, Any], str, float], Any] | None = None,
+    api_prefix: str = "/api/v1",
+    max_history_messages: int = 50,
+    summarize_after: int = 30,
 ) -> APIRouter:
     """Create a full set of auto-generated endpoints for an agent.
 
@@ -218,8 +270,19 @@ def create_default_router(
 
     router = APIRouter()
 
-    def _get_agent():
-        """Retrieve the agent from the registry or raise 404."""
+    # ── Memory Manager ────────────────────────────────────────────
+    memory_mgr = None
+    if thread_store:
+        from agentomatic.core.memory_manager import ConversationMemoryManager
+
+        memory_mgr = ConversationMemoryManager(
+            store=thread_store,
+            max_messages=max_history_messages,
+            summarize_after=summarize_after,
+        )
+
+    def _get_agent() -> Any:
+        """Resolve the agent from the registry or raise 404."""
         agent = registry.get(agent_name)
         if not agent:
             raise HTTPException(404, f"Agent '{agent_name}' not found")
@@ -302,8 +365,9 @@ def create_default_router(
             "current_query": query,
             "user_id": user_id,
             "thread_id": thread_id,
-            "messages": [],
-            "metadata": {**context, **metadata, **extra_metadata},
+            "messages": [],  # populated later by memory manager if available
+            "context": context,  # preserved as a separate state key for agent code
+            "metadata": {**metadata, **extra_metadata},
             "steps_taken": [],
             "response": "",
             "suggestions": [],
@@ -336,6 +400,7 @@ def create_default_router(
             suggestions=result.get("suggestions", []),
             citations=result.get("citations", []),
             steps_taken=result.get("steps_taken", []),
+            context=result.get("context", result.get("retrieved_documents", {})),
             metadata=res_metadata,
             duration_ms=duration_ms,
         )
@@ -344,6 +409,21 @@ def create_default_router(
         """Invoke agent synchronously."""
         agent = _get_agent()
         state = _build_initial_state(request)
+        thread_id = state.get("thread_id", "")
+        query = state.get("current_query", "")
+
+        # ── Load conversation history ────────────────────────────
+        if memory_mgr and thread_id:
+            try:
+                thread_id = await memory_mgr.get_or_create_thread(
+                    thread_id, state.get("user_id", "default-user"), agent_name
+                )
+                state["thread_id"] = thread_id
+                messages = await memory_mgr.load_history(thread_id, query)
+                state["messages"] = messages
+            except Exception as exc:
+                logger.warning(f"History loading failed: {exc}")
+
         t0 = time.perf_counter()
 
         # Run before_node hooks
@@ -371,6 +451,17 @@ def create_default_router(
                 except Exception as hook_exc:
                     logger.warning(f"Error executing after_node hook: {hook_exc}")
 
+            # ── Persist the turn ──────────────────────────────────
+            response_text = result.get("response", str(result))
+            if memory_mgr and thread_id and query:
+                await memory_mgr.save_turn(
+                    thread_id,
+                    query,
+                    response_text,
+                    agent_name=agent.slug,
+                    assistant_metadata={"prompt_version": state.get("prompt_version")},
+                )
+
             return _extract_response(
                 result, agent.slug, duration_ms, prompt_version=state.get("prompt_version")
             )
@@ -378,7 +469,7 @@ def create_default_router(
             if thread_store:
                 await thread_store.save_suspended_state(
                     approval_id=exc.approval_id,
-                    thread_id=state.get("thread_id") or "default_thread",
+                    thread_id=thread_id or "default_thread",
                     agent_name=agent_name,
                     node_name=exc.node_name,
                     state_json=exc.state_snapshot,
@@ -402,6 +493,20 @@ def create_default_router(
         """Invoke agent with SSE streaming."""
         agent = _get_agent()
         state = _build_initial_state(request)
+        thread_id = state.get("thread_id", "")
+        query = state.get("current_query", "")
+
+        # ── Load conversation history ────────────────────────────
+        if memory_mgr and thread_id:
+            try:
+                thread_id = await memory_mgr.get_or_create_thread(
+                    thread_id, state.get("user_id", "default-user"), agent_name
+                )
+                state["thread_id"] = thread_id
+                messages = await memory_mgr.load_history(thread_id, query)
+                state["messages"] = messages
+            except Exception as exc:
+                logger.warning(f"History loading failed for stream: {exc}")
 
         # Run before_node hooks
         for hook in registry.before_node_hooks:
@@ -412,20 +517,35 @@ def create_default_router(
 
         async def event_stream():
             """Yield SSE frames from graph or node execution."""
+            collected_response = ""
             try:
                 if agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
                         yield f"data: {json.dumps(event, default=str)}\n\n"
+                        # Collect response for persistence
+                        if isinstance(event, dict) and "response" in event:
+                            collected_response = event["response"]
                 elif agent.node_fn:
                     result = await agent.node_fn(state)
                     yield f"data: {json.dumps(result, default=str)}\n\n"
+                    if isinstance(result, dict):
+                        collected_response = result.get("response", "")
                 yield "data: [DONE]\n\n"
+
+                # Persist the turn after streaming completes
+                if memory_mgr and thread_id and query and collected_response:
+                    await memory_mgr.save_turn(
+                        thread_id,
+                        query,
+                        collected_response,
+                        agent_name=agent.slug,
+                    )
             except AgentSuspendedException as exc:
                 if thread_store:
                     await thread_store.save_suspended_state(
                         approval_id=exc.approval_id,
-                        thread_id=state.get("thread_id") or "default_thread",
+                        thread_id=thread_id or "default_thread",
                         agent_name=agent_name,
                         node_name=exc.node_name,
                         state_json=exc.state_snapshot,
@@ -461,7 +581,17 @@ def create_default_router(
     # ── POST /chat ────────────────────────────────────────────────
     @router.post("/chat")
     async def chat(request: AgentChatRequest) -> dict[str, Any]:
-        """Session-aware chat with auto-thread management."""
+        """Session-aware chat with auto-thread management and conversation memory.
+
+        When a ``thread_id`` is provided and a thread store is configured,
+        this endpoint automatically:
+        1. Loads prior conversation history into the agent's message context
+        2. Invokes the agent with full conversational awareness
+        3. Persists both user and assistant messages to the store
+
+        If the conversation exceeds the configured threshold, older messages
+        are automatically summarised and compressed.
+        """
         agent = _get_agent()
         thread_id = request.thread_id or f"thread_{uuid.uuid4().hex[:12]}"
 
@@ -470,6 +600,7 @@ def create_default_router(
             "user_id": request.user_id,
             "thread_id": thread_id,
             "messages": [],
+            "context": request.context,
             "metadata": request.metadata,
             "steps_taken": [],
         }
@@ -486,6 +617,45 @@ def create_default_router(
             state["prompt_version"] = random.choices(versions, weights=weights, k=1)[0]
         else:
             state["prompt_version"] = "v1"
+
+        # ── Load conversation history ────────────────────────────
+        history_loaded = 0
+        if request.messages is not None:
+            # User supplied their own messages — use them directly
+            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+            lc_messages: list[Any] = []
+            for msg in request.messages:
+                role = msg.get("role", "user")
+                content_val = msg.get("content", "")
+                if role == "assistant":
+                    lc_messages.append(AIMessage(content=content_val))
+                elif role == "system":
+                    lc_messages.append(SystemMessage(content=content_val))
+                else:
+                    lc_messages.append(HumanMessage(content=content_val))
+            lc_messages.append(HumanMessage(content=request.content))
+            state["messages"] = lc_messages
+            history_loaded = len(request.messages)
+        elif memory_mgr and request.include_history:
+            try:
+                thread_id = await memory_mgr.get_or_create_thread(
+                    thread_id,
+                    request.user_id,
+                    agent_name,
+                    title=request.content[:60],
+                )
+                state["thread_id"] = thread_id
+                max_hist = request.max_history or max_history_messages
+                messages = await memory_mgr.load_history(
+                    thread_id,
+                    request.content,
+                    max_messages=max_hist,
+                )
+                state["messages"] = messages
+                history_loaded = max(0, len(messages) - 1)
+            except Exception as exc:
+                logger.warning(f"History loading failed for chat: {exc}")
 
         # Run before_node hooks
         for hook in registry.before_node_hooks:
@@ -515,14 +685,31 @@ def create_default_router(
             res_meta = result.get("metadata") or {}
             res_meta["prompt_version"] = state["prompt_version"]
 
+            # ── Persist the turn ──────────────────────────────────
+            response_text = result.get("response", str(result))
+            if memory_mgr and thread_id and request.persist:
+                await memory_mgr.save_turn(
+                    thread_id,
+                    request.content,
+                    response_text,
+                    agent_name=agent.slug,
+                    assistant_metadata={
+                        "prompt_version": state.get("prompt_version"),
+                        "agent_type": result.get("agent_type", agent.slug),
+                    },
+                )
+
             return {
-                "response": result.get("response", str(result)),
+                "response": response_text,
                 "thread_id": thread_id,
                 "agent_type": result.get("agent_type", agent.slug),
                 "suggestions": result.get("suggestions", []),
                 "citations": result.get("citations", []),
+                "steps_taken": result.get("steps_taken", []),
+                "context": result.get("context", result.get("retrieved_documents", [])),
                 "duration_ms": round(duration_ms, 2),
                 "metadata": res_meta,
+                "history_loaded": history_loaded,
             }
         except AgentSuspendedException as exc:
             if thread_store:
@@ -601,10 +788,10 @@ def create_default_router(
                 "a2a": True,
             },
             "endpoints": {
-                "invoke": f"/api/v1/{agent_name}/invoke",
-                "chat": f"/api/v1/{agent_name}/chat",
-                "stream": f"/api/v1/{agent_name}/invoke/stream",
-                "health": f"/api/v1/{agent_name}/health",
+                "invoke": f"{api_prefix}/{agent_name}/invoke",
+                "chat": f"{api_prefix}/{agent_name}/chat",
+                "stream": f"{api_prefix}/{agent_name}/invoke/stream",
+                "health": f"{api_prefix}/{agent_name}/health",
             },
             "metadata": m.metadata,
         }
@@ -651,6 +838,22 @@ def create_default_router(
             "message": "Task tracking requires storage backend",
         }
 
+    # ── POST /threads ─────────────────────────────────────────────
+    @router.post("/threads")
+    async def create_thread_endpoint(request: CreateThreadRequest) -> dict[str, Any]:
+        """Create a new conversation thread explicitly."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        tid = request.thread_id or f"thread_{uuid.uuid4().hex[:12]}"
+        thread = await thread_store.create_thread(
+            thread_id=tid,
+            user_id=request.user_id,
+            agent_name=agent_name,
+            title=request.title,
+            metadata=request.metadata,
+        )
+        return thread  # type: ignore[no-any-return]
+
     # ── GET /threads ──────────────────────────────────────────────
     @router.get("/threads")
     async def list_threads(user_id: str | None = None) -> dict[str, Any]:
@@ -674,22 +877,94 @@ def create_default_router(
             raise HTTPException(404, f"Thread '{thread_id}' not found")
         return {"thread_id": thread_id, "message": "Thread storage not configured"}
 
+    # ── PATCH /threads/{thread_id} ────────────────────────────────
+    @router.patch("/threads/{thread_id}")
+    async def update_thread_endpoint(
+        thread_id: str, request: UpdateThreadRequest
+    ) -> dict[str, Any]:
+        """Update thread title or metadata."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        updates: dict[str, Any] = {}
+        if request.title is not None:
+            updates["title"] = request.title
+        if request.metadata is not None:
+            updates["metadata"] = request.metadata
+        if not updates:
+            raise HTTPException(400, "No fields to update")
+        result = await thread_store.update_thread(thread_id, **updates)
+        if result is None:
+            raise HTTPException(404, f"Thread '{thread_id}' not found")
+        return dict(result)
+
+    # ── DELETE /threads/{thread_id} ───────────────────────────────
+    @router.delete("/threads/{thread_id}")
+    async def delete_thread_endpoint(thread_id: str) -> dict[str, Any]:
+        """Delete a thread and all its messages."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        deleted = await thread_store.delete_thread(thread_id)
+        if not deleted:
+            raise HTTPException(404, f"Thread '{thread_id}' not found")
+        return {"status": "deleted", "thread_id": thread_id}
+
     # ── GET /threads/{thread_id}/messages ─────────────────────────
     @router.get("/threads/{thread_id}/messages")
-    async def get_messages(thread_id: str) -> dict[str, Any]:
-        """Get messages in a thread."""
+    async def get_messages(
+        thread_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Get messages in a thread with pagination."""
         if thread_store:
-            messages = await thread_store.get_messages(thread_id)
+            messages = await thread_store.get_messages(
+                thread_id,
+                limit=limit,
+                offset=offset,
+            )
             return {
                 "thread_id": thread_id,
                 "messages": messages,
                 "count": len(messages),
+                "limit": limit,
+                "offset": offset,
             }
         return {
             "thread_id": thread_id,
             "messages": [],
             "message": "Thread storage not configured",
         }
+
+    # ── DELETE /threads/{thread_id}/messages ──────────────────────
+    @router.delete("/threads/{thread_id}/messages")
+    async def clear_thread_messages(thread_id: str) -> dict[str, Any]:
+        """Clear all messages in a thread (keeps the thread itself)."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        thread = await thread_store.get_thread(thread_id)
+        if not thread:
+            raise HTTPException(404, f"Thread '{thread_id}' not found")
+        # Delete and recreate thread to clear messages
+        await thread_store.delete_thread(thread_id)
+        new_thread = await thread_store.create_thread(
+            thread_id=thread_id,
+            user_id=thread.get("user_id", "unknown"),
+            agent_name=thread.get("agent_name", agent_name),
+            title=thread.get("title"),
+        )
+        return {"status": "cleared", "thread_id": thread_id, "thread": new_thread}
+
+    # ── GET /threads/{thread_id}/summary ──────────────────────────
+    @router.get("/threads/{thread_id}/summary")
+    async def get_thread_summary(thread_id: str) -> dict[str, Any]:
+        """Get or generate a conversation summary for a thread."""
+        if not memory_mgr:
+            raise HTTPException(400, "Memory manager not configured (requires thread storage)")
+        try:
+            summary = await memory_mgr.get_conversation_summary(thread_id)
+            return {"thread_id": thread_id, "summary": summary}
+        except Exception as exc:
+            raise HTTPException(500, f"Failed to generate summary: {exc}") from exc
 
     # ── POST /optimize/invoke ─────────────────────────────────────
     @router.post("/optimize/invoke", response_model=OptimizeInvokeResponse)
@@ -838,11 +1113,10 @@ def create_default_router(
 
         # Reconstruct the execution context
         state = suspended.get("state_snapshot") or {}
-        # Apply human context updates
+        # Apply human context updates (only into metadata to prevent state key corruption)
         if "metadata" not in state:
             state["metadata"] = {}
         state["metadata"].update(request.context)
-        state.update(request.context)
         # Mark as approved in metadata
         state["metadata"]["hitl_approved"] = True
         state["metadata"]["approval_id"] = request.approval_id
@@ -880,6 +1154,13 @@ def create_default_router(
                     "message": exc.message,
                 },
             )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error resuming execution: {exc}",
+            ) from exc
 
     # ── POST /threads/{thread_id}/reject ──────────────────────────
     @router.post("/threads/{thread_id}/reject")
@@ -904,14 +1185,29 @@ def create_default_router(
         if not thread_store:
             raise HTTPException(400, "Thread storage not configured")
         new_id = request.new_thread_id or f"thread_{uuid.uuid4().hex[:12]}"
-        forked = await thread_store.fork_thread(
-            parent_thread_id=thread_id,
-            message_index=request.message_index,
-            new_thread_id=new_id,
-            title=request.title,
-        )
+        try:
+            forked = await thread_store.fork_thread(
+                parent_thread_id=thread_id,
+                message_index=request.message_index,
+                new_thread_id=new_id,
+                title=request.title,
+            )
+        except Exception as exc:
+            raise HTTPException(500, f"Failed to fork thread: {exc}") from exc
         if not forked:
             raise HTTPException(404, f"Thread '{thread_id}' not found")
         return forked  # type: ignore[no-any-return]
+
+    # ── GET /threads/{thread_id}/lineage ──────────────────────────
+    @router.get("/threads/{thread_id}/lineage")
+    async def get_thread_lineage(thread_id: str) -> dict[str, Any]:
+        """Get the full lineage tree (ancestors and descendants) for a thread."""
+        if not thread_store:
+            raise HTTPException(400, "Thread storage not configured")
+        try:
+            lineage = await thread_store.get_thread_lineage(thread_id)
+            return lineage  # type: ignore[no-any-return]
+        except Exception as exc:
+            raise HTTPException(500, f"Failed to retrieve lineage: {exc}") from exc
 
     return router

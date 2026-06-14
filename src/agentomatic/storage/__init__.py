@@ -28,7 +28,7 @@ from __future__ import annotations
 from .base import BaseStore
 from .memory import MemoryStore
 
-__all__ = ["BaseStore", "MemoryStore", "AgentomaticCheckpointer"]
+__all__ = ["BaseStore", "MemoryStore", "SQLAlchemyStore", "AgentomaticCheckpointer"]
 
 
 # Lazy import for optional dependencies

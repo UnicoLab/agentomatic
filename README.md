@@ -28,7 +28,7 @@ Create production-ready AI agent APIs with auto-discovery, auto-routing, streami
 | Feature | Description |
 |---|---|
 | 🔍 **Auto-Discovery** | Drop an agent folder → endpoints appear automatically |
-| 🚀 **12+ Endpoints Per Agent** | invoke, stream, chat, A2A, health, config, threads |
+| 🚀 **25+ Endpoints Per Agent** | invoke, stream, chat, A2A, health, config, threads, memory, feedback |
 | 🗄️ **Pluggable Storage** | MemoryStore, SQLAlchemy, or bring your own |
 | 🔐 **Middleware Pipeline** | Auth, rate limiting, Prometheus metrics — all toggleable |
 | 🎨 **Built-in Debug UI** | ChatGPT-like interface via Chainlit |
@@ -39,6 +39,17 @@ Create production-ready AI agent APIs with auto-discovery, auto-routing, streami
 | ⚡ **Prompt Optimizer** | DSPy-inspired prompt optimization (7 strategies) |
 | 🧪 **Data Synthesizer** | Auto-generate & augment eval datasets via LLM |
 | 📊 **HTML Reports** | SVG charts, prompt diffs, experiment tracking |
+| 🚦 **Human-in-the-Loop** | Suspend/resume execution with human approval gates |
+| 🌳 **Thread Lineage** | First-class parent/child tracking with ancestry traversal |
+| ⏰ **HITL TTL Expiry** | Auto-cleanup of stale suspended states (7-day default) |
+| 🛡️ **LLM Failover** | Multi-provider fallback chains with telemetry |
+| 🧬 **Thread Forking** | Clone conversations at any message index |
+| 🔀 **A/B Prompt Routing** | Weight-based prompt version selection |
+| 🪝 **State Hooks** | Before/after node interceptors for audit & telemetry |
+| 🧠 **Conversation Memory** | Automatic session + long-term memory with windowing |
+| 📝 **Auto-Summarization** | LLM-powered compression of long conversations |
+| 📋 **Thread CRUD** | Full thread lifecycle management (create/update/delete/clear) |
+| 💬 **Message Persistence** | Every turn auto-saved — history survives restarts |
 
 ## 🚀 Quick Start
 
@@ -213,6 +224,11 @@ Every agent gets 12+ endpoints automatically:
 | `GET` | `/api/v1/{agent}/card` | A2A agent card |
 | `POST` | `/api/v1/{agent}/a2a/tasks` | A2A task submission |
 | `GET` | `/api/v1/{agent}/threads` | List threads |
+| `POST` | `/api/v1/{agent}/threads/{id}/approve` | HITL: approve suspended state |
+| `POST` | `/api/v1/{agent}/threads/{id}/reject` | HITL: reject suspended state |
+| `GET` | `/api/v1/{agent}/threads/{id}/pending` | HITL: list pending approvals |
+| `POST` | `/api/v1/{agent}/threads/{id}/fork` | Fork thread at message index |
+| `GET` | `/api/v1/{agent}/threads/{id}/lineage` | Thread ancestry/descendant tree |
 | ... | ... | + config, prompts, thread messages |
 
 ## 🛠️ Development

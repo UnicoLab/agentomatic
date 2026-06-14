@@ -227,6 +227,14 @@ class BaseStore(ABC):
         """
         return False
 
+    async def cleanup_expired_states(self) -> int:
+        """Delete expired suspended states.
+
+        Returns:
+            Number of states deleted.
+        """
+        return 0
+
     # ------------------------------------------------------------------
     # Forking operations
     # ------------------------------------------------------------------
@@ -245,6 +253,15 @@ class BaseStore(ABC):
         Returns the new thread dict, or None if the parent thread is not found.
         """
         return None
+
+    async def get_thread_lineage(self, thread_id: str) -> dict[str, Any]:
+        """Get the full lineage tree for a thread (ancestors and descendants).
+
+        Returns:
+            Dict with ``ancestors`` (list from root to parent) and ``descendants``
+            (list of direct child threads).
+        """
+        return {"thread_id": thread_id, "ancestors": [], "descendants": []}
 
     # ------------------------------------------------------------------
     # Checkpointer operations

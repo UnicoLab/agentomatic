@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from loguru import logger
 
 _llm_instance: Any = None
+_failover_count: int = 0
+_llm_lock = threading.Lock()
+
+
+def get_failover_count() -> int:
+    """Return the number of LLM failover events recorded."""
+    return _failover_count
+
+
+def record_failover(primary_provider: str, fallback_provider: str, error: str) -> None:
+    """Record a failover event for telemetry."""
+    global _failover_count
+    _failover_count += 1
+    logger.warning(
+        f"🔄 LLM failover #{_failover_count}: {primary_provider} -> {fallback_provider} | Error: {error}"
+    )
 
 
 def get_llm(provider: str = "ollama", fallbacks: list[str] | None = None, **kwargs: Any) -> Any:
@@ -16,25 +33,35 @@ def get_llm(provider: str = "ollama", fallbacks: list[str] | None = None, **kwar
     """
     global _llm_instance
     if _llm_instance is not None:
+        logger.debug("Returning cached LLM instance (call reset_llm() to reconfigure)")
         return _llm_instance
 
-    try:
-        primary = _build_llm(provider, **kwargs)
-        if fallbacks:
-            fallback_models = []
-            for fb in fallbacks:
-                try:
-                    fallback_models.append(_build_llm(fb, **kwargs))
-                except Exception as exc:
-                    logger.warning(f"Failed to build fallback LLM {fb}: {exc}")
-            if fallback_models:
-                primary = primary.with_fallbacks(fallback_models)
-        _llm_instance = primary
-    except Exception as exc:
-        logger.warning(f"Failed to build {provider} LLM: {exc}. Falling back to dummy.")
-        _llm_instance = _build_dummy_llm()
+    with _llm_lock:
+        # Double-checked locking
+        if _llm_instance is not None:
+            return _llm_instance
 
-    return _llm_instance
+        try:
+            primary = _build_llm(provider, **kwargs)
+            if fallbacks:
+                fallback_models = []
+                for fb in fallbacks:
+                    try:
+                        fallback_models.append(_build_llm(fb, **kwargs))
+                    except Exception as exc:
+                        logger.warning(f"Failed to build fallback LLM {fb}: {exc}")
+                if fallback_models:
+                    primary = primary.with_fallbacks(
+                        fallback_models,
+                        exceptions_to_handle=(Exception,),
+                    )
+                    logger.info(f"🛡️ LLM failover chain configured: {provider} -> {fallbacks}")
+            _llm_instance = primary
+        except Exception as exc:
+            logger.warning(f"Failed to build {provider} LLM: {exc}. Falling back to dummy.")
+            _llm_instance = _build_dummy_llm()
+
+        return _llm_instance
 
 
 def _build_llm(provider: str, **kwargs: Any) -> Any:
@@ -98,8 +125,10 @@ def _build_dummy_llm() -> Any:
 
 def reset_llm() -> None:
     """Reset the LLM singleton."""
-    global _llm_instance
-    _llm_instance = None
+    global _llm_instance, _failover_count
+    with _llm_lock:
+        _llm_instance = None
+        _failover_count = 0
 
 
 async def invoke_with_retry(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import (
@@ -44,6 +44,10 @@ class ThreadModel(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     message_count: Mapped[int] = mapped_column(Integer, default=0)
+    parent_thread_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("threads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    fork_message_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     messages: Mapped[list[MessageModel]] = relationship(
         "MessageModel",
@@ -62,6 +66,8 @@ class ThreadModel(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "message_count": self.message_count,
+            "parent_thread_id": self.parent_thread_id,
+            "fork_message_index": self.fork_message_index,
         }
 
 
@@ -144,6 +150,12 @@ class SuspendedStateModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+        default=lambda: datetime.now(UTC) + timedelta(days=7),
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -153,6 +165,7 @@ class SuspendedStateModel(Base):
             "node_name": self.node_name,
             "state_snapshot": self.state_json,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
         }
 
 
