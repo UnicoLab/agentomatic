@@ -82,6 +82,7 @@ Changelog = "https://github.com/UnicoLab/agentomatic/blob/main/CHANGELOG.md"
 
 
 
+
 [dependency-groups]
 dev = [
     "pytest>=8",
