@@ -774,6 +774,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#default-schema-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Default Schema Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Default Schema Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentinvokerequest-default-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentInvokeRequest (default input)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agentinvokeresponse-default-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentInvokeResponse (default output)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agentchatrequest-chat-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentChatRequest (chat endpoint)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#baseagentstate-agent-state-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaseAgentState (agent state dict)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#defining-custom-schemas" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1456,6 +1517,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#default-schema-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Default Schema Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Default Schema Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentinvokerequest-default-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentInvokeRequest (default input)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agentinvokeresponse-default-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentInvokeResponse (default output)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agentchatrequest-chat-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentChatRequest (chat endpoint)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#baseagentstate-agent-state-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaseAgentState (agent state dict)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#defining-custom-schemas" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1599,6 +1721,282 @@
 <p>[!NOTE]
 If no matching classes are found in <code>schemas.py</code>, or if the file does not exist, Agentomatic falls back to the default <code>AgentInvokeRequest</code> and <code>AgentInvokeResponse</code> models.</p>
 </blockquote>
+<hr />
+<h2 id="default-schema-reference">📋 Default Schema Reference<a class="headerlink" href="#default-schema-reference" title="Permanent link">&para;</a></h2>
+<h3 id="agentinvokerequest-default-input"><code>AgentInvokeRequest</code> (default input)<a class="headerlink" href="#agentinvokerequest-default-input" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>query</code></td>
+<td><code>str</code></td>
+<td><em>required</em></td>
+<td>User query or input</td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td><code>str</code></td>
+<td><code>"default-user"</code></td>
+<td>User identifier</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td><code>dict</code></td>
+<td><code>{}</code></td>
+<td>Additional context — passed to agent as <code>state["context"]</code></td>
+</tr>
+<tr>
+<td><code>thread_id</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Thread ID for conversation continuity</td>
+</tr>
+<tr>
+<td><code>prompt_version</code></td>
+<td><code>str</code></td>
+<td><code>"v1"</code></td>
+<td>Prompt version to use</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td><code>float \| None</code></td>
+<td><code>None</code></td>
+<td>Temperature override (0.0–2.0)</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Max tokens override</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td><code>{}</code></td>
+<td>Extra metadata</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agentinvokeresponse-default-output"><code>AgentInvokeResponse</code> (default output)<a class="headerlink" href="#agentinvokeresponse-default-output" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>response</code></td>
+<td><code>str</code></td>
+<td>Agent response text</td>
+</tr>
+<tr>
+<td><code>agent_type</code></td>
+<td><code>str</code></td>
+<td>Agent slug</td>
+</tr>
+<tr>
+<td><code>thread_id</code></td>
+<td><code>str \| None</code></td>
+<td>Thread ID</td>
+</tr>
+<tr>
+<td><code>suggestions</code></td>
+<td><code>list[str]</code></td>
+<td>Follow-up suggestions</td>
+</tr>
+<tr>
+<td><code>citations</code></td>
+<td><code>list[dict]</code></td>
+<td>Source citations</td>
+</tr>
+<tr>
+<td><code>steps_taken</code></td>
+<td><code>list[str]</code></td>
+<td>Processing steps taken</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td><code>Any</code></td>
+<td>Context data returned by the agent (RAG documents, etc.)</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td>Response metadata (includes <code>prompt_version</code>)</td>
+</tr>
+<tr>
+<td><code>duration_ms</code></td>
+<td><code>float</code></td>
+<td>Processing time in milliseconds</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agentchatrequest-chat-endpoint"><code>AgentChatRequest</code> (chat endpoint)<a class="headerlink" href="#agentchatrequest-chat-endpoint" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td><code>str</code></td>
+<td><em>required</em></td>
+<td>User message</td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td><code>str</code></td>
+<td><code>"default-user"</code></td>
+<td>User identifier</td>
+</tr>
+<tr>
+<td><code>thread_id</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Existing thread ID (auto-created if omitted)</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td><code>dict</code></td>
+<td><code>{}</code></td>
+<td>Arbitrary context dict for agent code to consume</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td><code>{}</code></td>
+<td>Extra metadata</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>list[dict] \| None</code></td>
+<td><code>None</code></td>
+<td>Override: supply your own message history (skips auto-loading)</td>
+</tr>
+<tr>
+<td><code>include_history</code></td>
+<td><code>bool</code></td>
+<td><code>true</code></td>
+<td>Load conversation history from store</td>
+</tr>
+<tr>
+<td><code>max_history</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Max messages to load (overrides agent default)</td>
+</tr>
+<tr>
+<td><code>persist</code></td>
+<td><code>bool</code></td>
+<td><code>true</code></td>
+<td>Auto-save messages to the store after invocation</td>
+</tr>
+<tr>
+<td><code>prompt_version</code></td>
+<td><code>str</code></td>
+<td><code>"v1"</code></td>
+<td>Prompt version to use</td>
+</tr>
+</tbody>
+</table>
+<h3 id="baseagentstate-agent-state-dict"><code>BaseAgentState</code> (agent state dict)<a class="headerlink" href="#baseagentstate-agent-state-dict" title="Permanent link">&para;</a></h3>
+<p>This is the TypedDict available in your agent's <code>node_fn(state)</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>messages</code></td>
+<td><code>list</code></td>
+<td>LangChain messages (auto-loaded or user-supplied)</td>
+</tr>
+<tr>
+<td><code>thread_id</code></td>
+<td><code>str</code></td>
+<td>Thread ID</td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td><code>str</code></td>
+<td>User identifier</td>
+</tr>
+<tr>
+<td><code>current_query</code></td>
+<td><code>str</code></td>
+<td>The current user query</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td><code>dict</code></td>
+<td>Arbitrary context from the frontend/caller</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td>Request metadata</td>
+</tr>
+<tr>
+<td><code>prompt_version</code></td>
+<td><code>str</code></td>
+<td>Resolved prompt version</td>
+</tr>
+<tr>
+<td><code>response</code></td>
+<td><code>str</code></td>
+<td>Agent response (set by your code)</td>
+</tr>
+<tr>
+<td><code>agent_type</code></td>
+<td><code>str</code></td>
+<td>Agent slug (set by your code)</td>
+</tr>
+<tr>
+<td><code>suggestions</code></td>
+<td><code>list[str]</code></td>
+<td>Follow-up suggestions</td>
+</tr>
+<tr>
+<td><code>citations</code></td>
+<td><code>list[dict]</code></td>
+<td>Source citations</td>
+</tr>
+<tr>
+<td><code>steps_taken</code></td>
+<td><code>list[str]</code></td>
+<td>Processing steps taken</td>
+</tr>
+<tr>
+<td><code>routing_decision</code></td>
+<td><code>str</code></td>
+<td>Routing decision (for orchestrators)</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>str \| None</code></td>
+<td>Error message if any</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="defining-custom-schemas">🛠️ Defining Custom Schemas<a class="headerlink" href="#defining-custom-schemas" title="Permanent link">&para;</a></h2>
 <p>To define custom models, simply import Pydantic's <code>BaseModel</code> and declare your fields using type annotations and metadata helpers like <code>Field</code>.</p>

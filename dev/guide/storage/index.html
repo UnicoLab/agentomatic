@@ -1747,14 +1747,19 @@
 <td>Save user scores and comment metrics</td>
 </tr>
 <tr>
-<td><code>async def list_feedback(...) -&gt; list[dict]</code></td>
+<td><code>async def get_feedback(...) -&gt; list[dict]</code></td>
 <td>Optional</td>
 <td>Search feedback records</td>
 </tr>
 <tr>
+<td><code>async def get_stats() -&gt; dict</code></td>
+<td>Optional</td>
+<td>Return storage statistics (threads, messages, feedback counts)</td>
+</tr>
+<tr>
 <td><code>async def save_suspended_state(...) -&gt; dict</code></td>
 <td>Optional</td>
-<td>Save execution state for human approval</td>
+<td>Save execution state for human approval (auto-sets 7-day TTL)</td>
 </tr>
 <tr>
 <td><code>async def get_suspended_state(id) -&gt; dict \| None</code></td>
@@ -1772,9 +1777,19 @@
 <td>Delete suspended state on completion</td>
 </tr>
 <tr>
+<td><code>async def cleanup_expired_states() -&gt; int</code></td>
+<td>Optional</td>
+<td>Delete expired HITL states, returns count removed</td>
+</tr>
+<tr>
 <td><code>async def fork_thread(...) -&gt; dict \| None</code></td>
 <td>Optional</td>
 <td>Fork a conversation history up to index</td>
+</tr>
+<tr>
+<td><code>async def get_thread_lineage(id) -&gt; dict</code></td>
+<td>Optional</td>
+<td>Ancestry/descendant tree for a thread</td>
 </tr>
 <tr>
 <td><code>async def save_checkpoint(...) -&gt; None</code></td>
