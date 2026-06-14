@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-06-14)
+
+### Documentation
+
+- Add telemetry and feedback correlation notes for A/B testing
+  ([`2c27a86`](https://github.com/UnicoLab/agentomatic/commit/2c27a86ac83b44a022e5d002d88316953f01ab35))
+
+### Features
+
+- Implement advanced platform features (HITL, checkpointer, structured output, fork, A/B routing,
+  fallbacks, hooks) and update documentation
+  ([`c1a55c3`](https://github.com/UnicoLab/agentomatic/commit/c1a55c39b1efd24084f1453946df27a830d3d7ec))
+
+- Increase core test coverage over 85% and enhance homepage aesthetics
+  ([`98f28f5`](https://github.com/UnicoLab/agentomatic/commit/98f28f56308b7540d642149aa2a7edc20b2eeafb))
+
+### Testing
+
+- Enhance unit test coverage for sqlalchemy store, sync checkpointers, and structured fallbacks
+  ([`91ab042`](https://github.com/UnicoLab/agentomatic/commit/91ab04254a623fb4fbd108303265ad8d4b3aeba5))
+
+
 ## v0.1.1 (2026-06-13)
 
 ### Bug Fixes
