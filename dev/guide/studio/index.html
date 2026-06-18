@@ -1026,6 +1026,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#framework-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#key-features" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1087,13 +1098,80 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-it-works-under-the-hood" class="md-nav__link">
+  <a href="#studio-decorators" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How It Works Under The Hood
+        Studio Decorators
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Studio Decorators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#studio_graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @studio_graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @studio_state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio_stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @studio_stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1411,6 +1489,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#framework-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#key-features" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1472,13 +1561,80 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-it-works-under-the-hood" class="md-nav__link">
+  <a href="#studio-decorators" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How It Works Under The Hood
+        Studio Decorators
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Studio Decorators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#studio_graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @studio_graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @studio_state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio_stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @studio_stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1503,51 +1659,221 @@
 
 
 <h1 id="agentomatic-studio">Agentomatic Studio 🎨<a class="headerlink" href="#agentomatic-studio" title="Permanent link">&para;</a></h1>
-<p>Agentomatic provides a built-in visual development environment specifically designed to help you debug, inspect, and trace the execution of your agents in real-time. It completely removes the guesswork from debugging multi-agent graphs and provides native support for features like Time-Travel and Conditional Breakpoints.</p>
+<p>Agentomatic provides a built-in visual development environment specifically designed to help you debug, inspect, and trace the execution of your agents in real-time. It works with <strong>any agent framework</strong> — LangGraph, LangChain, CrewAI, AutoGen, or raw Python — via a universal adapter system.</p>
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<p>You don't need to configure a separate repository or run separate containers. The studio is bundled directly into the <code>agentomatic</code> pip package.</p>
-<p>To install the optional studio dependencies and launch the server:</p>
+<p>The studio is bundled directly into the <code>agentomatic</code> pip package. No separate setup required.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[studio]&quot;</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--studio
 </code></pre></div>
-<p>The unified platform will start serving both your API endpoints at <code>http://localhost:8000</code> and the Studio UI at <code>http://localhost:8000/studio/ui/</code>.</p>
+<p>The unified platform starts serving your API endpoints at <code>http://localhost:8000</code> and the Studio UI at <code>http://localhost:8000/studio/ui/</code>.</p>
+<hr />
+<h2 id="framework-support">Framework Support<a class="headerlink" href="#framework-support" title="Permanent link">&para;</a></h2>
+<p>Agentomatic Studio uses a <strong>universal adapter system</strong> to provide the best possible debugging experience for every agent:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th style="text-align: center;">LangGraph</th>
+<th style="text-align: center;">LangChain / Custom</th>
+<th style="text-align: center;">With Decorators</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Graph Topology</td>
+<td style="text-align: center;">✅ Real graph</td>
+<td style="text-align: center;">✅ Synthetic linear</td>
+<td style="text-align: center;">✅ Custom graph</td>
+</tr>
+<tr>
+<td>SSE Node Streaming</td>
+<td style="text-align: center;">✅ <code>astream_events</code></td>
+<td style="text-align: center;">✅ Trace-based</td>
+<td style="text-align: center;">✅ Custom stream</td>
+</tr>
+<tr>
+<td>Time-Travel History</td>
+<td style="text-align: center;">✅ Checkpointer</td>
+<td style="text-align: center;">✅ In-memory traces</td>
+<td style="text-align: center;">✅ In-memory traces</td>
+</tr>
+<tr>
+<td>State Inspection</td>
+<td style="text-align: center;">✅ Checkpointer</td>
+<td style="text-align: center;">✅ Last I/O capture</td>
+<td style="text-align: center;">✅ Custom provider</td>
+</tr>
+<tr>
+<td>State Mutation</td>
+<td style="text-align: center;">✅ <code>aupdate_state</code></td>
+<td style="text-align: center;">⚠️ In-memory only</td>
+<td style="text-align: center;">⚠️ In-memory only</td>
+</tr>
+<tr>
+<td>Breakpoints</td>
+<td style="text-align: center;">✅ <code>interrupt_before</code></td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>HITL Support</td>
+<td style="text-align: center;">✅ Native</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">❌</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
 <h3 id="1-live-node-streaming">1. Live Node Streaming<a class="headerlink" href="#1-live-node-streaming" title="Permanent link">&para;</a></h3>
-<p>When you execute an agent query via the chat interface, the <strong>Graph View</strong> maps directly to your agent's underlying LangGraph topology. As the execution progresses, nodes will visually pulse and light up. </p>
+<p>When you execute an agent query, the <strong>Graph View</strong> maps directly to your agent's topology. As the execution progresses, nodes pulse and light up in real-time.</p>
 <ul>
-<li>Server-Sent Events (SSE) stream the node transitions directly from the backend <code>astream_events</code> API.</li>
-<li>You can follow complex conditional edges and loops perfectly.</li>
+<li><strong>LangGraph agents</strong>: Server-Sent Events stream node transitions directly from <code>astream_events</code>.</li>
+<li><strong>Other agents</strong>: The generic adapter wraps execution with trace events that capture timing, input/output payloads, and exceptions.</li>
 </ul>
 <h3 id="2-time-travel-debugging">2. Time-Travel Debugging<a class="headerlink" href="#2-time-travel-debugging" title="Permanent link">&para;</a></h3>
-<p>Debugging deeply nested loops or non-deterministic agent flows can be difficult. Agentomatic natively records every step using the checkpointer.</p>
+<p>Agentomatic records every execution step for historical replay.</p>
 <ul>
-<li><strong>History View</strong>: Inside the Debug Console, the <strong>Time Travel</strong> tab lists all past checkpoints for the active thread.</li>
-<li><strong>Replay</strong>: Click <strong>"Replay from here"</strong> on any historical snapshot to branch your thread. The execution will perfectly resume from that prior state, allowing you to try a different input or test a different edge path.</li>
+<li><strong>History View</strong>: The <strong>Time Travel</strong> tab lists all past checkpoints (LangGraph) or execution traces (other frameworks).</li>
+<li><strong>Replay</strong>: Click <strong>"Replay from here"</strong> on any snapshot to branch your thread and resume from that state.</li>
 </ul>
 <h3 id="3-conditional-breakpoints">3. Conditional Breakpoints<a class="headerlink" href="#3-conditional-breakpoints" title="Permanent link">&para;</a></h3>
-<p>You can freeze execution right before an agent performs a critical action (like calling an external API or making a final decision).</p>
+<p>Freeze execution before a critical node (LangGraph only).</p>
 <ul>
-<li><strong>Setting Breakpoints</strong>: Right-click any node in the Graph View and select <strong>"Add Breakpoint"</strong>.</li>
-<li><strong>Execution</strong>: When the graph reaches that node, it will pause. The node will pulse, and the backend checkpointer will suspend the thread.</li>
-<li><strong>Resuming</strong>: You can either resume execution, or edit the state before continuing.</li>
+<li><strong>Setting Breakpoints</strong>: Right-click any node in the Graph View → <strong>"Add Breakpoint"</strong>.</li>
+<li><strong>Execution</strong>: The graph pauses before the target node. The node pulses, and the thread is suspended.</li>
+<li><strong>Resuming</strong>: Resume execution or edit the state before continuing.</li>
 </ul>
 <h3 id="4-live-state-editing">4. Live State Editing<a class="headerlink" href="#4-live-state-editing" title="Permanent link">&para;</a></h3>
-<p>While the graph is suspended (either due to a breakpoint or a <code>Human-in-the-loop</code> interrupt), you can manually mutate the internal LangGraph state payload.</p>
+<p>During a breakpoint pause or HITL interrupt, you can mutate the graph state.</p>
 <ul>
-<li><strong>State View</strong>: In the Debug Console, navigate to the <strong>State</strong> tab to see your <code>StateGraph</code> variables in real-time.</li>
-<li><strong>Editing</strong>: Click <strong>"Edit State"</strong>, modify the JSON directly, and click <strong>"Save"</strong>.</li>
-<li><strong>Backend Mutate</strong>: The studio fires an update command which natively triggers <code>graph.aupdate_state(config, values)</code>. When you resume execution, the agent will use your injected state!</li>
+<li><strong>State View</strong>: Navigate to the <strong>State</strong> tab in the Debug Console.</li>
+<li><strong>Editing</strong>: Click <strong>"Edit State"</strong>, modify the JSON, and click <strong>"Save"</strong>.</li>
+<li><strong>LangGraph</strong>: Changes are persisted via <code>graph.aupdate_state()</code>.</li>
+<li><strong>Other frameworks</strong>: Changes are stored in the in-memory trace store.</li>
 </ul>
 <hr />
-<h2 id="how-it-works-under-the-hood">How It Works Under The Hood<a class="headerlink" href="#how-it-works-under-the-hood" title="Permanent link">&para;</a></h2>
-<p>The Agentomatic Studio is built on React and communicates via standard Agentomatic APIs mounted under the <code>/studio/</code> router.</p>
+<h2 id="studio-decorators">Studio Decorators<a class="headerlink" href="#studio-decorators" title="Permanent link">&para;</a></h2>
+<p>For non-LangGraph agents, you can incrementally opt-in to richer Studio capabilities using decorators. These let you provide custom graph topologies, state providers, and stream functions.</p>
+<h3 id="studio_graph"><code>@studio_graph</code><a class="headerlink" href="#studio_graph" title="Permanent link">&para;</a></h3>
+<p>Register a custom graph topology for your agent:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.studio</span><span class="w"> </span><span class="kn">import</span> <span class="n">studio_graph</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nd">@studio_graph</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">my_topology</span><span class="p">():</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;__start__&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Start&quot;</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;start&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;fetch_data&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Fetch Data&quot;</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;tool&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Process&quot;</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;agent&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;validate&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Validate&quot;</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;condition&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;__end__&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;End&quot;</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;end&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="p">],</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="s2">&quot;edges&quot;</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>            <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;__start__&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;fetch_data&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>            <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;fetch_data&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;process&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>            <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;validate&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>            <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;validate&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;__end__&quot;</span><span class="p">,</span> <span class="s2">&quot;condition&quot;</span><span class="p">:</span> <span class="s2">&quot;valid&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>            <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;validate&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="s2">&quot;condition&quot;</span><span class="p">:</span> <span class="s2">&quot;retry&quot;</span><span class="p">},</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>        <span class="p">]</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="p">}</span>
+</code></pre></div>
+<h3 id="studio_state"><code>@studio_state</code><a class="headerlink" href="#studio_state" title="Permanent link">&para;</a></h3>
+<p>Register a custom state provider:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.studio</span><span class="w"> </span><span class="kn">import</span> <span class="n">studio_state</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nd">@studio_state</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_my_state</span><span class="p">(</span><span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the current state for a thread.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="k">await</span> <span class="n">my_database</span><span class="o">.</span><span class="n">get_thread_state</span><span class="p">(</span><span class="n">thread_id</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="studio_stream"><code>@studio_stream</code><a class="headerlink" href="#studio_stream" title="Permanent link">&para;</a></h3>
+<p>Register a custom SSE event stream:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.studio</span><span class="w"> </span><span class="kn">import</span> <span class="n">studio_stream</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.studio.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">StudioRunEvent</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nd">@studio_stream</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">my_streamer</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">breakpoints</span><span class="p">):</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">yield</span> <span class="n">StudioRunEvent</span><span class="p">(</span><span class="n">event</span><span class="o">=</span><span class="s2">&quot;node_start&quot;</span><span class="p">,</span> <span class="n">run_id</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">timestamp</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">&quot;my_node&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">my_agent</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">yield</span> <span class="n">StudioRunEvent</span><span class="p">(</span><span class="n">event</span><span class="o">=</span><span class="s2">&quot;node_end&quot;</span><span class="p">,</span> <span class="n">run_id</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">timestamp</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="s2">&quot;my_node&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;output&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">})</span>
+</code></pre></div>
+<hr />
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<p>The Studio uses a layered adapter architecture:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>┌──────────────────────────────────────────────────────┐
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>│                    Studio Router                      │
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>│            (FastAPI endpoints at /studio/)             │
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>└──────────────────┬───────────────────────────────────┘
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>                   │ resolve_adapter(agent)
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    ┌──────────────┼──────────────────┐
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    │              │                  │
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    ▼              ▼                  ▼
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>┌────────┐   ┌──────────┐   ┌──────────────┐
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>│LangGraph│   │ Generic  │   │   Custom     │
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>│Adapter  │   │ Adapter  │   │   Adapter    │
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>│ (full)  │   │ (traces) │   │(user-defined)│
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>└────────┘   └──────────┘   └──────────────┘
+</code></pre></div>
 <ul>
-<li><strong>Topology Extraction</strong>: <code>GET /studio/agents/{name}/graph</code> extracts your node mapping via <code>graph.get_graph().to_json()</code>.</li>
-<li><strong>SSE Tracking</strong>: <code>POST /studio/agents/{name}/runs/stream</code> wraps your execution config with any active breakpoints (<code>interrupt_before_nodes</code>). It streams all <code>on_chat_model_stream</code>, <code>on_tool_start</code>, and custom node events back to the UI.</li>
-<li><strong>State Patching</strong>: <code>POST /studio/agents/{name}/threads/{tid}/state</code> patches the checkpoint database dynamically.</li>
+<li><strong>Studio Router</strong>: Framework-agnostic FastAPI endpoints.</li>
+<li><strong>Adapter Factory</strong>: Automatically selects the best adapter based on the agent's configuration.</li>
+<li><strong>LangGraphAdapter</strong>: Full-featured — uses <code>CompiledGraph</code> APIs natively.</li>
+<li><strong>GenericAdapter</strong>: Trace-based — wraps <code>node_fn()</code> with timing and I/O capture.</li>
+<li><strong>Custom Adapter</strong>: User-registered via decorators or direct assignment.</li>
 </ul>
-<p>There is no "mock" data — the studio gives you 100% accurate insights into how your code operates in production.</p>
+<h3 id="api-endpoints">API Endpoints<a class="headerlink" href="#api-endpoints" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/studio/info</code></td>
+<td>GET</td>
+<td>Platform metadata and capabilities</td>
+</tr>
+<tr>
+<td><code>/studio/agents</code></td>
+<td>GET</td>
+<td>List agents with capabilities</td>
+</tr>
+<tr>
+<td><code>/studio/agents/{name}/graph</code></td>
+<td>GET</td>
+<td>Graph topology (real or synthetic)</td>
+</tr>
+<tr>
+<td><code>/studio/agents/{name}/schemas</code></td>
+<td>GET</td>
+<td>Input/output JSON schemas</td>
+</tr>
+<tr>
+<td><code>/studio/agents/{name}/runs/stream</code></td>
+<td>POST</td>
+<td>SSE-streamed execution</td>
+</tr>
+<tr>
+<td><code>/studio/agents/{name}/threads/{tid}/state</code></td>
+<td>GET</td>
+<td>Thread state snapshot</td>
+</tr>
+<tr>
+<td><code>/studio/agents/{name}/threads/{tid}/state</code></td>
+<td>POST</td>
+<td>Update thread state</td>
+</tr>
+<tr>
+<td><code>/studio/agents/{name}/threads/{tid}/history</code></td>
+<td>GET</td>
+<td>Checkpoint/trace history</td>
+</tr>
+</tbody>
+</table>
 
 
 
