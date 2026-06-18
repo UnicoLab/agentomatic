@@ -356,8 +356,7 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
 
         # Need at least k_examples scored results with query+response
         usable = [
-            r for r in scored
-            if r.get("query") and r.get("response") and r.get("score", 0.0) > 0
+            r for r in scored if r.get("query") and r.get("response") and r.get("score", 0.0) > 0
         ]
         if len(usable) < self.k_examples:
             logger.warning(
@@ -401,8 +400,7 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
         candidates: list[PromptCandidate] = []
         for rank, (quality, subset_idx, subset) in enumerate(top_subsets):
             few_shot = [
-                {"query": r.get("query", ""), "response": r.get("response", "")}
-                for r in subset
+                {"query": r.get("query", ""), "response": r.get("response", "")} for r in subset
             ]
             avg_score = sum(r.get("score", 0.0) for r in subset) / len(subset)
             diversity = _compute_diversity(subset)
@@ -713,8 +711,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             The fused instruction text, or empty string on failure.
         """
         numbered = "\n\n".join(
-            f"### Variant {i + 1}\n```\n{instr}\n```"
-            for i, instr in enumerate(instructions)
+            f"### Variant {i + 1}\n```\n{instr}\n```" for i, instr in enumerate(instructions)
         )
         prompt = (
             "You are a prompt engineering expert. Below are several "
@@ -779,13 +776,15 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
     n_mutations: int = 3
 
     # Default mutation aspects when fewer categories are found in feedback
-    _DEFAULT_ASPECTS: list[str] = field(default_factory=lambda: [
-        "completeness — ensure answers cover all parts of the question",
-        "factual grounding — ensure answers are accurate and evidence-based",
-        "format compliance — ensure answers follow the requested structure",
-        "conciseness — remove unnecessary verbosity while keeping substance",
-        "edge case handling — add instructions for unusual or ambiguous inputs",
-    ])
+    _DEFAULT_ASPECTS: list[str] = field(
+        default_factory=lambda: [
+            "completeness — ensure answers cover all parts of the question",
+            "factual grounding — ensure answers are accurate and evidence-based",
+            "format compliance — ensure answers follow the requested structure",
+            "conciseness — remove unnecessary verbosity while keeping substance",
+            "edge case handling — add instructions for unusual or ambiguous inputs",
+        ]
+    )
 
     async def propose(
         self,
@@ -820,12 +819,14 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
         for r in eval_results:
             fb = r.get("feedback") or r.get("reason") or r.get("details", "")
             if fb:
-                feedback_items.append({
-                    "query": r.get("query", "N/A"),
-                    "score": r.get("score", 0.0),
-                    "feedback": str(fb),
-                    "response_snippet": str(r.get("response", ""))[:200],
-                })
+                feedback_items.append(
+                    {
+                        "query": r.get("query", "N/A"),
+                        "score": r.get("score", 0.0),
+                        "feedback": str(fb),
+                        "response_snippet": str(r.get("response", ""))[:200],
+                    }
+                )
 
         # -- 2. Build feedback summary -----------------------------------
         feedback_summary = self._build_categorised_feedback(feedback_items)
@@ -907,9 +908,9 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
             return "No specific feedback available from evaluation results."
 
         # Group by score buckets
-        critical: list[dict[str, Any]] = []   # score < 0.3
-        moderate: list[dict[str, Any]] = []   # 0.3 <= score < 0.6
-        minor: list[dict[str, Any]] = []      # 0.6 <= score < 0.8
+        critical: list[dict[str, Any]] = []  # score < 0.3
+        moderate: list[dict[str, Any]] = []  # 0.3 <= score < 0.6
+        minor: list[dict[str, Any]] = []  # 0.6 <= score < 0.8
 
         for item in feedback_items:
             score = item.get("score", 0.0)
@@ -977,9 +978,7 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
             "ambig": "edge case handling — add instructions for unusual or ambiguous inputs",
         }
 
-        all_feedback_text = " ".join(
-            item.get("feedback", "").lower() for item in feedback_items
-        )
+        all_feedback_text = " ".join(item.get("feedback", "").lower() for item in feedback_items)
         for keyword, aspect in keyword_map.items():
             if keyword in all_feedback_text and aspect not in detected:
                 detected.append(aspect)
@@ -1121,10 +1120,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
             combos = search_space.sample_params(10, "model")
             for combo in combos:
                 merged = {**baseline.model_params, **combo}
-                changes = {
-                    k: v for k, v in combo.items()
-                    if baseline.model_params.get(k) != v
-                }
+                changes = {k: v for k, v in combo.items() if baseline.model_params.get(k) != v}
                 if not changes:
                     continue
 
@@ -1141,8 +1137,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     ),
                     source="param_search",
                     mutation_notes=(
-                        f"Model param change: "
-                        + ", ".join(f"{k}={v}" for k, v in changes.items())
+                        "Model param change: " + ", ".join(f"{k}={v}" for k, v in changes.items())
                     ),
                 )
                 candidates.append(candidate)
@@ -1153,10 +1148,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
             combos = search_space.sample_params(10, "rag")
             for combo in combos:
                 merged = {**baseline.rag_params, **combo}
-                changes = {
-                    k: v for k, v in combo.items()
-                    if baseline.rag_params.get(k) != v
-                }
+                changes = {k: v for k, v in combo.items() if baseline.rag_params.get(k) != v}
                 if not changes:
                     continue
 
@@ -1173,8 +1165,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     ),
                     source="param_search",
                     mutation_notes=(
-                        f"RAG param change: "
-                        + ", ".join(f"{k}={v}" for k, v in changes.items())
+                        "RAG param change: " + ", ".join(f"{k}={v}" for k, v in changes.items())
                     ),
                 )
                 candidates.append(candidate)
@@ -1185,10 +1176,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
             combos = search_space.sample_params(10, "tool")
             for combo in combos:
                 merged = {**baseline.tool_params, **combo}
-                changes = {
-                    k: v for k, v in combo.items()
-                    if baseline.tool_params.get(k) != v
-                }
+                changes = {k: v for k, v in combo.items() if baseline.tool_params.get(k) != v}
                 if not changes:
                     continue
 
@@ -1205,8 +1193,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     ),
                     source="param_search",
                     mutation_notes=(
-                        f"Tool param change: "
-                        + ", ".join(f"{k}={v}" for k, v in changes.items())
+                        "Tool param change: " + ", ".join(f"{k}={v}" for k, v in changes.items())
                     ),
                 )
                 candidates.append(candidate)
@@ -1446,10 +1433,7 @@ def resolve_fitter_optimizer(
     normalised = name.strip().lower()
     if normalised not in lookup:
         available = sorted(set(lookup.keys()))
-        msg = (
-            f"Unknown fitter optimizer '{name}'. "
-            f"Available: {available}"
-        )
+        msg = f"Unknown fitter optimizer '{name}'. Available: {available}"
         raise ValueError(msg)
 
     cls = lookup[normalised]

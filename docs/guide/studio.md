@@ -19,15 +19,83 @@ The unified platform starts serving your API endpoints at `http://localhost:8000
 
 Agentomatic Studio uses a **universal adapter system** to provide the best possible debugging experience for every agent:
 
-| Capability | LangGraph | LangChain / Custom | With Decorators |
-|---|:---:|:---:|:---:|
-| Graph Topology | ✅ Real graph | ✅ Synthetic linear | ✅ Custom graph |
-| SSE Node Streaming | ✅ `astream_events` | ✅ Trace-based | ✅ Custom stream |
-| Time-Travel History | ✅ Checkpointer | ✅ In-memory traces | ✅ In-memory traces |
-| State Inspection | ✅ Checkpointer | ✅ Last I/O capture | ✅ Custom provider |
-| State Mutation | ✅ `aupdate_state` | ⚠️ In-memory only | ⚠️ In-memory only |
-| Breakpoints | ✅ `interrupt_before` | ❌ | ❌ |
-| HITL Support | ✅ Native | ❌ | ❌ |
+| Capability | LangGraph | LangChain | Custom / Raw Python | With Decorators |
+|---|:---:|:---:|:---:|:---:|
+| Graph Topology | ✅ Real graph | ✅ LCEL extraction or synthetic chain | ✅ Synthetic linear | ✅ Custom graph |
+| SSE Node Streaming | ✅ `astream_events` | ✅ `astream_events` (v2) | ✅ Trace-based | ✅ Custom stream |
+| Time-Travel History | ✅ Checkpointer | ✅ In-memory traces | ✅ In-memory traces | ✅ In-memory traces |
+| State Inspection | ✅ Checkpointer | ✅ Message + I/O capture | ✅ Last I/O capture | ✅ Custom provider |
+| State Mutation | ✅ `aupdate_state` | ⚠️ In-memory only | ⚠️ In-memory only | ⚠️ In-memory only |
+| Breakpoints | ✅ `interrupt_before` | ❌ | ❌ | ❌ |
+| HITL Support | ✅ Native | ❌ | ❌ | ❌ |
+
+---
+
+## LangChain Integration
+
+Agentomatic Studio provides first-class support for LangChain-based agents, chatbots, and LCEL chains. When your agent's manifest declares `framework='langchain'`, the Studio automatically uses the dedicated `LangChainAdapter`.
+
+### Automatic Features
+
+The LangChain adapter automatically provides:
+
+- **LCEL graph extraction** — If your chain/runnable exposes `.get_graph()`, Studio extracts the real topology.
+- **Synthetic chain graph** — If no `.get_graph()` is found, Studio renders a typical chain layout: `Input → Prompt → LLM → Output Parser → Output`.
+- **Rich SSE streaming** — If `astream_events` is available on the runnable, the Studio streams `on_chain_start`, `on_chain_end`, `on_chat_model_stream`, `on_tool_start`, `on_tool_end`, and `on_llm_start/end` events in real-time.
+- **Automatic message tracking** — Captures conversation messages per thread for the State tab.
+
+### Example: LangChain Chatbot
+
+```python
+# agents/chatbot/__init__.py
+from agentomatic.core.manifest import AgentManifest
+
+manifest = AgentManifest(
+    name="chatbot",
+    slug="my-langchain-chatbot",
+    description="A conversational chatbot using LangChain",
+    framework="langchain",  # ← This triggers the LangChain adapter
+)
+
+async def node_fn(state: dict) -> dict:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import ChatPromptTemplate
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful assistant."),
+        ("human", "{query}"),
+    ])
+    llm = ChatOpenAI(model="gpt-4o-mini")
+    chain = prompt | llm
+
+    result = await chain.ainvoke({"query": state["current_query"]})
+    return {"response": result.content}
+```
+
+That's it! Drop this agent into your `agents/` folder and launch with `agentomatic run --studio`. The Studio will automatically:
+
+1. Show a chain-style graph in the Graph View
+2. Stream LLM tokens in real-time via SSE
+3. Track conversation state per thread
+4. Record execution history for the History tab
+
+### Advanced: Exposing LCEL Graphs
+
+For richer graph visualization, export your runnable as a module-level variable named `chain`, `runnable`, or `agent`. The `LangChainAdapter` will discover it and extract the real LCEL graph:
+
+```python
+# agents/rag_bot/__init__.py
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+prompt = ChatPromptTemplate.from_messages([...])
+llm = ChatOpenAI(model="gpt-4o-mini")
+parser = StrOutputParser()
+
+# Export as module-level — Studio will discover this automatically
+chain = prompt | llm | parser
+```
 
 ---
 

@@ -18,8 +18,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from loguru import logger
-
 
 @dataclass(slots=True)
 class RolloutConfig:
@@ -309,17 +307,16 @@ def build_deployment_recommendation(
     for dim, delta in fit_result.metric_deltas.items():
         if delta < -0.02:
             safety_notes.append(
-                f"⚠️ Regression detected in '{dim}': {delta:+.4f}. "
-                f"Monitor closely during rollout."
+                f"⚠️ Regression detected in '{dim}': {delta:+.4f}. Monitor closely during rollout."
             )
 
     if confidence == "low":
-        safety_notes.append(
-            "Small improvement margin. Consider running additional eval rounds."
-        )
+        safety_notes.append("Small improvement margin. Consider running additional eval rounds.")
 
     # ── Rollback instructions ─────────────────────────────────────
-    worst_dim = min(fit_result.metric_deltas.items(), key=lambda x: x[1], default=("composite", 0.0))
+    worst_dim = min(
+        fit_result.metric_deltas.items(), key=lambda x: x[1], default=("composite", 0.0)
+    )
     rollback_instructions = (
         f"If '{worst_dim[0]}' drops below baseline, "
         f"rollback to {fit_result.baseline_config.system_prompt[:30]}... (previous version)."

@@ -797,9 +797,7 @@ def generate_fit_report(
         Path to the generated report file.
     """
     if output_path is None:
-        output_path = Path(
-            f".optimize/{result.agent}/fit_report_{result.experiment_id}.html"
-        )
+        output_path = Path(f".optimize/{result.agent}/fit_report_{result.experiment_id}.html")
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -830,11 +828,11 @@ def _build_fit_report_html(result: Any) -> str:
       </div>
       <div class="kpi-card">
         <div style="color: #8b949e; font-size: 0.85rem;">Absolute Improvement</div>
-        <div style="font-size: 2rem; font-weight: 700; color: {'#3fb950' if improvement > 0 else '#f85149'};">{improvement:+.4f}</div>
+        <div style="font-size: 2rem; font-weight: 700; color: {"#3fb950" if improvement > 0 else "#f85149"};">{improvement:+.4f}</div>
       </div>
       <div class="kpi-card">
         <div style="color: #8b949e; font-size: 0.85rem;">Relative Improvement</div>
-        <div style="font-size: 2rem; font-weight: 700; color: {'#3fb950' if improvement_pct > 0 else '#f85149'};">{improvement_pct:+.1f}%</div>
+        <div style="font-size: 2rem; font-weight: 700; color: {"#3fb950" if improvement_pct > 0 else "#f85149"};">{improvement_pct:+.1f}%</div>
       </div>
       <div class="kpi-card">
         <div style="color: #8b949e; font-size: 0.85rem;">Total Trials</div>
@@ -910,11 +908,13 @@ def _build_fit_report_html(result: Any) -> str:
 
         # Show affected params if available
         affected = (
-            cluster.get("affected_params", []) if isinstance(cluster, dict)
+            cluster.get("affected_params", [])
+            if isinstance(cluster, dict)
             else getattr(cluster, "affected_params", [])
         )
         gains = (
-            cluster.get("expected_metric_gain", {}) if isinstance(cluster, dict)
+            cluster.get("expected_metric_gain", {})
+            if isinstance(cluster, dict)
             else getattr(cluster, "expected_metric_gain", {})
         )
         if affected:
@@ -924,7 +924,7 @@ def _build_fit_report_html(result: Any) -> str:
         if gains:
             gains_parts = [f"{k}: <strong>{v:+.2f}</strong>" for k, v in gains.items()]
             cluster_items += f"""
-          <p style="color: #58a6ff; margin: 0.25rem 0; font-size: 0.9em;">📈 Expected gain: {', '.join(gains_parts)}</p>"""
+          <p style="color: #58a6ff; margin: 0.25rem 0; font-size: 0.9em;">📈 Expected gain: {", ".join(gains_parts)}</p>"""
 
         cluster_items += """
         </div>"""
@@ -937,9 +937,7 @@ def _build_fit_report_html(result: Any) -> str:
         """
 
     # Suggestions
-    suggestion_items = "".join(
-        f"<li>{html.escape(s)}</li>" for s in result.suggestions
-    )
+    suggestion_items = "".join(f"<li>{html.escape(s)}</li>" for s in result.suggestions)
     suggestion_section = ""
     if result.suggestions:
         suggestion_section = f"""
@@ -963,9 +961,13 @@ def _build_fit_report_html(result: Any) -> str:
     for line in diff_lines:
         escaped = html.escape(line.rstrip("\n"))
         if line.startswith("+") and not line.startswith("+++"):
-            diff_html += f'<div style="color: #3fb950; background: rgba(63,185,80,0.1);">  {escaped}</div>'
+            diff_html += (
+                f'<div style="color: #3fb950; background: rgba(63,185,80,0.1);">  {escaped}</div>'
+            )
         elif line.startswith("-") and not line.startswith("---"):
-            diff_html += f'<div style="color: #f85149; background: rgba(248,81,73,0.1);">  {escaped}</div>'
+            diff_html += (
+                f'<div style="color: #f85149; background: rgba(248,81,73,0.1);">  {escaped}</div>'
+            )
         else:
             diff_html += f"<div>  {escaped}</div>"
 
@@ -987,7 +989,7 @@ def _build_fit_report_html(result: Any) -> str:
             <div style="background: #161b22; border-left: 3px solid #58a6ff; padding: 0.75rem 1rem; margin: 0.5rem 0; border-radius: 0 8px 8px 0;">
               <div style="color: #58a6ff; font-weight: 600;">Example {i}</div>
               <div style="color: #8b949e;">Q: {q}</div>
-              <div style="color: #c9d1d9;">A: {r[:300]}{'...' if len(r) > 300 else ''}</div>
+              <div style="color: #c9d1d9;">A: {r[:300]}{"..." if len(r) > 300 else ""}</div>
             </div>"""
         few_shot_section = f"""
         <h2>📚 Few-Shot Examples</h2>
@@ -1001,8 +1003,7 @@ def _build_fit_report_html(result: Any) -> str:
         safety_html = ""
         if rec.safety_notes:
             safety_items = "".join(
-                f"<li style='color: #f0883e;'>{html.escape(n)}</li>"
-                for n in rec.safety_notes
+                f"<li style='color: #f0883e;'>{html.escape(n)}</li>" for n in rec.safety_notes
             )
             safety_html = f"<ul>{safety_items}</ul>"
 
@@ -1015,7 +1016,7 @@ def _build_fit_report_html(result: Any) -> str:
           </div>
           <div class="kpi-card">
             <div style="color: #8b949e; font-size: 0.85rem;">Confidence</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: {'#3fb950' if rec.confidence == 'high' else '#f0883e' if rec.confidence == 'medium' else '#f85149'};">{rec.confidence}</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: {"#3fb950" if rec.confidence == "high" else "#f0883e" if rec.confidence == "medium" else "#f85149"};">{rec.confidence}</div>
           </div>
           <div class="kpi-card">
             <div style="color: #8b949e; font-size: 0.85rem;">Rollout Strategy</div>
@@ -1068,4 +1069,3 @@ def _build_fit_report_html(result: Any) -> str:
   <footer>Generated by Agentomatic PromptFitter — {timestamp}</footer>
 </body>
 </html>"""
-

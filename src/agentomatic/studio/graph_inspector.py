@@ -43,9 +43,7 @@ class GraphInspector:
             try:
                 return self._from_compiled_graph(agent)
             except Exception as exc:
-                logger.warning(
-                    f"Failed to inspect graph for agent '{agent.name}': {exc}"
-                )
+                logger.warning(f"Failed to inspect graph for agent '{agent.name}': {exc}")
                 # Fall through to node_fn or empty
         if agent.node_fn:
             return self._from_node_fn(agent)
@@ -127,10 +125,7 @@ class GraphInspector:
             if source is None or target is None:
                 continue
             # Conditional label (DrawableGraph edges may expose .data or .conditional)
-            condition = (
-                getattr(edge, "conditional", None)
-                or getattr(edge, "data", None)
-            )
+            condition = getattr(edge, "conditional", None) or getattr(edge, "data", None)
             if condition is True:
                 condition = "conditional"
             elif condition and not isinstance(condition, str):

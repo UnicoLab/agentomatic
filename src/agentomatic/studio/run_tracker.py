@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def _now_iso() -> str:
     """Return the current UTC time as an ISO-8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class RunTracker:
@@ -179,9 +179,7 @@ class RunTracker:
         yield f"data: {start_event.model_dump_json()}\n\n"
 
         try:
-            async for event in adapter.stream_execution(
-                state, config, breakpoints, checkpoint_id
-            ):
+            async for event in adapter.stream_execution(state, config, breakpoints, checkpoint_id):
                 # Stamp the run_id onto adapter events
                 event.run_id = run_id
                 self.add_event(run_id, event)

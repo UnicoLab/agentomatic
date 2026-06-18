@@ -15,7 +15,7 @@ import time
 import traceback
 from collections import defaultdict
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class GenericAdapter(StudioAdapter):
@@ -221,9 +221,7 @@ class GenericAdapter(StudioAdapter):
                     "duration_ms": duration,
                     "framework": self._agent.manifest.framework,
                 },
-                parent_id=(
-                    f"trace_{thread_id}_{step - 1}" if step > 1 else None
-                ),
+                parent_id=(f"trace_{thread_id}_{step - 1}" if step > 1 else None),
                 timestamp=_now_iso(),
             )
         )
@@ -262,6 +260,7 @@ class GenericAdapter(StudioAdapter):
         if self._custom_state_fn is not None:
             try:
                 import asyncio
+
                 if asyncio.iscoroutinefunction(self._custom_state_fn):
                     state_data = await self._custom_state_fn(thread_id)
                 else:

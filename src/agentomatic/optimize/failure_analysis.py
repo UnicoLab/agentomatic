@@ -17,7 +17,6 @@ from typing import Any
 
 from loguru import logger
 
-
 # =====================================================================
 # Failure Clustering
 # =====================================================================
@@ -48,8 +47,12 @@ class FailureCluster:
     severity: float = 0.0  # 0.0 to 1.0, higher = more impactful
 
     # ── Deployment-first fields ───────────────────────────────────
-    affected_params: list[str] = field(default_factory=list)  # e.g. ["rag.top_k", "tool_policy.force_retrieval"]
-    expected_metric_gain: dict[str, float] = field(default_factory=dict)  # e.g. {"faithfulness": +0.18}
+    affected_params: list[str] = field(
+        default_factory=list
+    )  # e.g. ["rag.top_k", "tool_policy.force_retrieval"]
+    expected_metric_gain: dict[str, float] = field(
+        default_factory=dict
+    )  # e.g. {"faithfulness": +0.18}
 
 
 class FailureClusterer:
@@ -122,9 +125,7 @@ class FailureClusterer:
             # Extract feedback from details or direct field
             feedback = f.get("feedback", "")
             if not feedback and f.get("details"):
-                reasons = [
-                    d.get("reason", "") for d in f["details"] if d.get("reason")
-                ]
+                reasons = [d.get("reason", "") for d in f["details"] if d.get("reason")]
                 feedback = "; ".join(reasons)
             if feedback:
                 item += f"  Feedback: {feedback[:200]}\n"
@@ -142,8 +143,8 @@ class FailureClusterer:
             f"2. For each cluster, provide a label, description, count, and suggested fix.\n"
             f"3. Return a JSON array of clusters.\n\n"
             "Return ONLY a JSON array like:\n"
-            '[\n'
-            '  {\n'
+            "[\n"
+            "  {\n"
             '    "label": "short_snake_case_label",\n'
             '    "description": "What goes wrong in these cases",\n'
             '    "count": 5,\n'
@@ -151,8 +152,8 @@ class FailureClusterer:
             '    "severity": 0.8,\n'
             '    "affected_params": ["prompt.output_contract", "rag.top_k"],\n'
             '    "expected_metric_gain": {"faithfulness": 0.15}\n'
-            '  }\n'
-            ']\n'
+            "  }\n"
+            "]\n"
         )
 
         data = await LLMCaller.call_with_json(
@@ -185,7 +186,8 @@ class FailureClusterer:
             )
             # Attach representative examples
             cluster.representative_examples = [
-                f for f in failures
+                f
+                for f in failures
                 if any(
                     keyword in str(f.get("query", "")).lower()
                     or keyword in str(f.get("response", "")).lower()
@@ -364,8 +366,7 @@ class DimensionAnalyzer:
             Multi-line string table.
         """
         header = (
-            f"{'Dimension':<25} {'Baseline':>10} {'Candidate':>10} "
-            f"{'Delta':>10} {'Decision':>10}"
+            f"{'Dimension':<25} {'Baseline':>10} {'Candidate':>10} {'Delta':>10} {'Decision':>10}"
         )
         sep = "─" * len(header)
         lines = [sep, header, sep]

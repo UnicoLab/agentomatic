@@ -33,8 +33,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from loguru import logger
-
 
 @dataclass(slots=True)
 class EvalContract:
@@ -147,7 +145,12 @@ class EvalContract:
         checks: list[dict[str, Any]] = []
 
         if not response or not response.strip():
-            return {"score": 0.0, "passed": 0, "failed": 1, "checks": [{"name": "non_empty", "passed": False}]}
+            return {
+                "score": 0.0,
+                "passed": 0,
+                "failed": 1,
+                "checks": [{"name": "non_empty", "passed": False}],
+            }
 
         # ── Format ────────────────────────────────────────────────
         if self.output_format == "json":
@@ -170,9 +173,13 @@ class EvalContract:
 
         # ── Length ────────────────────────────────────────────────
         if self.max_output_length is not None:
-            checks.append({"name": "max_length", "passed": len(response) <= self.max_output_length})
+            checks.append(
+                {"name": "max_length", "passed": len(response) <= self.max_output_length}
+            )
         if self.min_output_length is not None:
-            checks.append({"name": "min_length", "passed": len(response) >= self.min_output_length})
+            checks.append(
+                {"name": "min_length", "passed": len(response) >= self.min_output_length}
+            )
 
         passed = sum(1 for c in checks if c["passed"])
         failed = len(checks) - passed

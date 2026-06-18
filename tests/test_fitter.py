@@ -8,8 +8,6 @@ All LLM calls are mocked — no external services required.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -25,7 +23,6 @@ from agentomatic.optimize.failure_analysis import (
     FailureClusterer,
 )
 from agentomatic.optimize.fitter_optimizers import (
-    BaseFitterOptimizer,
     FewShotBootstrapOptimizer,
     ParamSearchOptimizer,
     RewriteOptimizer,
@@ -35,9 +32,8 @@ from agentomatic.optimize.judges import (
     CalibrationPair,
     JudgeCalibrationSet,
     LocalJudgeMetric,
-    MultiJudgePanel,
 )
-from agentomatic.optimize.llm_caller import LLMCaller, parse_model_spec
+from agentomatic.optimize.llm_caller import parse_model_spec
 from agentomatic.optimize.metrics import (
     CompositeMetric,
     ContainsMetric,
@@ -47,7 +43,6 @@ from agentomatic.optimize.metrics import (
     WeightedMetric,
 )
 from agentomatic.optimize.search_space import PromptSearchSpace
-
 
 # =====================================================================
 # PromptRuntimeConfig Tests

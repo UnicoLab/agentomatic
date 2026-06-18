@@ -32,7 +32,41 @@ Synthetic data::
 
 from __future__ import annotations
 
+# ── PromptFitter API (ML-like prompt/config optimisation) ────────────
+from agentomatic.optimize.config import (
+    ParamDelta,
+    PromptCandidate,
+    PromptFitResult,
+    PromptRuntimeConfig,
+)
 from agentomatic.optimize.dataset import DataPoint, Dataset
+
+# ── Deployment-first API ─────────────────────────────────────────────
+from agentomatic.optimize.deployment import (
+    DeploymentRecommendation,
+    RolloutConfig,
+    build_deployment_recommendation,
+)
+from agentomatic.optimize.eval_contract import EvalContract
+from agentomatic.optimize.failure_analysis import (
+    DimensionAnalyzer,
+    FailureCluster,
+    FailureClusterer,
+)
+from agentomatic.optimize.fitter import PromptFitter
+from agentomatic.optimize.fitter_optimizers import (
+    BaseFitterOptimizer,
+    FewShotBootstrapOptimizer,
+    GEPALikeOptimizer,
+    MIPROLikeOptimizer,
+    ParamSearchOptimizer,
+    RewriteOptimizer,
+)
+from agentomatic.optimize.judges import (
+    JudgeCalibrationSet,
+    LocalJudgeMetric,
+    MultiJudgePanel,
+)
 from agentomatic.optimize.loop import (
     AVAILABLE_STRATEGIES,
     LoopResult,
@@ -59,6 +93,7 @@ from agentomatic.optimize.metrics import (
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
 from agentomatic.optimize.report import generate_fit_report, generate_html_report
+from agentomatic.optimize.search_space import PromptSearchSpace
 from agentomatic.optimize.strategies import (
     MIPRO,
     BootstrapRandomSearch,
@@ -75,42 +110,6 @@ from agentomatic.optimize.synthesizer import (
     generate_from_docs,
     red_team,
 )
-
-# ── PromptFitter API (ML-like prompt/config optimisation) ────────────
-from agentomatic.optimize.config import (
-    ParamDelta,
-    PromptCandidate,
-    PromptFitResult,
-    PromptRuntimeConfig,
-)
-from agentomatic.optimize.failure_analysis import (
-    DimensionAnalyzer,
-    FailureClusterer,
-)
-from agentomatic.optimize.fitter import PromptFitter
-from agentomatic.optimize.fitter_optimizers import (
-    BaseFitterOptimizer,
-    FewShotBootstrapOptimizer,
-    GEPALikeOptimizer,
-    MIPROLikeOptimizer,
-    ParamSearchOptimizer,
-    RewriteOptimizer,
-)
-from agentomatic.optimize.judges import (
-    JudgeCalibrationSet,
-    LocalJudgeMetric,
-    MultiJudgePanel,
-)
-from agentomatic.optimize.search_space import PromptSearchSpace
-
-# ── Deployment-first API ─────────────────────────────────────────────
-from agentomatic.optimize.deployment import (
-    DeploymentRecommendation,
-    RolloutConfig,
-    build_deployment_recommendation,
-)
-from agentomatic.optimize.eval_contract import EvalContract
-from agentomatic.optimize.failure_analysis import FailureCluster
 
 __all__ = [
     # Core — local-first optimization loop
@@ -187,4 +186,3 @@ __all__ = [
     "CostMetric",
     "generate_fit_report",
 ]
-

@@ -6,7 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Server / Discovery
 # ---------------------------------------------------------------------------
@@ -31,7 +30,9 @@ class StudioAgentInfo(BaseModel):
     slug: str = Field(..., description="Unique agent slug")
     description: str = Field("", description="Human-readable description")
     version: str = Field("1.0.0", description="Agent version")
-    framework: str = Field("langgraph", description="Framework: 'langgraph' | 'langchain' | 'custom'")
+    framework: str = Field(
+        "langgraph", description="Framework: 'langgraph' | 'langchain' | 'custom'"
+    )
     capabilities: list[str] = Field(
         default_factory=list,
         description="Debug capabilities: 'graph', 'streaming', 'checkpoints', 'hitl', etc.",
@@ -88,7 +89,9 @@ class StudioAgentSchemas(BaseModel):
     """JSON Schema definitions for agent input and output models."""
 
     input_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for input")
-    output_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for output")
+    output_schema: dict[str, Any] = Field(
+        default_factory=dict, description="JSON Schema for output"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -29,7 +29,9 @@ def resolve_adapter(
        attribute (set via decorators or manual registration), use it.
     2. **LangGraph adapter** — If the agent has a ``graph_fn``, use the
        full-featured :class:`LangGraphAdapter`.
-    3. **Generic adapter** — For everything else, use the trace-based
+    3. **LangChain adapter** — If the agent's manifest declares
+       ``framework='langchain'``, use the :class:`LangChainAdapter`.
+    4. **Generic adapter** — For everything else, use the trace-based
        :class:`GenericAdapter` which provides maximum useful information.
 
     Args:
@@ -52,7 +54,14 @@ def resolve_adapter(
         logger.debug(f"Using LangGraph studio adapter for agent '{agent.name}'")
         return LangGraphAdapter(agent=agent, store=store)
 
-    # 3. Everything else → generic trace adapter
+    # 3. LangChain agents → enhanced adapter
+    if getattr(agent.manifest, "framework", "") == "langchain":
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        logger.debug(f"Using LangChain studio adapter for agent '{agent.name}'")
+        return LangChainAdapter(agent=agent, store=store)
+
+    # 4. Everything else → generic trace adapter
     from agentomatic.studio.adapters.generic import GenericAdapter
 
     logger.debug(f"Using generic studio adapter for agent '{agent.name}'")

@@ -336,9 +336,7 @@ class PromptFitResult:
             lines.append("")
 
         # Regressions
-        regressions = {
-            k: v for k, v in self.metric_deltas.items() if v < 0
-        }
+        regressions = {k: v for k, v in self.metric_deltas.items() if v < 0}
         if regressions:
             lines.append("  ⚠ Regressions:")
             for metric, delta in regressions.items():
@@ -372,9 +370,7 @@ class PromptFitResult:
             "baseline_score": self.baseline_score,
             "absolute_improvement": self.absolute_improvement,
             "metric_deltas": self.metric_deltas,
-            "param_suggestions": {
-                k: asdict(v) for k, v in self.param_suggestions.items()
-            },
+            "param_suggestions": {k: asdict(v) for k, v in self.param_suggestions.items()},
             "best_config": self.best_config.to_dict(),
             "baseline_config": self.baseline_config.to_dict(),
             "failure_clusters": self.failure_clusters,
@@ -383,7 +379,8 @@ class PromptFitResult:
             "duration_seconds": self.duration_seconds,
             "deployment_recommendation": (
                 self.deployment_recommendation.to_dict()
-                if self.deployment_recommendation else None
+                if self.deployment_recommendation
+                else None
             ),
         }
 
@@ -446,8 +443,7 @@ class PromptFitResult:
         # -- runtime_config.json -----------------------------------------
         config_path = base / "runtime_config.json"
         config_path.write_text(
-            json.dumps(self.best_config.to_dict(), indent=2, ensure_ascii=False)
-            + "\n",
+            json.dumps(self.best_config.to_dict(), indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
         logger.info("Wrote runtime config to {}", config_path.resolve())

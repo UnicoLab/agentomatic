@@ -64,7 +64,7 @@ def parse_model_spec(model: str) -> tuple[str, str]:
     for provider in _SUPPORTED_PROVIDERS:
         prefix = f"{provider}/"
         if model.startswith(prefix):
-            return provider, model[len(prefix):]
+            return provider, model[len(prefix) :]
     return "ollama", model
 
 

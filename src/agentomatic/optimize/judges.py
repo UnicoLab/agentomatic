@@ -21,7 +21,6 @@ from loguru import logger
 
 from agentomatic.optimize.metrics import BaseMetric, EvalResult, MetricResult
 
-
 # =====================================================================
 # Local SLM Judge
 # =====================================================================
@@ -95,9 +94,7 @@ class LocalJudgeMetric(BaseMetric):
         """Evaluate with full ``MetricResult`` output."""
         from agentomatic.optimize.llm_caller import LLMCaller
 
-        dimensions_list = "\n".join(
-            f"  - {d}: score (0.0–1.0)" for d in self.dimensions
-        )
+        dimensions_list = "\n".join(f"  - {d}: score (0.0–1.0)" for d in self.dimensions)
 
         prompt = (
             "You are an expert evaluation judge. Score the following AI response.\n\n"
@@ -116,18 +113,14 @@ class LocalJudgeMetric(BaseMetric):
             "1. Evaluate the response against each dimension.\n"
             "2. Provide a brief textual feedback explaining strengths and weaknesses.\n"
             "3. Return a JSON object with this exact structure:\n"
-            '{\n'
+            "{\n"
             '  "overall_score": 0.X,\n'
             '  "feedback": "Your textual feedback here...",\n'
             '  "dimensions": {\n'
         )
         for d in self.dimensions:
             prompt += f'    "{d}": 0.X,\n'
-        prompt += (
-            '  }\n'
-            '}\n\n'
-            "Return ONLY the JSON object.\n"
-        )
+        prompt += "  }\n}\n\nReturn ONLY the JSON object.\n"
 
         try:
             data = await LLMCaller.call_with_json(
@@ -201,10 +194,7 @@ class MultiJudgePanel(BaseMetric):
         context: list[str] | None = None,
     ) -> EvalResult:
         """Run all judges in parallel and aggregate."""
-        tasks = [
-            judge.evaluate_rich(query, response, expected, context)
-            for judge in self._judges
-        ]
+        tasks = [judge.evaluate_rich(query, response, expected, context) for judge in self._judges]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         valid_results: list[MetricResult] = []
@@ -247,16 +237,12 @@ class MultiJudgePanel(BaseMetric):
             },
         )
 
-    def _aggregate_average(
-        self, results: list[MetricResult]
-    ) -> dict[str, Any]:
+    def _aggregate_average(self, results: list[MetricResult]) -> dict[str, Any]:
         """Weighted average aggregation."""
         weights = self._weights[: len(results)]
         total_w = sum(weights)
 
-        weighted_score = sum(
-            r.score * w for r, w in zip(results, weights)
-        ) / total_w
+        weighted_score = sum(r.score * w for r, w in zip(results, weights)) / total_w
 
         # Aggregate dimensions
         all_dim_keys: set[str] = set()
@@ -271,9 +257,7 @@ class MultiJudgePanel(BaseMetric):
                 if key in r.dimensions
             ]
             if dim_vals:
-                dimensions[key] = sum(v * w for v, w in dim_vals) / sum(
-                    w for _, w in dim_vals
-                )
+                dimensions[key] = sum(v * w for v, w in dim_vals) / sum(w for _, w in dim_vals)
 
         return {"score": weighted_score, "dimensions": dimensions}
 

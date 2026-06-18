@@ -39,11 +39,9 @@ Example::
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -61,7 +59,6 @@ from agentomatic.optimize.metrics import (
     BaseMetric,
     CompositeMetric,
     EvalResult,
-    MetricResult,
 )
 from agentomatic.optimize.runner import AgentRunner, RunResult
 from agentomatic.optimize.search_space import PromptSearchSpace
@@ -281,7 +278,9 @@ class PromptFitter:
         # ── Step 2: Evaluate baseline on validation set ──────────────
         logger.info("📊 Step 2/10 — Evaluating baseline on valset ({} pts)", len(valset))
         baseline_score, baseline_dims, baseline_details = await self._evaluate_config(
-            baseline_config, valset, metric,
+            baseline_config,
+            valset,
+            metric,
         )
         logger.info("📊 Baseline score: {:.4f}", baseline_score)
         if baseline_dims:
@@ -290,9 +289,7 @@ class PromptFitter:
 
         # ── Step 3: Cluster failures ─────────────────────────────────
         logger.info("🔍 Step 3/10 — Clustering baseline failures")
-        failures = [
-            d for d in baseline_details if d.get("avg_score", 1.0) < _FAILURE_THRESHOLD
-        ]
+        failures = [d for d in baseline_details if d.get("avg_score", 1.0) < _FAILURE_THRESHOLD]
         failure_clusters_raw: list[dict[str, Any]] = []
         if failures:
             logger.info("   Found {} failures (score < {:.1f})", len(failures), _FAILURE_THRESHOLD)
@@ -311,7 +308,10 @@ class PromptFitter:
                 for c in clusters:
                     logger.info(
                         "   🏷️  {} ({} failures, severity {:.2f}): {}",
-                        c.label, c.count, c.severity, c.suggested_fix[:80],
+                        c.label,
+                        c.count,
+                        c.severity,
+                        c.suggested_fix[:80],
                     )
             except Exception as exc:
                 logger.warning("   Failure clustering failed: {}", exc)
@@ -343,7 +343,9 @@ class PromptFitter:
 
         logger.info(
             "   Minibatch: {} / {} points ({:.0%})",
-            minibatch_size, len(val_points), minibatch_size / max(len(val_points), 1),
+            minibatch_size,
+            len(val_points),
+            minibatch_size / max(len(val_points), 1),
         )
 
         eval_results = self._build_eval_results(baseline_details, metric)
@@ -367,7 +369,9 @@ class PromptFitter:
                 logger.error("   Candidate proposal failed: {}", exc)
                 no_improvement_rounds += 1
                 if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
-                    logger.warning("   ⏹️  Early stop: {} rounds without improvement", _EARLY_STOP_PATIENCE)
+                    logger.warning(
+                        "   ⏹️  Early stop: {} rounds without improvement", _EARLY_STOP_PATIENCE
+                    )
                     break
                 continue
 
@@ -387,29 +391,36 @@ class PromptFitter:
             for cand in candidates:
                 try:
                     cand_score, cand_dims, cand_details = await self._evaluate_config(
-                        cand.config, minibatch_dataset, metric,
+                        cand.config,
+                        minibatch_dataset,
+                        metric,
                     )
                     cand.composite_score = cand_score
                     cand.scores = dict(cand_dims)
                     candidate_scores.append((cand, cand_score, cand_dims))
 
-                    trials.append({
-                        "round": round_num,
-                        "name": cand.name,
-                        "source": cand.source,
-                        "phase": "minibatch",
-                        "score": cand_score,
-                        "dimensions": dict(cand_dims),
-                        "mutation_notes": cand.mutation_notes,
-                    })
+                    trials.append(
+                        {
+                            "round": round_num,
+                            "name": cand.name,
+                            "source": cand.source,
+                            "phase": "minibatch",
+                            "score": cand_score,
+                            "dimensions": dict(cand_dims),
+                            "mutation_notes": cand.mutation_notes,
+                        }
+                    )
                     logger.info(
                         "      {} ({}): {:.4f}",
-                        cand.name, cand.source, cand_score,
+                        cand.name,
+                        cand.source,
+                        cand_score,
                     )
                 except Exception as exc:
                     logger.warning(
                         "      {} evaluation failed: {}",
-                        cand.name, exc,
+                        cand.name,
+                        exc,
                     )
 
             if not candidate_scores:
@@ -422,8 +433,7 @@ class PromptFitter:
             # ── Step 6: Promote top candidates to full valset ────────
             candidate_scores.sort(key=lambda t: t[1], reverse=True)
             promotable = [
-                (cand, sc, dims) for cand, sc, dims in candidate_scores
-                if sc > best_score
+                (cand, sc, dims) for cand, sc, dims in candidate_scores if sc > best_score
             ][:_TOP_K_CANDIDATES]
 
             if not promotable:
@@ -437,30 +447,39 @@ class PromptFitter:
                     break
                 continue
 
-            logger.info("   🏆 Step 6 — Full evaluation for {} promoted candidate(s)", len(promotable))
+            logger.info(
+                "   🏆 Step 6 — Full evaluation for {} promoted candidate(s)", len(promotable)
+            )
 
             round_improved = False
             for cand, mini_score, _ in promotable:
                 try:
                     full_score, full_dims, full_details = await self._evaluate_config(
-                        cand.config, valset, metric,
+                        cand.config,
+                        valset,
+                        metric,
                     )
-                    trials.append({
-                        "round": round_num,
-                        "name": cand.name,
-                        "source": cand.source,
-                        "phase": "full_val",
-                        "score": full_score,
-                        "dimensions": dict(full_dims),
-                    })
+                    trials.append(
+                        {
+                            "round": round_num,
+                            "name": cand.name,
+                            "source": cand.source,
+                            "phase": "full_val",
+                            "score": full_score,
+                            "dimensions": dict(full_dims),
+                        }
+                    )
                     logger.info(
                         "      {} full-val: {:.4f} (minibatch was {:.4f})",
-                        cand.name, full_score, mini_score,
+                        cand.name,
+                        full_score,
+                        mini_score,
                     )
 
                     # ── Step 7: Dimensional acceptance ───────────────
                     comparisons = self._dimension_analyzer.compare(
-                        best_dims, full_dims,
+                        best_dims,
+                        full_dims,
                     )
                     accept, reason = self._dimension_analyzer.should_accept(
                         comparisons,
@@ -472,7 +491,8 @@ class PromptFitter:
                     if accept:
                         logger.info(
                             "      ✅ Accepted: {} — {}",
-                            cand.name, reason,
+                            cand.name,
+                            reason,
                         )
                         best_config = cand.config
                         best_score = full_score
@@ -482,7 +502,8 @@ class PromptFitter:
                     else:
                         logger.info(
                             "      ❌ Rejected: {} — {}",
-                            cand.name, reason,
+                            cand.name,
+                            reason,
                         )
                         dim_table = self._dimension_analyzer.format_table(comparisons)
                         logger.debug("      Dimension table:\n{}", dim_table)
@@ -490,7 +511,8 @@ class PromptFitter:
                 except Exception as exc:
                     logger.warning(
                         "      Full evaluation of {} failed: {}",
-                        cand.name, exc,
+                        cand.name,
+                        exc,
                     )
 
             if round_improved:
@@ -516,7 +538,8 @@ class PromptFitter:
         # ── Step 8: Produce param suggestions ────────────────────────
         logger.info("📝 Step 8/10 — Producing param suggestions")
         param_suggestions, suggestions = self._build_param_suggestions(
-            baseline_config, best_config,
+            baseline_config,
+            best_config,
         )
 
         # Compute metric deltas
@@ -533,7 +556,9 @@ class PromptFitter:
             logger.info("🧪 Step 9/10 — Test-set validation ({} pts)", len(testset))
             try:
                 test_score_val, test_dims, _ = await self._evaluate_config(
-                    best_config, testset, metric,
+                    best_config,
+                    testset,
+                    metric,
                 )
                 test_score = test_score_val
                 logger.info("🧪 Test score: {:.4f}", test_score)
@@ -663,14 +688,16 @@ class PromptFitter:
         for rr in run_results:
             if rr.error:
                 logger.debug("Skipping errored result for '{}'", rr.query[:50])
-                eval_details.append({
-                    "query": rr.query,
-                    "response": rr.response,
-                    "expected": rr.expected,
-                    "avg_score": 0.0,
-                    "error": rr.error,
-                    "details": [],
-                })
+                eval_details.append(
+                    {
+                        "query": rr.query,
+                        "response": rr.response,
+                        "expected": rr.expected,
+                        "avg_score": 0.0,
+                        "error": rr.error,
+                        "details": [],
+                    }
+                )
                 scores.append(0.0)
                 continue
 
@@ -691,38 +718,40 @@ class PromptFitter:
                     for dim, val in point_dims.items():
                         dim_accumulators.setdefault(dim, []).append(val)
 
-                eval_details.append({
-                    "query": rr.query,
-                    "response": rr.response,
-                    "expected": rr.expected,
-                    "avg_score": point_score,
-                    "dimensions": point_dims,
-                    "feedback": eval_result.reason,
-                    "details": [
-                        {
-                            "metric": eval_result.metric_name,
-                            "score": eval_result.score,
-                            "reason": eval_result.reason,
-                        },
-                    ],
-                })
+                eval_details.append(
+                    {
+                        "query": rr.query,
+                        "response": rr.response,
+                        "expected": rr.expected,
+                        "avg_score": point_score,
+                        "dimensions": point_dims,
+                        "feedback": eval_result.reason,
+                        "details": [
+                            {
+                                "metric": eval_result.metric_name,
+                                "score": eval_result.score,
+                                "reason": eval_result.reason,
+                            },
+                        ],
+                    }
+                )
             except Exception as exc:
                 logger.warning("Metric evaluation failed for '{}': {}", rr.query[:50], exc)
                 scores.append(0.0)
-                eval_details.append({
-                    "query": rr.query,
-                    "response": rr.response,
-                    "expected": rr.expected,
-                    "avg_score": 0.0,
-                    "error": str(exc),
-                    "details": [],
-                })
+                eval_details.append(
+                    {
+                        "query": rr.query,
+                        "response": rr.response,
+                        "expected": rr.expected,
+                        "avg_score": 0.0,
+                        "error": str(exc),
+                        "details": [],
+                    }
+                )
 
         avg_score = sum(scores) / len(scores) if scores else 0.0
         per_dim: dict[str, float] = {
-            dim: sum(vals) / len(vals)
-            for dim, vals in dim_accumulators.items()
-            if vals
+            dim: sum(vals) / len(vals) for dim, vals in dim_accumulators.items() if vals
         }
 
         return avg_score, per_dim, eval_details
@@ -775,7 +804,9 @@ class PromptFitter:
                 data = json.loads(prompts_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning(
-                    "Could not parse {}: {}", prompts_file, exc,
+                    "Could not parse {}: {}",
+                    prompts_file,
+                    exc,
                 )
                 continue
 
@@ -832,15 +863,17 @@ class PromptFitter:
         """
         results: list[dict[str, Any]] = []
         for detail in eval_details:
-            results.append({
-                "query": detail.get("query", ""),
-                "response": detail.get("response", ""),
-                "expected": detail.get("expected"),
-                "score": detail.get("avg_score", 0.0),
-                "dimensions": detail.get("dimensions", {}),
-                "feedback": detail.get("feedback", ""),
-                "is_failure": detail.get("avg_score", 0.0) < _FAILURE_THRESHOLD,
-            })
+            results.append(
+                {
+                    "query": detail.get("query", ""),
+                    "response": detail.get("response", ""),
+                    "expected": detail.get("expected"),
+                    "score": detail.get("avg_score", 0.0),
+                    "dimensions": detail.get("dimensions", {}),
+                    "feedback": detail.get("feedback", ""),
+                    "is_failure": detail.get("avg_score", 0.0) < _FAILURE_THRESHOLD,
+                }
+            )
         return results
 
     def _build_param_suggestions(
@@ -870,9 +903,7 @@ class PromptFitter:
         if "system_prompt" in diff:
             old_len = len(str(diff["system_prompt"]["old"]))
             new_len = len(str(diff["system_prompt"]["new"]))
-            reason = (
-                f"System prompt revised ({old_len} → {new_len} chars)"
-            )
+            reason = f"System prompt revised ({old_len} → {new_len} chars)"
             param_suggestions["system_prompt"] = ParamDelta(
                 param_name="system_prompt",
                 old_value=f"[{old_len} chars]",
@@ -937,8 +968,6 @@ class PromptFitter:
             text_suggestions.append("Tool parameters were adjusted")
 
         if not text_suggestions:
-            text_suggestions.append(
-                "No configuration changes improved over the baseline."
-            )
+            text_suggestions.append("No configuration changes improved over the baseline.")
 
         return param_suggestions, text_suggestions

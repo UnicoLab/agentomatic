@@ -1112,7 +1112,9 @@ class LatencyMetric(BaseMetric):
             score = 0.0
         else:
             # Linear decay between target and max
-            score = 1.0 - ((latency - self.target_seconds) / (self.max_seconds - self.target_seconds))
+            score = 1.0 - (
+                (latency - self.target_seconds) / (self.max_seconds - self.target_seconds)
+            )
 
         return EvalResult(
             metric_name=self.name,
@@ -1216,4 +1218,3 @@ class CostMetric(BaseMetric):
                         pass
         # Rough estimate: ~4 chars per token
         return max(1, len(response) // 4)
-

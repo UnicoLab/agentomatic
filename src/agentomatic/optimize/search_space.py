@@ -87,7 +87,9 @@ class PromptSearchSpace:
     tool_param_space: dict[str, list[Any]] = field(default_factory=dict)
 
     # -- deployment routing ------------------------------------------------
-    model_choices: list[str] = field(default_factory=list)  # e.g. ["ollama/qwen2.5:7b", "openai/gpt-4.1"]
+    model_choices: list[str] = field(
+        default_factory=list
+    )  # e.g. ["ollama/qwen2.5:7b", "openai/gpt-4.1"]
     fallback_models: list[str] = field(default_factory=list)  # fallback candidates
     routing_weight_space: dict[str, list[float]] = field(default_factory=dict)  # A/B weights
 

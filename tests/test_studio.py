@@ -4,17 +4,17 @@ Tests cover:
   - Studio module imports and exports
   - Graph inspector behavior
   - Run tracker event tracking
+  - Universal adapter architecture
   - Router endpoint integration (via TestClient)
 """
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 
 # =====================================================================
 # Studio Module Imports
@@ -37,16 +37,8 @@ class TestStudioImports:
     def test_import_models(self):
         from agentomatic.studio.models import (
             StudioAgentInfo,
-            StudioCheckpoint,
-            StudioGraphEdge,
-            StudioGraphNode,
             StudioGraphTopology,
-            StudioRunEvent,
-            StudioRunInfo,
-            StudioRunRequest,
             StudioServerInfo,
-            StudioStateSnapshot,
-            StudioStateUpdate,
         )
 
         # Verify they're all Pydantic models
@@ -337,7 +329,6 @@ class TestServeModule:
         from agentomatic.studio.serve import mount_studio_ui
 
         app = FastAPI()
-        routes_before = len(app.routes)
 
         # If studio is not available, no routes should be added
         mount_studio_ui(app)
@@ -465,7 +456,7 @@ class TestRouterIntegration:
         """Create a mock AgentRegistry with test agents."""
         registry = MagicMock()
 
-        # Create a test agent
+        # Create a test agent using spec to avoid spurious attributes
         test_agent = MagicMock()
         test_agent.name = "test_agent"
         test_agent.slug = "test-agent"
@@ -479,6 +470,11 @@ class TestRouterIntegration:
         test_agent.config = None
         test_agent.prompt_manager = None
         test_agent.module_path = None
+        # Ensure adapter factory doesn't pick up spurious MagicMock attrs
+        del test_agent._studio_adapter
+        del test_agent._studio_graph_fn
+        del test_agent._studio_state_fn
+        del test_agent._studio_stream_fn
 
         # Registry methods
         registry.count = 1
@@ -526,7 +522,7 @@ class TestRouterIntegration:
         assert response.status_code == 200
         data = response.json()
         assert data["agent_name"] == "test_agent"
-        # node_fn agent should get a simple linear graph
+        # node_fn agent should get a simple linear graph via GenericAdapter
         assert len(data["nodes"]) == 3  # start, agent, end
         assert len(data["edges"]) == 2
         assert data["entry_point"] == "__start__"
@@ -557,9 +553,350 @@ class TestRouterIntegration:
         data = response.json()
         assert data["thread_id"] == "t1"
         assert data["agent_name"] == "test_agent"
-        assert data["state"] == {}  # No checkpointer, empty state
+        assert data["state"] == {}  # GenericAdapter returns empty on first access
 
     def test_get_history_no_store(self, client):
         response = client.get("/studio/agents/test_agent/threads/t1/history")
         assert response.status_code == 200
         assert response.json() == []
+
+
+# =====================================================================
+# Universal Adapter Architecture
+# =====================================================================
+
+
+class TestAdapterImports:
+    """Verify the adapter system exports."""
+
+    def test_import_studio_adapter(self):
+        from agentomatic.studio.adapter import StudioAdapter
+
+        assert StudioAdapter is not None
+
+    def test_import_langgraph_adapter(self):
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        assert LangGraphAdapter is not None
+
+    def test_import_generic_adapter(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        assert GenericAdapter is not None
+
+    def test_import_resolve_adapter(self):
+        from agentomatic.studio.adapters import resolve_adapter
+
+        assert callable(resolve_adapter)
+
+    def test_import_decorators(self):
+        from agentomatic.studio.decorators import (
+            register_studio_hooks,
+            studio_graph,
+            studio_state,
+            studio_stream,
+        )
+
+        assert callable(studio_graph)
+        assert callable(studio_state)
+        assert callable(studio_stream)
+        assert callable(register_studio_hooks)
+
+    def test_public_exports(self):
+        from agentomatic.studio import (
+            StudioAdapter,
+            studio_graph,
+        )
+
+        assert StudioAdapter is not None
+        assert callable(studio_graph)
+
+
+class TestAdapterResolution:
+    """Test the adapter factory resolution logic."""
+
+    def _make_agent(self, graph_fn=None, node_fn=None, framework="custom"):
+        agent = MagicMock()
+        agent.name = "test_agent"
+        agent.graph_fn = graph_fn
+        agent.node_fn = node_fn
+        agent.manifest = MagicMock()
+        agent.manifest.name = "Test Agent"
+        agent.manifest.description = "A test agent"
+        agent.manifest.framework = framework
+        agent.module_path = None
+        # Remove spurious MagicMock attributes
+        del agent._studio_adapter
+        del agent._studio_graph_fn
+        del agent._studio_state_fn
+        del agent._studio_stream_fn
+        return agent
+
+    def test_resolve_generic_for_node_fn(self):
+        from agentomatic.studio.adapters import resolve_adapter
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = resolve_adapter(agent)
+        assert isinstance(adapter, GenericAdapter)
+
+    def test_resolve_langgraph_for_graph_fn(self):
+        from agentomatic.studio.adapters import resolve_adapter
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        mock_graph = MagicMock()
+        mock_graph.checkpointer = None
+        agent = self._make_agent(graph_fn=MagicMock(return_value=mock_graph))
+        adapter = resolve_adapter(agent)
+        assert isinstance(adapter, LangGraphAdapter)
+
+    def test_resolve_custom_adapter(self):
+        from agentomatic.studio.adapters import resolve_adapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        custom = MagicMock()
+        agent._studio_adapter = custom
+        adapter = resolve_adapter(agent)
+        assert adapter is custom
+
+    def test_resolve_langchain_for_framework(self):
+        from agentomatic.studio.adapters import resolve_adapter
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock(), framework="langchain")
+        adapter = resolve_adapter(agent)
+        assert isinstance(adapter, LangChainAdapter)
+
+
+class TestGenericAdapter:
+    """Test the generic trace-based adapter."""
+
+    def _make_agent(self, node_fn=None, framework="custom"):
+        agent = MagicMock()
+        agent.name = "my_agent"
+        agent.manifest = MagicMock()
+        agent.manifest.name = "My Agent"
+        agent.manifest.description = "A test agent"
+        agent.manifest.framework = framework
+        agent.graph_fn = None
+        agent.node_fn = node_fn
+        agent.module_path = None
+        del agent._studio_adapter
+        del agent._studio_graph_fn
+        del agent._studio_state_fn
+        del agent._studio_stream_fn
+        return agent
+
+    @pytest.mark.asyncio
+    async def test_get_graph_synthetic(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = GenericAdapter(agent)
+        graph = await adapter.get_graph()
+
+        assert graph.agent_name == "my_agent"
+        assert len(graph.nodes) == 3
+        assert len(graph.edges) == 2
+        assert graph.entry_point == "__start__"
+        node_ids = {n.id for n in graph.nodes}
+        assert "__start__" in node_ids
+        assert "my_agent" in node_ids
+        assert "__end__" in node_ids
+
+    def test_capabilities(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = GenericAdapter(agent)
+        caps = adapter.capabilities
+        assert "streaming" in caps
+        assert "traces" in caps
+        assert "graph" not in caps
+        assert "breakpoints" not in caps
+
+    @pytest.mark.asyncio
+    async def test_get_state_empty(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = GenericAdapter(agent)
+        state = await adapter.get_state("thread_1")
+        assert state is not None
+        assert state.thread_id == "thread_1"
+        assert state.state == {}
+
+    @pytest.mark.asyncio
+    async def test_update_state(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = GenericAdapter(agent)
+        result = await adapter.update_state("t1", {"key": "value"})
+        assert result is not None
+        assert result.state["key"] == "value"
+
+    @pytest.mark.asyncio
+    async def test_get_history_empty(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = GenericAdapter(agent)
+        history = await adapter.get_history("t1")
+        assert history == []
+
+    @pytest.mark.asyncio
+    async def test_stream_execution(self):
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock(return_value={"response": "hello"}))
+        adapter = GenericAdapter(agent)
+
+        events = []
+        async for event in adapter.stream_execution(
+            {"current_query": "test"},
+            config={"configurable": {"thread_id": "t1"}},
+        ):
+            events.append(event)
+
+        # Should have: node_start, trace, node_end
+        event_types = [e.event for e in events]
+        assert "node_start" in event_types
+        assert "node_end" in event_types
+        assert "trace" in event_types
+
+
+class TestDecorators:
+    """Test studio decorator registration."""
+
+    def test_studio_graph_marks_function(self):
+        from agentomatic.studio.decorators import studio_graph
+
+        @studio_graph
+        def my_graph():
+            return {"nodes": [], "edges": []}
+
+        assert hasattr(my_graph, "_is_studio_graph")
+        assert my_graph._is_studio_graph is True
+
+    def test_studio_state_marks_function(self):
+        from agentomatic.studio.decorators import studio_state
+
+        @studio_state
+        def my_state(thread_id):
+            return {}
+
+        assert hasattr(my_state, "_is_studio_state")
+        assert my_state._is_studio_state is True
+
+    def test_studio_stream_marks_function(self):
+        from agentomatic.studio.decorators import studio_stream
+
+        @studio_stream
+        async def my_stream(state, config, breakpoints):
+            yield  # pragma: no cover
+
+        assert hasattr(my_stream, "_is_studio_stream")
+        assert my_stream._is_studio_stream is True
+
+
+class TestLangChainAdapter:
+    """Test the LangChain-specific adapter."""
+
+    def _make_agent(self, node_fn=None):
+        agent = MagicMock()
+        agent.name = "chatbot"
+        agent.manifest = MagicMock()
+        agent.manifest.name = "Chatbot"
+        agent.manifest.description = "A LangChain chatbot"
+        agent.manifest.framework = "langchain"
+        agent.graph_fn = None
+        agent.node_fn = node_fn
+        agent.module_path = None
+        del agent._studio_adapter
+        del agent._studio_graph_fn
+        del agent._studio_state_fn
+        del agent._studio_stream_fn
+        del agent._langchain_runnable
+        return agent
+
+    def test_import(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        assert LangChainAdapter is not None
+
+    def test_capabilities(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = LangChainAdapter(agent)
+        caps = adapter.capabilities
+        assert "streaming" in caps
+        assert "traces" in caps
+
+    @pytest.mark.asyncio
+    async def test_get_graph_synthetic(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = LangChainAdapter(agent)
+        graph = await adapter.get_graph()
+
+        assert graph.agent_name == "chatbot"
+        # Synthetic LangChain graph: start → prompt → llm → output_parser → end
+        assert len(graph.nodes) == 5
+        assert len(graph.edges) == 4
+        assert graph.metadata.get("framework") == "langchain"
+
+    @pytest.mark.asyncio
+    async def test_get_state_empty(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = LangChainAdapter(agent)
+        state = await adapter.get_state("t1")
+        assert state is not None
+        assert state.state == {}
+
+    @pytest.mark.asyncio
+    async def test_update_state(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = LangChainAdapter(agent)
+        result = await adapter.update_state("t1", {"messages": ["hello"]})
+        assert result is not None
+        assert result.state["messages"] == ["hello"]
+
+    @pytest.mark.asyncio
+    async def test_get_history_empty(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock())
+        adapter = LangChainAdapter(agent)
+        history = await adapter.get_history("t1")
+        assert history == []
+
+    @pytest.mark.asyncio
+    async def test_stream_execution_fallback(self):
+        from agentomatic.studio.adapters.langchain import LangChainAdapter
+
+        agent = self._make_agent(node_fn=AsyncMock(return_value={"response": "hi there!"}))
+        adapter = LangChainAdapter(agent)
+
+        events = []
+        async for event in adapter.stream_execution(
+            {"current_query": "hello"},
+            config={"configurable": {"thread_id": "t1"}},
+        ):
+            events.append(event)
+
+        event_types = [e.event for e in events]
+        assert "node_start" in event_types
+        assert "node_end" in event_types
+        assert "trace" in event_types
+
+        # Verify history was recorded
+        history = await adapter.get_history("t1")
+        assert len(history) == 1
+        assert history[0].metadata["framework"] == "langchain"

@@ -8,9 +8,8 @@ breakpoints.
 
 from __future__ import annotations
 
-import time
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class LangGraphAdapter(StudioAdapter):
@@ -106,9 +105,7 @@ class LangGraphAdapter(StudioAdapter):
             target = getattr(edge, "target", None)
             if source is None or target is None:
                 continue
-            condition = getattr(edge, "conditional", None) or getattr(
-                edge, "data", None
-            )
+            condition = getattr(edge, "conditional", None) or getattr(edge, "data", None)
             if condition is True:
                 condition = "conditional"
             elif condition and not isinstance(condition, str):
