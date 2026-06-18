@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/debug-ui/">
       
       
-        <link rel="prev" href="../telemetry/">
+        <link rel="prev" href="../studio/">
       
       
-        <link rel="next" href="../studio/">
+        <link rel="next" href="../demo/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Debug UI - Agentomatic</title>
+        <title>Chat Interface (Chainlit) - Agentomatic</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#debug-ui" class="md-skip">
+        <a href="#chat-interface-chainlit" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Debug UI
+              Chat Interface (Chainlit)
             
           </span>
         </div>
@@ -264,17 +264,37 @@
   
   
   
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../agent-structure/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
     
   
   
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../agent-structure/" class="md-tabs__link">
+        <a href="../studio/" class="md-tabs__link">
           
   
   
-  User Guide
+  Debugging
 
         </a>
       </li>
@@ -587,31 +607,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -629,7 +646,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -920,6 +937,98 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Debugging
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../studio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agentomatic Studio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
               
                 
   
@@ -943,7 +1052,7 @@
   <span class="md-ellipsis">
     
   
-    Debug UI
+    Chat Interface (Chainlit)
   
 
     
@@ -961,7 +1070,7 @@
   <span class="md-ellipsis">
     
   
-    Debug UI
+    Chat Interface (Chainlit)
   
 
     
@@ -990,19 +1099,19 @@
   <a href="#installation-launch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🏁 Installation &amp; Launch
+        Installation &amp; Launch
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="🏁 Installation &amp; Launch">
+    <nav class="md-nav" aria-label="Installation &amp; Launch">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-embedded-mode-recommended" class="md-nav__link">
+  <a href="#install-the-ui-extra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Embedded Mode (Recommended)
+        Install the UI Extra
       
     </span>
   </a>
@@ -1010,10 +1119,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-standalone-mode" class="md-nav__link">
+  <a href="#launch-modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Standalone Mode
+        Launch Modes
       
     </span>
   </a>
@@ -1026,22 +1135,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interface-features-layout" class="md-nav__link">
+  <a href="#interface-features" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🎨 Interface Features &amp; Layout
+        Interface Features
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="🎨 Interface Features &amp; Layout">
+    <nav class="md-nav" aria-label="Interface Features">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-agent-selector" class="md-nav__link">
+  <a href="#agent-selector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🔍 1. Agent Selector
+        Agent Selector
       
     </span>
   </a>
@@ -1049,10 +1158,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-prompt-version-selector" class="md-nav__link">
+  <a href="#prompt-version-selector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🏷️ 2. Prompt Version Selector
+        Prompt Version Selector
       
     </span>
   </a>
@@ -1060,10 +1169,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-token-by-token-streaming" class="md-nav__link">
+  <a href="#token-by-token-streaming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🌊 3. Token-by-Token Streaming
+        Token-by-Token Streaming
       
     </span>
   </a>
@@ -1071,10 +1180,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-expandable-tool-call-visualizations" class="md-nav__link">
+  <a href="#tool-call-visualizations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🛠️ 4. Expandable Tool Call Visualizations
+        Tool Call Visualizations
       
     </span>
   </a>
@@ -1082,10 +1191,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-chain-of-thought-reasoning-spans" class="md-nav__link">
+  <a href="#chain-of-thought-reasoning" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🧠 5. Chain-of-Thought &amp; Reasoning Spans
+        Chain-of-Thought &amp; Reasoning
       
     </span>
   </a>
@@ -1093,10 +1202,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-citations-sources" class="md-nav__link">
+  <a href="#citations-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📖 6. Citations &amp; Sources
+        Citations &amp; Sources
       
     </span>
   </a>
@@ -1104,10 +1213,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#7-user-feedback-collection" class="md-nav__link">
+  <a href="#user-feedback-collection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        💬 7. User Feedback Collection
+        User Feedback Collection
       
     </span>
   </a>
@@ -1120,22 +1229,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#advanced-customization" class="md-nav__link">
+  <a href="#customization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ⚙️ Advanced Customization
+        Customization
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="⚙️ Advanced Customization">
+    <nav class="md-nav" aria-label="Customization">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#creating-custom-config-files" class="md-nav__link">
+  <a href="#theme-layout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating custom config files
+        Theme &amp; Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-welcome-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Welcome Message
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables
       
     </span>
   </a>
@@ -1144,6 +1275,28 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#programmatic-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmatic Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-chat-ui-vs-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use Chat UI vs Studio
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1163,14 +1316,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../studio/" class="md-nav__link">
+      <a href="../demo/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Agentomatic Studio
+    Demo Command
   
 
     
@@ -1213,10 +1366,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -1234,8 +1387,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1302,10 +1455,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1323,8 +1476,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1481,19 +1634,19 @@
   <a href="#installation-launch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🏁 Installation &amp; Launch
+        Installation &amp; Launch
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="🏁 Installation &amp; Launch">
+    <nav class="md-nav" aria-label="Installation &amp; Launch">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-embedded-mode-recommended" class="md-nav__link">
+  <a href="#install-the-ui-extra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Embedded Mode (Recommended)
+        Install the UI Extra
       
     </span>
   </a>
@@ -1501,10 +1654,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-standalone-mode" class="md-nav__link">
+  <a href="#launch-modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Standalone Mode
+        Launch Modes
       
     </span>
   </a>
@@ -1517,22 +1670,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interface-features-layout" class="md-nav__link">
+  <a href="#interface-features" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🎨 Interface Features &amp; Layout
+        Interface Features
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="🎨 Interface Features &amp; Layout">
+    <nav class="md-nav" aria-label="Interface Features">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-agent-selector" class="md-nav__link">
+  <a href="#agent-selector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🔍 1. Agent Selector
+        Agent Selector
       
     </span>
   </a>
@@ -1540,10 +1693,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-prompt-version-selector" class="md-nav__link">
+  <a href="#prompt-version-selector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🏷️ 2. Prompt Version Selector
+        Prompt Version Selector
       
     </span>
   </a>
@@ -1551,10 +1704,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-token-by-token-streaming" class="md-nav__link">
+  <a href="#token-by-token-streaming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🌊 3. Token-by-Token Streaming
+        Token-by-Token Streaming
       
     </span>
   </a>
@@ -1562,10 +1715,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-expandable-tool-call-visualizations" class="md-nav__link">
+  <a href="#tool-call-visualizations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🛠️ 4. Expandable Tool Call Visualizations
+        Tool Call Visualizations
       
     </span>
   </a>
@@ -1573,10 +1726,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-chain-of-thought-reasoning-spans" class="md-nav__link">
+  <a href="#chain-of-thought-reasoning" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🧠 5. Chain-of-Thought &amp; Reasoning Spans
+        Chain-of-Thought &amp; Reasoning
       
     </span>
   </a>
@@ -1584,10 +1737,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-citations-sources" class="md-nav__link">
+  <a href="#citations-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📖 6. Citations &amp; Sources
+        Citations &amp; Sources
       
     </span>
   </a>
@@ -1595,10 +1748,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#7-user-feedback-collection" class="md-nav__link">
+  <a href="#user-feedback-collection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        💬 7. User Feedback Collection
+        User Feedback Collection
       
     </span>
   </a>
@@ -1611,22 +1764,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#advanced-customization" class="md-nav__link">
+  <a href="#customization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ⚙️ Advanced Customization
+        Customization
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="⚙️ Advanced Customization">
+    <nav class="md-nav" aria-label="Customization">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#creating-custom-config-files" class="md-nav__link">
+  <a href="#theme-layout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating custom config files
+        Theme &amp; Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-welcome-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Welcome Message
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables
       
     </span>
   </a>
@@ -1635,6 +1810,28 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#programmatic-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmatic Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-chat-ui-vs-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use Chat UI vs Studio
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1658,67 +1855,262 @@
   
 
 
-<h1 id="debug-ui">Debug UI<a class="headerlink" href="#debug-ui" title="Permanent link">&para;</a></h1>
-<div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
-  <h3>Interactive Agent Playground</h3>
+<h1 id="chat-interface-chainlit">Chat Interface (Chainlit)<a class="headerlink" href="#chat-interface-chainlit" title="Permanent link">&para;</a></h1>
+<p>Agentomatic includes a built-in ChatGPT-like conversational interface powered by <strong>Chainlit</strong>. It provides an interactive chat playground to test agent responses, compare prompt versions, inspect tool calls, and collect user feedback — without writing any frontend code.</p>
+<div class="admonition info">
+<p class="admonition-title">Chat UI vs Agentomatic Studio</p>
+<p>Agentomatic offers <strong>two</strong> debug interfaces for different workflows:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Chat Interface (this page)</th>
+<th><a href="../studio/">Agentomatic Studio</a></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Conversational testing</td>
+<td>Visual debugging &amp; inspection</td>
+</tr>
+<tr>
+<td><strong>Launch flag</strong></td>
+<td><code>--with-ui</code></td>
+<td><code>--studio</code></td>
+</tr>
+<tr>
+<td><strong>URL</strong></td>
+<td><code>/chat</code></td>
+<td><code>/studio/ui/</code></td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Testing agent responses, prompt A/B testing, user feedback</td>
+<td>Graph visualization, state inspection, time-travel, breakpoints</td>
+</tr>
+<tr>
+<td><strong>Interface</strong></td>
+<td>Chat bubbles (ChatGPT-like)</td>
+<td>Node graph + debug panels</td>
+</tr>
+<tr>
+<td><strong>Framework</strong></td>
+<td>Chainlit</td>
+<td>React</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Use the Chat Interface when</strong> you want to have a conversation with your agent and evaluate response quality. <strong>Use <a href="../studio/">Studio</a> when</strong> you need to debug execution flow, inspect state, or trace node-by-node behavior.</p>
 </div>
-
 <hr />
-<p>Agentomatic includes a built-in ChatGPT-like conversational playground. Powered by <strong>Chainlit</strong>, it provides an interactive console to inspect, test, and debug your agents without writing any frontend code.</p>
-<hr />
-<h2 id="installation-launch">🏁 Installation &amp; Launch<a class="headerlink" href="#installation-launch" title="Permanent link">&para;</a></h2>
-<p>Install the web extra components:</p>
+<h2 id="installation-launch">Installation &amp; Launch<a class="headerlink" href="#installation-launch" title="Permanent link">&para;</a></h2>
+<h3 id="install-the-ui-extra">Install the UI Extra<a class="headerlink" href="#install-the-ui-extra" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>ui<span class="o">]</span>
 </code></pre></div>
-<p>You can launch the Debug UI in two modes:</p>
-<h3 id="1-embedded-mode-recommended">1. Embedded Mode (Recommended)<a class="headerlink" href="#1-embedded-mode-recommended" title="Permanent link">&para;</a></h3>
-<p>Mounts the Chainlit interface directly into your FastAPI web application. </p>
+<h3 id="launch-modes">Launch Modes<a class="headerlink" href="#launch-modes" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Embedded Mode (Recommended)</label><label for="__tabbed_1_2">Standalone Mode</label><label for="__tabbed_1_3">Combined with Studio</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Mounts the Chainlit interface directly into your FastAPI application. API requests and chat sessions share the same persistence backend and middleware stack.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--with-ui
 </code></pre></div>
-<p>This runs the platform and maps the UI to <code>/chat</code> (e.g., <code>http://localhost:8000/chat</code>). API requests and chat sessions utilize the same persistence backend and middleware filters.</p>
-<h3 id="2-standalone-mode">2. Standalone Mode<a class="headerlink" href="#2-standalone-mode" title="Permanent link">&para;</a></h3>
-<p>Launches the chat console directly, binding to a custom port.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>agentomatic<span class="w"> </span>ui<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+<ul>
+<li><strong>Platform API</strong>: <code>http://localhost:8000</code></li>
+<li><strong>Chat UI</strong>: <code>http://localhost:8000/chat</code></li>
+<li><strong>API Docs</strong>: <code>http://localhost:8000/docs</code></li>
+</ul>
+</div>
+<div class="tabbed-block">
+<p>Launches the chat console as a separate process, pointing to an already-running platform backend.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Start the platform first</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>agentomatic<span class="w"> </span>run
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Then launch the UI separately</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>agentomatic<span class="w"> </span>ui<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">8001</span>
+</code></pre></div>
+<ul>
+<li><strong>Chat UI</strong>: <code>http://localhost:8001</code></li>
+</ul>
+</div>
+<div class="tabbed-block">
+<p>Run both debug interfaces simultaneously:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--with-ui<span class="w"> </span>--studio<span class="w"> </span>--reload
+</code></pre></div>
+<ul>
+<li><strong>Chat UI</strong>: <code>http://localhost:8000/chat</code></li>
+<li><strong>Studio</strong>: <code>http://localhost:8000/studio/ui/</code></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Development workflow</p>
+<p>During development, combine <code>--with-ui</code> with <code>--reload</code> for live reloading:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--with-ui<span class="w"> </span>--reload
+</code></pre></div></p>
+</div>
+<hr />
+<h2 id="interface-features">Interface Features<a class="headerlink" href="#interface-features" title="Permanent link">&para;</a></h2>
+<h3 id="agent-selector"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5"/></svg></span> Agent Selector<a class="headerlink" href="#agent-selector" title="Permanent link">&para;</a></h3>
+<p>A top-navigation dropdown lists all registered agents discovered by the platform registry. Select an agent to dynamically load its input form, configuration, and documentation.</p>
+<h3 id="prompt-version-selector"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.5 7A1.5 1.5 0 0 1 4 5.5 1.5 1.5 0 0 1 5.5 4 1.5 1.5 0 0 1 7 5.5 1.5 1.5 0 0 1 5.5 7m15.91 4.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.11 0-2 .89-2 2v7c0 .55.22 1.05.59 1.41l8.99 9c.37.36.87.59 1.42.59s1.05-.23 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.56-.23-1.06-.59-1.42"/></svg></span> Prompt Version Selector<a class="headerlink" href="#prompt-version-selector" title="Permanent link">&para;</a></h3>
+<p>Inspect and switch between prompt versions (e.g., <code>v1</code>, <code>v2</code>, <code>v1_formal</code>) on the fly. Chat queries execute against the selected version, enabling manual A/B comparison of prompt behaviors.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// agents/my_agent/prompts.json</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p">{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">&quot;v1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">&quot;system&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a concise assistant.&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">&quot;user_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Query: {query}&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">&quot;v2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="nt">&quot;system&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a creative, detailed assistant.&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">&quot;user_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Please elaborate on: {query}&quot;</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="token-by-token-streaming"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33m0-6h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2V6h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0C17.22 5.53 18.61 6 20 6m0 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33"/></svg></span> Token-by-Token Streaming<a class="headerlink" href="#token-by-token-streaming" title="Permanent link">&para;</a></h3>
+<p>If your agent supports streaming (via SSE), response completions stream onto the screen in real-time, matching the experience of ChatGPT and similar interfaces.</p>
+<h3 id="tool-call-visualizations"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6zm3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47"/></svg></span> Tool Call Visualizations<a class="headerlink" href="#tool-call-visualizations" title="Permanent link">&para;</a></h3>
+<p>Intermediate agent actions — tool calls, function invocations, retrieval steps — are captured and rendered as clean, expandable panels in the chat flow. Click a panel to inspect the exact input arguments and JSON output returned by the tool.</p>
+<h3 id="chain-of-thought-reasoning"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.33 12.91c.09 1.55-.62 3.04-1.89 3.95l.77 1.49c.23.45.26.98.06 1.45-.19.47-.58.84-1.06 1l-.79.25a1.687 1.687 0 0 1-1.86-.55L14.44 18c-.89-.15-1.73-.53-2.44-1.1-.5.15-1 .23-1.5.23-.88 0-1.76-.27-2.5-.79-.53.16-1.07.23-1.62.22-.79.01-1.57-.15-2.3-.45a4.1 4.1 0 0 1-2.43-3.61c-.08-.72.04-1.45.35-2.11-.29-.75-.32-1.57-.07-2.33C2.3 7.11 3 6.32 3.87 5.82c.58-1.69 2.21-2.82 4-2.7 1.6-1.5 4.05-1.66 5.83-.37.42-.11.86-.17 1.3-.17 1.36-.03 2.65.57 3.5 1.64 2.04.53 3.5 2.35 3.58 4.47.05 1.11-.25 2.2-.86 3.13.07.36.11.72.11 1.09m-5-1.41c.57.07 1.02.5 1.02 1.07a1 1 0 0 1-1 1h-.63c-.32.9-.88 1.69-1.62 2.29.25.09.51.14.77.21 5.13-.07 4.53-3.2 4.53-3.25a2.59 2.59 0 0 0-2.69-2.49 1 1 0 0 1-1-1 1 1 0 0 1 1-1c1.23.03 2.41.49 3.33 1.3.05-.29.08-.59.08-.89-.06-1.24-.62-2.32-2.87-2.53-1.25-2.96-4.4-1.32-4.4-.4-.03.23.21.72.25.75a1 1 0 0 1 1 1c0 .55-.45 1-1 1-.53-.02-1.03-.22-1.43-.56-.48.31-1.03.5-1.6.56-.57.05-1.04-.35-1.07-.9a.97.97 0 0 1 .88-1.1c.16-.02.94-.14.94-.77 0-.66.25-1.29.68-1.79-.92-.25-1.91.08-2.91 1.29C6.75 5 6 5.25 5.45 7.2 4.5 7.67 4 8 3.78 9c1.08-.22 2.19-.13 3.22.25.5.19.78.75.59 1.29-.19.52-.77.78-1.29.59-.73-.32-1.55-.34-2.3-.06-.32.27-.32.83-.32 1.27 0 .74.37 1.43 1 1.83.53.27 1.12.41 1.71.4q-.225-.39-.39-.81a1.038 1.038 0 0 1 1.96-.68c.4 1.14 1.42 1.92 2.62 2.05 1.37-.07 2.59-.88 3.19-2.13.23-1.38 1.34-1.5 2.56-1.5m2 7.47-.62-1.3-.71.16 1 1.25zm-4.65-8.61a1 1 0 0 0-.91-1.03c-.71-.04-1.4.2-1.93.67-.57.58-.87 1.38-.84 2.19a1 1 0 0 0 1 1c.57 0 1-.45 1-1 0-.27.07-.54.23-.76.12-.1.27-.15.43-.15.55.03 1.02-.38 1.02-.92"/></svg></span> Chain-of-Thought &amp; Reasoning<a class="headerlink" href="#chain-of-thought-reasoning" title="Permanent link">&para;</a></h3>
+<p>If your agent returns reasoning or step-by-step logs, the UI highlights these in collapsible cards showing the agent's thought process before the final answer.</p>
+<h3 id="citations-sources"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 21.5c-1.35-.85-3.8-1.5-5.5-1.5-1.65 0-3.35.3-4.75 1.05-.1.05-.15.05-.25.05-.25 0-.5-.25-.5-.5V6c.6-.45 1.25-.75 2-1 1.11-.35 2.33-.5 3.5-.5 1.95 0 4.05.4 5.5 1.5 1.45-1.1 3.55-1.5 5.5-1.5 1.17 0 2.39.15 3.5.5.75.25 1.4.55 2 1v14.6c0 .25-.25.5-.5.5-.1 0-.15 0-.25-.05-1.4-.75-3.1-1.05-4.75-1.05-1.7 0-4.15.65-5.5 1.5M12 8v11.5c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5V7c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5m1 3.5c1.11-.68 2.6-1 4.5-1 .91 0 1.76.09 2.5.28V9.23c-.87-.15-1.71-.23-2.5-.23q-2.655 0-4.5.84zm4.5.17c-1.71 0-3.21.26-4.5.79v1.69c1.11-.65 2.6-.99 4.5-.99 1.04 0 1.88.08 2.5.24v-1.5c-.87-.16-1.71-.23-2.5-.23m2.5 2.9c-.87-.16-1.71-.24-2.5-.24-1.83 0-3.33.27-4.5.8v1.69c1.11-.66 2.6-.99 4.5-.99 1.04 0 1.88.08 2.5.24z"/></svg></span> Citations &amp; Sources<a class="headerlink" href="#citations-sources" title="Permanent link">&para;</a></h3>
+<p>Citations returned by RAG pipelines are rendered as clickable badges at the bottom of messages, referencing PDFs, web links, or documentation files.</p>
+<h3 id="user-feedback-collection"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23 10a2 2 0 0 0-2-2h-6.32l.96-4.57c.02-.1.03-.21.03-.32 0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.58C7.22 7.95 7 8.45 7 9v10a2 2 0 0 0 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73zM1 21h4V9H1z"/></svg></span> User Feedback Collection<a class="headerlink" href="#user-feedback-collection" title="Permanent link">&para;</a></h3>
+<p>Every response includes thumbs-up and thumbs-down icons. Users can submit rating scores and commentary directly from the UI. Feedback is:</p>
+<ul>
+<li>Immediately saved to the platform's database (SQL or Memory)</li>
+<li>Available via the <code>/api/v1/{agent}/feedback</code> endpoint</li>
+<li>Exportable as training data for prompt optimization</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Feedback-driven optimization</p>
+<p>Feedback collected through the Chat UI can be exported and used as evaluation datasets for the <a href="../optimization/">Prompt Optimization</a> pipeline:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>my_agent<span class="w"> </span>--dataset<span class="w"> </span>feedback_export.jsonl<span class="w"> </span>--metrics<span class="w"> </span>relevancy
+</code></pre></div></p>
+</div>
+<hr />
+<h2 id="customization">Customization<a class="headerlink" href="#customization" title="Permanent link">&para;</a></h2>
+<h3 id="theme-layout">Theme &amp; Layout<a class="headerlink" href="#theme-layout" title="Permanent link">&para;</a></h3>
+<p>When running <code>agentomatic run --with-ui</code> for the first time, Agentomatic generates a default <code>.chainlit/config.toml</code> file. Customize it to match your brand:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[theme]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># Custom brand colors</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">primary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#7c3aed&quot;</span><span class="w">          </span><span class="c1"># Deep purple (matches Agentomatic theme)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#1a202c&quot;</span><span class="w">       </span><span class="c1"># Dark background</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">paper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#2d3748&quot;</span><span class="w">            </span><span class="c1"># Card backgrounds</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">font_family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Inter, sans-serif&quot;</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="k">[UI]</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;My AI Assistant&quot;</span><span class="w">     </span><span class="c1"># Title shown in the header</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="n">show_readme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="w">          </span><span class="c1"># Hide the README panel</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">default_expand_messages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</code></pre></div>
+<h3 id="custom-welcome-message">Custom Welcome Message<a class="headerlink" href="#custom-welcome-message" title="Permanent link">&para;</a></h3>
+<p>Edit the <code>.chainlit/README.md</code> file to customize the welcome screen shown when users open a new session:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gh"># Welcome to My Agent Platform 🚀</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>Select an agent from the dropdown above and start chatting.
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="gs">**Available agents:**</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Support Bot**</span> — Answer customer questions
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Code Assistant**</span> — Help with programming tasks
+</code></pre></div>
+<h3 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CHAINLIT_AUTH_SECRET</code></td>
+<td>—</td>
+<td>Secret for session authentication</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_API_URL</code></td>
+<td><code>http://localhost:8000</code></td>
+<td>Backend API URL (standalone mode)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="programmatic-integration">Programmatic Integration<a class="headerlink" href="#programmatic-integration" title="Permanent link">&para;</a></h2>
+<p>You can also mount the Chat UI programmatically from Python:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Mount Chainlit UI</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.ui</span><span class="w"> </span><span class="kn">import</span> <span class="n">mount</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">mount</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>  <span class="c1"># Chat UI available at /chat</span>
 </code></pre></div>
 <hr />
-<h2 id="interface-features-layout">🎨 Interface Features &amp; Layout<a class="headerlink" href="#interface-features-layout" title="Permanent link">&para;</a></h2>
-<p>The Debug UI is fully optimized with a custom dark theme matching Agentomatic's sleek aesthetics:</p>
-<h3 id="1-agent-selector">🔍 1. Agent Selector<a class="headerlink" href="#1-agent-selector" title="Permanent link">&para;</a></h3>
-<p>A top-navigation dropdown lists all registered agents discovered by your platform registry. Select an agent to dynamically load its input form and instructions.</p>
-<h3 id="2-prompt-version-selector">🏷️ 2. Prompt Version Selector<a class="headerlink" href="#2-prompt-version-selector" title="Permanent link">&para;</a></h3>
-<p>Inspect and switch prompt versions (e.g., <code>v1</code>, <code>v2</code>, <code>v1_formal</code>) on the fly. Chat queries are executed against the selected version, letting you manually test and compare prompt behaviors.</p>
-<h3 id="3-token-by-token-streaming">🌊 3. Token-by-Token Streaming<a class="headerlink" href="#3-token-by-token-streaming" title="Permanent link">&para;</a></h3>
-<p>If your agent supports streaming (via <code>__init__.py</code> manifest metadata and SSE), response completions stream onto the screen in real-time, matching modern chat experiences.</p>
-<h3 id="4-expandable-tool-call-visualizations">🛠️ 4. Expandable Tool Call Visualizations<a class="headerlink" href="#4-expandable-tool-call-visualizations" title="Permanent link">&para;</a></h3>
-<p>Intermediate agent actions, like tool calls, are captured and rendered as clean, expandable panels in the chat flow. Click on a panel to inspect the exact input arguments and JSON output returned by the tool.</p>
-<h3 id="5-chain-of-thought-reasoning-spans">🧠 5. Chain-of-Thought &amp; Reasoning Spans<a class="headerlink" href="#5-chain-of-thought-reasoning-spans" title="Permanent link">&para;</a></h3>
-<p>If your graph returns reasoning or step-by-step logs, Agentomatic highlights these in collapsible cards, showing the agent's thought process before the final answer is rendered.</p>
-<h3 id="6-citations-sources">📖 6. Citations &amp; Sources<a class="headerlink" href="#6-citations-sources" title="Permanent link">&para;</a></h3>
-<p>Citations returned by RAG pipelines are rendered as clickable footers or badges at the bottom of messages, referencing PDFs, web links, or documentation files.</p>
-<h3 id="7-user-feedback-collection">💬 7. User Feedback Collection<a class="headerlink" href="#7-user-feedback-collection" title="Permanent link">&para;</a></h3>
-<p>Every response includes thumbs-up and thumbs-down icons. Users can submit rating scores and commentary directly from the UI, which are immediately saved to the platform's SQL/Memory database and exported for prompt optimization datasets.</p>
-<hr />
-<h2 id="advanced-customization">⚙️ Advanced Customization<a class="headerlink" href="#advanced-customization" title="Permanent link">&para;</a></h2>
-<p>You can customize Chainlit's configuration (colors, system messages, layout) by dropping a <code>.chainlit/</code> configuration directory into your project.</p>
-<h3 id="creating-custom-config-files">Creating custom config files<a class="headerlink" href="#creating-custom-config-files" title="Permanent link">&para;</a></h3>
-<p>When running <code>agentomatic run --with-ui</code> for the first time, Agentomatic generates a default <code>.chainlit/config.toml</code> file. You can edit this file to customize:</p>
-<ul>
-<li><strong>Theme colors</strong>: Adjust primary, background, and paper colors.</li>
-<li><strong>User Interface layout</strong>: Enable/disable chat history logs or file uploads.</li>
-<li><strong>Intro message</strong>: Customize the header title, logo, and quickstart text boxes shown when a user opens a new thread.</li>
-</ul>
-<p>Example edit in <code>.chainlit/config.toml</code>:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[theme]</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># Customize colors to match your brand style</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">primary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#d53f8c&quot;</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#1a202c&quot;</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">font_family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Inter, sans-serif&quot;</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">[UI]</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;My Enterprise AI Assistant&quot;</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">show_readme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
-</code></pre></div></p>
+<h2 id="when-to-use-chat-ui-vs-studio">When to Use Chat UI vs Studio<a class="headerlink" href="#when-to-use-chat-ui-vs-studio" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th style="text-align: center;">Use Chat UI</th>
+<th style="text-align: center;">Use Studio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Testing agent response quality</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td>Comparing prompt versions side-by-side</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td>Collecting user feedback</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td>Demonstrating agents to stakeholders</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td>Debugging graph execution flow</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Inspecting intermediate node state</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Time-travel debugging (replay from checkpoint)</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Setting breakpoints on nodes</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Live state editing during execution</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✅</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Recommendation</p>
+<p>For <strong>development and debugging</strong>, use <a href="../studio/">Agentomatic Studio</a>. For <strong>testing and evaluation</strong>, use the Chat Interface. Both can run simultaneously with <code>--with-ui --studio</code>.</p>
+</div>
 
 
 
