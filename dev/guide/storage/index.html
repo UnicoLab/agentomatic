@@ -867,67 +867,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#storage-architecture-models" class="md-nav__link">
+  <a href="#storage-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🏗️ Storage Architecture &amp; Models
+        🏗️ Storage Architecture
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#built-in-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📦 Built-in Backends
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="📦 Built-in Backends">
+    <nav class="md-nav" aria-label="🏗️ Storage Architecture">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-memorystore-development" class="md-nav__link">
+  <a href="#data-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. MemoryStore (Development)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-sqlalchemystore-production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. SQLAlchemyStore (Production)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. SQLAlchemyStore (Production)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#postgresql-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PostgreSQL Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sqlite-configuration-local-file-persistence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SQLite Configuration (Local file persistence)
+        Data Model
       
     </span>
   </a>
@@ -938,6 +893,40 @@
     </nav>
   
 </li>
+      
+        <li class="md-nav__item">
+  <a href="#backend-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📦 Backend Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memorystore-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧪 MemoryStore (Development)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧪 MemoryStore (Development)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#internal-data-structures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal Data Structures
+      
+    </span>
+  </a>
+  
+</li>
         
       </ul>
     </nav>
@@ -945,10 +934,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#implementing-a-custom-store-eg-redis" class="md-nav__link">
+  <a href="#sqlalchemystore-production" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🛠️ Implementing a Custom Store (e.g., Redis)
+        🐘 SQLAlchemyStore (Production)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🐘 SQLAlchemyStore (Production)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-table-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Table Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrating-the-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔌 Integrating the Store
       
     </span>
   </a>
@@ -956,10 +995,171 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integrating-the-store-with-your-platform" class="md-nav__link">
+  <a href="#thread-conversation-management" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🔌 Integrating the Store with your Platform
+        🗂️ Thread &amp; Conversation Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🗂️ Thread &amp; Conversation Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-and-managing-threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating and Managing Threads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thread-forking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread Forking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thread-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread Lineage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#langgraph-checkpointer-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ LangGraph Checkpointer Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="✅ LangGraph Checkpointer Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkpointer-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpointer API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementing-a-custom-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛠️ Implementing a Custom Backend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛠️ Implementing a Custom Backend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-redis-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Redis Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-your-custom-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Your Custom Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Storage Statistics
       
     </span>
   </a>
@@ -967,10 +1167,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-basestore-api-interface-reference" class="md-nav__link">
+  <a href="#further-reading" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🗂️ The BaseStore API Interface Reference
+        🔗 Further Reading
       
     </span>
   </a>
@@ -1001,6 +1201,34 @@
     
   
     Middleware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../langgraph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph Integration
   
 
     
@@ -1565,67 +1793,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#storage-architecture-models" class="md-nav__link">
+  <a href="#storage-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🏗️ Storage Architecture &amp; Models
+        🏗️ Storage Architecture
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#built-in-backends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📦 Built-in Backends
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="📦 Built-in Backends">
+    <nav class="md-nav" aria-label="🏗️ Storage Architecture">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-memorystore-development" class="md-nav__link">
+  <a href="#data-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. MemoryStore (Development)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-sqlalchemystore-production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. SQLAlchemyStore (Production)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. SQLAlchemyStore (Production)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#postgresql-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PostgreSQL Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sqlite-configuration-local-file-persistence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SQLite Configuration (Local file persistence)
+        Data Model
       
     </span>
   </a>
@@ -1636,6 +1819,40 @@
     </nav>
   
 </li>
+      
+        <li class="md-nav__item">
+  <a href="#backend-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📦 Backend Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memorystore-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧪 MemoryStore (Development)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧪 MemoryStore (Development)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#internal-data-structures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal Data Structures
+      
+    </span>
+  </a>
+  
+</li>
         
       </ul>
     </nav>
@@ -1643,10 +1860,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#implementing-a-custom-store-eg-redis" class="md-nav__link">
+  <a href="#sqlalchemystore-production" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🛠️ Implementing a Custom Store (e.g., Redis)
+        🐘 SQLAlchemyStore (Production)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🐘 SQLAlchemyStore (Production)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-table-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Table Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrating-the-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔌 Integrating the Store
       
     </span>
   </a>
@@ -1654,10 +1921,171 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integrating-the-store-with-your-platform" class="md-nav__link">
+  <a href="#thread-conversation-management" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🔌 Integrating the Store with your Platform
+        🗂️ Thread &amp; Conversation Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🗂️ Thread &amp; Conversation Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-and-managing-threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating and Managing Threads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thread-forking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread Forking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thread-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread Lineage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#langgraph-checkpointer-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ LangGraph Checkpointer Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="✅ LangGraph Checkpointer Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkpointer-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpointer API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementing-a-custom-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛠️ Implementing a Custom Backend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛠️ Implementing a Custom Backend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-redis-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Redis Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-your-custom-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Your Custom Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Storage Statistics
       
     </span>
   </a>
@@ -1665,10 +2093,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-basestore-api-interface-reference" class="md-nav__link">
+  <a href="#further-reading" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🗂️ The BaseStore API Interface Reference
+        🔗 Further Reading
       
     </span>
   </a>
@@ -1702,279 +2130,784 @@
 </div>
 
 <hr />
-<p>Agentomatic decouples chat persistence and session state from your agent logic. It uses a pluggable storage system where all storage backends inherit from the <code>BaseStore</code> abstract base class (ABC). This means you can build with an in-memory database locally and swap to an enterprise-grade PostgreSQL or custom Redis database in production by changing a single line of code.</p>
+<p>Agentomatic decouples chat persistence and session state from your agent logic. It uses a pluggable storage system where all backends inherit from the <code>BaseStore</code> abstract class. Build with in-memory storage locally, then swap to PostgreSQL in production by changing a single line.</p>
 <hr />
-<h2 id="storage-architecture-models">🏗️ Storage Architecture &amp; Models<a class="headerlink" href="#storage-architecture-models" title="Permanent link">&para;</a></h2>
-<p>Agentomatic’s data model consists of three core tables/entities:</p>
-<ol>
-<li><strong>Threads</strong>: A conversation session belonging to a unique user and agent. Tracks the session state, creation/update timestamps, and custom dictionary metadata.</li>
-<li><strong>Messages</strong>: Chronological logs of user questions, assistant responses, system instructions, and tool output traces within a specific thread.</li>
-<li><strong>Feedback</strong>: Ratings (1 to 5 stars), commentary, corrections, and query/response records submitted by users or API clients.</li>
-</ol>
-<hr />
-<h2 id="built-in-backends">📦 Built-in Backends<a class="headerlink" href="#built-in-backends" title="Permanent link">&para;</a></h2>
-<h3 id="1-memorystore-development">1. <code>MemoryStore</code> (Development)<a class="headerlink" href="#1-memorystore-development" title="Permanent link">&para;</a></h3>
-<p>The default store when launching Agentomatic. It stores all threads, messages, and feedback in dictionary structures in RAM. </p>
-<ul>
-<li><strong>Pros</strong>: Zero-config, extremely fast, no external dependencies.</li>
-<li><strong>Cons</strong>: Volatile (wiped on application restart), unsuitable for production.</li>
-</ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemoryStore</span><span class="p">()</span>
-</code></pre></div>
-<h3 id="2-sqlalchemystore-production">2. <code>SQLAlchemyStore</code> (Production)<a class="headerlink" href="#2-sqlalchemystore-production" title="Permanent link">&para;</a></h3>
-<p>The production-ready store supporting any SQL database supported by SQLAlchemy's async driver (e.g., PostgreSQL, MySQL, SQLite, or CockroachDB).</p>
-<ul>
-<li><strong>Pros</strong>: Relational ACID storage, indexed thread lookups, connection pooling.</li>
-<li><strong>Cons</strong>: Requires setup and driver installations (e.g., <code>asyncpg</code> or <code>aiosqlite</code>).</li>
-</ul>
-<h4 id="postgresql-configuration">PostgreSQL Configuration<a class="headerlink" href="#postgresql-configuration" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="s2">&quot;postgresql+asyncpg://postgres:secret@localhost:5432/agent_db&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">pool_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>         <span class="c1"># Minimum persistent connections</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">max_overflow</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>      <span class="c1"># Maximum temporary overflow connections</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">pool_timeout</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span>    <span class="c1"># Seconds to wait for a connection from the pool</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-</code></pre></div>
-<h4 id="sqlite-configuration-local-file-persistence">SQLite Configuration (Local file persistence)<a class="headerlink" href="#sqlite-configuration-local-file-persistence" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;sqlite+aiosqlite:///./data/agentomatic.db&quot;</span><span class="p">)</span>
-</code></pre></div>
-<hr />
-<h2 id="implementing-a-custom-store-eg-redis">🛠️ Implementing a Custom Store (e.g., Redis)<a class="headerlink" href="#implementing-a-custom-store-eg-redis" title="Permanent link">&para;</a></h2>
-<p>To use a custom backend like Redis, MongoDB, or DynamoDB, subclass <code>BaseStore</code> and implement the abstract database operations:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">redis.asyncio</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">aioredis</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseStore</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">RedisStore</span><span class="p">(</span><span class="n">BaseStore</span><span class="p">):</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">url</span> <span class="o">=</span> <span class="n">url</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="p">:</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">Redis</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Called automatically during platform startup.&quot;&quot;&quot;</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span> <span class="o">=</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">from_url</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="n">decode_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Called automatically during platform shutdown.&quot;&quot;&quot;</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="p">:</span>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">create_thread</span><span class="p">(</span>
-<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>        <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>        <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>        <span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>        <span class="o">*</span><span class="p">,</span>
-<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>        <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>        <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>        <span class="n">thread</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>            <span class="s2">&quot;thread_id&quot;</span><span class="p">:</span> <span class="n">thread_id</span><span class="p">,</span>
-<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>            <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>
-<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>            <span class="s2">&quot;agent_name&quot;</span><span class="p">:</span> <span class="n">agent_name</span><span class="p">,</span>
-<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>            <span class="s2">&quot;title&quot;</span><span class="p">:</span> <span class="n">title</span> <span class="ow">or</span> <span class="s2">&quot;New Conversation&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">metadata</span> <span class="ow">or</span> <span class="p">{}),</span>
-<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>        <span class="p">}</span>
-<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">hset</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;thread:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="n">thread</span><span class="p">)</span>
-<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>        <span class="k">return</span> <span class="n">thread</span>
-<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>
-<a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>        <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">hgetall</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;thread:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
-<a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>            <span class="k">return</span> <span class="kc">None</span>
-<a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">])</span>
-<a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>        <span class="k">return</span> <span class="n">data</span>
-<a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>
-<a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_threads</span><span class="p">(</span>
-<a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>        <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a>        <span class="o">*</span><span class="p">,</span>
-<a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a>        <span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>        <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
-<a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a>        <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-<a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-<a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a>        <span class="c1"># Scan and return matching thread hashes...</span>
-<a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>        <span class="k">return</span> <span class="p">[]</span>
-<a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>
-<a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">add_message</span><span class="p">(</span>
-<a id="__codelineno-3-58" name="__codelineno-3-58" href="#__codelineno-3-58"></a>        <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-3-59" name="__codelineno-3-59" href="#__codelineno-3-59"></a>        <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-60" name="__codelineno-3-60" href="#__codelineno-3-60"></a>        <span class="n">role</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-61" name="__codelineno-3-61" href="#__codelineno-3-61"></a>        <span class="n">content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-62" name="__codelineno-3-62" href="#__codelineno-3-62"></a>        <span class="o">*</span><span class="p">,</span>
-<a id="__codelineno-3-63" name="__codelineno-3-63" href="#__codelineno-3-63"></a>        <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-3-64" name="__codelineno-3-64" href="#__codelineno-3-64"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-3-65" name="__codelineno-3-65" href="#__codelineno-3-65"></a>        <span class="n">message</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-3-66" name="__codelineno-3-66" href="#__codelineno-3-66"></a>            <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="n">role</span><span class="p">,</span>
-<a id="__codelineno-3-67" name="__codelineno-3-67" href="#__codelineno-3-67"></a>            <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">content</span><span class="p">,</span>
-<a id="__codelineno-3-68" name="__codelineno-3-68" href="#__codelineno-3-68"></a>            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">metadata</span> <span class="ow">or</span> <span class="p">{}),</span>
-<a id="__codelineno-3-69" name="__codelineno-3-69" href="#__codelineno-3-69"></a>        <span class="p">}</span>
-<a id="__codelineno-3-70" name="__codelineno-3-70" href="#__codelineno-3-70"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">rpush</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;messages:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">message</span><span class="p">))</span>
-<a id="__codelineno-3-71" name="__codelineno-3-71" href="#__codelineno-3-71"></a>        <span class="k">return</span> <span class="n">message</span>
-<a id="__codelineno-3-72" name="__codelineno-3-72" href="#__codelineno-3-72"></a>
-<a id="__codelineno-3-73" name="__codelineno-3-73" href="#__codelineno-3-73"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_messages</span><span class="p">(</span>
-<a id="__codelineno-3-74" name="__codelineno-3-74" href="#__codelineno-3-74"></a>        <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-3-75" name="__codelineno-3-75" href="#__codelineno-3-75"></a>        <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-76" name="__codelineno-3-76" href="#__codelineno-3-76"></a>        <span class="o">*</span><span class="p">,</span>
-<a id="__codelineno-3-77" name="__codelineno-3-77" href="#__codelineno-3-77"></a>        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
-<a id="__codelineno-3-78" name="__codelineno-3-78" href="#__codelineno-3-78"></a>        <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-<a id="__codelineno-3-79" name="__codelineno-3-79" href="#__codelineno-3-79"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-<a id="__codelineno-3-80" name="__codelineno-3-80" href="#__codelineno-3-80"></a>        <span class="n">raw_msgs</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">lrange</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;messages:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">limit</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
-<a id="__codelineno-3-81" name="__codelineno-3-81" href="#__codelineno-3-81"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">raw_msgs</span><span class="p">]</span>
-</code></pre></div>
-<hr />
-<h2 id="integrating-the-store-with-your-platform">🔌 Integrating the Store with your Platform<a class="headerlink" href="#integrating-the-store-with-your-platform" title="Permanent link">&para;</a></h2>
-<p>Pass your store instance directly to the <code>AgentPlatform</code> initialization. Agentomatic takes care of opening connection pools at startup, closing them gracefully at shutdown, and handling session context across all HTTP routes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># 1. Initialize the persistent backend</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">db_store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://postgres:secret@localhost:5432/agent_db&quot;</span><span class="p">)</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># 2. Bind the store to the Platform</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">store</span><span class="o">=</span><span class="n">db_store</span><span class="p">,</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">)</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
-</code></pre></div>
-<hr />
-<h2 id="the-basestore-api-interface-reference">🗂️ The <code>BaseStore</code> API Interface Reference<a class="headerlink" href="#the-basestore-api-interface-reference" title="Permanent link">&para;</a></h2>
-<p>Every storage adapter implements the following async interface methods:</p>
+<h2 id="storage-architecture">🏗️ Storage Architecture<a class="headerlink" href="#storage-architecture" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TB
+    subgraph Platform["AgentPlatform"]
+        direction TB
+        Router["Router Layer&lt;br/&gt;/invoke, /chat, /threads"]
+        Checkpointer["AgentomaticCheckpointer&lt;br/&gt;(LangGraph integration)"]
+        Feedback["FeedbackCollector"]
+    end
+
+    subgraph Store["BaseStore Interface"]
+        direction TB
+        Threads["create/get/list/delete_thread"]
+        Messages["add/get_messages"]
+        FB["add/get_feedback"]
+        HITL["save/get/list_suspended_state"]
+        CP["save/get/list_checkpoints"]
+        Fork["fork_thread / get_lineage"]
+    end
+
+    subgraph Backends["Storage Backends"]
+        Memory["MemoryStore&lt;br/&gt;(development)"]
+        SQL["SQLAlchemyStore&lt;br/&gt;(production)"]
+        Custom["Custom Store&lt;br/&gt;(Redis, Mongo, etc.)"]
+    end
+
+    Router --&gt; Store
+    Checkpointer --&gt; Store
+    Feedback --&gt; Store
+    Store --&gt; Memory
+    Store --&gt; SQL
+    Store --&gt; Custom</code></pre>
+<h3 id="data-model">Data Model<a class="headerlink" href="#data-model" title="Permanent link">&para;</a></h3>
+<p>Agentomatic's data model consists of <strong>five</strong> core entities:</p>
 <table>
 <thead>
 <tr>
-<th>Method Signature</th>
-<th>Core / Option</th>
+<th>Entity</th>
+<th>Table</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>async def initialize(self) -&gt; None</code></td>
-<td>Optional</td>
-<td>Async database pool setup</td>
+<td><strong>Thread</strong></td>
+<td><code>threads</code></td>
+<td>A conversation session — tracks owner, agent, timestamps, metadata, and fork lineage</td>
 </tr>
 <tr>
-<td><code>async def close(self) -&gt; None</code></td>
-<td>Optional</td>
-<td>Graceful resource cleanup</td>
+<td><strong>Message</strong></td>
+<td><code>messages</code></td>
+<td>Chronological log of user/assistant/system/tool messages within a thread</td>
 </tr>
 <tr>
-<td><code>async def health_check(self) -&gt; dict</code></td>
-<td>Optional</td>
-<td>Used for liveness/readiness probe reports</td>
+<td><strong>Feedback</strong></td>
+<td><code>feedback</code></td>
+<td>User ratings (1–5), comments, corrections linked to threads</td>
 </tr>
 <tr>
-<td><code>async def create_thread(...) -&gt; dict</code></td>
-<td><strong>Required</strong></td>
-<td>Register a new conversation session</td>
+<td><strong>SuspendedState</strong></td>
+<td><code>suspended_states</code></td>
+<td>Execution state saved for human-in-the-loop approval (7-day TTL)</td>
 </tr>
 <tr>
-<td><code>async def get_thread(id) -&gt; dict \| None</code></td>
-<td><strong>Required</strong></td>
-<td>Fetch a single thread</td>
-</tr>
-<tr>
-<td><code>async def list_threads(...) -&gt; list[dict]</code></td>
-<td><strong>Required</strong></td>
-<td>Search/paginate session listings</td>
-</tr>
-<tr>
-<td><code>async def update_thread(id, **kw) -&gt; dict</code></td>
-<td>Optional</td>
-<td>Update metadata or title</td>
-</tr>
-<tr>
-<td><code>async def delete_thread(id) -&gt; bool</code></td>
-<td>Optional</td>
-<td>Cascade delete thread and messages</td>
-</tr>
-<tr>
-<td><code>async def add_message(...) -&gt; dict</code></td>
-<td><strong>Required</strong></td>
-<td>Save a new query/response message</td>
-</tr>
-<tr>
-<td><code>async def get_messages(id) -&gt; list[dict]</code></td>
-<td><strong>Required</strong></td>
-<td>Fetch chronological chat histories</td>
-</tr>
-<tr>
-<td><code>async def add_feedback(...) -&gt; dict</code></td>
-<td>Optional</td>
-<td>Save user scores and comment metrics</td>
-</tr>
-<tr>
-<td><code>async def get_feedback(...) -&gt; list[dict]</code></td>
-<td>Optional</td>
-<td>Search feedback records</td>
-</tr>
-<tr>
-<td><code>async def get_stats() -&gt; dict</code></td>
-<td>Optional</td>
-<td>Return storage statistics (threads, messages, feedback counts)</td>
-</tr>
-<tr>
-<td><code>async def save_suspended_state(...) -&gt; dict</code></td>
-<td>Optional</td>
-<td>Save execution state for human approval (auto-sets 7-day TTL)</td>
-</tr>
-<tr>
-<td><code>async def get_suspended_state(id) -&gt; dict \| None</code></td>
-<td>Optional</td>
-<td>Retrieve a suspended state</td>
-</tr>
-<tr>
-<td><code>async def list_suspended_states(...) -&gt; list[dict]</code></td>
-<td>Optional</td>
-<td>List all pending suspended states</td>
-</tr>
-<tr>
-<td><code>async def delete_suspended_state(id) -&gt; bool</code></td>
-<td>Optional</td>
-<td>Delete suspended state on completion</td>
-</tr>
-<tr>
-<td><code>async def cleanup_expired_states() -&gt; int</code></td>
-<td>Optional</td>
-<td>Delete expired HITL states, returns count removed</td>
-</tr>
-<tr>
-<td><code>async def fork_thread(...) -&gt; dict \| None</code></td>
-<td>Optional</td>
-<td>Fork a conversation history up to index</td>
-</tr>
-<tr>
-<td><code>async def get_thread_lineage(id) -&gt; dict</code></td>
-<td>Optional</td>
-<td>Ancestry/descendant tree for a thread</td>
-</tr>
-<tr>
-<td><code>async def save_checkpoint(...) -&gt; None</code></td>
-<td>Optional</td>
-<td>Save a LangGraph checkpoint state</td>
-</tr>
-<tr>
-<td><code>async def get_checkpoint(...) -&gt; dict \| None</code></td>
-<td>Optional</td>
-<td>Retrieve a LangGraph checkpoint state</td>
-</tr>
-<tr>
-<td><code>async def list_checkpoints(...) -&gt; list[dict]</code></td>
-<td>Optional</td>
-<td>List checkpoints for a thread namespace</td>
+<td><strong>Checkpoint</strong></td>
+<td><code>checkpoints</code></td>
+<td>LangGraph execution checkpoints for graph state persistence</td>
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="backend-comparison">📦 Backend Comparison<a class="headerlink" href="#backend-comparison" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th style="text-align: center;"><code>MemoryStore</code></th>
+<th style="text-align: center;"><code>SQLAlchemyStore</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Setup</strong></td>
+<td style="text-align: center;">Zero-config</td>
+<td style="text-align: center;">Requires database + driver</td>
+</tr>
+<tr>
+<td><strong>Persistence</strong></td>
+<td style="text-align: center;">❌ Lost on restart</td>
+<td style="text-align: center;">✅ Durable</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td style="text-align: center;">⚡ Ultra-fast</td>
+<td style="text-align: center;">🚀 Fast (pooled)</td>
+</tr>
+<tr>
+<td><strong>Concurrency</strong></td>
+<td style="text-align: center;">Single-process</td>
+<td style="text-align: center;">Multi-process safe</td>
+</tr>
+<tr>
+<td><strong>ACID compliance</strong></td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td><strong>Thread forking</strong></td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td><strong>HITL suspension</strong></td>
+<td style="text-align: center;">✅ (in-memory)</td>
+<td style="text-align: center;">✅ (persisted)</td>
+</tr>
+<tr>
+<td><strong>Checkpointing</strong></td>
+<td style="text-align: center;">✅ (in-memory)</td>
+<td style="text-align: center;">✅ (persisted)</td>
+</tr>
+<tr>
+<td><strong>Connection pooling</strong></td>
+<td style="text-align: center;">N/A</td>
+<td style="text-align: center;">✅ Configurable</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL</strong></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✅ <code>asyncpg</code></td>
+</tr>
+<tr>
+<td><strong>SQLite</strong></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✅ <code>aiosqlite</code></td>
+</tr>
+<tr>
+<td><strong>MySQL</strong></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✅ <code>asyncmy</code></td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td style="text-align: center;">Development, testing</td>
+<td style="text-align: center;">Production</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="memorystore-development">🧪 MemoryStore (Development)<a class="headerlink" href="#memorystore-development" title="Permanent link">&para;</a></h2>
+<p>Zero-configuration in-memory storage. All data is stored in Python dictionaries and lost when the process exits.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemoryStore</span><span class="p">()</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Volatility</p>
+<p><code>MemoryStore</code> is designed for development and testing only. All threads, messages, and feedback are <strong>wiped</strong> when the application restarts.</p>
+</div>
+<h3 id="internal-data-structures">Internal Data Structures<a class="headerlink" href="#internal-data-structures" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_threads</code></td>
+<td><code>dict[str, dict]</code></td>
+<td>Thread records keyed by thread ID</td>
+</tr>
+<tr>
+<td><code>_messages</code></td>
+<td><code>dict[str, list[dict]]</code></td>
+<td>Message lists keyed by thread ID</td>
+</tr>
+<tr>
+<td><code>_feedback</code></td>
+<td><code>list[dict]</code></td>
+<td>All feedback records</td>
+</tr>
+<tr>
+<td><code>_suspended_states</code></td>
+<td><code>dict[str, dict]</code></td>
+<td>HITL states keyed by approval ID</td>
+</tr>
+<tr>
+<td><code>_checkpoints</code></td>
+<td><code>dict[tuple, dict]</code></td>
+<td>Checkpoints keyed by (thread_id, ns, cp_id)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="sqlalchemystore-production">🐘 SQLAlchemyStore (Production)<a class="headerlink" href="#sqlalchemystore-production" title="Permanent link">&para;</a></h2>
+<p>Production-ready async storage supporting any SQLAlchemy-compatible database. Features connection pooling, automatic table creation, and full ACID compliance.</p>
+<h3 id="constructor-parameters">Constructor Parameters<a class="headerlink" href="#constructor-parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td><code>str</code></td>
+<td><code>"sqlite+aiosqlite:///data/platform.db"</code></td>
+<td>Database connection URL</td>
+</tr>
+<tr>
+<td><code>pool_size</code></td>
+<td><code>int</code></td>
+<td><code>10</code></td>
+<td>Number of persistent connections in the pool</td>
+</tr>
+<tr>
+<td><code>max_overflow</code></td>
+<td><code>int</code></td>
+<td><code>20</code></td>
+<td>Maximum temporary connections above <code>pool_size</code></td>
+</tr>
+<tr>
+<td><code>pool_recycle</code></td>
+<td><code>int</code></td>
+<td><code>3600</code></td>
+<td>Recycle connections after N seconds</td>
+</tr>
+<tr>
+<td><code>pool_pre_ping</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Test connections before use (prevents stale connections)</td>
+</tr>
+<tr>
+<td><code>echo</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Log all SQL statements (debug mode)</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">SQLite Pool Settings</p>
+<p>When using SQLite, <code>pool_size</code>, <code>max_overflow</code>, <code>pool_recycle</code>, and <code>pool_pre_ping</code> are automatically ignored since SQLite doesn't support connection pooling.</p>
+</div>
+<h3 id="setup-examples">Setup Examples<a class="headerlink" href="#setup-examples" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">PostgreSQL</label><label for="__tabbed_1_2">SQLite (File)</label><label for="__tabbed_1_3">MySQL</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s2">&quot;postgresql+asyncpg://postgres:secret@localhost:5432/agent_db&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">pool_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">max_overflow</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">pool_recycle</span><span class="o">=</span><span class="mi">3600</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">pool_pre_ping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">)</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">)</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Required package:</strong> <code>pip install asyncpg</code></p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;sqlite+aiosqlite:///./data/agentomatic.db&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Required package:</strong> <code>pip install aiosqlite</code></p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;mysql+asyncmy://user:password@localhost:3306/agent_db&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">pool_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Required package:</strong> <code>pip install asyncmy</code></p>
+</div>
+</div>
+</div>
+<h3 id="database-table-schema">Database Table Schema<a class="headerlink" href="#database-table-schema" title="Permanent link">&para;</a></h3>
+<p>Tables are created automatically during <code>platform.build()</code> via the lifespan <code>initialize()</code> call:</p>
+<pre class="mermaid"><code>erDiagram
+    threads ||--o{ messages : contains
+    threads ||--o{ feedback : receives
+    threads ||--o{ suspended_states : suspends
+    threads ||--o{ threads : forks
+
+    threads {
+        string id PK
+        string user_id
+        string agent_name
+        string title
+        json metadata_json
+        datetime created_at
+        datetime updated_at
+        int message_count
+        string parent_thread_id FK
+        int fork_message_index
+    }
+
+    messages {
+        int id PK
+        string thread_id FK
+        string role
+        text content
+        json metadata_json
+        datetime created_at
+    }
+
+    feedback {
+        int id PK
+        string thread_id FK
+        int message_id
+        string user_id
+        string agent_name
+        int rating
+        text comment
+        string feedback_type
+        datetime created_at
+    }
+
+    suspended_states {
+        string id PK
+        string thread_id FK
+        string agent_name
+        string node_name
+        json state_json
+        datetime created_at
+        datetime expires_at
+    }
+
+    checkpoints {
+        string thread_id PK
+        string checkpoint_ns PK
+        string checkpoint_id PK
+        string parent_checkpoint_id
+        json checkpoint_json
+        json metadata_json
+        datetime created_at
+    }</code></pre>
+<hr />
+<h2 id="integrating-the-store">🔌 Integrating the Store<a class="headerlink" href="#integrating-the-store" title="Permanent link">&para;</a></h2>
+<p>Pass your store instance to the <code>AgentPlatform</code>. Agentomatic handles initialization at startup and cleanup at shutdown automatically:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">db_store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="s2">&quot;postgresql+asyncpg://postgres:secret@localhost:5432/agent_db&quot;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">store</span><span class="o">=</span><span class="n">db_store</span><span class="p">,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="c1"># On startup:  await store.initialize() — creates tables, opens pool</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># On shutdown: await store.close()      — disposes engine, releases connections</span>
+</code></pre></div>
+<hr />
+<h2 id="thread-conversation-management">🗂️ Thread &amp; Conversation Management<a class="headerlink" href="#thread-conversation-management" title="Permanent link">&para;</a></h2>
+<h3 id="creating-and-managing-threads">Creating and Managing Threads<a class="headerlink" href="#creating-and-managing-threads" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Threads are typically managed via the auto-generated API endpoints</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># POST /api/v1/{agent_name}/threads      → Create thread</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># GET  /api/v1/{agent_name}/threads      → List threads</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># GET  /api/v1/{agent_name}/threads/{id} → Get thread</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># DELETE /api/v1/{agent_name}/threads/{id} → Delete thread</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Programmatic usage:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">thread</span> <span class="o">=</span> <span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">create_thread</span><span class="p">(</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">thread_id</span><span class="o">=</span><span class="s2">&quot;thread_abc123&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;user_42&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;qa_agent&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Tax Questions&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;department&quot;</span><span class="p">:</span> <span class="s2">&quot;finance&quot;</span><span class="p">},</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="thread-forking">Thread Forking<a class="headerlink" href="#thread-forking" title="Permanent link">&para;</a></h3>
+<p>Fork a conversation at any message index to create a branch:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">forked</span> <span class="o">=</span> <span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">fork_thread</span><span class="p">(</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">parent_thread_id</span><span class="o">=</span><span class="s2">&quot;thread_abc123&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">message_index</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>          <span class="c1"># Fork after message #5</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">new_thread_id</span><span class="o">=</span><span class="s2">&quot;thread_fork_001&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Fork: Different approach&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Copies the thread and messages 0–5 into a new thread</span>
+</code></pre></div>
+<h3 id="thread-lineage">Thread Lineage<a class="headerlink" href="#thread-lineage" title="Permanent link">&para;</a></h3>
+<p>Retrieve the full ancestry/descendant tree:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">lineage</span> <span class="o">=</span> <span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">get_thread_lineage</span><span class="p">(</span><span class="s2">&quot;thread_fork_001&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># {</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1">#     &quot;thread_id&quot;: &quot;thread_fork_001&quot;,</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1">#     &quot;ancestors&quot;: [{&quot;id&quot;: &quot;thread_abc123&quot;, ...}],</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1">#     &quot;descendants&quot;: []</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># }</span>
+</code></pre></div>
+<hr />
+<h2 id="langgraph-checkpointer-integration">✅ LangGraph Checkpointer Integration<a class="headerlink" href="#langgraph-checkpointer-integration" title="Permanent link">&para;</a></h2>
+<p>Agentomatic provides <code>AgentomaticCheckpointer</code>, a LangGraph <code>BaseCheckpointSaver</code> that delegates all checkpoint storage to your configured <code>BaseStore</code> backend.</p>
+<h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    LG["LangGraph&lt;br/&gt;CompiledGraph"] --&gt;|"save/load&lt;br/&gt;checkpoint"| CP["AgentomaticCheckpointer"]
+    CP --&gt;|"save_checkpoint()&lt;br/&gt;get_checkpoint()"| Store["BaseStore&lt;br/&gt;(Memory/SQL)"]</code></pre>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage.checkpointer</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentomaticCheckpointer</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># 1. Create your store</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://user:pass@localhost/db&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># 2. Wrap it in a checkpointer</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">checkpointer</span> <span class="o">=</span> <span class="n">AgentomaticCheckpointer</span><span class="p">(</span><span class="n">store</span><span class="p">)</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># 3. Compile your graph with the checkpointer</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">langgraph.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">StateGraph</span><span class="p">,</span> <span class="n">END</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseAgentState</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">build_graph</span><span class="p">():</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>    <span class="n">g</span> <span class="o">=</span> <span class="n">StateGraph</span><span class="p">(</span><span class="n">BaseAgentState</span><span class="p">)</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>    <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="n">process_node</span><span class="p">)</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>    <span class="n">g</span><span class="o">.</span><span class="n">set_entry_point</span><span class="p">(</span><span class="s2">&quot;process&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>    <span class="n">g</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="n">END</span><span class="p">)</span>
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>    <span class="k">return</span> <span class="n">g</span>
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="n">graph</span> <span class="o">=</span> <span class="n">build_graph</span><span class="p">()</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">checkpointer</span><span class="o">=</span><span class="n">checkpointer</span><span class="p">)</span>
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>
+<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="c1"># 4. Invoke with thread_id for state persistence</span>
+<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">graph</span><span class="o">.</span><span class="n">ainvoke</span><span class="p">(</span>
+<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>    <span class="p">{</span><span class="s2">&quot;current_query&quot;</span><span class="p">:</span> <span class="s2">&quot;Hello!&quot;</span><span class="p">},</span>
+<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>    <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;configurable&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;thread_id&quot;</span><span class="p">:</span> <span class="s2">&quot;thread_123&quot;</span><span class="p">}},</span>
+<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="checkpointer-api">Checkpointer API<a class="headerlink" href="#checkpointer-api" title="Permanent link">&para;</a></h3>
+<p>The checkpointer implements the full LangGraph <code>BaseCheckpointSaver</code> interface:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_tuple(config)</code></td>
+<td>Retrieve a checkpoint (sync wrapper)</td>
+</tr>
+<tr>
+<td><code>aget_tuple(config)</code></td>
+<td>Retrieve a checkpoint (async)</td>
+</tr>
+<tr>
+<td><code>put(config, checkpoint, metadata, new_versions)</code></td>
+<td>Save a checkpoint (sync wrapper)</td>
+</tr>
+<tr>
+<td><code>aput(config, checkpoint, metadata, new_versions)</code></td>
+<td>Save a checkpoint (async)</td>
+</tr>
+<tr>
+<td><code>list(config, ...)</code></td>
+<td>List checkpoints (sync wrapper, returns <code>Iterator</code>)</td>
+</tr>
+<tr>
+<td><code>alist(config, ...)</code></td>
+<td>List checkpoints (async, returns <code>AsyncIterator</code>)</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">JSON Serialization</p>
+<p>The checkpointer automatically ensures all checkpoint and metadata values are JSON-serializable using a <code>default=str</code> fallback. Custom objects, datetimes, and bytes are converted to their string representation.</p>
+</div>
+<hr />
+<h2 id="implementing-a-custom-backend">🛠️ Implementing a Custom Backend<a class="headerlink" href="#implementing-a-custom-backend" title="Permanent link">&para;</a></h2>
+<p>Subclass <code>BaseStore</code> and implement the abstract methods to create a custom backend:</p>
+<h3 id="required-methods">Required Methods<a class="headerlink" href="#required-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_thread</code></td>
+<td><code>(thread_id, user_id, agent_name, *, title, metadata) → dict</code></td>
+<td>Create a conversation session</td>
+</tr>
+<tr>
+<td><code>get_thread</code></td>
+<td><code>(thread_id) → dict \| None</code></td>
+<td>Retrieve a thread by ID</td>
+</tr>
+<tr>
+<td><code>list_threads</code></td>
+<td><code>(*, agent_name, user_id, limit, offset) → list[dict]</code></td>
+<td>List/filter threads</td>
+</tr>
+<tr>
+<td><code>add_message</code></td>
+<td><code>(thread_id, role, content, *, metadata) → dict</code></td>
+<td>Add a message to a thread</td>
+</tr>
+<tr>
+<td><code>get_messages</code></td>
+<td><code>(thread_id, *, limit, offset) → list[dict]</code></td>
+<td>Get messages chronologically</td>
+</tr>
+</tbody>
+</table>
+<h3 id="optional-methods">Optional Methods<a class="headerlink" href="#optional-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>initialize()</code></td>
+<td>Async setup (open connections)</td>
+<td>No-op</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>Graceful shutdown</td>
+<td>No-op</td>
+</tr>
+<tr>
+<td><code>health_check()</code></td>
+<td>Liveness/readiness info</td>
+<td><code>{"status": "healthy"}</code></td>
+</tr>
+<tr>
+<td><code>update_thread()</code></td>
+<td>Update thread metadata/title</td>
+<td>Returns <code>None</code></td>
+</tr>
+<tr>
+<td><code>delete_thread()</code></td>
+<td>Cascade delete thread + messages</td>
+<td>Returns <code>False</code></td>
+</tr>
+<tr>
+<td><code>add_feedback()</code></td>
+<td>Record user feedback</td>
+<td>Returns stub dict</td>
+</tr>
+<tr>
+<td><code>get_feedback()</code></td>
+<td>Retrieve feedback records</td>
+<td>Returns <code>[]</code></td>
+</tr>
+<tr>
+<td><code>get_stats()</code></td>
+<td>Storage statistics</td>
+<td>Returns backend name</td>
+</tr>
+<tr>
+<td><code>save_suspended_state()</code></td>
+<td>HITL state persistence</td>
+<td>Returns <code>{}</code></td>
+</tr>
+<tr>
+<td><code>get_suspended_state()</code></td>
+<td>HITL state retrieval</td>
+<td>Returns <code>None</code></td>
+</tr>
+<tr>
+<td><code>list_suspended_states()</code></td>
+<td>List pending HITL states</td>
+<td>Returns <code>[]</code></td>
+</tr>
+<tr>
+<td><code>delete_suspended_state()</code></td>
+<td>Delete completed HITL state</td>
+<td>Returns <code>False</code></td>
+</tr>
+<tr>
+<td><code>cleanup_expired_states()</code></td>
+<td>Remove expired HITL states</td>
+<td>Returns <code>0</code></td>
+</tr>
+<tr>
+<td><code>fork_thread()</code></td>
+<td>Fork a conversation</td>
+<td>Returns <code>None</code></td>
+</tr>
+<tr>
+<td><code>get_thread_lineage()</code></td>
+<td>Ancestry/descendant tree</td>
+<td>Returns empty tree</td>
+</tr>
+<tr>
+<td><code>save_checkpoint()</code></td>
+<td>LangGraph checkpoint save</td>
+<td>No-op</td>
+</tr>
+<tr>
+<td><code>get_checkpoint()</code></td>
+<td>LangGraph checkpoint load</td>
+<td>Returns <code>None</code></td>
+</tr>
+<tr>
+<td><code>list_checkpoints()</code></td>
+<td>LangGraph checkpoint listing</td>
+<td>Returns <code>[]</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-redis-backend">Example: Redis Backend<a class="headerlink" href="#example-redis-backend" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">redis.asyncio</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">aioredis</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseStore</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">RedisStore</span><span class="p">(</span><span class="n">BaseStore</span><span class="p">):</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Redis-backed storage for high-throughput scenarios.&quot;&quot;&quot;</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;redis://localhost:6379&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">url</span> <span class="o">=</span> <span class="n">url</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="p">:</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">Redis</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Open the Redis connection pool.&quot;&quot;&quot;</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span> <span class="o">=</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">from_url</span><span class="p">(</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="n">decode_responses</span><span class="o">=</span><span class="kc">True</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>        <span class="p">)</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Close all Redis connections.&quot;&quot;&quot;</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="p">:</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">health_check</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Verify Redis connectivity.&quot;&quot;&quot;</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">ping</span><span class="p">()</span>
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>            <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;healthy&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="s2">&quot;RedisStore&quot;</span><span class="p">}</span>
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a>        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a>            <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;unhealthy&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)}</span>
+<a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a>
+<a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">create_thread</span><span class="p">(</span>
+<a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a>        <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a>        <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a>        <span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a>        <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a>        <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a>        <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+<a id="__codelineno-9-42" name="__codelineno-9-42" href="#__codelineno-9-42"></a>
+<a id="__codelineno-9-43" name="__codelineno-9-43" href="#__codelineno-9-43"></a>        <span class="n">thread</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-9-44" name="__codelineno-9-44" href="#__codelineno-9-44"></a>            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">thread_id</span><span class="p">,</span>
+<a id="__codelineno-9-45" name="__codelineno-9-45" href="#__codelineno-9-45"></a>            <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>
+<a id="__codelineno-9-46" name="__codelineno-9-46" href="#__codelineno-9-46"></a>            <span class="s2">&quot;agent_name&quot;</span><span class="p">:</span> <span class="n">agent_name</span><span class="p">,</span>
+<a id="__codelineno-9-47" name="__codelineno-9-47" href="#__codelineno-9-47"></a>            <span class="s2">&quot;title&quot;</span><span class="p">:</span> <span class="n">title</span> <span class="ow">or</span> <span class="s2">&quot;New Conversation&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-48" name="__codelineno-9-48" href="#__codelineno-9-48"></a>            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">metadata</span> <span class="ow">or</span> <span class="p">{}),</span>
+<a id="__codelineno-9-49" name="__codelineno-9-49" href="#__codelineno-9-49"></a>            <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+<a id="__codelineno-9-50" name="__codelineno-9-50" href="#__codelineno-9-50"></a>        <span class="p">}</span>
+<a id="__codelineno-9-51" name="__codelineno-9-51" href="#__codelineno-9-51"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">hset</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;thread:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="n">thread</span><span class="p">)</span>
+<a id="__codelineno-9-52" name="__codelineno-9-52" href="#__codelineno-9-52"></a>        <span class="c1"># Index for listing</span>
+<a id="__codelineno-9-53" name="__codelineno-9-53" href="#__codelineno-9-53"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">sadd</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;threads:</span><span class="si">{</span><span class="n">agent_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">)</span>
+<a id="__codelineno-9-54" name="__codelineno-9-54" href="#__codelineno-9-54"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">sadd</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;user_threads:</span><span class="si">{</span><span class="n">user_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">)</span>
+<a id="__codelineno-9-55" name="__codelineno-9-55" href="#__codelineno-9-55"></a>        <span class="k">return</span> <span class="n">thread</span>
+<a id="__codelineno-9-56" name="__codelineno-9-56" href="#__codelineno-9-56"></a>
+<a id="__codelineno-9-57" name="__codelineno-9-57" href="#__codelineno-9-57"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-9-58" name="__codelineno-9-58" href="#__codelineno-9-58"></a>        <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">hgetall</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;thread:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-59" name="__codelineno-9-59" href="#__codelineno-9-59"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+<a id="__codelineno-9-60" name="__codelineno-9-60" href="#__codelineno-9-60"></a>            <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-9-61" name="__codelineno-9-61" href="#__codelineno-9-61"></a>        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">))</span>
+<a id="__codelineno-9-62" name="__codelineno-9-62" href="#__codelineno-9-62"></a>        <span class="k">return</span> <span class="n">data</span>
+<a id="__codelineno-9-63" name="__codelineno-9-63" href="#__codelineno-9-63"></a>
+<a id="__codelineno-9-64" name="__codelineno-9-64" href="#__codelineno-9-64"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_threads</span><span class="p">(</span>
+<a id="__codelineno-9-65" name="__codelineno-9-65" href="#__codelineno-9-65"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-9-66" name="__codelineno-9-66" href="#__codelineno-9-66"></a>        <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-9-67" name="__codelineno-9-67" href="#__codelineno-9-67"></a>        <span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-68" name="__codelineno-9-68" href="#__codelineno-9-68"></a>        <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-69" name="__codelineno-9-69" href="#__codelineno-9-69"></a>        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+<a id="__codelineno-9-70" name="__codelineno-9-70" href="#__codelineno-9-70"></a>        <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-9-71" name="__codelineno-9-71" href="#__codelineno-9-71"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<a id="__codelineno-9-72" name="__codelineno-9-72" href="#__codelineno-9-72"></a>        <span class="k">if</span> <span class="n">agent_name</span><span class="p">:</span>
+<a id="__codelineno-9-73" name="__codelineno-9-73" href="#__codelineno-9-73"></a>            <span class="n">thread_ids</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">smembers</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;threads:</span><span class="si">{</span><span class="n">agent_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-74" name="__codelineno-9-74" href="#__codelineno-9-74"></a>        <span class="k">elif</span> <span class="n">user_id</span><span class="p">:</span>
+<a id="__codelineno-9-75" name="__codelineno-9-75" href="#__codelineno-9-75"></a>            <span class="n">thread_ids</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">smembers</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;user_threads:</span><span class="si">{</span><span class="n">user_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-76" name="__codelineno-9-76" href="#__codelineno-9-76"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-9-77" name="__codelineno-9-77" href="#__codelineno-9-77"></a>            <span class="n">thread_ids</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">keys</span><span class="p">(</span><span class="s2">&quot;thread:*&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-78" name="__codelineno-9-78" href="#__codelineno-9-78"></a>            <span class="n">thread_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;thread:&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">thread_ids</span><span class="p">]</span>
+<a id="__codelineno-9-79" name="__codelineno-9-79" href="#__codelineno-9-79"></a>
+<a id="__codelineno-9-80" name="__codelineno-9-80" href="#__codelineno-9-80"></a>        <span class="n">threads</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-9-81" name="__codelineno-9-81" href="#__codelineno-9-81"></a>        <span class="k">for</span> <span class="n">tid</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">thread_ids</span><span class="p">)[</span><span class="n">offset</span><span class="p">:</span><span class="n">offset</span> <span class="o">+</span> <span class="n">limit</span><span class="p">]:</span>
+<a id="__codelineno-9-82" name="__codelineno-9-82" href="#__codelineno-9-82"></a>            <span class="n">thread</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_thread</span><span class="p">(</span><span class="n">tid</span><span class="p">)</span>
+<a id="__codelineno-9-83" name="__codelineno-9-83" href="#__codelineno-9-83"></a>            <span class="k">if</span> <span class="n">thread</span><span class="p">:</span>
+<a id="__codelineno-9-84" name="__codelineno-9-84" href="#__codelineno-9-84"></a>                <span class="n">threads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">thread</span><span class="p">)</span>
+<a id="__codelineno-9-85" name="__codelineno-9-85" href="#__codelineno-9-85"></a>        <span class="k">return</span> <span class="n">threads</span>
+<a id="__codelineno-9-86" name="__codelineno-9-86" href="#__codelineno-9-86"></a>
+<a id="__codelineno-9-87" name="__codelineno-9-87" href="#__codelineno-9-87"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">add_message</span><span class="p">(</span>
+<a id="__codelineno-9-88" name="__codelineno-9-88" href="#__codelineno-9-88"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-9-89" name="__codelineno-9-89" href="#__codelineno-9-89"></a>        <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-90" name="__codelineno-9-90" href="#__codelineno-9-90"></a>        <span class="n">role</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-91" name="__codelineno-9-91" href="#__codelineno-9-91"></a>        <span class="n">content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-92" name="__codelineno-9-92" href="#__codelineno-9-92"></a>        <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-9-93" name="__codelineno-9-93" href="#__codelineno-9-93"></a>        <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-94" name="__codelineno-9-94" href="#__codelineno-9-94"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-9-95" name="__codelineno-9-95" href="#__codelineno-9-95"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+<a id="__codelineno-9-96" name="__codelineno-9-96" href="#__codelineno-9-96"></a>
+<a id="__codelineno-9-97" name="__codelineno-9-97" href="#__codelineno-9-97"></a>        <span class="n">message</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-9-98" name="__codelineno-9-98" href="#__codelineno-9-98"></a>            <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="n">role</span><span class="p">,</span>
+<a id="__codelineno-9-99" name="__codelineno-9-99" href="#__codelineno-9-99"></a>            <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">content</span><span class="p">,</span>
+<a id="__codelineno-9-100" name="__codelineno-9-100" href="#__codelineno-9-100"></a>            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">metadata</span> <span class="ow">or</span> <span class="p">{}),</span>
+<a id="__codelineno-9-101" name="__codelineno-9-101" href="#__codelineno-9-101"></a>            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+<a id="__codelineno-9-102" name="__codelineno-9-102" href="#__codelineno-9-102"></a>        <span class="p">}</span>
+<a id="__codelineno-9-103" name="__codelineno-9-103" href="#__codelineno-9-103"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">rpush</span><span class="p">(</span>
+<a id="__codelineno-9-104" name="__codelineno-9-104" href="#__codelineno-9-104"></a>            <span class="sa">f</span><span class="s2">&quot;messages:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+<a id="__codelineno-9-105" name="__codelineno-9-105" href="#__codelineno-9-105"></a>        <span class="p">)</span>
+<a id="__codelineno-9-106" name="__codelineno-9-106" href="#__codelineno-9-106"></a>        <span class="k">return</span> <span class="n">message</span>
+<a id="__codelineno-9-107" name="__codelineno-9-107" href="#__codelineno-9-107"></a>
+<a id="__codelineno-9-108" name="__codelineno-9-108" href="#__codelineno-9-108"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_messages</span><span class="p">(</span>
+<a id="__codelineno-9-109" name="__codelineno-9-109" href="#__codelineno-9-109"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-9-110" name="__codelineno-9-110" href="#__codelineno-9-110"></a>        <span class="n">thread_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-9-111" name="__codelineno-9-111" href="#__codelineno-9-111"></a>        <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-9-112" name="__codelineno-9-112" href="#__codelineno-9-112"></a>        <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-9-113" name="__codelineno-9-113" href="#__codelineno-9-113"></a>        <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-9-114" name="__codelineno-9-114" href="#__codelineno-9-114"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<a id="__codelineno-9-115" name="__codelineno-9-115" href="#__codelineno-9-115"></a>        <span class="n">raw</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redis</span><span class="o">.</span><span class="n">lrange</span><span class="p">(</span>
+<a id="__codelineno-9-116" name="__codelineno-9-116" href="#__codelineno-9-116"></a>            <span class="sa">f</span><span class="s2">&quot;messages:</span><span class="si">{</span><span class="n">thread_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">limit</span> <span class="o">-</span> <span class="mi">1</span>
+<a id="__codelineno-9-117" name="__codelineno-9-117" href="#__codelineno-9-117"></a>        <span class="p">)</span>
+<a id="__codelineno-9-118" name="__codelineno-9-118" href="#__codelineno-9-118"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">raw</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="using-your-custom-backend">Using Your Custom Backend<a class="headerlink" href="#using-your-custom-backend" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">RedisStore</span><span class="p">(</span><span class="s2">&quot;redis://localhost:6379&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">)</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h2 id="storage-statistics">📊 Storage Statistics<a class="headerlink" href="#storage-statistics" title="Permanent link">&para;</a></h2>
+<p>All backends implement a <code>get_stats()</code> method, exposed at <code>/api/v1/storage/stats</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="err">GET /api/v1/storage/stats</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">&quot;backend&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SQLAlchemyStore&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">&quot;threads&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">142</span><span class="p">,</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">&quot;messages&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8463</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">&quot;feedback&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">37</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="further-reading">🔗 Further Reading<a class="headerlink" href="#further-reading" title="Permanent link">&para;</a></h2>
 <blockquote>
-<p>🚦 <em>For details on how checkpointer, thread forking, and human-in-the-loop suspension integrate with these storage methods, see the <a href="../platform-features/">Advanced Platform Features Guide</a>.</em></p>
+<p>🚦 For details on how checkpointing, thread forking, and human-in-the-loop suspension integrate at the platform level, see the <a href="../platform-features/">Advanced Platform Features Guide</a>.</p>
 </blockquote>
 
 

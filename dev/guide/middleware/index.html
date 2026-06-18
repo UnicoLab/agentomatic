@@ -18,7 +18,7 @@
         <link rel="prev" href="../storage/">
       
       
-        <link rel="next" href="../platform-features/">
+        <link rel="next" href="../langgraph/">
       
       
         
@@ -895,6 +895,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#middleware-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🏗️ Middleware Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🏗️ Middleware Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-registration-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Registration Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-stack-activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Stack Activation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1-authentication-middleware" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -905,6 +944,28 @@
   
     <nav class="md-nav" aria-label="🔐 1. Authentication Middleware">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Authentication
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#authentication-channels" class="md-nav__link">
@@ -918,10 +979,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#error-responses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
+        Error Responses
       
     </span>
   </a>
@@ -946,10 +1007,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#rate-limit-headers" class="md-nav__link">
+  <a href="#constructor-parameters_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rate Limit Headers
+        Constructor Parameters
       
     </span>
   </a>
@@ -957,10 +1018,54 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#limit-exceeded" class="md-nav__link">
+  <a href="#client-identification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Limit Exceeded
+        Client Identification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rate-limit-response-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limit Response Headers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limit-exceeded-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limit Exceeded Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-side-handling-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client-Side Handling Example
       
     </span>
   </a>
@@ -985,10 +1090,76 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#exposed-http-metrics" class="md-nav__link">
+  <a href="#constructor-parameters_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Exposed HTTP Metrics
+        Constructor Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposed-prometheus-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposed Prometheus Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#histogram-buckets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Histogram Buckets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cardinality-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cardinality Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scraping-with-prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scraping with Prometheus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample-metrics-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample /metrics Output
       
     </span>
   </a>
@@ -1001,24 +1172,279 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-structured-logging-middleware" class="md-nav__link">
+  <a href="#4-logging-middleware" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📝 4. Structured Logging Middleware
+        📝 4. Logging Middleware
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📝 4. Logging Middleware">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Logging
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#5-injecting-custom-middlewares" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🔌 5. Injecting Custom Middlewares
+        Features
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#response-headers-added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response Headers Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#console-output-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Console Output Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correlating-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correlating Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-feedback-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        👍 5. Feedback Middleware
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="👍 5. Feedback Middleware">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Feedback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feedbackrecord-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeedbackRecord Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Decorator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programmatic-feedback-recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmatic Feedback Recording
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporting-feedback-as-jsonl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exporting Feedback as JSONL
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔌 Custom Middleware
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔌 Custom Middleware">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Custom Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registering-custom-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering Custom Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-request-timing-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Request Timing Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-ip-allowlist-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: IP Allowlist Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#middleware-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Middleware Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Middleware Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ordering-guidelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ordering Guidelines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#middleware-interaction-with-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Middleware Interaction with Streaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disabling-all-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling All Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1026,6 +1452,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../langgraph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1582,6 +2036,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#middleware-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🏗️ Middleware Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🏗️ Middleware Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-registration-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Registration Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-stack-activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Stack Activation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1-authentication-middleware" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1592,6 +2085,28 @@
   
     <nav class="md-nav" aria-label="🔐 1. Authentication Middleware">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Authentication
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#authentication-channels" class="md-nav__link">
@@ -1605,10 +2120,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#error-responses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
+        Error Responses
       
     </span>
   </a>
@@ -1633,10 +2148,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#rate-limit-headers" class="md-nav__link">
+  <a href="#constructor-parameters_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rate Limit Headers
+        Constructor Parameters
       
     </span>
   </a>
@@ -1644,10 +2159,54 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#limit-exceeded" class="md-nav__link">
+  <a href="#client-identification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Limit Exceeded
+        Client Identification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rate-limit-response-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limit Response Headers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limit-exceeded-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limit Exceeded Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-side-handling-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client-Side Handling Example
       
     </span>
   </a>
@@ -1672,10 +2231,76 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#exposed-http-metrics" class="md-nav__link">
+  <a href="#constructor-parameters_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Exposed HTTP Metrics
+        Constructor Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposed-prometheus-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposed Prometheus Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#histogram-buckets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Histogram Buckets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cardinality-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cardinality Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scraping-with-prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scraping with Prometheus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample-metrics-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample /metrics Output
       
     </span>
   </a>
@@ -1688,24 +2313,279 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-structured-logging-middleware" class="md-nav__link">
+  <a href="#4-logging-middleware" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📝 4. Structured Logging Middleware
+        📝 4. Logging Middleware
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📝 4. Logging Middleware">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Logging
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#5-injecting-custom-middlewares" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🔌 5. Injecting Custom Middlewares
+        Features
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#response-headers-added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response Headers Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#console-output-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Console Output Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correlating-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correlating Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-feedback-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        👍 5. Feedback Middleware
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="👍 5. Feedback Middleware">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Feedback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feedbackrecord-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeedbackRecord Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Decorator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programmatic-feedback-recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmatic Feedback Recording
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporting-feedback-as-jsonl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exporting Feedback as JSONL
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔌 Custom Middleware
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔌 Custom Middleware">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Custom Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registering-custom-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering Custom Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-request-timing-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Request Timing Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-ip-allowlist-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: IP Allowlist Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#middleware-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Middleware Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Middleware Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ordering-guidelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ordering Guidelines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#middleware-interaction-with-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Middleware Interaction with Streaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disabling-all-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling All Middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1732,50 +2612,249 @@
 <h1 id="middleware-stack">Middleware Stack<a class="headerlink" href="#middleware-stack" title="Permanent link">&para;</a></h1>
 <div align="center">
   <img src="../assets/logo.png" width="200" alt="agentomatic logo">
-  <h3>Pipeline Security, Scaling, and Monitoring</h3>
+  <h3>Pipeline Security, Scaling, Monitoring, and Extensibility</h3>
 </div>
 
 <hr />
-<p>Agentomatic wraps every incoming request and outgoing response in a pluggable middleware pipeline. You can configure and toggle authentication, rate limiting, logging, and metrics collecting globally on the <code>AgentPlatform</code> wrapper.</p>
+<p>Agentomatic wraps every incoming request and outgoing response in a pluggable middleware pipeline. You can configure and toggle authentication, rate limiting, logging, metrics collection, and feedback recording globally on the <code>AgentPlatform</code>.</p>
+<hr />
+<h2 id="middleware-architecture">🏗️ Middleware Architecture<a class="headerlink" href="#middleware-architecture" title="Permanent link">&para;</a></h2>
+<p>Middleware components are added in <strong>reverse order</strong> — the last middleware added is the first to execute. The diagram below shows the actual execution flow for an incoming request:</p>
+<pre class="mermaid"><code>flowchart LR
+    Client["🌐 Client"] --&gt; CORS["CORS"]
+    CORS --&gt; Logging["📝 Logging"]
+    Logging --&gt; Auth["🔐 Auth"]
+    Auth --&gt; RateLimit["⚡ Rate Limit"]
+    RateLimit --&gt; Metrics["📊 Metrics"]
+    Metrics --&gt; Custom["🔌 Custom"]
+    Custom --&gt; Handler["🤖 Agent&lt;br/&gt;Handler"]
+    Handler --&gt; Custom
+    Custom --&gt; Metrics
+    Metrics --&gt; RateLimit
+    RateLimit --&gt; Auth
+    Auth --&gt; Logging
+    Logging --&gt; CORS
+    CORS --&gt; Client
+
+    style Auth fill:#ffcdd2
+    style RateLimit fill:#fff9c4
+    style Metrics fill:#c8e6c9
+    style Logging fill:#e1f5fe
+    style Custom fill:#f3e5f5</code></pre>
+<h3 id="pipeline-registration-order">Pipeline Registration Order<a class="headerlink" href="#pipeline-registration-order" title="Permanent link">&para;</a></h3>
+<p>The platform adds middleware in this specific order during <code>build()</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Order</th>
+<th>Middleware</th>
+<th>Toggle</th>
+<th>Always Active</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>CORS</strong></td>
+<td>—</td>
+<td>✅ Yes</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>LoggingMiddleware</strong></td>
+<td><code>enable_logging=True</code></td>
+<td>Default on</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>AuthMiddleware</strong></td>
+<td><code>enable_auth=True</code></td>
+<td>Default off</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>RateLimitMiddleware</strong></td>
+<td><code>enable_rate_limit=True</code></td>
+<td>Default off</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>MetricsMiddleware</strong></td>
+<td><code>enable_metrics=True</code></td>
+<td>Default off</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Custom middleware</strong></td>
+<td><code>middleware=[...]</code></td>
+<td>User-defined</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>FeedbackCollector</strong></td>
+<td><code>enable_feedback=True</code></td>
+<td>Default on</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>OpenTelemetry</strong></td>
+<td><code>enable_telemetry=True</code></td>
+<td>Default on</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">Starlette Ordering</p>
+<p>FastAPI/Starlette adds middleware in <strong>reverse order</strong>: the last <code>app.add_middleware()</code> call wraps the outermost layer. This means CORS (added first) is the outermost wrapper, and custom middleware (added last) is closest to the handler.</p>
+</div>
+<h3 id="full-stack-activation">Full Stack Activation<a class="headerlink" href="#full-stack-activation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="c1"># Enable all built-in middleware</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;sk_live_51hG782k...&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">rate_limit_requests</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">rate_limit_window</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://user:pass@localhost/db&quot;</span><span class="p">),</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="p">)</span>
+</code></pre></div>
 <hr />
 <h2 id="1-authentication-middleware">🔐 1. Authentication Middleware<a class="headerlink" href="#1-authentication-middleware" title="Permanent link">&para;</a></h2>
-<p>Secure your API endpoints against unauthorized traffic. When enabled, Agentomatic inspects every request (except health checks, documentation, and the global card) for a valid API token.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;sk_live_51hG782k...&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span>
+<p>Secures your API endpoints against unauthorized traffic. Inspects every request (except health checks and documentation) for a valid API key.</p>
+<h3 id="constructor-parameters">Constructor Parameters<a class="headerlink" href="#constructor-parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api_key</code></td>
+<td><code>str</code></td>
+<td><strong>(required)</strong></td>
+<td>The expected secret key value</td>
+</tr>
+<tr>
+<td><code>header_name</code></td>
+<td><code>str</code></td>
+<td><code>"X-API-Key"</code></td>
+<td>HTTP header to check for the key</td>
+</tr>
+<tr>
+<td><code>query_param</code></td>
+<td><code>str</code></td>
+<td><code>"api_key"</code></td>
+<td>Query parameter fallback name</td>
+</tr>
+<tr>
+<td><code>skip_paths</code></td>
+<td><code>set[str] \| None</code></td>
+<td>See below</td>
+<td>Paths that bypass authentication</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Default skip paths:</strong> <code>/health</code>, <code>/healthz</code>, <code>/readiness</code>, <code>/docs</code>, <code>/openapi.json</code>, <code>/redoc</code>, <code>/</code></p>
+<h3 id="enabling-authentication">Enabling Authentication<a class="headerlink" href="#enabling-authentication" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;sk_live_51hG782k...&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">)</span>
 </code></pre></div>
 <h3 id="authentication-channels">Authentication Channels<a class="headerlink" href="#authentication-channels" title="Permanent link">&para;</a></h3>
-<p>API clients can authenticate using one of the following two channels:</p>
-<ol>
-<li><strong>HTTP Headers (Recommended)</strong>: Pass the API key using the <code>X-API-Key</code> header.
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="err">X-API-Key: sk_live_51hG782k...</span>
-</code></pre></div></li>
-<li><strong>Query Parameters</strong>: Pass the API key as a query string parameter (useful for testing in browsers).
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="err">GET /api/v1/my_agent/invoke?api_key=sk_live_51hG782k...</span>
-</code></pre></div></li>
-</ol>
-<h3 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h3>
-<p>If the key is missing or invalid, the middleware intercepts the call and returns:
-- <strong>Status Code</strong>: <code>401 Unauthorized</code>
-- <strong>Response Payload</strong>:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Invalid or missing API Key&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">}</span>
-</code></pre></div></p>
+<p>Clients can authenticate using either of these methods:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">HTTP Header (Recommended)</label><label for="__tabbed_1_2">Query Parameter</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/my_agent/invoke<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;X-API-Key: sk_live_51hG782k...&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;query&quot;: &quot;Hello!&quot;}&#39;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Useful for browser testing and WebSocket connections</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8000/api/v1/my_agent/health?api_key=sk_live_51hG782k...&quot;</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h3 id="error-responses">Error Responses<a class="headerlink" href="#error-responses" title="Permanent link">&para;</a></h3>
+<p>When the key is missing or invalid:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">401</span> <span class="ne">Unauthorized</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">{</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Invalid or missing API key&quot;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">}</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Security Best Practices</p>
+<ul>
+<li>Never commit API keys to version control</li>
+<li>Use environment variables: <code>export AGENTOMATIC_AUTH_API_KEY=sk_prod_...</code></li>
+<li>Rotate keys regularly</li>
+<li>Use different keys for development, staging, and production</li>
+</ul>
+</div>
 <hr />
 <h2 id="2-rate-limiting-middleware">⚡ 2. Rate Limiting Middleware<a class="headerlink" href="#2-rate-limiting-middleware" title="Permanent link">&para;</a></h2>
-<p>Protect your backend and LLM models from burst traffic and denial of service (DoS) attacks. Agentomatic features an in-memory token-bucket style rate limiter.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">rate_limit_requests</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>   <span class="c1"># Allowed requests</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">rate_limit_window</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>     <span class="c1"># Time window (seconds)</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">)</span>
+<p>Protects your backend and LLM models from burst traffic and denial-of-service attacks. Implements an in-memory <strong>sliding-window</strong> rate limiter per client IP.</p>
+<h3 id="constructor-parameters_1">Constructor Parameters<a class="headerlink" href="#constructor-parameters_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_requests</code></td>
+<td><code>int</code></td>
+<td><code>100</code></td>
+<td>Maximum requests allowed per window</td>
+</tr>
+<tr>
+<td><code>window_seconds</code></td>
+<td><code>int</code></td>
+<td><code>60</code></td>
+<td>Sliding window duration in seconds</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Skip paths:</strong> <code>/health</code>, <code>/healthz</code>, <code>/readiness</code></p>
+<h3 id="client-identification">Client Identification<a class="headerlink" href="#client-identification" title="Permanent link">&para;</a></h3>
+<p>The middleware identifies clients using:</p>
+<ol>
+<li><strong><code>X-Forwarded-For</code> header</strong> — first IP in the chain (for proxied requests)</li>
+<li><strong><code>request.client.host</code></strong> — direct connection IP (fallback)</li>
+</ol>
+<h3 id="enabling-rate-limiting">Enabling Rate Limiting<a class="headerlink" href="#enabling-rate-limiting" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">rate_limit_requests</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>    <span class="c1"># 60 requests</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">rate_limit_window</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>      <span class="c1"># per 60-second window</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
 </code></pre></div>
-<h3 id="rate-limit-headers">Rate Limit Headers<a class="headerlink" href="#rate-limit-headers" title="Permanent link">&para;</a></h3>
-<p>Every response includes headers letting the client know their current rate status:</p>
+<h3 id="rate-limit-response-headers">Rate Limit Response Headers<a class="headerlink" href="#rate-limit-response-headers" title="Permanent link">&para;</a></h3>
+<p>Every successful response includes rate status headers:</p>
 <table>
 <thead>
 <tr>
@@ -1786,36 +2865,75 @@
 <tbody>
 <tr>
 <td><code>X-RateLimit-Limit</code></td>
-<td>The maximum number of requests allowed within the window.</td>
+<td>Maximum requests allowed within the window</td>
 </tr>
 <tr>
 <td><code>X-RateLimit-Remaining</code></td>
-<td>The remaining number of requests the client can make in the current window.</td>
+<td>Remaining requests the client can make</td>
 </tr>
 <tr>
 <td><code>Retry-After</code></td>
-<td><em>(Included on 429 errors)</em> The number of seconds the client must wait before retrying.</td>
+<td><em>(On 429 only)</em> Seconds until the client can retry</td>
 </tr>
 </tbody>
 </table>
-<h3 id="limit-exceeded">Limit Exceeded<a class="headerlink" href="#limit-exceeded" title="Permanent link">&para;</a></h3>
-<p>When a client exceeds their allowance, the request is blocked:
-- <strong>Status Code</strong>: <code>429 Too Many Requests</code>
-- <strong>Response Payload</strong>:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Rate limit exceeded. Try again in 12 seconds.&quot;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="p">}</span>
-</code></pre></div></p>
+<h3 id="limit-exceeded-response">Limit Exceeded Response<a class="headerlink" href="#limit-exceeded-response" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">429</span> <span class="ne">Too Many Requests</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="na">Retry-After</span><span class="o">:</span> <span class="l">12</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">{</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Rate limit exceeded&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">&quot;retry_after&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="client-side-handling-example">Client-Side Handling Example<a class="headerlink" href="#client-side-handling-example" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">call_with_retry</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>            <span class="n">retry_after</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Retry-After&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rate limited. Retrying in </span><span class="si">{</span><span class="n">retry_after</span><span class="si">}</span><span class="s2">s...&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_after</span><span class="p">)</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>            <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+</code></pre></div>
 <hr />
 <h2 id="3-prometheus-metrics-middleware">📊 3. Prometheus Metrics Middleware<a class="headerlink" href="#3-prometheus-metrics-middleware" title="Permanent link">&para;</a></h2>
-<p>Expose real-time API telemetry to scrape with Prometheus and visualize in Grafana. Mounting this middleware automatically exposes a <code>/metrics</code> route at the root level of your platform application.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">)</span>
+<p>Exposes real-time API telemetry for scraping with Prometheus and visualizing in Grafana. Automatically serves a <code>/metrics</code> endpoint.</p>
+<h3 id="constructor-parameters_2">Constructor Parameters<a class="headerlink" href="#constructor-parameters_2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prefix</code></td>
+<td><code>str</code></td>
+<td><code>"agentomatic"</code></td>
+<td>Prefix for all Prometheus metric names</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Skip paths:</strong> <code>/health</code>, <code>/healthz</code>, <code>/readiness</code>, <code>/metrics</code></p>
+<p><strong>Dependency:</strong> Requires <code>prometheus-client</code> package. If not installed, the middleware degrades gracefully (no metrics recorded).</p>
+<h3 id="enabling-metrics">Enabling Metrics<a class="headerlink" href="#enabling-metrics" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">)</span>
 </code></pre></div>
-<h3 id="exposed-http-metrics">Exposed HTTP Metrics<a class="headerlink" href="#exposed-http-metrics" title="Permanent link">&para;</a></h3>
-<p>The middleware instrumentations record the following standard web application metrics:</p>
+<h3 id="exposed-prometheus-metrics">Exposed Prometheus Metrics<a class="headerlink" href="#exposed-prometheus-metrics" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -1827,66 +2945,399 @@
 </thead>
 <tbody>
 <tr>
-<td><code>agentomatic_requests_total</code></td>
+<td><code>agentomatic_http_requests_total</code></td>
 <td>Counter</td>
-<td><code>method</code>, <code>endpoint</code>, <code>status_code</code></td>
-<td>Total HTTP requests processed.</td>
+<td><code>method</code>, <code>path</code>, <code>status</code></td>
+<td>Total HTTP requests processed</td>
 </tr>
 <tr>
-<td><code>agentomatic_request_duration_seconds</code></td>
+<td><code>agentomatic_http_request_duration_seconds</code></td>
 <td>Histogram</td>
-<td><code>method</code>, <code>endpoint</code></td>
-<td>Processing latency for requests.</td>
+<td><code>method</code>, <code>path</code></td>
+<td>Request processing latency</td>
 </tr>
 <tr>
-<td><code>agentomatic_active_requests</code></td>
+<td><code>agentomatic_http_requests_active</code></td>
 <td>Gauge</td>
-<td>None</td>
-<td>Number of concurrent requests currently running.</td>
+<td>—</td>
+<td>Number of concurrent in-flight requests</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p>📊 <em>For custom agent metrics (LLM durations, database connections, agent logic timings), see the <a href="../telemetry/">Telemetry &amp; Feedback Guide</a>.</em></p>
-</blockquote>
-<hr />
-<h2 id="4-structured-logging-middleware">📝 4. Structured Logging Middleware<a class="headerlink" href="#4-structured-logging-middleware" title="Permanent link">&para;</a></h2>
-<p>Monitors API lifecycle events, measures precise processing speeds, and isolates exceptions.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span>  <span class="c1"># DEBUG | INFO | WARNING | ERROR</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>
+<h3 id="histogram-buckets">Histogram Buckets<a class="headerlink" href="#histogram-buckets" title="Permanent link">&para;</a></h3>
+<p>The duration histogram uses these bucket boundaries (in seconds):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0
 </code></pre></div>
-<p>Agentomatic standardizes console outputs using the <code>loguru</code> framework, printing clean, structured, and color-coded message lines:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>2026-06-13 22:16:10.123 | INFO     | agentomatic.middleware.logging:dispatch:18 - GET /api/v1/my_agent/health - 200 OK - 4.21ms
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>2026-06-13 22:16:15.541 | ERROR    | agentomatic.middleware.logging:dispatch:24 - POST /api/v1/qa_agent/invoke - 500 Internal Error - exception: ConnectionRefusedError
+<h3 id="cardinality-control">Cardinality Control<a class="headerlink" href="#cardinality-control" title="Permanent link">&para;</a></h3>
+<p>To prevent metric explosion, the middleware <strong>normalizes high-cardinality paths</strong> by collapsing UUIDs and hex IDs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>/api/v1/my_agent/threads/thread_a1b2c3d4e5f6/messages
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>→ /api/v1/my_agent/threads/{id}/messages
+</code></pre></div>
+<h3 id="scraping-with-prometheus">Scraping with Prometheus<a class="headerlink" href="#scraping-with-prometheus" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># prometheus.yml</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">scrape_configs</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;agentomatic&#39;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;localhost:8000&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="nt">metrics_path</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;/metrics&#39;</span>
+</code></pre></div>
+<h3 id="sample-metrics-output">Sample <code>/metrics</code> Output<a class="headerlink" href="#sample-metrics-output" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a># HELP agentomatic_http_requests_total Total HTTP requests
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a># TYPE agentomatic_http_requests_total counter
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>agentomatic_http_requests_total{method=&quot;POST&quot;,path=&quot;/api/v1/qa_agent/invoke&quot;,status=&quot;200&quot;} 1847.0
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a># HELP agentomatic_http_request_duration_seconds HTTP request duration
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a># TYPE agentomatic_http_request_duration_seconds histogram
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>agentomatic_http_request_duration_seconds_bucket{le=&quot;0.1&quot;,method=&quot;POST&quot;,path=&quot;/api/v1/qa_agent/invoke&quot;} 52.0
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>agentomatic_http_request_duration_seconds_bucket{le=&quot;0.5&quot;,method=&quot;POST&quot;,path=&quot;/api/v1/qa_agent/invoke&quot;} 1803.0
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a># HELP agentomatic_http_requests_active Active HTTP requests
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a># TYPE agentomatic_http_requests_active gauge
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>agentomatic_http_requests_active 3.0
 </code></pre></div>
 <hr />
-<h2 id="5-injecting-custom-middlewares">🔌 5. Injecting Custom Middlewares<a class="headerlink" href="#5-injecting-custom-middlewares" title="Permanent link">&para;</a></h2>
-<p>You can append custom ASGI or FastAPI middlewares to the platform stack using the <code>middleware</code> parameter. Pass a list of tuples containing the middleware class and its configuration keyword arguments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.middleware.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseHTTPMiddleware</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">SecurityHeadersMiddleware</span><span class="p">(</span><span class="n">BaseHTTPMiddleware</span><span class="p">):</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">,</span> <span class="n">custom_header_value</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">custom_header_value</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">dispatch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">call_next</span><span class="p">):</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">call_next</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-Content-Type-Options&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;nosniff&quot;</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-Frame-Options&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;DENY&quot;</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-Security-Level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>        <span class="k">return</span> <span class="n">response</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="c1"># Register in the platform stack</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="n">middleware</span><span class="o">=</span><span class="p">[</span>
-<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>        <span class="p">(</span><span class="n">SecurityHeadersMiddleware</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;custom_header_value&quot;</span><span class="p">:</span> <span class="s2">&quot;Maximum&quot;</span><span class="p">})</span>
-<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>    <span class="p">],</span>
-<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="p">)</span>
+<h2 id="4-logging-middleware">📝 4. Logging Middleware<a class="headerlink" href="#4-logging-middleware" title="Permanent link">&para;</a></h2>
+<p>Monitors API lifecycle events with structured, color-coded console output. Tracks request/response timing and assigns unique request IDs for traceability.</p>
+<h3 id="enabling-logging">Enabling Logging<a class="headerlink" href="#enabling-logging" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># Enabled by default</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span>     <span class="c1"># DEBUG | INFO | WARNING | ERROR</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Skip paths:</strong> <code>/health</code>, <code>/healthz</code>, <code>/readiness</code>, <code>/metrics</code>, <code>/favicon.ico</code></p>
+<h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Request ID tracking</strong></td>
+<td>Uses <code>X-Request-ID</code> header if provided, otherwise generates a unique 12-character hex ID</td>
+</tr>
+<tr>
+<td><strong>Response timing</strong></td>
+<td>Measures precise processing time in milliseconds</td>
+</tr>
+<tr>
+<td><strong>Response headers</strong></td>
+<td>Adds <code>X-Request-ID</code> and <code>X-Process-Time-Ms</code> to every response</td>
+</tr>
+<tr>
+<td><strong>Structured format</strong></td>
+<td>Uses <code>loguru</code> for clean, color-coded, structured output</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response-headers-added">Response Headers Added<a class="headerlink" href="#response-headers-added" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Header</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>X-Request-ID</code></td>
+<td>Unique request identifier (from client header or auto-generated)</td>
+</tr>
+<tr>
+<td><code>X-Process-Time-Ms</code></td>
+<td>Processing time in milliseconds</td>
+</tr>
+</tbody>
+</table>
+<h3 id="console-output-example">Console Output Example<a class="headerlink" href="#console-output-example" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>2026-06-13 22:16:10.123 | INFO | → POST /api/v1/my_agent/invoke [a1b2c3d4e5f6]
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>2026-06-13 22:16:10.547 | INFO | ← POST /api/v1/my_agent/invoke → 200 (424.3ms) [a1b2c3d4e5f6]
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>2026-06-13 22:16:15.541 | INFO | → POST /api/v1/qa_agent/chat [f7e8d9c0b1a2]
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>2026-06-13 22:16:18.102 | INFO | ← POST /api/v1/qa_agent/chat → 200 (2561.0ms) [f7e8d9c0b1a2]
+</code></pre></div>
+<h3 id="correlating-requests">Correlating Requests<a class="headerlink" href="#correlating-requests" title="Permanent link">&para;</a></h3>
+<p>Pass a custom request ID from the client for end-to-end traceability:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/my_agent/invoke<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;X-Request-ID: my-trace-12345&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;query&quot;: &quot;Hello!&quot;}&#39;</span>
+</code></pre></div>
+<hr />
+<h2 id="5-feedback-middleware">👍 5. Feedback Middleware<a class="headerlink" href="#5-feedback-middleware" title="Permanent link">&para;</a></h2>
+<p>Automatically records user feedback (thumbs up/down, ratings, corrections, comments) for every agent. Feedback data feeds into optimization datasets for prompt tuning.</p>
+<h3 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h3>
+<p>The feedback system has two main components:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FeedbackCollector</code></td>
+<td>Async collector with background storage and in-memory buffer</td>
+</tr>
+<tr>
+<td><code>@collect_feedback</code></td>
+<td>Decorator for auto-recording agent inputs/outputs</td>
+</tr>
+</tbody>
+</table>
+<h3 id="enabling-feedback">Enabling Feedback<a class="headerlink" href="#enabling-feedback" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>    <span class="c1"># Default: True</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://...&quot;</span><span class="p">),</span>  <span class="c1"># Persists feedback</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="feedbackrecord-fields">FeedbackRecord Fields<a class="headerlink" href="#feedbackrecord-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>feedback_id</code></td>
+<td><code>str</code></td>
+<td>Auto-generated unique ID</td>
+</tr>
+<tr>
+<td><code>agent_name</code></td>
+<td><code>str</code></td>
+<td>Name of the agent</td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td><code>str</code></td>
+<td>User who submitted the feedback</td>
+</tr>
+<tr>
+<td><code>thread_id</code></td>
+<td><code>str \| None</code></td>
+<td>Associated conversation thread</td>
+</tr>
+<tr>
+<td><code>message_id</code></td>
+<td><code>int \| None</code></td>
+<td>Specific message being rated</td>
+</tr>
+<tr>
+<td><code>query</code></td>
+<td><code>str</code></td>
+<td>Original user query</td>
+</tr>
+<tr>
+<td><code>response</code></td>
+<td><code>str</code></td>
+<td>Agent's response</td>
+</tr>
+<tr>
+<td><code>rating</code></td>
+<td><code>int \| None</code></td>
+<td>1 (thumbs down) to 5 (thumbs up)</td>
+</tr>
+<tr>
+<td><code>comment</code></td>
+<td><code>str \| None</code></td>
+<td>Free-text comment</td>
+</tr>
+<tr>
+<td><code>correction</code></td>
+<td><code>str \| None</code></td>
+<td>User-provided correct answer</td>
+</tr>
+<tr>
+<td><code>feedback_type</code></td>
+<td><code>str</code></td>
+<td>Type: <code>thumbs</code>, <code>rating</code>, <code>correction</code>, <code>comment</code></td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td><code>str</code></td>
+<td>ISO 8601 timestamp</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td>Arbitrary metadata</td>
+</tr>
+</tbody>
+</table>
+<h3 id="using-the-decorator">Using the Decorator<a class="headerlink" href="#using-the-decorator" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.middleware.feedback</span><span class="w"> </span><span class="kn">import</span> <span class="n">collect_feedback</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="nd">@collect_feedback</span><span class="p">(</span><span class="n">store</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">node_fn</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Every invocation is automatically recorded for feedback.&quot;&quot;&quot;</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">query</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;current_query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Processed: </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+</code></pre></div>
+<h3 id="programmatic-feedback-recording">Programmatic Feedback Recording<a class="headerlink" href="#programmatic-feedback-recording" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.middleware.feedback</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_collector</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">collector</span> <span class="o">=</span> <span class="n">get_collector</span><span class="p">()</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">record</span> <span class="o">=</span> <span class="k">await</span> <span class="n">collector</span><span class="o">.</span><span class="n">record</span><span class="p">(</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;qa_agent&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;user_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="n">query</span><span class="o">=</span><span class="s2">&quot;What is the return policy?&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="n">response</span><span class="o">=</span><span class="s2">&quot;Our return policy allows...&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>    <span class="n">rating</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="n">feedback_type</span><span class="o">=</span><span class="s2">&quot;thumbs&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>    <span class="n">thread_id</span><span class="o">=</span><span class="s2">&quot;thread_abc123&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="exporting-feedback-as-jsonl">Exporting Feedback as JSONL<a class="headerlink" href="#exporting-feedback-as-jsonl" title="Permanent link">&para;</a></h3>
+<p>Export feedback data for prompt optimization pipelines:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">collector</span> <span class="o">=</span> <span class="n">get_collector</span><span class="p">()</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">jsonl_data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">collector</span><span class="o">.</span><span class="n">export_jsonl</span><span class="p">(</span><span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;qa_agent&quot;</span><span class="p">)</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Save to file</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;feedback_export.jsonl&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">jsonl_data</span><span class="p">)</span>
+</code></pre></div>
+<p>Output format (one JSON object per line):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p">{</span><span class="nt">&quot;query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;What is the return policy?&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;expected_answer&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Our return policy...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;rating&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;comment&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;feedback_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;thumbs&quot;</span><span class="p">}}</span>
+</code></pre></div>
+<hr />
+<h2 id="custom-middleware">🔌 Custom Middleware<a class="headerlink" href="#custom-middleware" title="Permanent link">&para;</a></h2>
+<p>You can inject custom ASGI or Starlette middlewares into the pipeline using the <code>middleware</code> parameter.</p>
+<h3 id="creating-custom-middleware">Creating Custom Middleware<a class="headerlink" href="#creating-custom-middleware" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.middleware.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseHTTPMiddleware</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.requests</span><span class="w"> </span><span class="kn">import</span> <span class="n">Request</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.responses</span><span class="w"> </span><span class="kn">import</span> <span class="n">Response</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">SecurityHeadersMiddleware</span><span class="p">(</span><span class="n">BaseHTTPMiddleware</span><span class="p">):</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Add security headers to all responses.&quot;&quot;&quot;</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">csp_policy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default-src &#39;self&#39;&quot;</span><span class="p">):</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">csp_policy</span> <span class="o">=</span> <span class="n">csp_policy</span>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">dispatch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span> <span class="n">call_next</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Response</span><span class="p">:</span>
+<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">call_next</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-Content-Type-Options&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;nosniff&quot;</span>
+<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-Frame-Options&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;DENY&quot;</span>
+<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-XSS-Protection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1; mode=block&quot;</span>
+<a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Content-Security-Policy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">csp_policy</span>
+<a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Strict-Transport-Security&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>            <span class="s2">&quot;max-age=31536000; includeSubDomains&quot;</span>
+<a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a>        <span class="p">)</span>
+<a id="__codelineno-21-21" name="__codelineno-21-21" href="#__codelineno-21-21"></a>        <span class="k">return</span> <span class="n">response</span>
+</code></pre></div>
+<h3 id="registering-custom-middleware">Registering Custom Middleware<a class="headerlink" href="#registering-custom-middleware" title="Permanent link">&para;</a></h3>
+<p>Pass a list of <code>(MiddlewareClass, kwargs)</code> tuples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="n">middleware</span><span class="o">=</span><span class="p">[</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>        <span class="p">(</span><span class="n">SecurityHeadersMiddleware</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;csp_policy&quot;</span><span class="p">:</span> <span class="s2">&quot;default-src &#39;self&#39;&quot;</span><span class="p">}),</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>        <span class="p">(</span><span class="n">AnotherMiddleware</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;option&quot;</span><span class="p">:</span> <span class="s2">&quot;value&quot;</span><span class="p">}),</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="p">],</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="example-request-timing-middleware">Example: Request Timing Middleware<a class="headerlink" href="#example-request-timing-middleware" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.middleware.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseHTTPMiddleware</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">DetailedTimingMiddleware</span><span class="p">(</span><span class="n">BaseHTTPMiddleware</span><span class="p">):</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Add detailed timing headers for performance monitoring.&quot;&quot;&quot;</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">dispatch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">call_next</span><span class="p">):</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">call_next</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>        <span class="n">duration</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;X-Response-Time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">duration</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>        <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Server-Timing&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;total;dur=</span><span class="si">{</span><span class="n">duration</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1000</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>        <span class="k">return</span> <span class="n">response</span>
+</code></pre></div>
+<h3 id="example-ip-allowlist-middleware">Example: IP Allowlist Middleware<a class="headerlink" href="#example-ip-allowlist-middleware" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.middleware.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseHTTPMiddleware</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.responses</span><span class="w"> </span><span class="kn">import</span> <span class="n">JSONResponse</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">IPAllowlistMiddleware</span><span class="p">(</span><span class="n">BaseHTTPMiddleware</span><span class="p">):</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Restrict access to specific IP addresses.&quot;&quot;&quot;</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">allowed_ips</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">allowed_ips</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">allowed_ips</span><span class="p">)</span>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">dispatch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">call_next</span><span class="p">):</span>
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>        <span class="n">client_ip</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">host</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">client</span> <span class="k">else</span> <span class="s2">&quot;unknown&quot;</span>
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>        <span class="k">if</span> <span class="n">client_ip</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">allowed_ips</span><span class="p">:</span>
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>            <span class="k">return</span> <span class="n">JSONResponse</span><span class="p">(</span>
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>                <span class="p">{</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Access denied&quot;</span><span class="p">},</span>
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>                <span class="n">status_code</span><span class="o">=</span><span class="mi">403</span><span class="p">,</span>
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>            <span class="p">)</span>
+<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>        <span class="k">return</span> <span class="k">await</span> <span class="n">call_next</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="middleware-best-practices">📋 Middleware Best Practices<a class="headerlink" href="#middleware-best-practices" title="Permanent link">&para;</a></h2>
+<h3 id="ordering-guidelines">Ordering Guidelines<a class="headerlink" href="#ordering-guidelines" title="Permanent link">&para;</a></h3>
+<div class="admonition tip">
+<p class="admonition-title">Recommended Order</p>
+<ol>
+<li><strong>Security middleware</strong> (auth, IP allowlist) — reject bad requests early</li>
+<li><strong>Rate limiting</strong> — protect against abuse before processing</li>
+<li><strong>Logging/tracing</strong> — capture all requests including rejected ones</li>
+<li><strong>Metrics</strong> — measure everything that passes security</li>
+<li><strong>Business logic middleware</strong> — custom transformations</li>
+</ol>
+</div>
+<h3 id="performance-considerations">Performance Considerations<a class="headerlink" href="#performance-considerations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Practice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep <code>skip_paths</code> updated</td>
+<td>Avoid unnecessary processing on health/probe endpoints</td>
+</tr>
+<tr>
+<td>Use <code>time.perf_counter()</code></td>
+<td>More precise than <code>time.time()</code> for latency measurements</td>
+</tr>
+<tr>
+<td>Avoid blocking I/O in middleware</td>
+<td>All middleware is async — don't use synchronous database calls</td>
+</tr>
+<tr>
+<td>Minimize response body inspection</td>
+<td>Reading the body forces buffering and hurts streaming</td>
+</tr>
+</tbody>
+</table>
+<h3 id="middleware-interaction-with-streaming">Middleware Interaction with Streaming<a class="headerlink" href="#middleware-interaction-with-streaming" title="Permanent link">&para;</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">SSE / Streaming Responses</p>
+<p>The logging and metrics middleware measure time until the <strong>first byte</strong> is sent, not until the full streaming response completes. For streaming endpoints (<code>/chat/stream</code>), the <code>X-Process-Time-Ms</code> header reflects initial response time only.</p>
+</div>
+<h3 id="disabling-all-middleware">Disabling All Middleware<a class="headerlink" href="#disabling-all-middleware" title="Permanent link">&para;</a></h3>
+<p>For maximum performance in trusted environments:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="p">)</span>
 </code></pre></div>
 
 

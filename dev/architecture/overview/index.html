@@ -860,6 +860,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/langgraph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/platform-features/" class="md-nav__link">
         
   
@@ -1330,10 +1358,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#high-level-architecture" class="md-nav__link">
+  <a href="#system-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        High-Level Architecture
+        System Architecture
       
     </span>
   </a>
@@ -1341,37 +1369,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#request-flow" class="md-nav__link">
+  <a href="#component-descriptions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Request Flow
+        Component Descriptions
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#studio-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Studio Architecture
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#core-components" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core Components
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Core Components">
+    <nav class="md-nav" aria-label="Component Descriptions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1386,10 +1392,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#agent-registry" class="md-nav__link">
+  <a href="#agentregistry" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent Registry
+        AgentRegistry
       
     </span>
   </a>
@@ -1401,6 +1407,17 @@
     <span class="md-ellipsis">
       
         RouterFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Studio Adapters
       
     </span>
   </a>
@@ -1420,6 +1437,134 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Request Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoke-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoke Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hitl-suspendresume-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HITL Suspend/Resume Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-registration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Registration Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent Registration Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agent-folder-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Folder Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-process-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single Process (Development)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-worker-staging-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Worker (Staging / Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#containerized-kubernetes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containerized (Kubernetes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1559,10 +1704,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#high-level-architecture" class="md-nav__link">
+  <a href="#system-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        High-Level Architecture
+        System Architecture
       
     </span>
   </a>
@@ -1570,37 +1715,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#request-flow" class="md-nav__link">
+  <a href="#component-descriptions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Request Flow
+        Component Descriptions
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#studio-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Studio Architecture
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#core-components" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core Components
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Core Components">
+    <nav class="md-nav" aria-label="Component Descriptions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1615,10 +1738,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#agent-registry" class="md-nav__link">
+  <a href="#agentregistry" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent Registry
+        AgentRegistry
       
     </span>
   </a>
@@ -1630,6 +1753,17 @@
     <span class="md-ellipsis">
       
         RouterFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Studio Adapters
       
     </span>
   </a>
@@ -1649,6 +1783,134 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Request Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoke-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoke Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hitl-suspendresume-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HITL Suspend/Resume Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-registration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Registration Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent Registration Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agent-folder-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Folder Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-process-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single Process (Development)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-worker-staging-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Worker (Staging / Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#containerized-kubernetes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containerized (Kubernetes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1684,109 +1946,109 @@
 
 
 <h1 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h1>
-<p>Agentomatic follows a <strong>convention-over-configuration</strong> design where agents are discovered, registered, and served with minimal boilerplate.</p>
+<p>Agentomatic follows a <strong>convention-over-configuration</strong> design where agents are discovered, registered, and served with minimal boilerplate. This page describes the system architecture, component relationships, request lifecycle, and deployment patterns.</p>
 <hr />
-<h2 id="high-level-architecture">High-Level Architecture<a class="headerlink" href="#high-level-architecture" title="Permanent link">&para;</a></h2>
+<h2 id="system-architecture">System Architecture<a class="headerlink" href="#system-architecture" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>graph TB
     subgraph "Client Layer"
-        CL["REST Client&lt;br/&gt;(curl, SDK, frontend)"]
-        ST["Agentomatic Studio&lt;br/&gt;(React debug UI)"]
-        CH["Chainlit&lt;br/&gt;(Chat UI)"]
+        CL["REST Client\n(curl · SDK · frontend)"]
+        ST["Agentomatic Studio\n(React debug UI)"]
+        CH["Chainlit\n(Chat UI)"]
+        A2AC["A2A Client\n(Agent-to-Agent)"]
     end
 
-    subgraph "Agentomatic Platform"
-        MW["Middleware Stack&lt;br/&gt;Auth · Rate Limit · Metrics · Logging"]
-        RF["RouterFactory&lt;br/&gt;Auto-generated endpoints per agent"]
-        SR["Studio Router&lt;br/&gt;Debug API (/studio/)"]
-        REG["Agent Registry"]
-        SM["Storage Manager"]
+    subgraph "Middleware Pipeline"
+        AUTH["Auth Middleware\nAPI key · JWT · Custom"]
+        RL["Rate Limiter\nPer-user · Per-agent"]
+        CORS["CORS\nCross-origin config"]
+        OTEL["OpenTelemetry\nTraces · Spans"]
+        PROM["Prometheus\nHistograms · Counters"]
+        LOG["Loguru\nStructured logging"]
+    end
+
+    subgraph "Agentomatic Platform Core"
+        AP["AgentPlatform\nCentral orchestrator"]
+        REG["AgentRegistry\nIn-memory agent store"]
+        RF["RouterFactory\nAuto-generated REST\n(20+ endpoints per agent)"]
+        SR["StudioRouter\nDebug API (/studio/*)"]
+        MM["MemoryManager\nConversation history\nSummarization · Windowing"]
+        FB["FeedbackCollector\nRatings · Corrections"]
     end
 
     subgraph "Agent Layer"
-        A1["Agent A&lt;br/&gt;(LangGraph)"]
-        A2["Agent B&lt;br/&gt;(LangChain)"]
-        A3["Agent C&lt;br/&gt;(Raw Python)"]
+        A1["Agent A\n(LangGraph)\ngraph_fn → CompiledGraph"]
+        A2["Agent B\n(LangChain)\nnode_fn → LCEL chain"]
+        A3["Agent C\n(Raw Python)\nnode_fn → async callable"]
+        A4["Agent D\n(Deep Agent)\ngraph_fn → Subagent graph"]
     end
 
     subgraph "Studio Adapter Layer"
-        LGA["LangGraphAdapter&lt;br/&gt;Full graph + checkpoints"]
-        LCA["LangChainAdapter&lt;br/&gt;LCEL + astream_events"]
-        GA["GenericAdapter&lt;br/&gt;Trace-based fallback"]
+        LGA["LangGraphAdapter\n✅ Real graph topology\n✅ Checkpoints + time-travel\n✅ SSE via astream_events\n✅ HITL breakpoints"]
+        LCA["LangChainAdapter\n✅ LCEL graph extraction\n✅ SSE via astream_events\n○ Synthetic checkpoints"]
+        GA["GenericAdapter\n✅ Synthetic graph\n✅ Trace-based events\n○ Basic state tracking"]
     end
 
-    subgraph "Infrastructure"
-        DB["Storage Backend&lt;br/&gt;Memory · SQLite · PostgreSQL"]
-        OT["OpenTelemetry&lt;br/&gt;Traces · Metrics"]
-        PM["Prometheus&lt;br/&gt;Histograms · Counters"]
+    subgraph "Storage Layer"
+        MEM["MemoryStore\nIn-process dict\n(development)"]
+        SQL["SQLAlchemyStore\nPostgreSQL · SQLite\n(production)"]
+        CP["AgentomaticCheckpointer\nLangGraph ↔ BaseStore\nbridge"]
     end
 
-    CL --&gt; MW
-    ST --&gt; SR
-    CH --&gt; RF
-    MW --&gt; RF
-    MW --&gt; SR
+    subgraph "Observability"
+        OT["OpenTelemetry Collector"]
+        PM["Prometheus /metrics"]
+        LK["Loguru → stdout/file"]
+    end
+
+    %% Client → Middleware
+    CL --&gt; AUTH
+    ST --&gt; AUTH
+    CH --&gt; AUTH
+    A2AC --&gt; AUTH
+
+    %% Middleware chain
+    AUTH --&gt; RL --&gt; CORS --&gt; AP
+
+    %% Platform routing
+    AP --&gt; RF
+    AP --&gt; SR
+    AP --&gt; REG
+
+    %% Router → Registry → Agent
     RF --&gt; REG
     SR --&gt; REG
     REG --&gt; A1
     REG --&gt; A2
     REG --&gt; A3
+    REG --&gt; A4
+
+    %% Agent → Adapter
     A1 --&gt; LGA
     A2 --&gt; LCA
     A3 --&gt; GA
-    RF --&gt; SM
-    SM --&gt; DB
-    RF --&gt; OT
-    MW --&gt; PM</code></pre>
-<hr />
-<h2 id="request-flow">Request Flow<a class="headerlink" href="#request-flow" title="Permanent link">&para;</a></h2>
-<pre class="mermaid"><code>sequenceDiagram
-    participant Client
-    participant Middleware
-    participant Router
-    participant Registry
-    participant Agent
-    participant Storage
+    A4 --&gt; LGA
 
-    Client-&gt;&gt;+Middleware: HTTP Request
-    Middleware-&gt;&gt;Middleware: Auth · Rate Limit · Metrics
-    Middleware-&gt;&gt;+Router: Authenticated Request
-    Router-&gt;&gt;+Registry: get_agent(name)
-    Registry--&gt;&gt;-Router: RegisteredAgent
-    Router-&gt;&gt;+Agent: invoke / stream / chat
-    Agent-&gt;&gt;Agent: graph_fn or node_fn execution
-    Agent--&gt;&gt;-Router: Result
-    Router-&gt;&gt;+Storage: Save thread + messages
-    Storage--&gt;&gt;-Router: Persisted
-    Router--&gt;&gt;-Middleware: Response
-    Middleware--&gt;&gt;-Client: JSON / SSE Stream</code></pre>
-<hr />
-<h2 id="studio-architecture">Studio Architecture<a class="headerlink" href="#studio-architecture" title="Permanent link">&para;</a></h2>
-<p>The Studio uses an <strong>adapter pattern</strong> to provide debugging capabilities across different agent frameworks:</p>
-<pre class="mermaid"><code>graph LR
-    subgraph "Resolution Chain"
-        R["resolve_adapter()"]
-    end
+    %% Storage
+    RF --&gt; MM --&gt; SQL
+    RF --&gt; FB
+    LGA --&gt; CP --&gt; SQL
+    LGA --&gt; CP --&gt; MEM
 
-    subgraph "Adapters"
-        R --&gt;|"graph_fn?"| LG["LangGraphAdapter"]
-        R --&gt;|"framework=langchain?"| LC["LangChainAdapter"]
-        R --&gt;|"fallback"| GN["GenericAdapter"]
-        R --&gt;|"_studio_adapter?"| CU["Custom Adapter"]
-    end
+    %% Observability
+    AP --&gt; OTEL --&gt; OT
+    AP --&gt; PROM --&gt; PM
+    AP --&gt; LOG --&gt; LK
 
-    subgraph "Capabilities"
-        LG --&gt; G1["✅ Real Graph"]
-        LG --&gt; G2["✅ Checkpoints"]
-        LG --&gt; G3["✅ HITL"]
-        LC --&gt; L1["✅ LCEL Graph"]
-        LC --&gt; L2["✅ astream_events"]
-        GN --&gt; N1["✅ Synthetic Graph"]
-        GN --&gt; N2["✅ Trace Events"]
-    end</code></pre>
+    style AP fill:#4a9eff,color:#fff
+    style REG fill:#4a9eff,color:#fff
+    style RF fill:#4a9eff,color:#fff
+    style LGA fill:#ff6b6b,color:#fff
+    style CP fill:#ff6b6b,color:#fff
+    style SQL fill:#51cf66,color:#fff</code></pre>
 <hr />
-<h2 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">&para;</a></h2>
+<h2 id="component-descriptions">Component Descriptions<a class="headerlink" href="#component-descriptions" title="Permanent link">&para;</a></h2>
 <h3 id="agentplatform">AgentPlatform<a class="headerlink" href="#agentplatform" title="Permanent link">&para;</a></h3>
-<p>The central orchestrator. Created via <code>AgentPlatform.from_folder()</code> which:</p>
+<p>The central orchestrator. Created via <code>AgentPlatform.from_folder()</code>:</p>
 <ol>
 <li><strong>Scans</strong> the agents directory for valid agent folders</li>
 <li><strong>Imports</strong> each agent's <code>__init__.py</code> to extract <code>manifest</code> and <code>node_fn</code>/<code>graph_fn</code></li>
@@ -1794,67 +2056,477 @@
 <li><strong>Generates</strong> REST endpoints per agent via <code>RouterFactory</code></li>
 <li><strong>Mounts</strong> middleware, Studio router, and Chainlit UI as requested</li>
 </ol>
-<h3 id="agent-registry">Agent Registry<a class="headerlink" href="#agent-registry" title="Permanent link">&para;</a></h3>
-<p>An in-memory registry that holds <code>RegisteredAgent</code> instances. Each agent carries:</p>
-<ul>
-<li><strong>manifest</strong> — <code>AgentManifest</code> with name, description, framework, schemas</li>
-<li><strong>node_fn</strong> — The async callable that processes state</li>
-<li><strong>graph_fn</strong> — Optional LangGraph <code>StateGraph</code> factory</li>
-<li><strong>config</strong> — Optional Pydantic configuration class</li>
-<li><strong>prompt_manager</strong> — Template versioning from <code>prompts.json</code></li>
-</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://...&quot;</span><span class="p">),</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">enable_studio</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">enable_chainlit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">app</span>  <span class="c1"># FastAPI application</span>
+</code></pre></div>
+<h3 id="agentregistry">AgentRegistry<a class="headerlink" href="#agentregistry" title="Permanent link">&para;</a></h3>
+<p>An in-memory registry holding <code>RegisteredAgent</code> instances. Each agent carries:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td>Machine name (folder name)</td>
+</tr>
+<tr>
+<td><code>slug</code></td>
+<td><code>str</code></td>
+<td>URL-safe identifier</td>
+</tr>
+<tr>
+<td><code>manifest</code></td>
+<td><code>AgentManifest</code></td>
+<td>Name, description, framework, version</td>
+</tr>
+<tr>
+<td><code>node_fn</code></td>
+<td><code>Callable</code></td>
+<td>Async callable that processes state</td>
+</tr>
+<tr>
+<td><code>graph_fn</code></td>
+<td><code>Callable \| None</code></td>
+<td>LangGraph <code>StateGraph</code> factory</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td><code>BaseModel \| None</code></td>
+<td>Pydantic configuration</td>
+</tr>
+<tr>
+<td><code>prompt_manager</code></td>
+<td><code>PromptManager \| None</code></td>
+<td>Template versioning from <code>prompts.json</code></td>
+</tr>
+<tr>
+<td><code>module_path</code></td>
+<td><code>str \| None</code></td>
+<td>Python module path for schema discovery</td>
+</tr>
+</tbody>
+</table>
 <h3 id="routerfactory">RouterFactory<a class="headerlink" href="#routerfactory" title="Permanent link">&para;</a></h3>
-<p>Auto-generates 20+ FastAPI endpoints per agent:</p>
+<p>Auto-generates a full FastAPI router per agent with 20+ endpoints:</p>
 <table>
 <thead>
 <tr>
 <th>Category</th>
 <th>Endpoints</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><strong>Execution</strong></td>
 <td><code>POST /invoke</code>, <code>POST /invoke/stream</code>, <code>POST /chat</code></td>
+<td>Sync, streaming, session-aware</td>
 </tr>
 <tr>
 <td><strong>A2A Protocol</strong></td>
-<td><code>GET /card</code>, <code>POST /a2a/tasks</code></td>
+<td><code>GET /card</code>, <code>POST /a2a/tasks</code>, <code>GET /a2a/tasks/{id}</code></td>
+<td>Agent-to-agent interop</td>
 </tr>
 <tr>
 <td><strong>Threads</strong></td>
-<td><code>GET/POST /threads</code>, <code>GET /threads/{id}/messages</code></td>
+<td><code>POST /threads</code>, <code>GET /threads</code>, <code>GET /threads/{id}</code>, <code>PATCH /threads/{id}</code>, <code>DELETE /threads/{id}</code></td>
+<td>Full CRUD</td>
+</tr>
+<tr>
+<td><strong>Messages</strong></td>
+<td><code>GET /threads/{id}/messages</code>, <code>DELETE /threads/{id}/messages</code>, <code>GET /threads/{id}/summary</code></td>
+<td>History + summarization</td>
 </tr>
 <tr>
 <td><strong>HITL</strong></td>
-<td><code>POST /threads/{id}/approve</code>, <code>POST /threads/{id}/reject</code></td>
-</tr>
-<tr>
-<td><strong>Inspection</strong></td>
-<td><code>GET /health</code>, <code>GET /config</code>, <code>GET /prompts</code></td>
+<td><code>GET /threads/{id}/pending</code>, <code>POST /threads/{id}/approve</code>, <code>POST /threads/{id}/reject</code></td>
+<td>Human-in-the-loop approval</td>
 </tr>
 <tr>
 <td><strong>Forking</strong></td>
 <td><code>POST /threads/{id}/fork</code>, <code>GET /threads/{id}/lineage</code></td>
+<td>Thread branching + ancestry</td>
+</tr>
+<tr>
+<td><strong>Feedback</strong></td>
+<td><code>POST /feedback</code>, <code>GET /feedback</code>, <code>GET /feedback/export</code></td>
+<td>User ratings + JSONL export</td>
+</tr>
+<tr>
+<td><strong>Inspection</strong></td>
+<td><code>GET /health</code>, <code>GET /config</code>, <code>GET /prompts</code></td>
+<td>Agent health + config</td>
+</tr>
+<tr>
+<td><strong>Optimization</strong></td>
+<td><code>POST /optimize/invoke</code></td>
+<td>Full-context pipeline for DeepEval</td>
 </tr>
 </tbody>
 </table>
-<h3 id="storage-layer">Storage Layer<a class="headerlink" href="#storage-layer" title="Permanent link">&para;</a></h3>
-<p>Abstract <code>BaseStore</code> with implementations:</p>
+<h3 id="studio-adapters">Studio Adapters<a class="headerlink" href="#studio-adapters" title="Permanent link">&para;</a></h3>
+<p>The Studio uses an <strong>adapter pattern</strong> to provide debugging capabilities across different agent frameworks:</p>
+<pre class="mermaid"><code>graph LR
+    subgraph "Resolution Chain"
+        R["resolve_adapter()"]
+    end
+
+    subgraph "Adapters"
+        R --&gt;|"graph_fn present?"| LG["LangGraphAdapter"]
+        R --&gt;|"framework=langchain?"| LC["LangChainAdapter"]
+        R --&gt;|"_studio_adapter set?"| CU["Custom Adapter"]
+        R --&gt;|"fallback"| GN["GenericAdapter"]
+    end
+
+    subgraph "Capabilities"
+        LG --&gt; G1["✅ Real Graph Topology"]
+        LG --&gt; G2["✅ Checkpoints + Time-travel"]
+        LG --&gt; G3["✅ HITL Breakpoints"]
+        LG --&gt; G4["✅ SSE via astream_events"]
+        LC --&gt; L1["✅ LCEL Graph"]
+        LC --&gt; L2["✅ astream_events"]
+        GN --&gt; N1["✅ Synthetic Graph"]
+        GN --&gt; N2["✅ Trace Events"]
+    end</code></pre>
+<p>Each adapter implements the <code>StudioAdapter</code> ABC:</p>
 <ul>
-<li><strong>MemoryStore</strong> — In-process dict, perfect for development</li>
-<li><strong>SQLAlchemyStore</strong> — PostgreSQL / SQLite via async SQLAlchemy</li>
+<li><strong><code>get_graph()</code></strong> — Returns <code>StudioGraphTopology</code> with nodes and edges</li>
+<li><strong><code>stream_execution()</code></strong> — Yields <code>StudioRunEvent</code> via SSE</li>
+<li><strong><code>get_state()</code></strong> — Returns <code>StudioStateSnapshot</code> for a thread</li>
+<li><strong><code>update_state()</code></strong> — Applies partial state updates</li>
+<li><strong><code>get_history()</code></strong> — Returns checkpoint history</li>
 </ul>
+<h3 id="storage-layer">Storage Layer<a class="headerlink" href="#storage-layer" title="Permanent link">&para;</a></h3>
+<p>Abstract <code>BaseStore</code> with swappable implementations:</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Backend</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MemoryStore</code></td>
+<td>In-process <code>dict</code></td>
+<td>Development, testing, CI</td>
+</tr>
+<tr>
+<td><code>SQLAlchemyStore</code></td>
+<td>PostgreSQL / SQLite</td>
+<td>Production deployment</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>AgentomaticCheckpointer</code> bridges LangGraph's <code>BaseCheckpointSaver</code> to <code>BaseStore</code>, enabling checkpoint persistence through the same storage backend used for threads and messages.</p>
+<hr />
+<h2 id="request-lifecycle">Request Lifecycle<a class="headerlink" href="#request-lifecycle" title="Permanent link">&para;</a></h2>
+<h3 id="invoke-flow">Invoke Flow<a class="headerlink" href="#invoke-flow" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Middleware
+    participant RouterFactory
+    participant Registry
+    participant MemoryManager
+    participant Agent
+    participant Storage
+
+    Client-&gt;&gt;+Middleware: POST /api/v1/{agent}/invoke
+    Middleware-&gt;&gt;Middleware: Auth · Rate Limit · Metrics
+    Middleware-&gt;&gt;+RouterFactory: Authenticated Request
+
+    RouterFactory-&gt;&gt;+Registry: get(agent_name)
+    Registry--&gt;&gt;-RouterFactory: RegisteredAgent
+
+    RouterFactory-&gt;&gt;RouterFactory: _build_initial_state(request)
+
+    alt Thread store configured
+        RouterFactory-&gt;&gt;+MemoryManager: get_or_create_thread()
+        MemoryManager-&gt;&gt;+Storage: get/create thread
+        Storage--&gt;&gt;-MemoryManager: thread_id
+        MemoryManager--&gt;&gt;-RouterFactory: thread_id
+
+        RouterFactory-&gt;&gt;+MemoryManager: load_history(thread_id, query)
+        MemoryManager-&gt;&gt;+Storage: get_messages()
+        Storage--&gt;&gt;-MemoryManager: messages
+        MemoryManager--&gt;&gt;-RouterFactory: LangChain messages
+    end
+
+    RouterFactory-&gt;&gt;RouterFactory: Execute before_node hooks
+
+    alt Has graph_fn
+        RouterFactory-&gt;&gt;+Agent: graph.ainvoke(state)
+    else Has node_fn
+        RouterFactory-&gt;&gt;+Agent: node_fn(state)
+    end
+    Agent--&gt;&gt;-RouterFactory: result dict
+
+    RouterFactory-&gt;&gt;RouterFactory: Execute after_node hooks
+
+    alt Thread store configured
+        RouterFactory-&gt;&gt;+MemoryManager: save_turn(query, response)
+        MemoryManager-&gt;&gt;+Storage: add_message(user) + add_message(assistant)
+        Storage--&gt;&gt;-MemoryManager: persisted
+        MemoryManager--&gt;&gt;-RouterFactory: done
+    end
+
+    RouterFactory-&gt;&gt;RouterFactory: _extract_response(result)
+    RouterFactory--&gt;&gt;-Middleware: AgentInvokeResponse
+    Middleware--&gt;&gt;-Client: JSON Response</code></pre>
+<h3 id="hitl-suspendresume-flow">HITL Suspend/Resume Flow<a class="headerlink" href="#hitl-suspendresume-flow" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Router
+    participant Agent
+    participant Storage
+
+    Client-&gt;&gt;+Router: POST /invoke
+    Router-&gt;&gt;+Agent: graph.ainvoke(state)
+    Agent--&gt;&gt;-Router: raises AgentSuspendedException
+
+    Router-&gt;&gt;+Storage: save_suspended_state()
+    Storage--&gt;&gt;-Router: saved
+
+    Router--&gt;&gt;-Client: 202 Accepted + approval_id
+
+    Note over Client: Human reviews and approves
+
+    Client-&gt;&gt;+Router: POST /threads/{id}/approve
+    Router-&gt;&gt;+Storage: get_suspended_state(approval_id)
+    Storage--&gt;&gt;-Router: state_snapshot
+
+    Router-&gt;&gt;+Storage: delete_suspended_state()
+    Storage--&gt;&gt;-Router: deleted
+
+    Router-&gt;&gt;Router: Merge human context into state
+    Router-&gt;&gt;Router: Set metadata.hitl_approved = true
+
+    Router-&gt;&gt;+Agent: graph.ainvoke(resumed_state)
+    Agent--&gt;&gt;-Router: result
+
+    Router--&gt;&gt;-Client: AgentInvokeResponse</code></pre>
+<hr />
+<h2 id="agent-registration-flow">Agent Registration Flow<a class="headerlink" href="#agent-registration-flow" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>graph TD
+    SCAN["AgentPlatform.from_folder('agents/')"] --&gt; DISC["Discovery: scan for __init__.py"]
+    DISC --&gt; IMP["Import each agent module"]
+
+    IMP --&gt; EXTRACT["Extract:\n• manifest (required)\n• graph_fn or node_fn\n• config (optional)\n• prompts.json (optional)"]
+
+    EXTRACT --&gt; VAL["Validate manifest"]
+
+    VAL --&gt; REG["Register in AgentRegistry"]
+
+    REG --&gt; SCHEMA["Discover custom schemas\n(schemas.py module)"]
+
+    SCHEMA --&gt; ROUTER["RouterFactory creates\n20+ endpoints per agent"]
+
+    ROUTER --&gt; STUDIO["Studio adapter resolved\n(LangGraph/LangChain/Generic)"]
+
+    ROUTER --&gt; MOUNT["Mount on FastAPI app\nat /api/v1/{agent_name}/"]
+
+    style SCAN fill:#4a9eff,color:#fff
+    style ROUTER fill:#ff6b6b,color:#fff
+    style MOUNT fill:#51cf66,color:#fff</code></pre>
+<h3 id="agent-folder-structure">Agent Folder Structure<a class="headerlink" href="#agent-folder-structure" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>agents/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── my_agent/
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>│   ├── __init__.py       # Required: manifest + graph_fn/node_fn
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│   ├── prompts.json      # Optional: prompt versions
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│   ├── schemas.py        # Optional: custom request/response models
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│   ├── config.py         # Optional: Pydantic config class
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│   └── api.py            # Optional: custom router (replaces auto-generated)
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── another_agent/
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    └── __init__.py
+</code></pre></div>
+<hr />
+<h2 id="deployment-patterns">Deployment Patterns<a class="headerlink" href="#deployment-patterns" title="Permanent link">&para;</a></h2>
+<h3 id="single-process-development">Single Process (Development)<a class="headerlink" href="#single-process-development" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph LR
+    UV["uvicorn main:app"] --&gt; AP["AgentPlatform"]
+    AP --&gt; MEM["MemoryStore"]</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># main.py</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">app</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># uvicorn main:app --reload --port 8000</span>
+</code></pre></div>
+<h3 id="multi-worker-staging-production">Multi-Worker (Staging / Production)<a class="headerlink" href="#multi-worker-staging-production" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph TB
+    LB["Load Balancer\n(nginx / ALB)"]
+    LB --&gt; W1["Gunicorn Worker 1\n(uvicorn)"]
+    LB --&gt; W2["Gunicorn Worker 2\n(uvicorn)"]
+    LB --&gt; W3["Gunicorn Worker 3\n(uvicorn)"]
+
+    W1 --&gt; DB["PostgreSQL\n(SQLAlchemyStore)"]
+    W2 --&gt; DB
+    W3 --&gt; DB
+
+    W1 --&gt; OTEL["OpenTelemetry\nCollector"]
+    W2 --&gt; OTEL
+    W3 --&gt; OTEL</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gunicorn<span class="w"> </span>main:app<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--worker-class<span class="w"> </span>uvicorn.workers.UvicornWorker<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--bind<span class="w"> </span><span class="m">0</span>.0.0.0:8000
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">MemoryStore is Not Multi-Worker Safe</p>
+<p>Use <code>SQLAlchemyStore</code> when running with multiple workers. <code>MemoryStore</code> is per-process and does not share state.</p>
+</div>
+<h3 id="containerized-kubernetes">Containerized (Kubernetes)<a class="headerlink" href="#containerized-kubernetes" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph TB
+    ING["Ingress Controller"] --&gt; SVC["K8s Service"]
+
+    subgraph "Deployment (replicas: 3)"
+        SVC --&gt; P1["Pod 1\nAgentomatic"]
+        SVC --&gt; P2["Pod 2\nAgentomatic"]
+        SVC --&gt; P3["Pod 3\nAgentomatic"]
+    end
+
+    subgraph "Stateful Services"
+        P1 --&gt; PG["PostgreSQL\n(StatefulSet / RDS)"]
+        P2 --&gt; PG
+        P3 --&gt; PG
+
+        P1 --&gt; REDIS["Redis\n(Optional: rate limiting)"]
+        P2 --&gt; REDIS
+        P3 --&gt; REDIS
+    end
+
+    subgraph "Observability Stack"
+        P1 --&gt; PROM["Prometheus"]
+        P1 --&gt; JAEGER["Jaeger / Tempo\n(traces)"]
+    end</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">FROM</span><span class="w"> </span><span class="s">python:3.12-slim</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">COPY</span><span class="w"> </span>.<span class="w"> </span>.
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">RUN</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all]&quot;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">EXPOSE</span><span class="w"> </span><span class="s">8000</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;uvicorn&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;main:app&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--host&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--port&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;8000&quot;</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># k8s deployment excerpt</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">spec</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="nt">spec</span><span class="p">:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">containers</span><span class="p">:</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agentomatic</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myregistry/agentomatic:latest</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">          </span><span class="nt">ports</span><span class="p">:</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">          </span><span class="nt">env</span><span class="p">:</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DATABASE_URL</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-credentials</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">url</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">          </span><span class="nt">livenessProbe</span><span class="p">:</span>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span>
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span>
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/readiness</span>
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+</code></pre></div>
+<hr />
+<h2 id="extension-points">Extension Points<a class="headerlink" href="#extension-points" title="Permanent link">&para;</a></h2>
+<p>Agentomatic is designed for extensibility at every layer:</p>
+<table>
+<thead>
+<tr>
+<th>Extension Point</th>
+<th>Mechanism</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Custom agents</strong></td>
+<td>Drop folder in <code>agents/</code></td>
+<td>Any Python async function</td>
+</tr>
+<tr>
+<td><strong>Custom routers</strong></td>
+<td><code>api.py</code> in agent folder</td>
+<td>Replace auto-generated endpoints</td>
+</tr>
+<tr>
+<td><strong>Custom schemas</strong></td>
+<td><code>schemas.py</code> in agent folder</td>
+<td>Domain-specific request/response models</td>
+</tr>
+<tr>
+<td><strong>Custom adapters</strong></td>
+<td><code>_studio_adapter</code> attribute</td>
+<td>Framework-specific Studio integration</td>
+</tr>
+<tr>
+<td><strong>Before/after hooks</strong></td>
+<td><code>register_before_node_hook()</code></td>
+<td>Audit logging, security scanning</td>
+</tr>
+<tr>
+<td><strong>Storage backends</strong></td>
+<td>Subclass <code>BaseStore</code></td>
+<td>Custom databases, cloud storage</td>
+</tr>
+<tr>
+<td><strong>Middleware</strong></td>
+<td>FastAPI middleware</td>
+<td>Auth, rate limiting, custom headers</td>
+</tr>
+<tr>
+<td><strong>Prompt versions</strong></td>
+<td><code>prompts.json</code></td>
+<td>A/B testing, version management</td>
+</tr>
+<tr>
+<td><strong>LLM providers</strong></td>
+<td><code>get_llm(provider=...)</code></td>
+<td>OpenAI, Azure, Ollama, Anthropic</td>
+</tr>
+<tr>
+<td><strong>Checkpointers</strong></td>
+<td><code>AgentomaticCheckpointer</code></td>
+<td>Bridge any store to LangGraph</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="key-design-decisions">Key Design Decisions<a class="headerlink" href="#key-design-decisions" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Convention over configuration</strong> — Drop a folder, get a full API</li>
-<li><strong>Everything is optional</strong> — Only <code>__init__.py</code> is required</li>
+<li><strong>Everything is optional</strong> — Only <code>__init__.py</code> with a manifest is required</li>
 <li><strong>Override anything</strong> — Custom <code>api.py</code> routers replace auto-generated ones</li>
-<li><strong>Async-first</strong> — All I/O uses async/await</li>
+<li><strong>Async-first</strong> — All I/O uses <code>async</code>/<code>await</code></li>
 <li><strong>ABC-based storage</strong> — Swap backends without code changes</li>
 <li><strong>Universal Studio</strong> — Adapter pattern degrades gracefully across frameworks</li>
 <li><strong>Middleware pipeline</strong> — Composable, ordered middleware with per-request context</li>
+<li><strong>Schema discovery</strong> — Custom Pydantic models auto-integrate into OpenAPI docs</li>
+<li><strong>Checkpoint bridge</strong> — Single storage backend for threads, messages, and LangGraph checkpoints</li>
+<li><strong>HITL as first-class</strong> — Suspend/resume built into the router factory, not bolted on</li>
 </ol>
 
 
