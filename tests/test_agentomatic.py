@@ -287,9 +287,12 @@ class TestVersion:
     """Test version."""
 
     def test_version_exists(self):
+        import re
+
         from agentomatic import __version__
 
-        assert __version__ == "0.3.0"
+        assert __version__
+        assert re.match(r"^\d+\.\d+\.\d+", __version__)
 
 
 class TestAgentRegistryDiscovery:
