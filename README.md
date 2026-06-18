@@ -14,10 +14,10 @@
 [![License](https://img.shields.io/github/license/UnicoLab/agentomatic.svg)](https://github.com/UnicoLab/agentomatic/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://unicolab.github.io/agentomatic)
 
-**Zero-code multi-agent API platform framework.**
-Create production-ready AI agent APIs with auto-discovery, auto-routing, streaming, A2A protocol, and full observability — in 3 lines of code.
+**The Zero-Code Multi-Agent API & Observability Framework.**
+Build, trace, optimize, and time-travel debug production-ready AI agent APIs in just 3 lines of code. Agentomatic natively provides auto-discovery, auto-routing, dynamic streaming, a built-in visual Studio, and A2A protocols right out of the box.
 
-[Documentation](https://unicolab.github.io/agentomatic) · [Quick Start](#-quick-start) · [CLI Reference](#-cli) · [Templates](#-templates) · [Contributing](CONTRIBUTING.md)
+[Documentation](https://unicolab.github.io/agentomatic) · [Agentomatic Studio](#-agentomatic-studio) · [Quick Start](#-quick-start) · [CLI Reference](#-cli) · [Templates](#-templates) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -27,30 +27,29 @@ Create production-ready AI agent APIs with auto-discovery, auto-routing, streami
 
 | Feature | Description |
 |---|---|
-| 🔍 **Auto-Discovery** | Drop an agent folder → endpoints appear automatically |
-| 🚀 **25+ Endpoints Per Agent** | invoke, stream, chat, A2A, health, config, threads, memory, feedback |
-| 🗄️ **Pluggable Storage** | MemoryStore, SQLAlchemy, or bring your own |
-| 🔐 **Middleware Pipeline** | Auth, rate limiting, Prometheus metrics — all toggleable |
-| 🎨 **Built-in Debug UI** | ChatGPT-like interface via Chainlit |
-| 🎯 **Agentomatic Studio** | Visual agent debugger with graph view, SSE streaming, state inspection, time-travel |
-| 📦 **5 Scaffolding Templates** | basic, full, rag, chatbot, custom |
-| 🤖 **A2A Protocol** | Agent-to-agent communication out of the box |
-| 🔌 **Framework Agnostic** | LangGraph, LangChain, or raw Python |
-| 🩺 **Rich CLI** | Beautiful terminal experience with doctor, inspect, test |
-| ⚡ **Prompt Optimizer** | ML-like prompt/config fitting with 5 optimizers + deployment recommendations |
-| 🧪 **Data Synthesizer** | Auto-generate & augment eval datasets via LLM |
-| 📊 **HTML Reports** | SVG charts, prompt diffs, experiment tracking |
-| 🚦 **Human-in-the-Loop** | Suspend/resume execution with human approval gates |
-| 🌳 **Thread Lineage** | First-class parent/child tracking with ancestry traversal |
-| ⏰ **HITL TTL Expiry** | Auto-cleanup of stale suspended states (7-day default) |
-| 🛡️ **LLM Failover** | Multi-provider fallback chains with telemetry |
-| 🧬 **Thread Forking** | Clone conversations at any message index |
-| 🔀 **A/B Prompt Routing** | Weight-based prompt version selection |
-| 🪝 **State Hooks** | Before/after node interceptors for audit & telemetry |
-| 🧠 **Conversation Memory** | Automatic session + long-term memory with windowing |
-| 📝 **Auto-Summarization** | LLM-powered compression of long conversations |
-| 📋 **Thread CRUD** | Full thread lifecycle management (create/update/delete/clear) |
-| 💬 **Message Persistence** | Every turn auto-saved — history survives restarts |
+| 🎯 **Agentomatic Studio** | Embedded visual agent debugger with graph rendering, live SSE node streaming, state mutation, and historical time-travel capabilities. |
+| ⚡ **Prompt Optimizer** | Enterprise-grade prompt and configuration fitting utilizing 5 distinct optimizers with deployment recommendations. |
+| 🔍 **Zero-Code Auto-Discovery** | Drop an agent folder → 25+ fully-documented REST endpoints appear automatically. |
+| 🚀 **Rich API Surface** | Natively handles `invoke`, `stream`, `chat`, `A2A`, `health`, `config`, `threads`, `memory`, and `feedback`. |
+| 🗄️ **Pluggable Storage** | Use `MemoryStore`, `SQLAlchemy`, or plug in your own custom persistence layer. |
+| 🔐 **Enterprise Middleware** | High-performance pipeline with JWT Auth, dynamic rate limiting, and Prometheus telemetry — all toggleable. |
+| 📦 **Scaffolding Templates** | Jumpstart development with 5 templates: `basic`, `full`, `rag`, `chatbot`, and `custom`. |
+| 🤖 **A2A Protocol** | True Agent-to-Agent communication flows integrated out of the box. |
+| 🔌 **Framework Agnostic** | Fully supports LangGraph, LangChain, or raw Python execution logic. |
+| 🩺 **Beautiful CLI** | A rich terminal experience with commands like `doctor`, `inspect`, and `test`. |
+| 🧪 **Data Synthesizer** | Auto-generate and systematically augment evaluation datasets using LLMs. |
+| 📊 **Observability HTML Reports** | Generate rich SVG charts, prompt diffs, and deep experiment tracking analytics. |
+| 🚦 **Human-in-the-Loop** | Seamlessly suspend, intercept, and resume execution with human approval gates. |
+| 🌳 **Thread Lineage** | First-class parent/child conversation tracking with recursive ancestry traversal. |
+| ⏰ **HITL TTL Expiry** | Automatic garbage collection and cleanup of stale suspended states (7-day default). |
+| 🛡️ **LLM Failover Chains** | Multi-provider fallback pipelines to guarantee extreme runtime resilience. |
+| 🧬 **Thread Forking** | Clone conversations and branch execution at any specific message index natively. |
+| 🔀 **A/B Prompt Routing** | Dynamically inject weight-based prompt version selection to test optimizations in production. |
+| 🪝 **State Hooks** | Before/after node interceptors designed specifically for robust audit and telemetry logs. |
+| 🧠 **Conversation Memory** | Automatic short-term session logic paired with long-term memory windowing. |
+| 📝 **Auto-Summarization** | Intelligent LLM-powered compression of excessively long conversations to save token limits. |
+| 📋 **Thread CRUD** | Full lifecycle management (`create`, `update`, `delete`, `clear`). |
+| 💬 **Message Persistence** | Every conversational turn is automatically saved to storage — ensuring history survives system restarts perfectly. |
 
 ## 🚀 Quick Start
 
