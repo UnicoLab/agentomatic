@@ -5,13 +5,10 @@
 # UI release is published. Downloads the release tarball, extracts it into
 # src/agentomatic/studio/static/, and creates a PR for review.
 #
-# NOTE: GH_TOKEN must be a PAT with `repo` scope on BOTH UnicoLab/agentomatic
-#       and UnicoLab/agentomatic-studio (the studio repo is private).
+# Uses GitHub App (TECHNICAL_APP_APP_ID + TECHNICAL_APP_PEM) for cross-repo
+# access to the private agentomatic-studio repository.
 # ─────────────────────────────────────────────────────────────────────────────
 name: Sync Studio UI
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 on:
   repository_dispatch:
@@ -33,17 +30,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.TECHNICAL_APP_APP_ID }}
+          private-key: ${{ secrets.TECHNICAL_APP_PEM }}
+          owner: UnicoLab
+          repositories: agentomatic,agentomatic-studio
+
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       # ── Determine which version to download ──
       - name: Resolve studio version
         id: resolve
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           # Priority: dispatch payload > manual input > latest release
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
@@ -66,7 +72,7 @@ jobs:
       # ── Download the studio release tarball ──
       - name: Download studio build
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           TAG="v${VERSION}"
@@ -110,7 +116,7 @@ jobs:
       # ── Create a PR with the updated static files ──
       - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           BRANCH="${{ steps.resolve.outputs.branch }}"

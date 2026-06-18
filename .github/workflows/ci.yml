@@ -173,7 +173,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Install package
-        run: uv sync
+        run: uv sync --all-extras
 
       - name: Verify imports
         run: |

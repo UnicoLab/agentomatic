@@ -7,8 +7,8 @@
 # src/agentomatic/studio/static/ so `pip install agentomatic[studio]` ships
 # the frontend.
 #
-# NOTE: GH_TOKEN must be a PAT with `repo` scope on BOTH UnicoLab/agentomatic
-#       and UnicoLab/agentomatic-studio (the studio repo is private).
+# Uses GitHub App (TECHNICAL_APP_APP_ID + TECHNICAL_APP_PEM) for cross-repo
+# access to the private agentomatic-studio repository.
 # ─────────────────────────────────────────────────────────────────────────────
 name: Release
 
@@ -46,10 +46,19 @@ jobs:
       released: ${{ steps.release.outputs.released }}
 
     steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.TECHNICAL_APP_APP_ID }}
+          private-key: ${{ secrets.TECHNICAL_APP_PEM }}
+          owner: UnicoLab
+          repositories: agentomatic,agentomatic-studio
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: actions/setup-python@v5
         with:
@@ -65,7 +74,7 @@ jobs:
         id: release
         uses: python-semantic-release/python-semantic-release@v9
         with:
-          github_token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           root_options: ${{ inputs.DRY_RUN && '--noop' || '' }}
 
       - name: Show release info
@@ -90,17 +99,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.TECHNICAL_APP_APP_ID }}
+          private-key: ${{ secrets.TECHNICAL_APP_PEM }}
+          owner: UnicoLab
+          repositories: agentomatic-studio
+
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
 
       # Download the latest Studio UI tarball from the private
-      # agentomatic-studio repo. Requires GH_TOKEN with `repo` scope.
+      # agentomatic-studio repo.
       - name: Download latest studio release
         id: download
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "⬇️  Downloading latest Studio UI release..."
           gh release download \
@@ -225,7 +243,7 @@ jobs:
       - name: Publish GitHub Release
         uses: python-semantic-release/publish-action@v9
         with:
-          github_token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   # ─────────────────────────────────────────────────────────────
   # 5. DEPLOY DOCS — Build and deploy versioned documentation
