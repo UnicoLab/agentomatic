@@ -5,10 +5,8 @@ Targets low-coverage modules to boost overall test coverage above 55%.
 
 from __future__ import annotations
 
-import asyncio
-import time
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from starlette.testclient import TestClient
@@ -99,7 +97,7 @@ class TestEmbeddingsProvider:
     def test_reset_clears_singleton(self):
         from agentomatic.providers.embeddings import get_embeddings, reset_embeddings
 
-        emb1 = get_embeddings()
+        get_embeddings()
         reset_embeddings()
         emb2 = get_embeddings()
         # After reset, new instance should be created
@@ -420,7 +418,6 @@ class TestRegisterStudioHooks:
 
     def test_discovers_decorated_functions(self):
         """Create a mock module with decorated functions and verify discovery."""
-        from unittest.mock import MagicMock
 
         from agentomatic.studio.decorators import register_studio_hooks
 
