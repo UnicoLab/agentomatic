@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/configuration/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/studio/">
       
       
-        <link rel="prev" href="../templates/">
+        <link rel="prev" href="../debug-ui/">
       
       
-        <link rel="next" href="../storage/">
+        <link rel="next" href="../../cli/commands/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Configuration - Agentomatic</title>
+        <title>Agentomatic Studio - Agentomatic</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#configuration-reference" class="md-skip">
+        <a href="#agentomatic-studio" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Configuration
+              Agentomatic Studio
             
           </span>
         </div>
@@ -756,37 +756,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
@@ -802,120 +775,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#platform-parameters-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ⚙️ Platform Parameters Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="⚙️ Platform Parameters Reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-metadata-properties" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Metadata Properties
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-networking-and-cors-settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Networking and CORS Settings
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-observability-and-debugging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Observability and Debugging
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-storage-backend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Storage Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-memory-conversation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Memory &amp; Conversation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-security-rate-limiting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Security &amp; Rate Limiting
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#environment-variables-override" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🌐 Environment Variables Override
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1093,10 +952,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../studio/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agentomatic Studio
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1112,6 +998,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-live-node-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Live Node Streaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-time-travel-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Time-Travel Debugging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-conditional-breakpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Conditional Breakpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-live-state-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Live State Editing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works-under-the-hood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works Under The Hood
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1411,22 +1400,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#platform-parameters-reference" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ⚙️ Platform Parameters Reference
+        Quick Start
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="⚙️ Platform Parameters Reference">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Features">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-metadata-properties" class="md-nav__link">
+  <a href="#1-live-node-streaming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Metadata Properties
+        1. Live Node Streaming
       
     </span>
   </a>
@@ -1434,10 +1434,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-networking-and-cors-settings" class="md-nav__link">
+  <a href="#2-time-travel-debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Networking and CORS Settings
+        2. Time-Travel Debugging
       
     </span>
   </a>
@@ -1445,10 +1445,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-observability-and-debugging" class="md-nav__link">
+  <a href="#3-conditional-breakpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Observability and Debugging
+        3. Conditional Breakpoints
       
     </span>
   </a>
@@ -1456,32 +1456,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-storage-backend" class="md-nav__link">
+  <a href="#4-live-state-editing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Storage Backend
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-memory-conversation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Memory &amp; Conversation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-security-rate-limiting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Security &amp; Rate Limiting
+        4. Live State Editing
       
     </span>
   </a>
@@ -1494,10 +1472,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#environment-variables-override" class="md-nav__link">
+  <a href="#how-it-works-under-the-hood" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🌐 Environment Variables Override
+        How It Works Under The Hood
       
     </span>
   </a>
@@ -1524,102 +1502,52 @@
   
 
 
-<h1 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h1>
-<div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
-  <h3>Platform and Settings Customization</h3>
-</div>
-
-<hr />
-<p>Agentomatic offers global settings configuration at the <code>AgentPlatform</code> initialization level. Config settings can be defined in Python code or overridden using system environment variables.</p>
-<hr />
-<h2 id="platform-parameters-reference">⚙️ Platform Parameters Reference<a class="headerlink" href="#platform-parameters-reference" title="Permanent link">&para;</a></h2>
-<p>When initializing <code>AgentPlatform.from_folder()</code> (or the direct <code>AgentPlatform()</code> constructor), you can pass the following keyword arguments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">agents_dir</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;My Custom Agent Platform&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Enterprise Assistant APIs&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">api_prefix</span><span class="o">=</span><span class="s2">&quot;/api/v1&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">cors_origins</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;https://dashboard.mycompany.com&quot;</span><span class="p">],</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">(),</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;sk_live_51hG...&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">rate_limit_requests</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">rate_limit_window</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="n">max_history_messages</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="n">summarize_after</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="p">)</span>
+<h1 id="agentomatic-studio">Agentomatic Studio 🎨<a class="headerlink" href="#agentomatic-studio" title="Permanent link">&para;</a></h1>
+<p>Agentomatic provides a built-in visual development environment specifically designed to help you debug, inspect, and trace the execution of your agents in real-time. It completely removes the guesswork from debugging multi-agent graphs and provides native support for features like Time-Travel and Conditional Breakpoints.</p>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<p>You don't need to configure a separate repository or run separate containers. The studio is bundled directly into the <code>agentomatic</code> pip package.</p>
+<p>To install the optional studio dependencies and launch the server:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[studio]&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--studio
 </code></pre></div>
-<h3 id="1-metadata-properties">1. Metadata Properties<a class="headerlink" href="#1-metadata-properties" title="Permanent link">&para;</a></h3>
+<p>The unified platform will start serving both your API endpoints at <code>http://localhost:8000</code> and the Studio UI at <code>http://localhost:8000/studio/ui/</code>.</p>
+<hr />
+<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
+<h3 id="1-live-node-streaming">1. Live Node Streaming<a class="headerlink" href="#1-live-node-streaming" title="Permanent link">&para;</a></h3>
+<p>When you execute an agent query via the chat interface, the <strong>Graph View</strong> maps directly to your agent's underlying LangGraph topology. As the execution progresses, nodes will visually pulse and light up. </p>
 <ul>
-<li><strong><code>agents_dir</code></strong> (type: <code>str | Path</code>, default: <code>"agents/"</code>): Filesystem path to scan for discovered agent packages.</li>
-<li><strong><code>title</code></strong> (type: <code>str</code>, default: <code>"Agentomatic Platform"</code>): Display title of the API platform, visible in OpenAPI Swagger documentation (<code>/docs</code>) and Redoc.</li>
-<li><strong><code>description</code></strong> (type: <code>str</code>, default: <code>"Multi-agent API platform powered by Agentomatic"</code>): Detailed description displayed in Swagger UI.</li>
-<li><strong><code>version</code></strong> (type: <code>str</code>, default: <code>"1.0.0"</code>): Semantic version string shown in API docs and root responses.</li>
+<li>Server-Sent Events (SSE) stream the node transitions directly from the backend <code>astream_events</code> API.</li>
+<li>You can follow complex conditional edges and loops perfectly.</li>
 </ul>
-<h3 id="2-networking-and-cors-settings">2. Networking and CORS Settings<a class="headerlink" href="#2-networking-and-cors-settings" title="Permanent link">&para;</a></h3>
+<h3 id="2-time-travel-debugging">2. Time-Travel Debugging<a class="headerlink" href="#2-time-travel-debugging" title="Permanent link">&para;</a></h3>
+<p>Debugging deeply nested loops or non-deterministic agent flows can be difficult. Agentomatic natively records every step using the checkpointer.</p>
 <ul>
-<li><strong><code>api_prefix</code></strong> (type: <code>str</code>, default: <code>"/api/v1"</code>): Global URL prefix prepended to all auto-generated and custom agent routers (e.g. <code>/api/v1/{agent_name}/invoke</code>).</li>
-<li><strong><code>cors_origins</code></strong> (type: <code>list[str]</code>, default: <code>["*"]</code>): List of allowed origins for Cross-Origin Resource Sharing (CORS). Defaults to allowing all origins.</li>
+<li><strong>History View</strong>: Inside the Debug Console, the <strong>Time Travel</strong> tab lists all past checkpoints for the active thread.</li>
+<li><strong>Replay</strong>: Click <strong>"Replay from here"</strong> on any historical snapshot to branch your thread. The execution will perfectly resume from that prior state, allowing you to try a different input or test a different edge path.</li>
 </ul>
-<h3 id="3-observability-and-debugging">3. Observability and Debugging<a class="headerlink" href="#3-observability-and-debugging" title="Permanent link">&para;</a></h3>
+<h3 id="3-conditional-breakpoints">3. Conditional Breakpoints<a class="headerlink" href="#3-conditional-breakpoints" title="Permanent link">&para;</a></h3>
+<p>You can freeze execution right before an agent performs a critical action (like calling an external API or making a final decision).</p>
 <ul>
-<li><strong><code>log_level</code></strong> (type: <code>str</code>, default: <code>"INFO"</code>): Verbosity level for console logging (<code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>).</li>
-<li><strong><code>enable_logging</code></strong> (type: <code>bool</code>, default: <code>True</code>): Toggles requests/responses lifecycle log printouts via structured <code>loguru</code> middleware.</li>
-<li><strong><code>enable_metrics</code></strong> (type: <code>bool</code>, default: <code>False</code>): Mounts the Prometheus instrumentation exporter at the <code>/metrics</code> endpoint.</li>
-<li><strong><code>enable_telemetry</code></strong> (type: <code>bool</code>, default: <code>True</code>): Configures OpenTelemetry spans tracking LLMs, RAG, and execution runtimes.</li>
-<li><strong><code>enable_feedback</code></strong> (type: <code>bool</code>, default: <code>True</code>): Enables thumbs-up/correction endpoints per agent to build optimization datasets.</li>
+<li><strong>Setting Breakpoints</strong>: Right-click any node in the Graph View and select <strong>"Add Breakpoint"</strong>.</li>
+<li><strong>Execution</strong>: When the graph reaches that node, it will pause. The node will pulse, and the backend checkpointer will suspend the thread.</li>
+<li><strong>Resuming</strong>: You can either resume execution, or edit the state before continuing.</li>
 </ul>
-<h3 id="4-storage-backend">4. Storage Backend<a class="headerlink" href="#4-storage-backend" title="Permanent link">&para;</a></h3>
+<h3 id="4-live-state-editing">4. Live State Editing<a class="headerlink" href="#4-live-state-editing" title="Permanent link">&para;</a></h3>
+<p>While the graph is suspended (either due to a breakpoint or a <code>Human-in-the-loop</code> interrupt), you can manually mutate the internal LangGraph state payload.</p>
 <ul>
-<li><strong><code>store</code></strong> (type: <code>BaseStore | None</code>, default: <code>None</code>): Instance of a storage adapter (e.g. <code>MemoryStore</code> or <code>SQLAlchemyStore</code>) used to save message threads, conversation history, and rating logs.</li>
-</ul>
-<h3 id="5-memory-conversation">5. Memory &amp; Conversation<a class="headerlink" href="#5-memory-conversation" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><code>max_history_messages</code></strong> (type: <code>int</code>, default: <code>50</code>): Maximum number of messages to load from the thread store into the agent's context window. When the conversation exceeds this limit, older messages are windowed out or summarised.</li>
-<li><strong><code>summarize_after</code></strong> (type: <code>int</code>, default: <code>30</code>): When the message count in a thread exceeds this threshold, older messages are automatically summarised using the configured LLM and prepended as a <code>[Conversation Summary]</code> system message.</li>
-</ul>
-<blockquote>
-<p>[!TIP]
-These values can also be overridden per-request using the <code>max_history</code> field on <code>AgentChatRequest</code>, giving frontends full control over how much context each invocation receives.</p>
-</blockquote>
-<h3 id="6-security-rate-limiting">6. Security &amp; Rate Limiting<a class="headerlink" href="#6-security-rate-limiting" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><code>enable_auth</code></strong> (type: <code>bool</code>, default: <code>False</code>): If <code>True</code>, mounts Key Authentication middleware on all agent routes.</li>
-<li><strong><code>auth_api_key</code></strong> (type: <code>str</code>, default: <code>""</code>): The secret API key token required by clients when <code>enable_auth</code> is enabled.</li>
-<li><strong><code>enable_rate_limit</code></strong> (type: <code>bool</code>, default: <code>False</code>): Enables rate limit checks for client requests.</li>
-<li><strong><code>rate_limit_requests</code></strong> (type: <code>int</code>, default: <code>100</code>): Maximum allowed queries a single IP/client can make within the rate limit window.</li>
-<li><strong><code>rate_limit_window</code></strong> (type: <code>int</code>, default: <code>60</code>): Sliding window duration (in seconds) for rate limiting.</li>
+<li><strong>State View</strong>: In the Debug Console, navigate to the <strong>State</strong> tab to see your <code>StateGraph</code> variables in real-time.</li>
+<li><strong>Editing</strong>: Click <strong>"Edit State"</strong>, modify the JSON directly, and click <strong>"Save"</strong>.</li>
+<li><strong>Backend Mutate</strong>: The studio fires an update command which natively triggers <code>graph.aupdate_state(config, values)</code>. When you resume execution, the agent will use your injected state!</li>
 </ul>
 <hr />
-<h2 id="environment-variables-override">🌐 Environment Variables Override<a class="headerlink" href="#environment-variables-override" title="Permanent link">&para;</a></h2>
-<p>All platform settings can be dynamically overridden using environment variables prefixed with <code>AGENTOMATIC_</code>. This is ideal for production deployments (e.g. Docker, Kubernetes, or serverless envs):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Network Bind Configs</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_PORT</span><span class="o">=</span><span class="m">9000</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_HOST</span><span class="o">=</span><span class="s2">&quot;127.0.0.1&quot;</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Platform Overrides</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_API_PREFIX</span><span class="o">=</span><span class="s2">&quot;/api/v2&quot;</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_LOG_LEVEL</span><span class="o">=</span><span class="s2">&quot;DEBUG&quot;</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># Security Configurations</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_ENABLE_AUTH</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_AUTH_API_KEY</span><span class="o">=</span><span class="s2">&quot;sk_prod_992kjh1...&quot;</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Rate Limiting</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_ENABLE_RATE_LIMIT</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_RATE_LIMIT_REQUESTS</span><span class="o">=</span><span class="m">300</span>
-</code></pre></div>
+<h2 id="how-it-works-under-the-hood">How It Works Under The Hood<a class="headerlink" href="#how-it-works-under-the-hood" title="Permanent link">&para;</a></h2>
+<p>The Agentomatic Studio is built on React and communicates via standard Agentomatic APIs mounted under the <code>/studio/</code> router.</p>
+<ul>
+<li><strong>Topology Extraction</strong>: <code>GET /studio/agents/{name}/graph</code> extracts your node mapping via <code>graph.get_graph().to_json()</code>.</li>
+<li><strong>SSE Tracking</strong>: <code>POST /studio/agents/{name}/runs/stream</code> wraps your execution config with any active breakpoints (<code>interrupt_before_nodes</code>). It streams all <code>on_chat_model_stream</code>, <code>on_tool_start</code>, and custom node events back to the UI.</li>
+<li><strong>State Patching</strong>: <code>POST /studio/agents/{name}/threads/{tid}/state</code> patches the checkpoint database dynamically.</li>
+</ul>
+<p>There is no "mock" data — the studio gives you 100% accurate insights into how your code operates in production.</p>
 
 
 
