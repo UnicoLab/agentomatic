@@ -687,3 +687,426 @@ For frontend applications (React, Vue, mobile), here's the recommended flow:
 ```
 
 All thread data is persisted in the configured store (MemoryStore for dev, SQLAlchemyStore for production).
+
+---
+
+## 🔄 14. HITL Approval Workflow — End-to-End Example
+
+This section walks through a complete Human-in-the-Loop approval pipeline: from building a multi-step agent with approval gates, to suspending execution, to approving via REST, to resuming and completing the graph.
+
+### Architecture
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend / API Client
+    participant RF as RouterFactory
+    participant AG as Agent Graph
+    participant ST as Thread Store
+
+    FE->>RF: POST /invoke (query: "Transfer $5000")
+    RF->>AG: graph.ainvoke(state)
+    AG->>AG: analyze_request node
+    AG->>AG: risk_assessment node
+    AG-->>RF: raises AgentSuspendedException
+    RF->>ST: save_suspended_state(approval_id, snapshot)
+    RF-->>FE: 202 Accepted {approval_id: "tx_001"}
+
+    Note over FE: Human reviews in dashboard
+
+    FE->>RF: GET /threads/{id}/pending
+    RF->>ST: list_suspended_states()
+    RF-->>FE: [{id: "tx_001", state_snapshot: {...}}]
+
+    FE->>RF: POST /threads/{id}/approve {approval_id, context}
+    RF->>ST: get_suspended_state("tx_001")
+    RF->>ST: delete_suspended_state("tx_001")
+    RF->>RF: Merge context, set hitl_approved=true
+    RF->>AG: graph.ainvoke(resumed_state)
+    AG->>AG: risk_assessment (approved path)
+    AG->>AG: execute_transfer node
+    AG-->>RF: result
+    RF-->>FE: AgentInvokeResponse
+```
+
+### Complete Agent Code
+
+```python
+"""agents/transfer_agent/__init__.py — Multi-step agent with HITL gate."""
+
+from langgraph.graph import StateGraph, END
+from agentomatic.core.state import BaseAgentState
+from agentomatic.core.manifest import AgentManifest
+from agentomatic.core.router_factory import AgentSuspendedException
+
+
+async def analyze_request(state: BaseAgentState) -> dict:
+    """Parse the transfer request and extract parameters."""
+    query = state.get("current_query", "")
+    # In production, use an LLM to extract structured data
+    amount = 5000  # Parsed from query
+    return {
+        "context": {"amount": amount, "currency": "USD", "recipient": "vendor_123"},
+        "steps_taken": ["analyze_request"],
+    }
+
+
+async def risk_assessment(state: BaseAgentState) -> dict:
+    """Assess risk and gate high-value transfers for human approval."""
+    metadata = state.get("metadata", {})
+    context = state.get("context", {})
+    amount = context.get("amount", 0)
+
+    # If already approved by human, skip the gate
+    if metadata.get("hitl_approved"):
+        return {
+            "steps_taken": ["risk_assessment_approved"],
+            "metadata": {"risk_level": "approved_by_human"},
+        }
+
+    # High-value transfers require human approval
+    if amount > 1000:
+        raise AgentSuspendedException(
+            approval_id=f"tx_{state.get('thread_id', 'unknown')}",
+            node_name="risk_assessment",
+            state_snapshot=dict(state),
+            message=f"Transfer of ${amount:,.2f} requires manager approval.",
+        )
+
+    # Low-value transfers proceed automatically
+    return {
+        "steps_taken": ["risk_assessment_auto_approved"],
+        "metadata": {"risk_level": "low"},
+    }
+
+
+async def execute_transfer(state: BaseAgentState) -> dict:
+    """Execute the approved transfer."""
+    context = state.get("context", {})
+    amount = context.get("amount", 0)
+    recipient = context.get("recipient", "unknown")
+
+    return {
+        "response": f"✅ Successfully transferred ${amount:,.2f} to {recipient}",
+        "steps_taken": ["execute_transfer"],
+    }
+
+
+# Build the graph
+builder = StateGraph(BaseAgentState)
+builder.add_node("analyze_request", analyze_request)
+builder.add_node("risk_assessment", risk_assessment)
+builder.add_node("execute_transfer", execute_transfer)
+
+builder.set_entry_point("analyze_request")
+builder.add_edge("analyze_request", "risk_assessment")
+builder.add_edge("risk_assessment", "execute_transfer")
+builder.add_edge("execute_transfer", END)
+
+
+def graph_fn():
+    return builder.compile()
+
+
+manifest = AgentManifest(
+    name="transfer_agent",
+    slug="transfer-agent",
+    description="Financial transfer agent with HITL approval for high-value transactions",
+    version="1.0.0",
+    framework="langgraph",
+)
+```
+
+### Step-by-Step Walkthrough
+
+**Step 1 — Invoke the agent:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/transfer_agent/invoke \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Transfer $5000 to vendor_123",
+    "thread_id": "thread_tx_001",
+    "user_id": "employee_42"
+  }'
+```
+
+**Response (202 Accepted):**
+
+```json
+{
+  "detail": {
+    "status": "suspended",
+    "approval_id": "tx_thread_tx_001",
+    "node_name": "risk_assessment",
+    "message": "Transfer of $5,000.00 requires manager approval."
+  }
+}
+```
+
+**Step 2 — List pending approvals (manager dashboard):**
+
+```bash
+curl http://localhost:8000/api/v1/transfer_agent/threads/thread_tx_001/pending
+```
+
+```json
+{
+  "thread_id": "thread_tx_001",
+  "pending": [
+    {
+      "id": "tx_thread_tx_001",
+      "node_name": "risk_assessment",
+      "state_snapshot": {
+        "current_query": "Transfer $5000 to vendor_123",
+        "context": {"amount": 5000, "currency": "USD", "recipient": "vendor_123"},
+        "steps_taken": ["analyze_request"]
+      },
+      "created_at": "2026-06-18T20:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Step 3 — Approve with context:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/transfer_agent/threads/thread_tx_001/approve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "approval_id": "tx_thread_tx_001",
+    "context": {
+      "approved_by": "manager_jane",
+      "approval_notes": "Verified vendor contract"
+    }
+  }'
+```
+
+**Response (200 OK — graph completed):**
+
+```json
+{
+  "response": "✅ Successfully transferred $5,000.00 to vendor_123",
+  "agent_type": "transfer-agent",
+  "thread_id": "thread_tx_001",
+  "steps_taken": ["analyze_request", "risk_assessment_approved", "execute_transfer"],
+  "metadata": {
+    "hitl_approved": true,
+    "approval_id": "tx_thread_tx_001",
+    "approved_by": "manager_jane",
+    "approval_notes": "Verified vendor contract"
+  },
+  "duration_ms": 45.2
+}
+```
+
+### Chaining Multiple Approvals
+
+If the resumed graph hits another `AgentSuspendedException`, Agentomatic re-suspends with a new `202` response. This enables **multi-gate approval pipelines**:
+
+```python
+async def compliance_check(state: BaseAgentState) -> dict:
+    metadata = state.get("metadata", {})
+    if not metadata.get("compliance_approved"):
+        raise AgentSuspendedException(
+            approval_id=f"compliance_{state.get('thread_id')}",
+            node_name="compliance_check",
+            state_snapshot=dict(state),
+            message="Compliance review required for international transfers.",
+        )
+    return {"steps_taken": ["compliance_approved"]}
+```
+
+---
+
+## 🤖 15. Deep Agent Subagent Visualization
+
+When building agents that delegate to subagents (via LangGraph subgraphs), the Studio adapter automatically detects and visualizes the delegation hierarchy.
+
+### How Subagent Detection Works
+
+The `LangGraphAdapter` detects subagent execution through two mechanisms:
+
+1. **Checkpoint namespace detection** — LangGraph assigns nested namespaces (`parent:child:grandchild`) to subgraph executions. When the adapter sees `langgraph_checkpoint_ns` containing `:`, it classifies events as subagent operations.
+
+2. **Node name classification** — Nodes named with patterns like `task`, `delegate`, `subagent`, or `spawn` are automatically classified as `subagent` type in the graph topology.
+
+### Event Mapping
+
+| LangGraph Event | Condition | Studio Event |
+|---|---|---|
+| `on_chain_start` | `checkpoint_ns` contains `:` | `subagent_start` |
+| `on_chain_end` | `checkpoint_ns` contains `:` | `subagent_end` |
+| `on_tool_start` | name is `write_todos` or `write_todo` | `task_update` |
+| `on_chain_start` | no nested namespace | `node_start` |
+
+### Subagent SSE Events
+
+When streaming through Studio, subagent events include the full namespace path:
+
+```json
+{
+  "event": "subagent_start",
+  "run_id": "run_abc",
+  "timestamp": "2026-06-18T20:00:00Z",
+  "node": "research_worker",
+  "data": {
+    "namespace": "supervisor:research_worker",
+    "tags": ["seq:step:2"]
+  }
+}
+```
+
+```json
+{
+  "event": "subagent_end",
+  "run_id": "run_abc",
+  "timestamp": "2026-06-18T20:00:05Z",
+  "node": "research_worker",
+  "data": {
+    "namespace": "supervisor:research_worker",
+    "output": {"response": "Research findings..."}
+  }
+}
+```
+
+### Node Classification for Deep Agents
+
+The adapter applies specialized classification for deep agent patterns:
+
+```python
+# These node names are auto-classified by LangGraphAdapter._classify_node():
+"task_executor"    → type: "subagent"
+"delegate_work"    → type: "subagent"
+"write_todo"       → type: "planning"
+"plan_tasks"       → type: "planning"
+"search_tool"      → type: "tool"
+"human_review"     → type: "human"
+```
+
+### Capability Detection
+
+When the adapter detects deep-agent patterns, it reports additional capabilities:
+
+```python
+# Auto-detected when graph has todo/task nodes:
+adapter.capabilities
+# → ["graph", "streaming", "checkpoints", "state", "breakpoints",
+#     "hitl", "deep_agent", "subagents", "planning"]
+```
+
+These capabilities allow the Studio UI to enable specialized views like the task board and delegation timeline.
+
+---
+
+## 🗄️ 16. Thread Management Deep Dive
+
+### Thread Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Created: POST /threads\nor auto-created by /chat
+    Created --> Active: Messages added
+    Active --> Active: More messages
+    Active --> Summarized: Message count > summarize_after
+    Active --> Forked: POST /threads/{id}/fork
+    Forked --> Active: New messages on fork
+    Active --> Cleared: DELETE /threads/{id}/messages
+    Cleared --> Active: New messages
+    Active --> Deleted: DELETE /threads/{id}
+    Deleted --> [*]
+```
+
+### Auto-Creation via Chat
+
+When a `/chat` request includes a `thread_id` that doesn't exist, the `ConversationMemoryManager` auto-creates it:
+
+```python
+# This transparently creates the thread if needed:
+thread_id = await memory_mgr.get_or_create_thread(
+    "thread_new_123",      # Thread ID
+    "user_42",             # User ID
+    "my_agent",            # Agent name
+    title="First message",  # Auto-titled from first message
+)
+```
+
+### Thread Metadata Patterns
+
+Use thread metadata for application-specific tracking:
+
+```bash
+# Create with metadata
+curl -X POST http://localhost:8000/api/v1/my_agent/threads \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user_42",
+    "title": "Support Ticket #1234",
+    "metadata": {
+      "ticket_id": "1234",
+      "priority": "high",
+      "department": "engineering",
+      "tags": ["bug", "production"]
+    }
+  }'
+
+# Update metadata later
+curl -X PATCH http://localhost:8000/api/v1/my_agent/threads/thread_abc \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": {"status": "resolved", "resolution_time_hours": 2.5}}'
+```
+
+### Forking for A/B Testing
+
+Use thread forking to test different approaches on the same conversation:
+
+```python
+# Original conversation
+POST /chat {"content": "Help me write a marketing email", "thread_id": "original"}
+# → Response with approach A
+
+# Fork at message 2 to try approach B
+POST /threads/original/fork {"message_index": 2, "title": "Variant B - Casual tone"}
+
+# Continue the fork with different instructions
+POST /chat {"content": "Make it more casual", "thread_id": "fork_xyz"}
+
+# Compare lineage
+GET /threads/fork_xyz/lineage
+# → Shows "original" as ancestor
+```
+
+### Bulk Operations Pattern
+
+For administrative tasks like cleaning up old threads:
+
+```python
+import httpx
+
+async def cleanup_old_threads(agent: str, user_id: str, keep_latest: int = 10):
+    """Keep only the latest N threads for a user."""
+    async with httpx.AsyncClient() as client:
+        # List all threads
+        resp = await client.get(
+            f"http://localhost:8000/api/v1/{agent}/threads",
+            params={"user_id": user_id},
+        )
+        threads = resp.json()["threads"]
+
+        # Sort by creation time and delete old ones
+        sorted_threads = sorted(threads, key=lambda t: t["created_at"], reverse=True)
+        for thread in sorted_threads[keep_latest:]:
+            await client.delete(
+                f"http://localhost:8000/api/v1/{agent}/threads/{thread['id']}"
+            )
+```
+
+---
+
+## 📚 Related Documentation
+
+- [LangGraph Integration Guide](langgraph.md) — Deep dive into LangGraph patterns with Agentomatic
+- [Architecture Overview](../architecture/overview.md) — System design and component relationships
+- [API Reference](../architecture/api-reference.md) — Complete endpoint documentation
+- [Studio Guide](studio.md) — Studio debugging UI guide
+- [Storage Guide](storage.md) — Storage backend configuration

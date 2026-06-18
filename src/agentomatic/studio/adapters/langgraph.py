@@ -422,4 +422,54 @@ class LangGraphAdapter(StudioAdapter):
                 data={"tool_output": tool_output},
             )
 
+        # ----- Retriever events (RAG agents) -----
+        if event_type == "on_retriever_start":
+            query = data.get("input", {})
+            if isinstance(query, dict):
+                query = query.get("query", str(query))
+            return StudioRunEvent(
+                event="node_start",
+                run_id="",
+                timestamp=_now_iso(),
+                node=f"retriever:{name}",
+                data={"query": str(query)},
+            )
+
+        if event_type == "on_retriever_end":
+            docs = data.get("output", [])
+            doc_count = len(docs) if isinstance(docs, list) else 0
+            return StudioRunEvent(
+                event="node_end",
+                run_id="",
+                timestamp=_now_iso(),
+                node=f"retriever:{name}",
+                data={"document_count": doc_count},
+            )
+
+        # ----- LLM events (non-chat models) -----
+        if event_type == "on_llm_start":
+            return StudioRunEvent(
+                event="node_start",
+                run_id="",
+                timestamp=_now_iso(),
+                node=f"llm:{name}",
+                data={"prompts": data.get("prompts", [])},
+            )
+
+        if event_type == "on_llm_end":
+            generations = data.get("output", {})
+            if hasattr(generations, "generations"):
+                text = str(generations.generations[0][0].text) if generations.generations else ""
+            elif isinstance(generations, dict):
+                text = str(generations.get("text", ""))
+            else:
+                text = str(generations)
+            return StudioRunEvent(
+                event="node_end",
+                run_id="",
+                timestamp=_now_iso(),
+                node=f"llm:{name}",
+                data={"output": text},
+            )
+
         return None

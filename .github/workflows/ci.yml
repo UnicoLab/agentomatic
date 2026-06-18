@@ -131,11 +131,77 @@ jobs:
         run: uv run mypy src/agentomatic/ --ignore-missing-imports
 
   # ─────────────────────────────────────────────────────
-  # 4. BUILD — Validate package builds correctly
+  # 4. DOCS — Verify documentation builds cleanly
+  # ─────────────────────────────────────────────────────
+  docs:
+    name: Docs Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --group docs
+
+      - name: Build docs (strict)
+        run: uv run mkdocs build --strict
+
+  # ─────────────────────────────────────────────────────
+  # 5. SMOKE — Import and basic runtime validation
+  # ─────────────────────────────────────────────────────
+  smoke:
+    name: Import Smoke Test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install package
+        run: uv sync
+
+      - name: Verify imports
+        run: |
+          uv run python -c "
+          from agentomatic import (
+              AgentPlatform, AgentManifest, BaseAgentState,
+              AgentRegistry, PromptManager, GraphInspector,
+              RunTracker, __version__,
+          )
+          print(f'✅ agentomatic v{__version__} imports OK')
+          print(f'   Platform:  {AgentPlatform.__name__}')
+          print(f'   Manifest:  {AgentManifest.__name__}')
+          print(f'   State:     {BaseAgentState.__name__}')
+          print(f'   Registry:  {AgentRegistry.__name__}')
+          print(f'   Studio:    {GraphInspector.__name__}, {RunTracker.__name__}')
+          "
+
+      - name: Verify CLI
+        run: |
+          uv run agentomatic --help
+          uv run agentomatic doctor
+
+  # ─────────────────────────────────────────────────────
+  # 6. BUILD — Validate package builds correctly
   # ─────────────────────────────────────────────────────
   build:
     name: Build Package
-    needs: [lint, test, typecheck]
+    needs: [lint, test, typecheck, docs, smoke]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,8 +216,15 @@ jobs:
       - name: Build
         run: uv build
 
+      - name: Verify wheel contents
+        run: |
+          echo "📦 Wheel contents:"
+          python -m zipfile -l dist/*.whl | head -30
+          echo "📊 Total files: $(python -m zipfile -l dist/*.whl | wc -l)"
+
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
+

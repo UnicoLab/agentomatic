@@ -90,6 +90,7 @@ nav:
     - Configuration: guide/configuration.md
     - Storage Backends: guide/storage.md
     - Middleware: guide/middleware.md
+    - LangGraph Integration: guide/langgraph.md
     - Advanced Platform Features: guide/platform-features.md
     - Prompt Optimization: guide/optimization.md
     - Telemetry & Feedback: guide/telemetry.md

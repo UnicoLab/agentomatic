@@ -198,6 +198,64 @@ class TestDeepAgentEventMapping:
         assert event is not None
         assert event.event == "node_start"
 
+    def test_map_retriever_start(self):
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        event = LangGraphAdapter._map_event(
+            {
+                "event": "on_retriever_start",
+                "name": "VectorStoreRetriever",
+                "data": {"input": {"query": "What is AI?"}},
+            }
+        )
+        assert event is not None
+        assert event.event == "node_start"
+        assert event.node == "retriever:VectorStoreRetriever"
+        assert event.data["query"] == "What is AI?"
+
+    def test_map_retriever_end(self):
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        event = LangGraphAdapter._map_event(
+            {
+                "event": "on_retriever_end",
+                "name": "VectorStoreRetriever",
+                "data": {"output": [{"page_content": "doc1"}, {"page_content": "doc2"}]},
+            }
+        )
+        assert event is not None
+        assert event.event == "node_end"
+        assert event.node == "retriever:VectorStoreRetriever"
+        assert event.data["document_count"] == 2
+
+    def test_map_llm_start(self):
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        event = LangGraphAdapter._map_event(
+            {
+                "event": "on_llm_start",
+                "name": "OpenAI",
+                "data": {"prompts": ["Hello, world!"]},
+            }
+        )
+        assert event is not None
+        assert event.event == "node_start"
+        assert event.node == "llm:OpenAI"
+
+    def test_map_llm_end(self):
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        event = LangGraphAdapter._map_event(
+            {
+                "event": "on_llm_end",
+                "name": "OpenAI",
+                "data": {"output": {"text": "Generated response"}},
+            }
+        )
+        assert event is not None
+        assert event.event == "node_end"
+        assert event.node == "llm:OpenAI"
+
     def test_map_unknown_event_returns_none(self):
         from agentomatic.studio.adapters.langgraph import LangGraphAdapter
 

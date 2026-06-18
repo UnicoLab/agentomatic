@@ -7,11 +7,11 @@
 
 # === Setup ===
 install: ## Install agentomatic (core)
-	uv pip install -e .
+	uv sync
 
 dev: ## Install with ALL dev dependencies
-	uv pip install -e ".[all,dev,docs]"
-	pre-commit install
+	uv sync --all-extras --group dev --group docs
+	uv run pre-commit install
 
 # === Quality ===
 lint: ## Run ruff linter
@@ -45,7 +45,7 @@ test-studio: ## Run studio-specific tests
 
 # === Build & Publish ===
 build: clean ## Build the package
-	uv run python -m build
+	uv build
 
 publish: build ## Publish to PyPI
 	uv run twine upload dist/*
@@ -59,6 +59,9 @@ docs-serve: ## Serve docs locally (live reload)
 
 docs-build: ## Build static docs site
 	uv run mkdocs build
+
+docs-check: ## Verify docs build (strict mode)
+	uv run mkdocs build --strict
 
 docs-deploy: ## Deploy docs to GitHub Pages (via mike)
 	uv run mike deploy --push --update-aliases $$(uv run python -c "from agentomatic import __version__; print(__version__)") latest
@@ -101,10 +104,10 @@ version: ## Show package version
 structure: ## Show package structure
 	@find src/agentomatic -type f -name "*.py" | sort
 
-check-all: lint typecheck test ## Run all quality checks
+check-all: lint typecheck test docs-check ## Run all quality checks
 	@echo "✅ All checks passed!"
 
-check-ci: lint format typecheck test-cov ## Full CI parity check (lint + format + typecheck + coverage)
+check-ci: lint format typecheck test-cov docs-check ## Full CI parity check (lint + format + typecheck + coverage)
 	@echo "✅ CI check passed!"
 
 # === Help ===
