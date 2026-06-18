@@ -1,0 +1,166 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Sync Studio UI — agentomatic
+#
+# Triggered by repository_dispatch from agentomatic-studio when a new Studio
+# UI release is published. Downloads the release tarball, extracts it into
+# src/agentomatic/studio/static/, and creates a PR for review.
+#
+# NOTE: GH_TOKEN must be a PAT with `repo` scope on BOTH UnicoLab/agentomatic
+#       and UnicoLab/agentomatic-studio (the studio repo is private).
+# ─────────────────────────────────────────────────────────────────────────────
+name: Sync Studio UI
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  repository_dispatch:
+    types: [studio-release]
+  workflow_dispatch:
+    inputs:
+      STUDIO_VERSION:
+        required: false
+        type: string
+        description: "Studio version to sync (e.g. 0.1.0). Leave empty for latest."
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-studio:
+    name: Sync Studio UI Static Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          token: ${{ secrets.GH_TOKEN }}
+
+      # ── Determine which version to download ──
+      - name: Resolve studio version
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          # Priority: dispatch payload > manual input > latest release
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            echo "📡 Version from repository_dispatch: ${VERSION}"
+          elif [ -n "${{ inputs.STUDIO_VERSION }}" ]; then
+            VERSION="${{ inputs.STUDIO_VERSION }}"
+            echo "📝 Version from manual input: ${VERSION}"
+          else
+            VERSION=$(gh release view \
+              --repo UnicoLab/agentomatic-studio \
+              --json tagName \
+              --jq '.tagName | ltrimstr("v")')
+            echo "🔍 Latest studio release: ${VERSION}"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "branch=chore/update-studio-ui-v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # ── Download the studio release tarball ──
+      - name: Download studio build
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          VERSION="${{ steps.resolve.outputs.version }}"
+          TAG="v${VERSION}"
+          echo "⬇️  Downloading studio-ui-${VERSION}.tar.gz from release ${TAG}"
+
+          gh release download "$TAG" \
+            --repo UnicoLab/agentomatic-studio \
+            --pattern "studio-ui-*.tar.gz" \
+            --dir /tmp/studio-download
+
+          ls -la /tmp/studio-download/
+
+      # ── Extract into the static directory ──
+      - name: Extract studio build
+        run: |
+          STATIC_DIR="src/agentomatic/studio/static"
+
+          # Clean previous build files (keep .gitignore)
+          echo "🧹 Cleaning ${STATIC_DIR}..."
+          find "${STATIC_DIR}" -mindepth 1 ! -name '.gitignore' -delete 2>/dev/null || true
+
+          # Extract tarball — contents are at root level (index.html, static/, etc.)
+          TARBALL=$(ls /tmp/studio-download/studio-ui-*.tar.gz)
+          echo "📂 Extracting ${TARBALL} → ${STATIC_DIR}/"
+          tar -xzf "${TARBALL}" -C "${STATIC_DIR}"
+
+          # Verify extraction
+          echo ""
+          echo "✅ Extracted files:"
+          find "${STATIC_DIR}" -type f | head -20
+          echo ""
+          echo "📊 Total files: $(find "${STATIC_DIR}" -type f | wc -l)"
+          echo "📊 Total size: $(du -sh "${STATIC_DIR}" | cut -f1)"
+
+          # Verify index.html exists
+          if [ ! -f "${STATIC_DIR}/index.html" ]; then
+            echo "❌ ERROR: index.html not found after extraction!"
+            exit 1
+          fi
+
+      # ── Create a PR with the updated static files ──
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          VERSION="${{ steps.resolve.outputs.version }}"
+          BRANCH="${{ steps.resolve.outputs.branch }}"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create branch, commit, push
+          git checkout -b "${BRANCH}"
+          git add src/agentomatic/studio/static/
+          git status
+
+          # Only create PR if there are changes
+          if git diff --cached --quiet; then
+            echo "⏭️  No changes detected — studio files are already up to date."
+            exit 0
+          fi
+
+          git commit -m "chore: update studio UI to v${VERSION}"
+          git push origin "${BRANCH}" --force
+
+          # Create PR (or update existing one)
+          EXISTING_PR=$(gh pr list --head "${BRANCH}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "${EXISTING_PR}" ]; then
+            echo "📝 Updating existing PR #${EXISTING_PR}"
+          else
+            gh pr create \
+              --title "chore: update studio UI to v${VERSION}" \
+              --body "## 🎨 Studio UI Update
+
+          Automated PR to update the bundled Studio UI to **v${VERSION}**.
+
+          ### What changed
+          - Downloaded \`studio-ui-${VERSION}.tar.gz\` from [agentomatic-studio release](https://github.com/UnicoLab/agentomatic-studio/releases/tag/v${VERSION})
+          - Extracted built React app into \`src/agentomatic/studio/static/\`
+
+          ### How to verify
+          \`\`\`bash
+          pip install -e '.[studio]'
+          agentomatic serve  # Visit http://localhost:8000/studio/ui/
+          \`\`\`
+
+          ### After merging
+          The next \`agentomatic\` release will include this Studio UI version in the PyPI wheel.
+
+          ---
+          *This PR was automatically created by the [sync-studio workflow](https://github.com/UnicoLab/agentomatic/actions/workflows/sync-studio.yml).*" \
+              --label "automated,studio-ui" \
+              --base main
+
+            echo "✅ Pull request created successfully"
+          fi

@@ -779,3 +779,441 @@ def _resolve_single(name: str, model: str) -> BaseMetric:
         f"Special: ['geval:<criteria>', 'red_team']. "
         f"Or pass a BaseMetric / CustomMetric / DeepEvalMetric instance."
     )
+
+
+# =====================================================================
+# PromptFitter-specific metrics — richer result types
+# =====================================================================
+
+
+@dataclass
+class MetricResult:
+    """Structured metric output with score, feedback, and sub-dimensions.
+
+    Unlike ``EvalResult`` (which carries a flat score + reason), this type
+    is designed for the PromptFitter optimisation loop where textual feedback
+    guides reflective prompt improvement (GEPA-style) and per-dimension
+    breakdowns enable fine-grained candidate comparison.
+
+    Example::
+
+        result = MetricResult(
+            score=0.78,
+            feedback="The answer is mostly correct but misses the governance-risk section.",
+            dimensions={
+                "correctness": 0.85,
+                "faithfulness": 0.72,
+                "completeness": 0.66,
+                "format_compliance": 0.91,
+                "latency_penalty": -0.04,
+            },
+        )
+    """
+
+    score: float
+    feedback: str = ""
+    dimensions: dict[str, float] = field(default_factory=dict)
+
+    def to_eval_result(self, metric_name: str) -> EvalResult:
+        """Down-cast to a plain ``EvalResult`` for backward compatibility."""
+        return EvalResult(
+            metric_name=metric_name,
+            score=self.score,
+            reason=self.feedback,
+            metadata={"dimensions": self.dimensions},
+        )
+
+
+@dataclass
+class WeightedMetric:
+    """A metric paired with a weight for use inside ``CompositeMetric``.
+
+    Example::
+
+        wm = WeightedMetric(
+            name="faithfulness",
+            metric=LLMJudgeMetric(criteria="Is the response faithful?"),
+            weight=0.35,
+        )
+    """
+
+    name: str
+    metric: BaseMetric
+    weight: float = 1.0
+
+
+class CompositeMetric(BaseMetric):
+    """Weighted composition of multiple metrics returning ``MetricResult``.
+
+    This is the recommended metric type for ``PromptFitter.fit()`` because
+    it aggregates scores, feedback, and per-dimension breakdowns.
+
+    Example::
+
+        metric = CompositeMetric(
+            metrics=[
+                WeightedMetric("format", ExactMatchMetric(), weight=0.15),
+                WeightedMetric("relevance", LLMJudgeMetric(criteria="..."), weight=0.50),
+                WeightedMetric("risk", LLMJudgeMetric(criteria="..."), weight=0.35),
+            ],
+        )
+        eval_result = await metric.evaluate(query, response, expected)
+    """
+
+    name = "composite"
+
+    def __init__(self, metrics: list[WeightedMetric]) -> None:
+        if not metrics:
+            raise ValueError("CompositeMetric requires at least one WeightedMetric")
+        self._metrics = metrics
+        total_weight = sum(m.weight for m in metrics)
+        if total_weight <= 0:
+            raise ValueError("Total weight must be positive")
+        self._total_weight = total_weight
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> EvalResult:
+        """Run all sub-metrics and return a weighted composite result.
+
+        The ``metadata`` field of the returned ``EvalResult`` contains:
+        - ``"dimensions"``: per-metric scores
+        - ``"feedback"``: aggregated textual feedback
+        - ``"metric_result"``: the full ``MetricResult`` object
+        """
+        dimensions: dict[str, float] = {}
+        feedback_parts: list[str] = []
+        weighted_sum = 0.0
+
+        for wm in self._metrics:
+            try:
+                result = await wm.metric.evaluate(query, response, expected, context)
+                dimensions[wm.name] = result.score
+                weighted_sum += result.score * wm.weight
+                if result.reason:
+                    feedback_parts.append(f"[{wm.name}] {result.reason}")
+            except Exception as exc:
+                logger.warning(f"CompositeMetric: sub-metric '{wm.name}' failed: {exc}")
+                dimensions[wm.name] = 0.0
+
+        composite_score = weighted_sum / self._total_weight
+        feedback = " | ".join(feedback_parts)
+
+        metric_result = MetricResult(
+            score=composite_score,
+            feedback=feedback,
+            dimensions=dimensions,
+        )
+
+        return EvalResult(
+            metric_name=self.name,
+            score=composite_score,
+            reason=feedback,
+            metadata={
+                "dimensions": dimensions,
+                "feedback": feedback,
+                "metric_result": metric_result,
+            },
+        )
+
+    async def evaluate_rich(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> MetricResult:
+        """Like ``evaluate`` but returns a ``MetricResult`` directly."""
+        eval_result = await self.evaluate(query, response, expected, context)
+        return eval_result.metadata.get("metric_result", MetricResult(score=eval_result.score))
+
+
+class DeterministicMetric(BaseMetric):
+    """Non-LLM metric for format compliance, regex matching, and structural checks.
+
+    Cheap and fast — no LLM calls required. Useful for validating output
+    structure, JSON schema compliance, keyword presence, and length constraints.
+
+    Example::
+
+        # Format compliance: response must contain specific sections
+        metric = DeterministicMetric(
+            name="format_compliance",
+            checks=[
+                {"type": "contains", "value": "## Summary"},
+                {"type": "contains", "value": "## Risks"},
+                {"type": "max_length", "value": 2000},
+                {"type": "regex", "value": r"\\d{4}-\\d{2}-\\d{2}"},  # date pattern
+            ],
+        )
+    """
+
+    def __init__(
+        self,
+        name: str = "format_compliance",
+        checks: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self.name = name
+        self._checks = checks or []
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> EvalResult:
+        """Evaluate all checks and return aggregate score."""
+        if not self._checks:
+            return EvalResult(metric_name=self.name, score=1.0, reason="No checks defined")
+
+        import re
+
+        passed = 0
+        reasons: list[str] = []
+
+        for check in self._checks:
+            check_type = check.get("type", "")
+            value = check.get("value", "")
+
+            if check_type == "contains":
+                if str(value).lower() in response.lower():
+                    passed += 1
+                else:
+                    reasons.append(f"Missing: '{value}'")
+
+            elif check_type == "not_contains":
+                if str(value).lower() not in response.lower():
+                    passed += 1
+                else:
+                    reasons.append(f"Should not contain: '{value}'")
+
+            elif check_type == "regex":
+                if re.search(str(value), response):
+                    passed += 1
+                else:
+                    reasons.append(f"Regex not matched: '{value}'")
+
+            elif check_type == "min_length":
+                if len(response) >= int(value):
+                    passed += 1
+                else:
+                    reasons.append(f"Too short: {len(response)} < {value}")
+
+            elif check_type == "max_length":
+                if len(response) <= int(value):
+                    passed += 1
+                else:
+                    reasons.append(f"Too long: {len(response)} > {value}")
+
+            elif check_type == "json_valid":
+                import json as json_mod
+
+                try:
+                    json_mod.loads(response)
+                    passed += 1
+                except (json_mod.JSONDecodeError, ValueError):
+                    reasons.append("Response is not valid JSON")
+
+            elif check_type == "starts_with":
+                if response.strip().startswith(str(value)):
+                    passed += 1
+                else:
+                    reasons.append(f"Does not start with: '{value}'")
+
+            elif check_type == "ends_with":
+                if response.strip().endswith(str(value)):
+                    passed += 1
+                else:
+                    reasons.append(f"Does not end with: '{value}'")
+
+            else:
+                logger.warning(f"DeterministicMetric: unknown check type '{check_type}'")
+
+        score = passed / len(self._checks) if self._checks else 1.0
+        reason = "; ".join(reasons) if reasons else f"All {passed} checks passed"
+
+        return EvalResult(
+            metric_name=self.name,
+            score=score,
+            reason=reason,
+            metadata={"passed": passed, "total": len(self._checks)},
+        )
+
+
+class LatencyMetric(BaseMetric):
+    """Deployment-aware latency metric that penalises slow responses.
+
+    Returns a score between 0.0 and 1.0 based on response latency.
+    Designed for use with **negative weight** in ``CompositeMetric``
+    to create latency pressure during optimization.
+
+    Score mapping (default thresholds):
+    - < 1s → 1.0 (excellent)
+    - 1s–3s → linear decay 1.0 → 0.5
+    - 3s–10s → linear decay 0.5 → 0.0
+    - > 10s → 0.0
+
+    Example::
+
+        metric = LatencyMetric(
+            name="p95_latency",
+            target_seconds=2.0,
+            max_seconds=10.0,
+        )
+
+        # In CompositeMetric with negative weight:
+        CompositeMetric(metrics=[
+            WeightedMetric("quality", judge, weight=0.80),
+            WeightedMetric("latency", LatencyMetric(), weight=-0.10),
+        ])
+    """
+
+    def __init__(
+        self,
+        name: str = "latency",
+        target_seconds: float = 2.0,
+        max_seconds: float = 10.0,
+    ) -> None:
+        self.name = name
+        self.target_seconds = target_seconds
+        self.max_seconds = max_seconds
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> EvalResult:
+        """Score based on latency metadata.
+
+        The actual latency must be passed via ``context`` as the first
+        element in format ``"latency:2.35"`` or via the response metadata.
+        If no latency data is available, returns 0.5 (neutral).
+        """
+        latency = self._extract_latency(response, context)
+
+        if latency is None:
+            return EvalResult(
+                metric_name=self.name,
+                score=0.5,
+                reason="No latency data available",
+                metadata={"latency_seconds": None},
+            )
+
+        if latency <= self.target_seconds:
+            score = 1.0
+        elif latency >= self.max_seconds:
+            score = 0.0
+        else:
+            # Linear decay between target and max
+            score = 1.0 - ((latency - self.target_seconds) / (self.max_seconds - self.target_seconds))
+
+        return EvalResult(
+            metric_name=self.name,
+            score=max(0.0, min(1.0, score)),
+            reason=f"Latency: {latency:.2f}s (target: {self.target_seconds}s)",
+            metadata={"latency_seconds": latency},
+        )
+
+    def _extract_latency(
+        self,
+        response: str,
+        context: list[str] | None,
+    ) -> float | None:
+        """Extract latency from context metadata."""
+        if context:
+            for item in context:
+                if isinstance(item, str) and item.startswith("latency:"):
+                    try:
+                        return float(item.split(":", 1)[1])
+                    except (ValueError, IndexError):
+                        pass
+        return None
+
+
+class CostMetric(BaseMetric):
+    """Deployment-aware cost metric that penalises expensive responses.
+
+    Returns a score between 0.0 and 1.0 based on token usage / cost.
+    Designed for use with **negative weight** in ``CompositeMetric``.
+
+    Score mapping:
+    - < target_tokens → 1.0
+    - target → max → linear decay 1.0 → 0.0
+    - > max_tokens → 0.0
+
+    Example::
+
+        metric = CostMetric(
+            name="tokens",
+            target_tokens=500,
+            max_tokens=3000,
+        )
+
+        # In CompositeMetric:
+        CompositeMetric(metrics=[
+            WeightedMetric("quality", judge, weight=0.85),
+            WeightedMetric("cost", CostMetric(), weight=-0.05),
+        ])
+    """
+
+    def __init__(
+        self,
+        name: str = "cost",
+        target_tokens: int = 500,
+        max_tokens: int = 3000,
+    ) -> None:
+        self.name = name
+        self.target_tokens = target_tokens
+        self.max_tokens = max_tokens
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> EvalResult:
+        """Score based on token count or cost metadata.
+
+        Extracts token count from ``context`` (format ``"tokens:1234"``)
+        or estimates from response length.
+        """
+        tokens = self._extract_tokens(response, context)
+
+        if tokens <= self.target_tokens:
+            score = 1.0
+        elif tokens >= self.max_tokens:
+            score = 0.0
+        else:
+            score = 1.0 - ((tokens - self.target_tokens) / (self.max_tokens - self.target_tokens))
+
+        return EvalResult(
+            metric_name=self.name,
+            score=max(0.0, min(1.0, score)),
+            reason=f"Tokens: {tokens} (target: {self.target_tokens})",
+            metadata={"tokens": tokens},
+        )
+
+    def _extract_tokens(
+        self,
+        response: str,
+        context: list[str] | None,
+    ) -> int:
+        """Extract token count from context or estimate from response."""
+        if context:
+            for item in context:
+                if isinstance(item, str) and item.startswith("tokens:"):
+                    try:
+                        return int(item.split(":", 1)[1])
+                    except (ValueError, IndexError):
+                        pass
+        # Rough estimate: ~4 chars per token
+        return max(1, len(response) // 4)
+

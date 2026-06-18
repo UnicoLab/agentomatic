@@ -77,6 +77,8 @@ class AgentPlatform:
         # --- Memory ---
         max_history_messages: int = 50,
         summarize_after: int = 30,
+        # --- Studio ---
+        enable_studio: bool = False,
     ) -> None:
         """Initialise the platform.
 
@@ -100,6 +102,7 @@ class AgentPlatform:
             enable_metrics: Add Prometheus metrics middleware.
             enable_feedback: Auto-add feedback endpoints per agent (default ``True``).
             enable_telemetry: Auto-configure OpenTelemetry tracing (default ``True``).
+            enable_studio: Mount the Studio debug API and UI (default ``False``).
             middleware: Custom middleware list ``[(MiddlewareClass, {kwargs}), ...]``.
         """
         self.agents_dir = Path(agents_dir).resolve()
@@ -125,6 +128,7 @@ class AgentPlatform:
         self._enable_metrics = enable_metrics
         self._enable_feedback = enable_feedback
         self._enable_telemetry = enable_telemetry
+        self._enable_studio = enable_studio
         self._custom_middleware = middleware or []
 
         # Memory config
@@ -343,6 +347,7 @@ class AgentPlatform:
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=["X-Studio-Run-Id"],
         )
 
         # Logging
@@ -550,6 +555,36 @@ class AgentPlatform:
         # Extra routers
         for prefix, router, kwargs in self._extra_routers:
             app.include_router(router, prefix=prefix, **kwargs)
+
+        # ------------------------------------------------------------------
+        # Studio Debug API + UI
+        # ------------------------------------------------------------------
+        if self._enable_studio:
+            try:
+                from agentomatic.studio.router import create_studio_router
+
+                studio_router = create_studio_router(
+                    registry=self._registry,
+                    store=self._store,
+                    platform_title=self.title,
+                    platform_version=self.version,
+                )
+                app.include_router(studio_router)
+                logger.info("🎨 Studio API mounted at /studio/")
+
+                # Mount the built Studio UI (if available)
+                from agentomatic.studio.serve import is_studio_available, mount_studio_ui
+
+                if is_studio_available():
+                    mount_studio_ui(app)
+                else:
+                    logger.info(
+                        "🎨 Studio API is running but UI assets not bundled. "
+                        "Run the frontend separately or build with: "
+                        "./scripts/build_studio.sh"
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Studio setup failed: {exc}")
 
         self._app = app
         return app

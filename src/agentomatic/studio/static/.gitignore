@@ -1,0 +1,5 @@
+# Built Studio UI assets — auto-synced from agentomatic-studio repo.
+# These files ARE tracked in git (committed via CI/CD sync PRs).
+# Only ignore development/build artifacts:
+*.map
+*.LICENSE.txt

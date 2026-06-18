@@ -43,16 +43,22 @@ from agentomatic.optimize.loop import (
 )
 from agentomatic.optimize.metrics import (
     BaseMetric,
+    CompositeMetric,
     ContainsMetric,
+    CostMetric,
     CustomMetric,
     DeepEvalMetric,
+    DeterministicMetric,
     ExactMatchMetric,
     GEvalMetric,
+    LatencyMetric,
     LLMJudgeMetric,
+    MetricResult,
     RedTeamMetric,
+    WeightedMetric,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
-from agentomatic.optimize.report import generate_html_report
+from agentomatic.optimize.report import generate_fit_report, generate_html_report
 from agentomatic.optimize.strategies import (
     MIPRO,
     BootstrapRandomSearch,
@@ -69,6 +75,42 @@ from agentomatic.optimize.synthesizer import (
     generate_from_docs,
     red_team,
 )
+
+# ── PromptFitter API (ML-like prompt/config optimisation) ────────────
+from agentomatic.optimize.config import (
+    ParamDelta,
+    PromptCandidate,
+    PromptFitResult,
+    PromptRuntimeConfig,
+)
+from agentomatic.optimize.failure_analysis import (
+    DimensionAnalyzer,
+    FailureClusterer,
+)
+from agentomatic.optimize.fitter import PromptFitter
+from agentomatic.optimize.fitter_optimizers import (
+    BaseFitterOptimizer,
+    FewShotBootstrapOptimizer,
+    GEPALikeOptimizer,
+    MIPROLikeOptimizer,
+    ParamSearchOptimizer,
+    RewriteOptimizer,
+)
+from agentomatic.optimize.judges import (
+    JudgeCalibrationSet,
+    LocalJudgeMetric,
+    MultiJudgePanel,
+)
+from agentomatic.optimize.search_space import PromptSearchSpace
+
+# ── Deployment-first API ─────────────────────────────────────────────
+from agentomatic.optimize.deployment import (
+    DeploymentRecommendation,
+    RolloutConfig,
+    build_deployment_recommendation,
+)
+from agentomatic.optimize.eval_contract import EvalContract
+from agentomatic.optimize.failure_analysis import FailureCluster
 
 __all__ = [
     # Core — local-first optimization loop
@@ -109,4 +151,40 @@ __all__ = [
     "red_team",
     # Reports
     "generate_html_report",
+    # ── PromptFitter API ──────────────────────────────────────────
+    "PromptFitter",
+    "PromptRuntimeConfig",
+    "PromptCandidate",
+    "PromptFitResult",
+    "ParamDelta",
+    "PromptSearchSpace",
+    # PromptFitter metrics
+    "MetricResult",
+    "CompositeMetric",
+    "DeterministicMetric",
+    "WeightedMetric",
+    # Judges
+    "LocalJudgeMetric",
+    "MultiJudgePanel",
+    "JudgeCalibrationSet",
+    # Fitter optimizers
+    "BaseFitterOptimizer",
+    "RewriteOptimizer",
+    "FewShotBootstrapOptimizer",
+    "MIPROLikeOptimizer",
+    "GEPALikeOptimizer",
+    "ParamSearchOptimizer",
+    # Failure analysis
+    "FailureClusterer",
+    "FailureCluster",
+    "DimensionAnalyzer",
+    # ── Deployment-first API ───────────────────────────────────────
+    "EvalContract",
+    "DeploymentRecommendation",
+    "RolloutConfig",
+    "build_deployment_recommendation",
+    "LatencyMetric",
+    "CostMetric",
+    "generate_fit_report",
 ]
+

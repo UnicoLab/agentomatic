@@ -1,0 +1,9 @@
+{
+  "short_name": "Agentomatic Studio",
+  "name": "Agentomatic Studio - Visual Debugging Interface for Agentomatic Agents",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#7c3aed",
+  "background_color": "#1e1b4b"
+}

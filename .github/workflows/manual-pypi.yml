@@ -1,3 +1,13 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Manual PyPI Publish — agentomatic
+#
+# Allows manually triggering a PyPI publish with a specific version.
+# Downloads the latest Studio UI from agentomatic-studio releases before
+# building, so the wheel includes the bundled frontend.
+#
+# NOTE: GH_TOKEN must be a PAT with `repo` scope on BOTH UnicoLab/agentomatic
+#       and UnicoLab/agentomatic-studio (the studio repo is private).
+# ─────────────────────────────────────────────────────────────────────────────
 name: "Manual PyPI Publish"
 
 env:
@@ -10,6 +20,11 @@ on:
         required: true
         type: string
         description: "Release version to publish to PyPI (e.g. 0.2.0)"
+      SKIP_STUDIO:
+        required: false
+        default: false
+        type: boolean
+        description: "Skip bundling Studio UI (publish without frontend)"
 
 permissions:
   contents: write
@@ -42,6 +57,33 @@ jobs:
           sed -i "s/^version = \".*\"/version = \"${{ inputs.RELEASE_VERSION }}\"/" pyproject.toml
           # Update version in _version.py
           sed -i "s/__version__ = \".*\"/__version__ = \"${{ inputs.RELEASE_VERSION }}\"/" src/agentomatic/_version.py
+
+      # ── Bundle Studio UI ──
+      - name: Download latest studio release
+        if: inputs.SKIP_STUDIO != true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "⬇️  Downloading latest Studio UI release..."
+          gh release download \
+            --repo UnicoLab/agentomatic-studio \
+            --pattern "studio-ui-*.tar.gz" \
+            --dir /tmp/studio-download || {
+            echo "⚠️  No studio release found — building without frontend"
+            exit 0
+          }
+
+          STATIC_DIR="src/agentomatic/studio/static"
+          find "${STATIC_DIR}" -mindepth 1 ! -name '.gitignore' -delete 2>/dev/null || true
+
+          TARBALL=$(ls /tmp/studio-download/studio-ui-*.tar.gz)
+          tar -xzf "${TARBALL}" -C "${STATIC_DIR}"
+
+          if [ -f "${STATIC_DIR}/index.html" ]; then
+            echo "✅ Studio UI bundled ($(find ${STATIC_DIR} -type f | wc -l) files)"
+          else
+            echo "⚠️  Studio UI extraction failed — building without frontend"
+          fi
 
       - name: Build package
         run: uv build

@@ -132,7 +132,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "optimize", "telemetry"], marker = "extra == 'all'" },
+    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry"], marker = "extra == 'all'" },
     { name = "aiosqlite", marker = "extra == 'db'", specifier = ">=0.20" },
     { name = "asyncpg", marker = "extra == 'db-postgres'", specifier = ">=0.30" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0" },
@@ -181,7 +181,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.12" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
-provides-extras = ["langgraph", "langchain", "ollama", "openai", "azure", "vertex", "metrics", "db", "db-postgres", "cli", "ui", "optimize", "telemetry", "all", "docs", "dev"]
+provides-extras = ["langgraph", "langchain", "ollama", "openai", "azure", "vertex", "metrics", "db", "db-postgres", "cli", "ui", "studio", "optimize", "telemetry", "all", "docs", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

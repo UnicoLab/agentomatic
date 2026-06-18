@@ -215,6 +215,7 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
 @click.option("--title", default=None, help="Platform title")
 @click.option("--log-level", default="INFO", help="Log level")
 @click.option("--with-ui", "--ui", is_flag=True, help="Enable Chainlit debug UI at /chat")
+@click.option("--studio", is_flag=True, help="Enable Agentomatic Studio debug UI at /studio/ui")
 def run(
     agents_dir: str,
     host: str,
@@ -223,6 +224,7 @@ def run(
     title: str | None,
     log_level: str,
     with_ui: bool,
+    studio: bool,
 ) -> None:
     """Run the platform with Rich status output."""
     _print_banner()
@@ -233,6 +235,7 @@ def run(
     kwargs: dict[str, Any] = {
         "title": title or "Agentomatic Platform",
         "log_level": log_level,
+        "enable_studio": studio,
     }
 
     # Auto-detect and enable UI

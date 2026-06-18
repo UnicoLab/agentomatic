@@ -42,6 +42,9 @@ from agentomatic.prompts import PromptManager
 # Protocols
 from agentomatic.protocols.decorators import APIResponse, handle_api_errors, log_api_call
 
+# Studio
+from agentomatic.studio import GraphInspector, RunTracker
+
 __all__ = [
     # Core
     "AgentPlatform",
@@ -56,6 +59,9 @@ __all__ = [
     "log_api_call",
     # Prompts
     "PromptManager",
+    # Studio
+    "GraphInspector",
+    "RunTracker",
     # Version
     "__version__",
 ]

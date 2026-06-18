@@ -772,3 +772,300 @@ footer { text-align: center; margin-top: 3rem; padding: 1rem;
          color: var(--text-dim); font-size: 0.85rem;
          border-top: 1px solid var(--border); }
 """
+
+
+# =====================================================================
+# PromptFitter-specific report
+# =====================================================================
+
+
+def generate_fit_report(
+    result: Any,  # PromptFitResult
+    output_path: str | Path | None = None,
+) -> str:
+    """Generate a self-contained HTML report for ``PromptFitResult``.
+
+    Includes KPI cards, parameter change table, failure clusters,
+    dimension comparison, trial history, prompt diff, few-shot examples,
+    and actionable recommendations.
+
+    Args:
+        result: ``PromptFitResult`` from ``PromptFitter.fit()``.
+        output_path: Path to write the HTML file. Auto-generated if None.
+
+    Returns:
+        Path to the generated report file.
+    """
+    if output_path is None:
+        output_path = Path(
+            f".optimize/{result.agent}/fit_report_{result.experiment_id}.html"
+        )
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Build HTML
+    html_content = _build_fit_report_html(result)
+    output_path.write_text(html_content, encoding="utf-8")
+    logger.info(f"📊 Fit report generated: {output_path}")
+    return str(output_path)
+
+
+def _build_fit_report_html(result: Any) -> str:
+    """Build the self-contained HTML for a PromptFitResult."""
+    improvement = result.best_score - result.baseline_score
+    improvement_pct = (
+        (improvement / result.baseline_score * 100) if result.baseline_score > 0 else 0
+    )
+
+    # KPI section
+    kpis = f"""
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 2rem 0;">
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Baseline Score</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #f0883e;">{result.baseline_score:.4f}</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Best Score</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #3fb950;">{result.best_score:.4f}</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Absolute Improvement</div>
+        <div style="font-size: 2rem; font-weight: 700; color: {'#3fb950' if improvement > 0 else '#f85149'};">{improvement:+.4f}</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Relative Improvement</div>
+        <div style="font-size: 2rem; font-weight: 700; color: {'#3fb950' if improvement_pct > 0 else '#f85149'};">{improvement_pct:+.1f}%</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Total Trials</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #58a6ff;">{len(result.trials)}</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Duration</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #d2a8ff;">{result.duration_seconds:.1f}s</div>
+      </div>
+    </div>
+    """
+
+    # Param suggestions table
+    param_rows = ""
+    for name, delta in result.param_suggestions.items():
+        param_rows += f"""
+        <tr>
+          <td><code>{html.escape(str(name))}</code></td>
+          <td style="color: #f0883e;">{html.escape(str(delta.old_value))}</td>
+          <td style="color: #3fb950;">{html.escape(str(delta.new_value))}</td>
+          <td style="color: #8b949e;">{html.escape(str(delta.reason))}</td>
+        </tr>"""
+
+    param_section = ""
+    if result.param_suggestions:
+        param_section = f"""
+        <h2>🔧 Parameter Changes</h2>
+        <table>
+          <thead><tr><th>Parameter</th><th>Old</th><th>New</th><th>Reason</th></tr></thead>
+          <tbody>{param_rows}</tbody>
+        </table>
+        """
+
+    # Metric deltas table
+    delta_rows = ""
+    for dim, delta_val in result.metric_deltas.items():
+        color = "#3fb950" if delta_val >= 0 else "#f85149"
+        delta_rows += f"""
+        <tr>
+          <td>{html.escape(dim)}</td>
+          <td style="color: {color};">{delta_val:+.4f}</td>
+        </tr>"""
+
+    delta_section = ""
+    if result.metric_deltas:
+        delta_section = f"""
+        <h2>📊 Metric Deltas</h2>
+        <table>
+          <thead><tr><th>Dimension</th><th>Delta</th></tr></thead>
+          <tbody>{delta_rows}</tbody>
+        </table>
+        """
+
+    # Failure clusters
+    cluster_items = ""
+    for cluster in result.failure_clusters:
+        if isinstance(cluster, dict):
+            label = cluster.get("label", "unknown")
+            desc = cluster.get("description", "")
+            count = cluster.get("count", 0)
+            fix = cluster.get("suggested_fix", "")
+        else:
+            label = getattr(cluster, "label", "unknown")
+            desc = getattr(cluster, "description", "")
+            count = getattr(cluster, "count", 0)
+            fix = getattr(cluster, "suggested_fix", "")
+        cluster_items += f"""
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;">
+          <strong style="color: #f0883e;">{html.escape(str(label))}</strong>
+          <span style="color: #8b949e;"> ({count} cases)</span>
+          <p style="color: #c9d1d9; margin: 0.5rem 0;">{html.escape(str(desc))}</p>
+          <p style="color: #3fb950; font-style: italic;">💡 {html.escape(str(fix))}</p>"""
+
+        # Show affected params if available
+        affected = (
+            cluster.get("affected_params", []) if isinstance(cluster, dict)
+            else getattr(cluster, "affected_params", [])
+        )
+        gains = (
+            cluster.get("expected_metric_gain", {}) if isinstance(cluster, dict)
+            else getattr(cluster, "expected_metric_gain", {})
+        )
+        if affected:
+            params_html = ", ".join(f"<code>{html.escape(p)}</code>" for p in affected)
+            cluster_items += f"""
+          <p style="color: #d2a8ff; margin: 0.25rem 0; font-size: 0.9em;">🎯 Affected params: {params_html}</p>"""
+        if gains:
+            gains_parts = [f"{k}: <strong>{v:+.2f}</strong>" for k, v in gains.items()]
+            cluster_items += f"""
+          <p style="color: #58a6ff; margin: 0.25rem 0; font-size: 0.9em;">📈 Expected gain: {', '.join(gains_parts)}</p>"""
+
+        cluster_items += """
+        </div>"""
+
+    cluster_section = ""
+    if result.failure_clusters:
+        cluster_section = f"""
+        <h2>🔍 Failure Clusters</h2>
+        {cluster_items}
+        """
+
+    # Suggestions
+    suggestion_items = "".join(
+        f"<li>{html.escape(s)}</li>" for s in result.suggestions
+    )
+    suggestion_section = ""
+    if result.suggestions:
+        suggestion_section = f"""
+        <h2>💡 Recommendations</h2>
+        <ol style="color: #c9d1d9; line-height: 1.8;">{suggestion_items}</ol>
+        """
+
+    # Prompt diff
+    baseline_prompt = result.baseline_config.system_prompt
+    best_prompt = result.best_config.system_prompt
+    diff_lines = list(
+        difflib.unified_diff(
+            baseline_prompt.splitlines(keepends=True),
+            best_prompt.splitlines(keepends=True),
+            fromfile="baseline",
+            tofile="best",
+            lineterm="",
+        )
+    )
+    diff_html = ""
+    for line in diff_lines:
+        escaped = html.escape(line.rstrip("\n"))
+        if line.startswith("+") and not line.startswith("+++"):
+            diff_html += f'<div style="color: #3fb950; background: rgba(63,185,80,0.1);">  {escaped}</div>'
+        elif line.startswith("-") and not line.startswith("---"):
+            diff_html += f'<div style="color: #f85149; background: rgba(248,81,73,0.1);">  {escaped}</div>'
+        else:
+            diff_html += f"<div>  {escaped}</div>"
+
+    diff_section = f"""
+    <h2>📝 Prompt Diff</h2>
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap;">
+{diff_html}
+    </div>
+    """
+
+    # Few-shot examples
+    few_shot_section = ""
+    if result.best_config.few_shot_examples:
+        examples_html = ""
+        for i, ex in enumerate(result.best_config.few_shot_examples, 1):
+            q = html.escape(str(ex.get("query", "")))
+            r = html.escape(str(ex.get("response", "")))
+            examples_html += f"""
+            <div style="background: #161b22; border-left: 3px solid #58a6ff; padding: 0.75rem 1rem; margin: 0.5rem 0; border-radius: 0 8px 8px 0;">
+              <div style="color: #58a6ff; font-weight: 600;">Example {i}</div>
+              <div style="color: #8b949e;">Q: {q}</div>
+              <div style="color: #c9d1d9;">A: {r[:300]}{'...' if len(r) > 300 else ''}</div>
+            </div>"""
+        few_shot_section = f"""
+        <h2>📚 Few-Shot Examples</h2>
+        {examples_html}
+        """
+
+    # Deployment recommendation section
+    deployment_section = ""
+    if getattr(result, "deployment_recommendation", None):
+        rec = result.deployment_recommendation
+        safety_html = ""
+        if rec.safety_notes:
+            safety_items = "".join(
+                f"<li style='color: #f0883e;'>{html.escape(n)}</li>"
+                for n in rec.safety_notes
+            )
+            safety_html = f"<ul>{safety_items}</ul>"
+
+        deployment_section = f"""
+        <h2>🚀 Deployment Recommendation</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0;">
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Version</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #58a6ff;">{html.escape(rec.prompt_version)}</div>
+          </div>
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Confidence</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: {'#3fb950' if rec.confidence == 'high' else '#f0883e' if rec.confidence == 'medium' else '#f85149'};">{rec.confidence}</div>
+          </div>
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Rollout Strategy</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #d2a8ff;">{rec.rollout.strategy} @ {rec.rollout.initial_weight:.0%}</div>
+          </div>
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Monitor</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #c9d1d9;">{rec.rollout.monitoring_hours}h</div>
+          </div>
+        </div>
+        {safety_html}
+        """
+
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptFitter Report — {html.escape(result.agent)}</title>
+  <style>
+    :root {{ --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #c9d1d9; --text-dim: #8b949e; }}
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    body {{ background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding: 2rem; max-width: 1200px; margin: 0 auto; line-height: 1.6; }}
+    h1 {{ font-size: 1.8rem; color: #f0f6fc; margin-bottom: 0.5rem; }}
+    h2 {{ font-size: 1.3rem; color: #f0f6fc; margin: 2rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }}
+    .kpi-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }}
+    table {{ width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; }}
+    th, td {{ padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }}
+    th {{ background: #1c2128; color: var(--text-dim); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }}
+    td {{ color: var(--text); }}
+    code {{ background: #1c2128; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }}
+    footer {{ text-align: center; margin-top: 3rem; padding: 1rem; color: var(--text-dim); font-size: 0.85rem; border-top: 1px solid var(--border); }}
+  </style>
+</head>
+<body>
+  <h1>⚡ PromptFitter Report</h1>
+  <p style="color: #8b949e;">Agent: <strong style="color: #58a6ff;">{html.escape(result.agent)}</strong> | Experiment: <code>{html.escape(result.experiment_id)}</code> | {timestamp}</p>
+
+  {kpis}
+  {param_section}
+  {delta_section}
+  {cluster_section}
+  {suggestion_section}
+  {deployment_section}
+  {diff_section}
+  {few_shot_section}
+
+  <footer>Generated by Agentomatic PromptFitter — {timestamp}</footer>
+</body>
+</html>"""
+

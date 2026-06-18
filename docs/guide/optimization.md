@@ -221,3 +221,481 @@ from agentomatic.optimize import generate_html_report
 # Generate static report file
 generate_html_report(result, filepath="reports/my_agent_optimization.html")
 ```
+
+---
+
+## 🔧 Prompt Fitting (Deployment-First Optimization)
+
+### Overview
+
+Traditional prompt engineering is manual and ad-hoc: you tweak words, run a few tests, and hope
+for the best. **Prompt Fitting** replaces that with a principled, ML-like workflow where every
+change is evaluated against a scored dataset and the result is a *better deployment configuration*
+— not a compiled program.
+
+The core API mirrors scikit-learn:
+
+```python
+fitter = PromptFitter(agent="scope_agent", ...)
+result = await fitter.fit(trainset, valset, metric)
+```
+
+**What the fitter produces:**
+
+- A better system prompt (rewritten, restructured, with stronger guardrails)
+- Optimized model parameters (temperature, top_p, penalties)
+- Curated few-shot examples (bootstrapped from high-scoring traces)
+- Tuned RAG parameters (top_k, rerank strategy)
+- A `DeploymentRecommendation` with rollout strategy and confidence level
+
+> **Key insight:** Your agent is already deployed and serving traffic. Optimization does not
+> produce a new artifact — it produces a *better version* of the existing deployment. Every
+> result includes canary weights, confidence scores, and failure diagnostics so you can ship
+> changes safely.
+
+---
+
+### EvalContract — Structural Quality Gate
+
+Before optimizing, define what a valid agent response *must* look like. The `EvalContract`
+enforces structural constraints and can be used as a metric or as judge criteria:
+
+```python
+from agentomatic.optimize import EvalContract
+
+contract = EvalContract(
+    name="scoping_response",
+    input_fields=["query", "context"],
+    output_format="json",
+    required_output_fields=["answer", "confidence", "risks", "next_questions"],
+    constraints=["confidence must be between 0.0 and 1.0"],
+)
+
+# Structural validation — returns a score between 0.0 and 1.0
+score = contract.validate(response_text)
+
+# Detailed validation — field-by-field breakdown
+details = contract.validate_details(response_text)
+# details.missing_fields   → ["next_questions"]
+# details.constraint_violations → ["confidence was 1.5, expected 0.0-1.0"]
+# details.score            → 0.75
+
+# Use as a weighted metric inside CompositeMetric
+metric = contract.as_metric(weight=0.10)
+
+# Use as judge criteria for LLM-based evaluation
+criteria = contract.as_judge_criteria()
+```
+
+The contract acts as a lightweight schema enforcer. When used inside `CompositeMetric`, it
+ensures that optimization never sacrifices structural correctness for content quality.
+
+---
+
+### Metrics: CompositeMetric and Friends
+
+Agentomatic ships several metric types that compose into a single scoring function.
+
+#### Metric Types
+
+| Metric | Description |
+|---|---|
+| `LocalJudgeMetric(criteria)` | Asks a local LLM judge to score the response on a named criterion (e.g. "completeness", "business_relevance"). Returns 0.0–1.0. |
+| `DeterministicMetric(fn)` | Wraps a pure Python function `fn(response, expected) → float`. No LLM calls — fast and reproducible. |
+| `LatencyMetric()` | Measures agent response latency in seconds. Normalized to 0.0–1.0 (lower latency = higher score). |
+| `CostMetric()` | Estimates token cost per response. Normalized to 0.0–1.0 (lower cost = higher score). |
+| `WeightedMetric(name, metric, weight)` | Wraps any metric with a scalar weight. **Negative weights** penalize the dimension (useful for cost/latency). |
+
+#### CompositeMetric — Multi-Dimensional Scoring
+
+Combine quality judges with negative-weight cost/latency penalties so the optimizer balances
+accuracy against operational cost:
+
+```python
+from agentomatic.optimize import (
+    CompositeMetric,
+    WeightedMetric,
+    LocalJudgeMetric,
+    DeterministicMetric,
+    LatencyMetric,
+    CostMetric,
+)
+
+metric = CompositeMetric(metrics=[
+    # Quality dimensions — positive weights
+    WeightedMetric("completeness",   LocalJudgeMetric("completeness"),      weight=0.30),
+    WeightedMetric("relevance",      LocalJudgeMetric("business_relevance"),weight=0.25),
+    WeightedMetric("risk_detection", LocalJudgeMetric("risk_detection"),    weight=0.20),
+    WeightedMetric("format",         contract.as_metric(),                  weight=0.10),
+
+    # Operational dimensions — negative weights (penalties)
+    WeightedMetric("latency",        LatencyMetric(),                       weight=-0.10),
+    WeightedMetric("cost",           CostMetric(),                          weight=-0.05),
+])
+```
+
+The composite score is calculated as:
+
+```
+score = Σ (weight_i × metric_i)
+```
+
+Negative weights on `LatencyMetric` and `CostMetric` mean that slower or more expensive
+candidates are penalized, steering the fitter toward cost-effective configurations without
+sacrificing quality.
+
+You can also use `DeterministicMetric` for fast, reproducible checks:
+
+```python
+def check_json_parseable(response: str, expected: str, **kwargs) -> float:
+    try:
+        json.loads(response)
+        return 1.0
+    except json.JSONDecodeError:
+        return 0.0
+
+metric = DeterministicMetric(fn=check_json_parseable)
+```
+
+---
+
+### PromptSearchSpace — Full Configuration Surface
+
+The search space defines what the fitter is allowed to change. Every axis can be toggled
+independently:
+
+```python
+from agentomatic.optimize import PromptSearchSpace
+
+space = PromptSearchSpace(
+    # Prompt optimization
+    optimize_system_prompt=True,     # rewrite system instructions
+    optimize_few_shot=True,          # select/bootstrap few-shot examples
+
+    # Model selection
+    optimize_model_choice=True,      # try different models
+    model_choices=["ollama/qwen2.5:7b", "openai/gpt-4.1"],
+    fallback_models=["openai/gpt-4.1-mini"],
+
+    # Model parameters
+    optimize_model_params=True,
+    model_param_space={
+        "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
+        "top_p": [0.7, 0.9, 1.0],
+    },
+
+    # RAG parameters
+    optimize_rag_params=True,
+    rag_param_space={
+        "top_k": [3, 5, 8, 12],
+        "rerank": [True, False],
+    },
+)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `optimize_system_prompt` | `bool` | Allow the fitter to rewrite system instructions |
+| `optimize_few_shot` | `bool` | Allow bootstrapping/selection of few-shot examples |
+| `optimize_model_choice` | `bool` | Try different models from `model_choices` |
+| `model_choices` | `list[str]` | Candidate models to evaluate |
+| `fallback_models` | `list[str]` | Models to fall back to if primary fails |
+| `optimize_model_params` | `bool` | Search over `model_param_space` values |
+| `model_param_space` | `dict` | Grid of parameter values to search |
+| `optimize_rag_params` | `bool` | Tune RAG retrieval settings |
+| `rag_param_space` | `dict` | Grid of RAG parameter values |
+
+---
+
+### The 5 Fitter Optimizers
+
+Agentomatic includes five optimizer strategies, each suited to different optimization
+scenarios:
+
+| Strategy | CLI ID | How It Works | Best For |
+|---|---|---|---|
+| **RewriteOptimizer** | `rewrite` | Analyzes failure clusters, generates a diagnostic summary, and asks the rewriter LLM to produce an improved system prompt. Iterates until improvement stalls. | General prompt improvement; fixing instruction ambiguities and missing guardrails. |
+| **FewShotBootstrapOptimizer** | `few_shot_bootstrap` | Runs the agent on the training set, scores every trace, selects the top examples using Score²-weighted sampling with diversity scoring, and injects them as few-shot demonstrations. | Tasks where showing the right examples matters more than instruction tuning. |
+| **MIPROLikeOptimizer** | `mipro_like` | Generates multiple instruction variants from different perspectives (clarity, brevity, domain expertise), creates few-shot example sets, and performs a cross-product search over all combinations. | Complex pipelines where both instructions and examples interact. |
+| **GEPALikeOptimizer** | `gepa_like` | Uses evaluation feedback to identify specific weaknesses, applies targeted mutations to the relevant prompt sections, and validates each mutation against the failure cases. Most sample-efficient strategy. | Iterative refinement when you have a decent baseline and want targeted improvements. |
+| **ParamSearchOptimizer** | `param_search` | Performs a structured grid search over model parameters (temperature, top_p), RAG settings (top_k, rerank), and tool policies. Evaluates each configuration on a minibatch for speed. | Finding the optimal operating point for model/RAG/tool configuration. |
+
+You can combine strategies by running multiple fit passes:
+
+```python
+# First pass: optimize the prompt
+fitter_prompt = PromptFitter(agent="scope_agent", optimizer="gepa_like", ...)
+result1 = await fitter_prompt.fit(trainset, valset, metric)
+result1.apply(version="v2_prompt")
+
+# Second pass: optimize parameters with the new prompt
+fitter_params = PromptFitter(agent="scope_agent", optimizer="param_search", ...)
+result2 = await fitter_params.fit(trainset, valset, metric)
+result2.apply(version="v2_full")
+```
+
+---
+
+### PromptFitter — Full API
+
+The `PromptFitter` is the main entry point for all optimization:
+
+```python
+from agentomatic.optimize import PromptFitter
+
+fitter = PromptFitter(
+    agent="scope_agent",                    # agent name from agents.json
+    task_model="ollama/qwen2.5:7b",         # model used for agent execution
+    rewrite_model="openai/gpt-4.1",         # model used for prompt rewriting
+    optimizer="gepa_like",                  # optimization strategy
+    search_space=space,                     # PromptSearchSpace config
+    max_trials=30,                          # maximum optimization trials
+    min_absolute_improvement=0.05,          # stop if gain < 5%
+    concurrency=5,                          # parallel evaluation workers
+)
+
+result = await fitter.fit(
+    trainset,                               # training examples (for few-shot)
+    valset,                                 # validation set (for scoring)
+    metric,                                 # CompositeMetric instance
+    testset=testset,                        # optional held-out test set
+)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `agent` | `str` | — | Agent name as defined in `agents.json` |
+| `task_model` | `str` | — | Model used for running the agent during evaluation |
+| `rewrite_model` | `str` | — | Model used by the optimizer for prompt rewriting |
+| `optimizer` | `str` | `"rewrite"` | Strategy: `rewrite`, `few_shot_bootstrap`, `mipro_like`, `gepa_like`, `param_search` |
+| `search_space` | `PromptSearchSpace` | — | Configuration surface to search |
+| `max_trials` | `int` | `20` | Maximum number of candidate evaluations |
+| `min_absolute_improvement` | `float` | `0.02` | Early stop if best improvement is below this threshold |
+| `concurrency` | `int` | `3` | Number of parallel evaluation workers |
+
+---
+
+### The 10-Step Fit Loop
+
+When you call `fitter.fit()`, the following steps execute:
+
+1. **Load baseline config** — Read the current prompt, model params, and RAG settings from `prompts.json` and `agents.json`.
+
+2. **Evaluate baseline on validation set** — Run the agent with the current config on every validation example and score with the composite metric. This establishes the baseline score.
+
+3. **Cluster failures** — Group low-scoring examples into failure clusters based on error patterns (e.g., "missed retrieval context", "malformed JSON output"). Each cluster includes `affected_params` and `expected_metric_gain`.
+
+4. **Generate candidates** — The optimizer generates candidate configurations. For `rewrite`, this means new prompts. For `param_search`, this means parameter grid points. For `few_shot_bootstrap`, this means example subsets.
+
+5. **Score candidates on minibatch** — Each candidate is evaluated on a representative minibatch (subset of validation set) for speed. Candidates are ranked by composite score.
+
+6. **Promote top candidates** — The top-k candidates advance to full validation set evaluation. This two-stage approach reduces cost while maintaining quality.
+
+7. **Compare in absolute improvement space** — The best candidate's score is compared against the baseline. Improvement is measured in absolute terms (e.g., 0.72 → 0.79 = +0.07 improvement).
+
+8. **Produce param suggestions** — Based on failure cluster analysis and candidate performance, the fitter generates actionable parameter suggestions (e.g., "increase `rag.top_k` to 8").
+
+9. **Validate on testset** — If a held-out test set was provided, the best candidate is evaluated on it to check for overfitting. A significant gap between validation and test scores triggers a warning.
+
+10. **Build and return `PromptFitResult`** — The final result object contains the optimized configuration, metric deltas, suggestions, and deployment recommendation.
+
+---
+
+### PromptFitResult API
+
+The `PromptFitResult` object returned by `fitter.fit()` provides full access to the
+optimization outcome:
+
+```python
+# Optimized configuration
+result.best_prompt              # str — the optimized system prompt
+result.best_params              # dict — optimized model parameters
+                                # e.g. {"temperature": 0.2, "top_p": 0.9}
+result.best_few_shot_examples   # list[dict] — selected few-shot examples
+
+# Evaluation metrics
+result.metric_deltas            # dict — per-dimension improvement
+                                # e.g. {"completeness": +0.12, "latency": -0.03}
+
+# Actionable output
+result.suggestions              # list[str] — human-readable recommendations
+result.deployment_recommendation # DeploymentRecommendation object
+result.failure_clusters         # list[FailureCluster] — grouped failure patterns
+
+# Serialization
+result.summary()                # str — human-readable summary for terminal output
+result.to_dict()                # dict — full serializable representation
+
+# Apply to project
+result.apply(version="v2_fit")  # writes optimized config to prompts.json
+                                # under the specified version name
+```
+
+Example `summary()` output:
+
+```
+╭─────────────────────────────────────────────╮
+│ PromptFitResult: scope_agent                │
+├─────────────────────────────────────────────┤
+│ Baseline score:  0.61                       │
+│ Best score:      0.79  (+0.18)              │
+│ Trials run:      24 / 30                    │
+│ Strategy:        gepa_like                  │
+├─────────────────────────────────────────────┤
+│ Metric deltas:                              │
+│   completeness:    +0.15                    │
+│   relevance:       +0.08                    │
+│   risk_detection:  +0.22                    │
+│   format:          +0.12                    │
+│   latency:         −0.03  (faster)          │
+│   cost:            +0.01  (cheaper)         │
+├─────────────────────────────────────────────┤
+│ Deployment:  canary @ 40% (confidence: high)│
+╰─────────────────────────────────────────────╯
+```
+
+---
+
+### DeploymentRecommendation
+
+Every `PromptFitResult` includes a `DeploymentRecommendation` calculated from the observed
+improvement magnitude, metric variance, and test-set generalization:
+
+```python
+rec = result.deployment_recommendation
+
+# Confidence level based on improvement stability
+print(rec.confidence)              # "high" / "medium" / "low"
+
+# Rollout strategy
+print(rec.rollout.strategy)        # "canary"
+print(rec.rollout.initial_weight)  # 0.40  (40% of traffic)
+print(rec.rollout.ramp_schedule)   # ["40%@0h", "70%@24h", "100%@48h"]
+
+# Human-readable summary
+print(rec.summary())
+# "Recommend canary rollout at 40% initial traffic. Confidence: high.
+#  Ramp to 100% over 48 hours if error rate stays below 2%."
+
+# Machine-readable for CI/CD integration
+config = rec.to_dict()
+# {
+#   "confidence": "high",
+#   "rollout": {
+#     "strategy": "canary",
+#     "initial_weight": 0.40,
+#     "ramp_schedule": ["40%@0h", "70%@24h", "100%@48h"]
+#   },
+#   "abort_conditions": {"error_rate_above": 0.02}
+# }
+```
+
+The confidence level is determined by:
+
+| Confidence | Criteria |
+|---|---|
+| **High** | Improvement ≥ 0.10, low variance across validation folds, test score within 0.02 of validation score |
+| **Medium** | Improvement ≥ 0.05, moderate variance, test score within 0.05 of validation |
+| **Low** | Improvement < 0.05, high variance, or significant test/validation gap |
+
+---
+
+### Failure Clusters
+
+During optimization, the fitter clusters validation failures into actionable groups.
+Each cluster identifies the failure pattern, the parameters most likely to resolve it,
+and the expected metric gain if the issue is fixed:
+
+```
+Failure cluster 1:
+  Agent answered without using retrieval context.
+  → Suggested fix: force context-first behavior.
+  → Affected params: rag.top_k, tool_policy.force_retrieval
+  → Expected metric gain: faithfulness +0.18
+
+Failure cluster 2:
+  Agent produced unstructured answers.
+  → Suggested fix: stronger output format block.
+  → Affected params: prompt.output_contract
+  → Expected metric gain: format_compliance +0.12
+
+Failure cluster 3:
+  Agent missed secondary risks in multi-risk queries.
+  → Suggested fix: add explicit "enumerate all risks" instruction.
+  → Affected params: prompt.system_instructions
+  → Expected metric gain: risk_detection +0.09
+```
+
+Access clusters programmatically:
+
+```python
+for cluster in result.failure_clusters:
+    print(f"Pattern: {cluster.description}")
+    print(f"Fix: {cluster.suggested_fix}")
+    print(f"Params: {cluster.affected_params}")
+    print(f"Expected gain: {cluster.expected_metric_gain}")
+```
+
+---
+
+### End-to-End CLI Flow
+
+The complete optimization lifecycle from deployment to promotion:
+
+```bash
+# 1. Deploy your agents
+agentomatic run
+
+# 2. Generate a synthetic evaluation dataset from your documentation
+agentomatic dataset synth scope_agent \
+  --from-docs docs/scoping.md \
+  --n 100 \
+  --out scope_eval.jsonl
+
+# 3. Evaluate the current prompt version
+agentomatic eval scope_agent \
+  --dataset scope_eval.jsonl \
+  --prompt-version v1
+
+# 4. Fit a better configuration
+agentomatic optimize scope_agent \
+  --dataset scope_eval.jsonl \
+  --optimize prompt,params,rag,tools \
+  --judge ollama/qwen2.5:7b \
+  --rewriter gpt-4.1 \
+  --max-trials 40 \
+  --apply-as v2_optimized
+
+# 5. Canary release — send 20% of traffic to the new version
+agentomatic route scope_agent --version v2_optimized --weight 20
+
+# 6. Monitor and promote when satisfied
+agentomatic promote scope_agent --version v2_optimized
+```
+
+Each command maps to a stage in the optimization lifecycle:
+
+| Command | Stage | What It Does |
+|---|---|---|
+| `agentomatic run` | Deploy | Starts the agent server with current configuration |
+| `agentomatic dataset synth` | Data | Generates synthetic evaluation data from docs or descriptions |
+| `agentomatic eval` | Evaluate | Scores a prompt version against a dataset with metrics |
+| `agentomatic optimize` | Fit | Runs the optimization loop and produces a new version |
+| `agentomatic route` | Canary | Splits traffic between versions for safe rollout |
+| `agentomatic promote` | Ship | Promotes a version to receive 100% of traffic |
+
+---
+
+### Vocabulary
+
+To maintain consistency across documentation and code, use deployment-first terminology:
+
+| ❌ Avoid | ✅ Use instead | Why |
+|----------|----------------|-----|
+| Program | Agent endpoint | Agents are deployed services, not standalone programs |
+| Compile | Fit / optimize / tune | The output is a configuration, not a binary |
+| Signature | EvalContract | Contracts define structural requirements, not type signatures |
+| Module | Deployment component | Components are parts of a deployed system |
+| Predictor | Agent version | Agents serve versioned configurations, not predictions |
+| Compiled artifact | Optimized config version | The artifact is a JSON config, not compiled code |
+

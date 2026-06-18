@@ -32,11 +32,12 @@ Create production-ready AI agent APIs with auto-discovery, auto-routing, streami
 | 🗄️ **Pluggable Storage** | MemoryStore, SQLAlchemy, or bring your own |
 | 🔐 **Middleware Pipeline** | Auth, rate limiting, Prometheus metrics — all toggleable |
 | 🎨 **Built-in Debug UI** | ChatGPT-like interface via Chainlit |
+| 🎯 **Agentomatic Studio** | Visual agent debugger with graph view, SSE streaming, state inspection, time-travel |
 | 📦 **5 Scaffolding Templates** | basic, full, rag, chatbot, custom |
 | 🤖 **A2A Protocol** | Agent-to-agent communication out of the box |
 | 🔌 **Framework Agnostic** | LangGraph, LangChain, or raw Python |
 | 🩺 **Rich CLI** | Beautiful terminal experience with doctor, inspect, test |
-| ⚡ **Prompt Optimizer** | DSPy-inspired prompt optimization (7 strategies) |
+| ⚡ **Prompt Optimizer** | ML-like prompt/config fitting with 5 optimizers + deployment recommendations |
 | 🧪 **Data Synthesizer** | Auto-generate & augment eval datasets via LLM |
 | 📊 **HTML Reports** | SVG charts, prompt diffs, experiment tracking |
 | 🚦 **Human-in-the-Loop** | Suspend/resume execution with human approval gates |
@@ -149,12 +150,32 @@ agentomatic init my_agent --template <template>
 
   init <name>      Scaffold a new agent from template
   run              Start the platform server
+  run --studio     Start the platform server AND the visual Agentomatic Studio 🎨
   list             List discovered agents (Rich table)
   test <name>      Interactive terminal testing
   inspect <name>   Show agent structure + config
   doctor           Environment health check
   ui               Launch Chainlit debug UI
 ```
+
+## 🎨 Agentomatic Studio
+
+Agentomatic ships with a built-in React-based visual studio designed for time-travel debugging, real-time node streaming, and state inspection for all underlying LangGraph agents.
+
+To use the studio, install the optional package dependencies and run with the `--studio` flag:
+
+```bash
+pip install "agentomatic[studio]"
+agentomatic run --studio
+```
+
+The unified server will bind to `http://localhost:8000` and mount the studio at `http://localhost:8000/studio/ui/`. 
+
+**Key Studio Features**:
+- **Live Node Streaming**: Watch Server-Sent Events (SSE) transition node activity dynamically.
+- **Conditional Breakpoints**: Right-click graph nodes to intercept flow before execution triggers.
+- **Time-Travel History**: Rewind to any state checkpoint and replay from historical forks.
+- **Live State Editing**: Mutate graph state payloads on the fly during a breakpoint pause.
 
 ## ⚙️ Configuration
 
@@ -211,6 +232,35 @@ agentomatic run --with-ui
 
 Features: agent selector, streaming, tool call visualization, chain-of-thought, feedback collection.
 
+## 🎯 Agentomatic Studio
+
+Visual debugging interface for any agent — graph visualization, real-time execution tracing, state inspection, and time-travel debugging. Works with LangGraph, LangChain, or custom agents.
+
+```bash
+# Option 1: Bundled (zero-config)
+agentomatic run --studio
+# → Studio at http://localhost:8000/studio/ui/
+
+# Option 2: Standalone Docker
+docker run -p 3000:80 -e REACT_APP_API_URL=http://your-server:8000 agentomatic-studio
+```
+
+**Studio API Endpoints** (mounted at `/studio/`):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/studio/info` | Server info + capabilities |
+| `GET` | `/studio/agents` | List agents with debugging capabilities |
+| `GET` | `/studio/agents/{name}/graph` | Graph topology (nodes, edges) |
+| `GET` | `/studio/agents/{name}/schemas` | Input/output JSON schemas |
+| `POST` | `/studio/agents/{name}/runs/stream` | Execute with SSE event streaming |
+| `GET` | `/studio/agents/{name}/threads/{tid}/state` | Thread state snapshot |
+| `GET` | `/studio/agents/{name}/threads/{tid}/history` | Checkpoint history |
+
+**Capabilities degrade gracefully:**
+- **LangGraph agents** → Full graph visualization, checkpoints, time-travel, state editing
+- **Custom/simple agents** → Chat, invoke, thread management, response inspection
+
 ## 📊 Auto-Generated Endpoints
 
 Every agent gets 12+ endpoints automatically:
@@ -230,6 +280,190 @@ Every agent gets 12+ endpoints automatically:
 | `POST` | `/api/v1/{agent}/threads/{id}/fork` | Fork thread at message index |
 | `GET` | `/api/v1/{agent}/threads/{id}/lineage` | Thread ancestry/descendant tree |
 | ... | ... | + config, prompts, thread messages |
+
+### 🔧 Prompt Fitting (ML-like API)
+
+Agentomatic Optimize treats your deployed agent configuration as a **parameter surface**
+to fit against real evaluation data. The output is never a compiled program — it's a
+**better deployment configuration**: an improved prompt, tuned model parameters,
+optimized RAG settings, and a rollout recommendation you can ship with confidence.
+
+> **Philosophy:** Your agent is already deployed. Optimization produces a *better version*
+> of that deployment, not a new artifact. Every result includes a `DeploymentRecommendation`
+> with canary weights and confidence scores so you can roll out safely.
+
+#### EvalContract — Structural Quality Gate
+
+Define what a valid agent response looks like *before* you optimize:
+
+```python
+from agentomatic.optimize import EvalContract
+
+contract = EvalContract(
+    name="scoping_response",
+    input_fields=["query", "context"],
+    output_format="json",
+    required_output_fields=["answer", "confidence", "risks", "next_questions"],
+    constraints=["confidence must be between 0.0 and 1.0"],
+)
+
+score = contract.validate(response_text)       # 0.0 – 1.0
+metric = contract.as_metric(weight=0.10)       # use inside CompositeMetric
+criteria = contract.as_judge_criteria()         # feed to LLM judge
+```
+
+#### CompositeMetric — Multi-Dimensional Scoring
+
+Combine quality judges with **negative-weight** cost/latency penalties so the optimizer
+balances accuracy against operational cost:
+
+```python
+from agentomatic.optimize import (
+    CompositeMetric, WeightedMetric,
+    LocalJudgeMetric, LatencyMetric, CostMetric,
+)
+
+metric = CompositeMetric(metrics=[
+    WeightedMetric("completeness",   LocalJudgeMetric("completeness"),      weight=0.30),
+    WeightedMetric("relevance",      LocalJudgeMetric("business_relevance"),weight=0.25),
+    WeightedMetric("risk_detection", LocalJudgeMetric("risk_detection"),    weight=0.20),
+    WeightedMetric("format",         contract.as_metric(),                  weight=0.10),
+    WeightedMetric("latency",        LatencyMetric(),                       weight=-0.10),
+    WeightedMetric("cost",           CostMetric(),                          weight=-0.05),
+])
+```
+
+> Negative weights penalize candidates that are slower or more expensive, steering the
+> fitter toward cost-effective configurations.
+
+#### PromptSearchSpace — Full Configuration Surface
+
+Tell the fitter *what* it's allowed to change:
+
+```python
+from agentomatic.optimize import PromptSearchSpace
+
+space = PromptSearchSpace(
+    optimize_system_prompt=True,
+    optimize_few_shot=True,
+    optimize_model_params=True,
+    optimize_model_choice=True,
+    model_choices=["ollama/qwen2.5:7b", "openai/gpt-4.1"],
+    fallback_models=["openai/gpt-4.1-mini"],
+    model_param_space={
+        "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
+        "top_p": [0.7, 0.9, 1.0],
+    },
+    rag_param_space={"top_k": [3, 5, 8, 12], "rerank": [True, False]},
+    optimize_rag_params=True,
+)
+```
+
+#### PromptFitter — The scikit-learn-like API
+
+```python
+from agentomatic.optimize import PromptFitter
+
+fitter = PromptFitter(
+    agent="scope_agent",
+    task_model="ollama/qwen2.5:7b",
+    rewrite_model="openai/gpt-4.1",
+    optimizer="gepa_like",
+    search_space=space,
+    max_trials=30,
+    min_absolute_improvement=0.05,
+    concurrency=5,
+)
+result = await fitter.fit(trainset, valset, metric, testset=testset)
+```
+
+Access the full result surface:
+
+```python
+result.best_prompt              # optimized system prompt
+result.best_params              # {"temperature": 0.2, "top_p": 0.9}
+result.best_few_shot_examples   # selected few-shot examples
+result.metric_deltas            # per-dimension improvement
+result.suggestions              # actionable recommendations
+result.deployment_recommendation # canary rollout config
+result.summary()                # human-readable summary
+result.apply(version="v2_optimized")
+```
+
+**Five optimisation strategies:**
+
+| Strategy | What it does |
+|---|---|
+| `rewrite` | LLM-driven prompt rewrite based on failure analysis |
+| `few_shot_bootstrap` | Score²-weighted example selection with diversity scoring |
+| `mipro_like` | Multi-perspective instruction generation + cross-product search |
+| `gepa_like` | Feedback-guided targeted prompt mutations |
+| `param_search` | Grid search over model/RAG/tool parameters |
+
+#### DeploymentRecommendation — Ship With Confidence
+
+Every `PromptFitResult` includes a deployment recommendation based on the observed
+improvement magnitude and variance:
+
+```python
+rec = result.deployment_recommendation
+print(rec.confidence)              # "high" / "medium" / "low"
+print(rec.rollout.strategy)        # "canary"
+print(rec.rollout.initial_weight)  # 0.40
+print(rec.summary())               # human-readable deployment plan
+```
+
+#### Failure Clusters — Targeted Diagnostics
+
+The fitter groups validation failures into actionable clusters, each with the parameters
+most likely to resolve the issue and the expected metric gain:
+
+```
+Failure cluster 1:
+  Agent answered without using retrieval context.
+  → Suggested fix: force context-first behavior.
+  → Affected params: rag.top_k, tool_policy.force_retrieval
+  → Expected metric gain: faithfulness +0.18
+
+Failure cluster 2:
+  Agent produced unstructured answers.
+  → Suggested fix: stronger output format block.
+  → Affected params: prompt.output_contract
+  → Expected metric gain: format_compliance +0.12
+```
+
+#### Ideal CLI Flow
+
+```bash
+# 1. Run your agents
+agentomatic run
+
+# 2. Generate a synthetic evaluation dataset from your docs
+agentomatic dataset synth scope_agent --from-docs docs/scoping.md --n 100
+
+# 3. Evaluate the current version
+agentomatic eval scope_agent --dataset scope_eval.jsonl --metrics scoping_quality
+
+# 4. Fit a better configuration
+agentomatic optimize scope_agent --optimize prompt,params,rag,tools
+
+# 5. Canary release — send 20 % traffic to the new version
+agentomatic route scope_agent --version v2_optimized --weight 20
+
+# 6. Promote when satisfied
+agentomatic promote scope_agent --version v2_optimized
+```
+
+#### Vocabulary
+
+| ❌ Avoid | ✅ Use instead |
+|----------|----------------|
+| Program | Agent endpoint |
+| Compile | Fit / optimize / tune |
+| Signature | EvalContract |
+| Module | Deployment component |
+| Predictor | Agent version |
+| Compiled artifact | Optimized config version |
 
 ## 🛠️ Development
 
