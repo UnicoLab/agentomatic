@@ -13,7 +13,7 @@ from loguru import logger
 from agentomatic.studio.models import StudioRunEvent, StudioRunInfo
 
 if TYPE_CHECKING:
-    from agentomatic.core.manifest import RegisteredAgent
+    from agentomatic.studio.adapter import StudioAdapter
 
 
 def _now_iso() -> str:
@@ -25,8 +25,11 @@ class RunTracker:
     """Track agent execution as a series of events for debugging.
 
     Maintains an in-memory store of :class:`StudioRunInfo` objects and
-    provides an async generator (``execute_and_stream``) that yields
+    provides an async generator (``execute_with_adapter``) that yields
     SSE-formatted events during agent execution.
+
+    This class is **framework-agnostic** — all framework-specific logic
+    is delegated to the :class:`~agentomatic.studio.adapter.StudioAdapter`.
     """
 
     def __init__(self) -> None:
@@ -120,27 +123,31 @@ class RunTracker:
             run.error = error
 
     # ------------------------------------------------------------------
-    # Streaming execution
+    # Streaming execution (adapter-based)
     # ------------------------------------------------------------------
 
-    async def execute_and_stream(
+    async def execute_with_adapter(
         self,
-        agent: RegisteredAgent,
+        adapter: StudioAdapter,
         state: dict[str, Any],
         run_id: str,
         thread_id: str | None = None,
         checkpoint_id: str | None = None,
         breakpoints: list[str] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Execute an agent with full event tracking, yielding SSE frames.
+        """Execute an agent via its adapter with full event tracking.
 
-        For LangGraph agents this uses ``graph.astream_events()``.
-        For simple ``node_fn`` agents it wraps execution with start/end events.
+        Delegates all framework-specific logic to the provided
+        :class:`~agentomatic.studio.adapter.StudioAdapter`, wrapping
+        the execution with run lifecycle events.
 
         Args:
-            agent: The registered agent to execute.
+            adapter: The Studio adapter for the target agent.
             state: Initial agent state dict.
             run_id: The run ID to attach events to.
+            thread_id: Optional thread identifier for config.
+            checkpoint_id: Optional checkpoint to resume from.
+            breakpoints: Optional node names to pause before.
 
         Yields:
             SSE-formatted strings (``data: ...\\n\\n``).
@@ -152,29 +159,38 @@ class RunTracker:
         run.status = "running"
         start_time = time.monotonic()
 
+        # Build config for the adapter
+        config: dict[str, Any] = {}
+        if thread_id:
+            config["configurable"] = {"thread_id": thread_id}
+
         # -- Run start event --
         start_event = StudioRunEvent(
             event="run_start",
             run_id=run_id,
             timestamp=_now_iso(),
-            data={"agent": run.agent_name, "input": run.input},
+            data={
+                "agent": run.agent_name,
+                "input": run.input,
+                "capabilities": adapter.capabilities,
+            },
         )
         self.add_event(run_id, start_event)
         yield f"data: {start_event.model_dump_json()}\n\n"
 
         try:
-            if agent.graph_fn:
-                async for sse_frame in self._stream_graph(
-                    agent, state, run_id, start_time, thread_id, checkpoint_id, breakpoints
-                ):
-                    yield sse_frame
-            elif agent.node_fn:
-                async for sse_frame in self._stream_node_fn(agent, state, run_id, start_time):
-                    yield sse_frame
-            else:
-                raise RuntimeError(f"Agent '{agent.name}' has no callable (graph_fn or node_fn)")
+            async for event in adapter.stream_execution(
+                state, config, breakpoints, checkpoint_id
+            ):
+                # Stamp the run_id onto adapter events
+                event.run_id = run_id
+                self.add_event(run_id, event)
+                yield f"data: {event.model_dump_json()}\n\n"
 
-            # -- Run complete event --
+            # -- Run complete --
+            duration = (time.monotonic() - start_time) * 1000
+            self.complete_run(run_id, state, duration)
+
             run = self._runs.get(run_id)
             complete_event = StudioRunEvent(
                 event="run_complete",
@@ -202,164 +218,3 @@ class RunTracker:
             yield f"data: {error_event.model_dump_json()}\n\n"
 
         yield "data: [DONE]\n\n"
-
-    # ------------------------------------------------------------------
-    # Internal — LangGraph streaming
-    # ------------------------------------------------------------------
-
-    async def _stream_graph(
-        self,
-        agent: RegisteredAgent,
-        state: dict[str, Any],
-        run_id: str,
-        start_time: float,
-        thread_id: str | None = None,
-        checkpoint_id: str | None = None,
-        breakpoints: list[str] | None = None,
-    ) -> AsyncGenerator[str, None]:
-        """Stream events from a LangGraph compiled graph."""
-        graph = agent.graph_fn()  # type: ignore[misc]
-
-        config: dict[str, Any] = {}
-        if thread_id:
-            config["configurable"] = {"thread_id": thread_id}
-            if checkpoint_id:
-                config["configurable"]["checkpoint_id"] = checkpoint_id
-
-        if breakpoints:
-            try:
-                graph.interrupt_before_nodes = frozenset(breakpoints)
-            except Exception:
-                pass
-
-        async for lg_event in graph.astream_events(state, config=config, version="v2"):
-            studio_event = self._map_langgraph_event(run_id, lg_event)
-            if studio_event:
-                self.add_event(run_id, studio_event)
-                yield f"data: {studio_event.model_dump_json()}\n\n"
-
-        duration = (time.monotonic() - start_time) * 1000
-        self.complete_run(run_id, state, duration)
-
-    # ------------------------------------------------------------------
-    # Internal — node_fn streaming
-    # ------------------------------------------------------------------
-
-    async def _stream_node_fn(
-        self,
-        agent: RegisteredAgent,
-        state: dict[str, Any],
-        run_id: str,
-        start_time: float,
-    ) -> AsyncGenerator[str, None]:
-        """Stream events for a simple node_fn agent."""
-        # Node start
-        node_start = StudioRunEvent(
-            event="node_start",
-            run_id=run_id,
-            timestamp=_now_iso(),
-            node=agent.name,
-        )
-        self.add_event(run_id, node_start)
-        yield f"data: {node_start.model_dump_json()}\n\n"
-
-        # Execute
-        result = await agent.node_fn(state)  # type: ignore[misc]
-
-        # Node end
-        node_end = StudioRunEvent(
-            event="node_end",
-            run_id=run_id,
-            timestamp=_now_iso(),
-            node=agent.name,
-            data={"output": result if isinstance(result, dict) else {"result": str(result)}},
-            duration_ms=round((time.monotonic() - start_time) * 1000, 2),
-        )
-        self.add_event(run_id, node_end)
-        yield f"data: {node_end.model_dump_json()}\n\n"
-
-        duration = (time.monotonic() - start_time) * 1000
-        output = result if isinstance(result, dict) else {"response": str(result)}
-        self.complete_run(run_id, output, duration)
-
-    # ------------------------------------------------------------------
-    # Internal — LangGraph event mapping
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _map_langgraph_event(
-        run_id: str,
-        lg_event: dict[str, Any],
-    ) -> StudioRunEvent | None:
-        """Map a LangGraph streaming event to a :class:`StudioRunEvent`.
-
-        Only a subset of LangGraph events are mapped — unmapped events
-        return ``None`` and are silently skipped.
-        """
-        event_type = lg_event.get("event", "")
-        name = lg_event.get("name", "")
-        data = lg_event.get("data", {})
-
-        if event_type == "on_chain_start" and name != "LangGraph":
-            return StudioRunEvent(
-                event="node_start",
-                run_id=run_id,
-                timestamp=_now_iso(),
-                node=name,
-                data={"tags": lg_event.get("tags", [])},
-            )
-
-        if event_type == "on_chain_end" and name != "LangGraph":
-            output = data.get("output", {})
-            # Ensure output is JSON-serializable
-            if not isinstance(output, (dict, list, str, int, float, bool, type(None))):
-                output = str(output)
-            return StudioRunEvent(
-                event="node_end",
-                run_id=run_id,
-                timestamp=_now_iso(),
-                node=name,
-                data={"output": output},
-            )
-
-        if event_type == "on_chat_model_stream":
-            chunk = data.get("chunk", {})
-            content = ""
-            if hasattr(chunk, "content"):
-                content = chunk.content
-            elif isinstance(chunk, dict):
-                content = chunk.get("content", "")
-            if content:
-                return StudioRunEvent(
-                    event="message_chunk",
-                    run_id=run_id,
-                    timestamp=_now_iso(),
-                    node=name,
-                    data={"content": content},
-                )
-
-        if event_type == "on_tool_start":
-            tool_input = data.get("input", {})
-            if not isinstance(tool_input, (dict, list, str, int, float, bool, type(None))):
-                tool_input = str(tool_input)
-            return StudioRunEvent(
-                event="node_start",
-                run_id=run_id,
-                timestamp=_now_iso(),
-                node=f"tool:{name}",
-                data={"tool_input": tool_input},
-            )
-
-        if event_type == "on_tool_end":
-            tool_output = data.get("output", "")
-            if not isinstance(tool_output, (dict, list, str, int, float, bool, type(None))):
-                tool_output = str(tool_output)
-            return StudioRunEvent(
-                event="node_end",
-                run_id=run_id,
-                timestamp=_now_iso(),
-                node=f"tool:{name}",
-                data={"tool_output": tool_output},
-            )
-
-        return None  # Skip unmapped events

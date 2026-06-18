@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
-from agentomatic.studio.graph_inspector import GraphInspector
+from agentomatic.studio.adapters import resolve_adapter
 from agentomatic.studio.models import (
     StudioAgentInfo,
     StudioAgentSchemas,
@@ -43,9 +43,9 @@ def create_studio_router(
 ) -> APIRouter:
     """Create the Studio debug API router.
 
-    Provides endpoints for agent discovery, graph inspection, execution
-    tracing (with SSE streaming), state inspection, and checkpoint
-    browsing.
+    Uses the universal :func:`~agentomatic.studio.adapters.resolve_adapter`
+    factory to provide the best debugging experience for every agent,
+    regardless of framework.
 
     Args:
         registry: The platform's agent registry.
@@ -57,7 +57,6 @@ def create_studio_router(
         A fully-wired :class:`~fastapi.APIRouter`.
     """
     router = APIRouter(prefix="/studio", tags=["Studio Debug API"])
-    inspector = GraphInspector()
     tracker = RunTracker()
 
     # ------------------------------------------------------------------
@@ -70,6 +69,11 @@ def create_studio_router(
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
         return agent
+
+    def _get_adapter(name: str):
+        """Resolve the agent and its Studio adapter."""
+        agent = _resolve_agent(name)
+        return agent, resolve_adapter(agent, store)
 
     # ==================================================================
     # Discovery endpoints
@@ -94,6 +98,7 @@ def create_studio_router(
         """List all registered agents with their debugging capabilities."""
         infos: list[StudioAgentInfo] = []
         for _name, agent in registry.all().items():
+            adapter = resolve_adapter(agent, store)
             infos.append(
                 StudioAgentInfo(
                     name=agent.name,
@@ -101,8 +106,8 @@ def create_studio_router(
                     description=agent.manifest.description,
                     version=agent.manifest.version,
                     framework=agent.manifest.framework,
-                    capabilities=inspector.get_capabilities(agent),
-                    has_graph=agent.graph_fn is not None,
+                    capabilities=adapter.capabilities,
+                    has_graph=adapter.supports_graph or agent.graph_fn is not None,
                     has_config=agent.config is not None,
                     has_prompts=agent.prompt_manager is not None,
                 )
@@ -119,9 +124,14 @@ def create_studio_router(
         summary="Get agent graph topology",
     )
     async def get_graph(name: str) -> StudioGraphTopology:
-        """Return the execution graph topology for an agent."""
-        agent = _resolve_agent(name)
-        return inspector.inspect(agent)
+        """Return the execution graph topology for an agent.
+
+        Works for all agent frameworks — LangGraph agents get their real
+        graph topology extracted, while other frameworks receive a
+        synthetic or user-defined topology.
+        """
+        _agent, adapter = _get_adapter(name)
+        return await adapter.get_graph()
 
     @router.get(
         "/agents/{name}/schemas",
@@ -208,7 +218,7 @@ def create_studio_router(
     )
     async def create_run(name: str, request: StudioRunRequest) -> StudioRunInfo:
         """Create a new run, execute the agent synchronously, and return the result."""
-        agent = _resolve_agent(name)
+        _agent, adapter = _get_adapter(name)
         thread_id = request.thread_id or f"thread_{uuid.uuid4().hex[:12]}"
 
         run = tracker.create_run(
@@ -220,8 +230,8 @@ def create_studio_router(
         state = _build_studio_state(request, thread_id)
 
         # Execute — consume the stream to completion, discard SSE frames
-        async for _frame in tracker.execute_and_stream(
-            agent, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+        async for _frame in tracker.execute_with_adapter(
+            adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
         ):
             pass
 
@@ -236,8 +246,13 @@ def create_studio_router(
         summary="Create and stream a run via SSE",
     )
     async def stream_run(name: str, request: StudioRunRequest) -> StreamingResponse:
-        """Create a new run and stream execution events as Server-Sent Events."""
-        agent = _resolve_agent(name)
+        """Create a new run and stream execution events as Server-Sent Events.
+
+        Works with all agent frameworks. LangGraph agents stream rich
+        node-level events; other frameworks stream trace events with
+        timing data and input/output payloads.
+        """
+        _agent, adapter = _get_adapter(name)
         thread_id = request.thread_id or f"thread_{uuid.uuid4().hex[:12]}"
 
         run = tracker.create_run(
@@ -249,8 +264,8 @@ def create_studio_router(
         state = _build_studio_state(request, thread_id)
 
         return StreamingResponse(
-            tracker.execute_and_stream(
-                agent, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+            tracker.execute_with_adapter(
+                adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
             ),
             media_type="text/event-stream",
             headers={
@@ -300,60 +315,20 @@ def create_studio_router(
     async def get_state(name: str, thread_id: str) -> StudioStateSnapshot:
         """Retrieve the latest state for a thread.
 
-        If the agent has a checkpointer, loads the most recent checkpoint.
-        Otherwise returns an empty state snapshot.
+        Delegates to the agent's Studio adapter, which uses the best
+        available method (checkpointer, in-memory store, or custom
+        provider) to retrieve state.
         """
-        agent = _resolve_agent(name)
-        state_data: dict[str, Any] = {}
-        checkpoint_id: str | None = None
-
-        # Try to get state from graph checkpointer
-        if agent.graph_fn:
-            try:
-                graph = agent.graph_fn()
-                checkpointer = getattr(graph, "checkpointer", None)
-                if checkpointer is not None:
-                    config = {
-                        "configurable": {
-                            "thread_id": thread_id,
-                            "checkpoint_ns": "",
-                        }
-                    }
-                    if hasattr(checkpointer, "aget_tuple"):
-                        cp_tuple = await checkpointer.aget_tuple(config)
-                    elif hasattr(checkpointer, "get_tuple"):
-                        cp_tuple = checkpointer.get_tuple(config)
-                    else:
-                        cp_tuple = None
-
-                    if cp_tuple:
-                        state_data = cp_tuple.checkpoint or {}
-                        checkpoint_id = (
-                            cp_tuple.config.get("configurable", {}).get("checkpoint_id")
-                            if cp_tuple.config
-                            else None
-                        )
-            except Exception as exc:
-                logger.warning(f"Failed to load state from checkpointer: {exc}")
-
-        # Fall back to store if available
-        if not state_data and store is not None:
-            try:
-                cps = await store.list_checkpoints(thread_id, "", limit=1)
-                if cps:
-                    latest = cps[0]
-                    state_data = latest.get("checkpoint", {})
-                    checkpoint_id = latest.get("checkpoint_id")
-            except Exception as exc:
-                logger.warning(f"Failed to load state from store: {exc}")
-
-        return StudioStateSnapshot(
-            thread_id=thread_id,
-            agent_name=name,
-            state=state_data,
-            timestamp=_now_iso(),
-            checkpoint_id=checkpoint_id,
-        )
+        _agent, adapter = _get_adapter(name)
+        result = await adapter.get_state(thread_id)
+        if result is None:
+            return StudioStateSnapshot(
+                thread_id=thread_id,
+                agent_name=name,
+                state={},
+                timestamp=_now_iso(),
+            )
+        return result
 
     @router.post(
         "/agents/{name}/threads/{thread_id}/state",
@@ -367,33 +342,20 @@ def create_studio_router(
     ) -> StudioStateSnapshot:
         """Apply a partial state update to a thread.
 
-        Loads the current state, merges the provided updates, and if a
-        checkpointer is available saves a new checkpoint.
+        Delegates to the agent's Studio adapter. LangGraph agents
+        persist changes via the graph checkpointer; other agents
+        update the in-memory trace store.
         """
-        agent = _resolve_agent(name)
-
-        # Get current state first
-        current_state = await get_state(name, thread_id)
-        merged = {**current_state.state, **body.updates}
-
-        # Try to persist via graph checkpointer
-        if agent.graph_fn:
-            try:
-                graph = agent.graph_fn()
-                if hasattr(graph, "update_state"):
-                    config = {"configurable": {"thread_id": thread_id}}
-                    await graph.aupdate_state(config, body.updates)
-                    logger.debug(f"State updated via graph checkpointer for {thread_id}")
-            except Exception as exc:
-                logger.warning(f"Failed to update state via checkpointer: {exc}")
-
-        return StudioStateSnapshot(
-            thread_id=thread_id,
-            agent_name=name,
-            state=merged,
-            timestamp=_now_iso(),
-            checkpoint_id=current_state.checkpoint_id,
-        )
+        _agent, adapter = _get_adapter(name)
+        result = await adapter.update_state(thread_id, body.updates)
+        if result is None:
+            return StudioStateSnapshot(
+                thread_id=thread_id,
+                agent_name=name,
+                state=body.updates,
+                timestamp=_now_iso(),
+            )
+        return result
 
     @router.get(
         "/agents/{name}/threads/{thread_id}/history",
@@ -401,33 +363,13 @@ def create_studio_router(
         summary="Get checkpoint history",
     )
     async def get_history(name: str, thread_id: str) -> list[StudioCheckpoint]:
-        """List checkpoint history for a thread.
+        """List checkpoint or execution history for a thread.
 
-        Uses the storage backend's ``list_checkpoints`` method to retrieve
-        the execution history.
+        LangGraph agents return real checkpoint history. Other agents
+        return execution trace history from the in-memory store.
         """
-        _resolve_agent(name)
-        checkpoints: list[StudioCheckpoint] = []
-
-        if store is not None:
-            try:
-                raw_cps = await store.list_checkpoints(thread_id, "")
-                for idx, cp in enumerate(raw_cps):
-                    checkpoints.append(
-                        StudioCheckpoint(
-                            id=cp.get("checkpoint_id", f"cp_{idx}"),
-                            thread_id=thread_id,
-                            step=idx,
-                            state=cp.get("checkpoint", {}),
-                            metadata=cp.get("metadata", {}),
-                            parent_id=cp.get("parent_checkpoint_id"),
-                            timestamp=cp.get("timestamp", _now_iso()),
-                        )
-                    )
-            except Exception as exc:
-                logger.warning(f"Failed to list checkpoints: {exc}")
-
-        return checkpoints
+        _agent, adapter = _get_adapter(name)
+        return await adapter.get_history(thread_id)
 
     # ------------------------------------------------------------------
     # Helpers (module-level closures)
