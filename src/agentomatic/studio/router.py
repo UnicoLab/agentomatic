@@ -398,6 +398,7 @@ def create_studio_router(
                 config = {"configurable": {"thread_id": thread_id}}
 
                 # Use LangGraph's Command to resume from interrupt
+                resume_input: Any
                 try:
                     from langgraph.types import Command
 
