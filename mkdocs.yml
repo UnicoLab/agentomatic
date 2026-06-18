@@ -94,6 +94,7 @@ nav:
     - Prompt Optimization: guide/optimization.md
     - Telemetry & Feedback: guide/telemetry.md
     - Debug UI: guide/debug-ui.md
+    - Agentomatic Studio: guide/studio.md
   - CLI Reference:
     - Commands: cli/commands.md
   - Architecture:
