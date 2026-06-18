@@ -29,6 +29,7 @@ Options:
 Commands:
   init      Scaffold a new agent from a template.
   run       Start the platform server.
+  demo      Launch demo platform with Studio for E2E testing.
   list      List discovered agents.
   test      Interactive agent testing in the console.
   inspect   Show agent folder structure and configs.
@@ -84,7 +85,10 @@ Options:
   --host TEXT        Bind address  [default: 0.0.0.0]
   --port INTEGER     Bind port  [default: 8000]
   --reload           Auto-reload on code or config file changes
+  --title TEXT       Platform title
+  --log-level TEXT   Log level  [default: INFO]
   --with-ui          Mount the Chainlit chat UI at /chat
+  --studio           Mount Agentomatic Studio at /studio/ui/
 ```
 
 ### Examples
@@ -92,12 +96,48 @@ Options:
 # Standard launch
 agentomatic run
 
-# Dev launch (live reload + debugging Chat UI at http://localhost:8000/chat)
+# Dev launch with Studio visual debugger
+agentomatic run --reload --studio
+
+# Dev launch with Chainlit chat UI
 agentomatic run --reload --with-ui
+
+# Both debug UIs simultaneously
+agentomatic run --reload --studio --with-ui
 
 # Bound to specific port
 agentomatic run --port 9000
 ```
+
+---
+
+## 🧪 `agentomatic demo`
+
+Launch a self-contained demo platform with a built-in agent and Studio enabled. No project setup required.
+
+### Usage
+```text
+Usage: agentomatic demo [OPTIONS]
+
+Options:
+  --host TEXT      Bind address  [default: 0.0.0.0]
+  --port INTEGER   Bind port  [default: 8000]
+```
+
+### Examples
+```bash
+# Quick E2E test
+agentomatic demo
+
+# Custom port
+agentomatic demo --port 9000
+```
+
+The demo starts:
+
+- **API server** at `http://localhost:8000`
+- **Studio** at `http://localhost:8000/studio/ui/`
+- **Demo agent** (`demo_assistant`) with a custom 5-node graph
 
 ---
 

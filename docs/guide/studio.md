@@ -2,14 +2,32 @@
 
 Agentomatic provides a built-in visual development environment specifically designed to help you debug, inspect, and trace the execution of your agents in real-time. It works with **any agent framework** — LangGraph, LangChain, CrewAI, AutoGen, or raw Python — via a universal adapter system.
 
+!!! info "Studio vs Chat Interface"
+    | | **Agentomatic Studio** (this page) | [Chat Interface (Chainlit)](debug-ui.md) |
+    |---|---|---|
+    | **Purpose** | Visual debugging & state inspection | Conversational testing |
+    | **Launch** | `agentomatic run --studio` | `agentomatic run --with-ui` |
+    | **URL** | `/studio/ui/` | `/chat` |
+    | **Best for** | Graph visualization, SSE tracing, breakpoints, time-travel | Testing responses, prompt A/B testing, feedback |
+
 ## Quick Start
 
 The studio is bundled directly into the `agentomatic` pip package. No separate setup required.
 
-```bash
-pip install "agentomatic[studio]"
-agentomatic run --studio
-```
+=== "With Your Agents"
+
+    ```bash
+    pip install "agentomatic[studio]"
+    agentomatic run --studio
+    ```
+
+=== "Quick Demo (No Setup)"
+
+    ```bash
+    agentomatic demo
+    ```
+
+    Launches a built-in demo agent with Studio enabled — perfect for first-time exploration or CI smoke tests. See the [Demo Command](demo.md) page for details.
 
 The unified platform starts serving your API endpoints at `http://localhost:8000` and the Studio UI at `http://localhost:8000/studio/ui/`.
 

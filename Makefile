@@ -40,6 +40,9 @@ test-quick: ## Run tests (fast, no verbose)
 test-watch: ## Run tests in watch mode (requires pytest-watch)
 	uv run ptw tests/ -- -v
 
+test-studio: ## Run studio-specific tests
+	uv run pytest tests/test_studio.py -v --override-ini="addopts="
+
 # === Build & Publish ===
 build: clean ## Build the package
 	uv run python -m build
@@ -68,8 +71,14 @@ init: ## Scaffold a new agent (usage: make init AGENT=my_agent TEMPLATE=basic)
 run: ## Run the platform
 	uv run agentomatic run --agents-dir agents --reload
 
-run-ui: ## Run the platform with debug UI
+run-ui: ## Run the platform with Chainlit chat UI
 	uv run agentomatic run --agents-dir agents --reload --with-ui
+
+run-studio: ## Run the platform with Studio debug UI
+	uv run agentomatic run --agents-dir agents --reload --studio
+
+demo: ## Launch demo platform with Studio for E2E testing
+	uv run agentomatic demo
 
 list-agents: ## List discovered agents
 	uv run agentomatic list --agents-dir agents
@@ -94,6 +103,9 @@ structure: ## Show package structure
 
 check-all: lint typecheck test ## Run all quality checks
 	@echo "✅ All checks passed!"
+
+check-ci: lint format typecheck test-cov ## Full CI parity check (lint + format + typecheck + coverage)
+	@echo "✅ CI check passed!"
 
 # === Help ===
 help: ## Show this help

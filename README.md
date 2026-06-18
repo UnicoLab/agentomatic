@@ -149,12 +149,15 @@ agentomatic init my_agent --template <template>
 
   init <name>      Scaffold a new agent from template
   run              Start the platform server
-  run --studio     Start the platform server AND the visual Agentomatic Studio 🎨
+  run --studio     Start with Agentomatic Studio visual debugger 🎨
+  run --with-ui    Start with Chainlit chat interface 💬
+  demo             Launch demo platform with Studio (no setup needed)
   list             List discovered agents (Rich table)
   test <name>      Interactive terminal testing
   inspect <name>   Show agent structure + config
   doctor           Environment health check
-  ui               Launch Chainlit debug UI
+  optimize <name>  Run prompt optimization
+  ui               Launch Chainlit debug UI standalone
 ```
 
 ## 🎨 Agentomatic Studio
@@ -231,18 +234,28 @@ agentomatic run --with-ui
 
 Features: agent selector, streaming, tool call visualization, chain-of-thought, feedback collection.
 
-## 🎯 Agentomatic Studio
+## 🎨 Agentomatic Studio
 
-Visual debugging interface for any agent — graph visualization, real-time execution tracing, state inspection, and time-travel debugging. Works with LangGraph, LangChain, or custom agents.
+Visual debugging environment for **any agent framework** — graph visualization, real-time execution tracing, state inspection, and time-travel debugging.
 
 ```bash
-# Option 1: Bundled (zero-config)
+# Quick demo (no setup required)
+agentomatic demo
+
+# With your agents
 agentomatic run --studio
 # → Studio at http://localhost:8000/studio/ui/
-
-# Option 2: Standalone Docker
-docker run -p 3000:80 -e REACT_APP_API_URL=http://your-server:8000 agentomatic-studio
 ```
+
+**Universal Framework Support:**
+
+| Feature | LangGraph | LangChain | Custom / Raw Python |
+|---|:---:|:---:|:---:|
+| Graph Visualization | ✅ Real graph | ✅ LCEL / synthetic | ✅ Synthetic or `@studio_graph` |
+| SSE Node Streaming | ✅ Full | ✅ `astream_events` | ✅ Trace-based |
+| State Inspection | ✅ Checkpointer | ✅ I/O capture | ✅ Custom or in-memory |
+| Time-Travel History | ✅ Checkpoints | ✅ Traces | ✅ Traces |
+| Breakpoints / HITL | ✅ | ❌ | ❌ |
 
 **Studio API Endpoints** (mounted at `/studio/`):
 
@@ -256,9 +269,19 @@ docker run -p 3000:80 -e REACT_APP_API_URL=http://your-server:8000 agentomatic-s
 | `GET` | `/studio/agents/{name}/threads/{tid}/state` | Thread state snapshot |
 | `GET` | `/studio/agents/{name}/threads/{tid}/history` | Checkpoint history |
 
-**Capabilities degrade gracefully:**
-- **LangGraph agents** → Full graph visualization, checkpoints, time-travel, state editing
-- **Custom/simple agents** → Chat, invoke, thread management, response inspection
+**Studio Decorators** — incrementally upgrade any agent's Studio experience:
+
+```python
+from agentomatic.studio import studio_graph, studio_state
+
+@studio_graph
+def my_topology():
+    return {"nodes": [...], "edges": [...]}
+
+@studio_state
+async def get_state(thread_id: str) -> dict:
+    return await my_db.get_state(thread_id)
+```
 
 ## 📊 Auto-Generated Endpoints
 

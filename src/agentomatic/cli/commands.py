@@ -263,6 +263,46 @@ def run(
 
 
 # =====================================================================
+# DEMO — Launch demo platform with Studio
+# =====================================================================
+
+
+@cli.command()
+@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", type=int, default=8000, help="Port to listen on")
+def demo(host: str, port: int) -> None:
+    """Launch a demo platform with a built-in agent and Studio for E2E testing."""
+    _print_banner()
+
+    if HAS_RICH:
+        console.print(
+            Panel(
+                "[bold cyan]🎪 Demo Mode[/bold cyan]\n\n"
+                "Starting a self-contained platform with:\n"
+                "  • [green]demo_assistant[/green] — multi-step reasoning agent\n"
+                "  • [green]Studio UI[/green] — graph visualisation & state inspection",
+                title="Agentomatic Demo",
+                border_style="cyan",
+            )
+        )
+    else:
+        click.echo("🎪 Demo Mode")
+        click.echo("  • demo_assistant — multi-step reasoning agent")
+        click.echo("  • Studio UI — graph visualisation & state inspection")
+
+    _echo("")
+    _echo(f"  📡 API:    http://{host}:{port}")
+    _echo(f"  📖 Docs:   http://{host}:{port}/docs")
+    _echo(f"  🎨 Studio: http://{host}:{port}/studio/ui/")
+    _echo("")
+
+    from agentomatic.demo.server import create_demo_platform
+
+    platform = create_demo_platform(host=host, port=port, enable_studio=True)
+    platform.run(host=host, port=port)
+
+
+# =====================================================================
 # LIST — Show discovered agents
 # =====================================================================
 
