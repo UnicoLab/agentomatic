@@ -112,7 +112,7 @@ def cli():
 @click.option(
     "--template",
     "-t",
-    type=click.Choice(["basic", "full", "rag", "chatbot", "custom"]),
+    type=click.Choice(["basic", "full", "rag", "chatbot", "deepagent", "custom"]),
     default=None,
     help="Template to use (default: interactive selection)",
 )

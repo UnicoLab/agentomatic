@@ -73,6 +73,21 @@ class LangGraphAdapter(StudioAdapter):
             pass
         if self._agent.manifest.framework == "langgraph":
             caps.append("hitl")
+
+        # Detect deep_agent capabilities from graph node names
+        try:
+            drawable = graph.get_graph()
+            node_names = [
+                getattr(n, "name", str(k)).lower()
+                for k, n in getattr(drawable, "nodes", {}).items()
+            ]
+            if any("write_todo" in n or "task" in n for n in node_names):
+                caps.append("deep_agent")
+                caps.append("subagents")
+                caps.append("planning")
+        except Exception:
+            pass
+
         return caps
 
     # ------------------------------------------------------------------
@@ -158,10 +173,27 @@ class LangGraphAdapter(StudioAdapter):
         if checkpoint_id and "configurable" in config:
             config["configurable"]["checkpoint_id"] = checkpoint_id
 
-        async for lg_event in graph.astream_events(state, config=config, version="v2"):
-            studio_event = self._map_event(lg_event)
-            if studio_event:
-                yield studio_event
+        try:
+            async for lg_event in graph.astream_events(state, config=config, version="v2"):
+                studio_event = self._map_event(lg_event)
+                if studio_event:
+                    yield studio_event
+        except Exception as exc:
+            exc_name = type(exc).__name__
+            if exc_name in ("NodeInterrupt", "GraphInterrupt"):
+                yield StudioRunEvent(
+                    event="breakpoint_hit",
+                    run_id="",
+                    timestamp=_now_iso(),
+                    node=getattr(exc, "node", "unknown"),
+                    data={
+                        "reason": str(exc),
+                        "resumable": True,
+                        "interrupt_type": exc_name,
+                    },
+                )
+            else:
+                raise
 
     # ------------------------------------------------------------------
     # State inspection
@@ -281,6 +313,15 @@ class LangGraphAdapter(StudioAdapter):
             return "condition"
         if any(kw in name for kw in ("human", "approval", "review")):
             return "human"
+        # Deep-agent-specific node classifications
+        if any(kw in name for kw in ("task", "delegate", "subagent", "spawn")):
+            return "subagent"
+        if any(kw in name for kw in ("plan", "todo", "write_todo")):
+            return "planning"
+        if any(kw in name for kw in ("file", "filesystem", "read_file", "write_file")):
+            return "tool"
+        if any(kw in name for kw in ("execute", "shell", "command")):
+            return "tool"
         return "agent"
 
     @staticmethod
@@ -289,7 +330,19 @@ class LangGraphAdapter(StudioAdapter):
         name = lg_event.get("name", "")
         data = lg_event.get("data", {})
 
+        # ----- Subagent delegation events (must come before generic chain) -----
         if event_type == "on_chain_start" and name != "LangGraph":
+            metadata = lg_event.get("metadata", {})
+            parent_ns = metadata.get("langgraph_checkpoint_ns", "")
+            if parent_ns and ":" in parent_ns:
+                tags = lg_event.get("tags", [])
+                return StudioRunEvent(
+                    event="subagent_start",
+                    run_id="",
+                    timestamp=_now_iso(),
+                    node=name,
+                    data={"namespace": parent_ns, "tags": tags},
+                )
             return StudioRunEvent(
                 event="node_start",
                 run_id="",
@@ -299,9 +352,19 @@ class LangGraphAdapter(StudioAdapter):
             )
 
         if event_type == "on_chain_end" and name != "LangGraph":
+            metadata = lg_event.get("metadata", {})
+            parent_ns = metadata.get("langgraph_checkpoint_ns", "")
             output = data.get("output", {})
             if not isinstance(output, (dict, list, str, int, float, bool, type(None))):
                 output = str(output)
+            if parent_ns and ":" in parent_ns:
+                return StudioRunEvent(
+                    event="subagent_end",
+                    run_id="",
+                    timestamp=_now_iso(),
+                    node=name,
+                    data={"namespace": parent_ns, "output": output},
+                )
             return StudioRunEvent(
                 event="node_end",
                 run_id="",
@@ -330,6 +393,15 @@ class LangGraphAdapter(StudioAdapter):
             tool_input = data.get("input", {})
             if not isinstance(tool_input, (dict, list, str, int, float, bool, type(None))):
                 tool_input = str(tool_input)
+            # Deep-agent planning tool detection
+            if name in ("write_todos", "write_todo"):
+                return StudioRunEvent(
+                    event="task_update",
+                    run_id="",
+                    timestamp=_now_iso(),
+                    node=f"planning:{name}",
+                    data={"todos": tool_input},
+                )
             return StudioRunEvent(
                 event="node_start",
                 run_id="",

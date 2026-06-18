@@ -31,7 +31,8 @@ class StudioAgentInfo(BaseModel):
     description: str = Field("", description="Human-readable description")
     version: str = Field("1.0.0", description="Agent version")
     framework: str = Field(
-        "langgraph", description="Framework: 'langgraph' | 'langchain' | 'custom'"
+        "langgraph",
+        description="Framework: 'langgraph' | 'langchain' | 'deepagent' | 'custom'",
     )
     capabilities: list[str] = Field(
         default_factory=list,
@@ -54,7 +55,10 @@ class StudioGraphNode(BaseModel):
     name: str = Field(..., description="Human-readable node name")
     type: str = Field(
         "default",
-        description="Node type: 'start', 'end', 'agent', 'tool', 'condition', 'human', 'default'",
+        description=(
+            "Node type: 'start', 'end', 'agent', 'tool', 'condition', "
+            "'human', 'subagent', 'planning', 'default'"
+        ),
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -128,7 +132,9 @@ class StudioRunEvent(BaseModel):
         ...,
         description=(
             "Event type: 'run_start', 'node_start', 'node_end', "
-            "'state_update', 'message_chunk', 'run_complete', 'run_error', 'breakpoint_hit'"
+            "'state_update', 'message_chunk', 'run_complete', 'run_error', "
+            "'breakpoint_hit', 'trace', 'subagent_start', 'subagent_end', "
+            "'task_update', 'file_operation'"
         ),
     )
     run_id: str = Field(..., description="Run this event belongs to")

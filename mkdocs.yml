@@ -95,6 +95,7 @@ nav:
     - Telemetry & Feedback: guide/telemetry.md
   - Debugging:
     - Agentomatic Studio: guide/studio.md
+    - Deep Agent Integration: guide/deep-agents.md
     - Chat Interface (Chainlit): guide/debug-ui.md
     - Demo Command: guide/demo.md
   - CLI Reference:

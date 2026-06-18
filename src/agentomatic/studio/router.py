@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import importlib
+import json as json_mod
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from agentomatic.studio.adapters import resolve_adapter
 from agentomatic.studio.models import (
@@ -356,6 +359,69 @@ def create_studio_router(
                 timestamp=_now_iso(),
             )
         return result
+
+    # ==================================================================
+    # Resume endpoint (deep_agent / HITL interrupt support)
+    # ==================================================================
+
+    class StudioResumeRequest(BaseModel):
+        """Request to resume a paused/interrupted execution."""
+
+        value: Any = Field(None, description="Human response or approval value")
+        action: str = Field("approve", description="'approve' or 'reject'")
+
+    @router.post(
+        "/agents/{name}/threads/{thread_id}/resume",
+        summary="Resume interrupted execution",
+    )
+    async def resume_execution(
+        name: str,
+        thread_id: str,
+        body: StudioResumeRequest,
+    ) -> StreamingResponse:
+        """Resume a LangGraph execution that was paused by an interrupt.
+
+        Passes the human's response to the graph via ``Command(resume=value)``
+        and streams the continued execution.
+        """
+        agent, adapter = _get_adapter(name)
+
+        if agent.graph_fn is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Agent '{name}' does not support interrupt/resume (no graph_fn)",
+            )
+
+        async def _stream() -> AsyncGenerator[str, None]:
+            try:
+                graph = agent.graph_fn()
+                config = {"configurable": {"thread_id": thread_id}}
+
+                # Use LangGraph's Command to resume from interrupt
+                try:
+                    from langgraph.types import Command
+
+                    resume_input = Command(resume=body.value)
+                except ImportError:
+                    resume_input = {"__resume__": body.value}
+
+                async for lg_event in graph.astream_events(
+                    resume_input, config=config, version="v2"
+                ):
+                    mapped = adapter._map_event(lg_event)
+                    if mapped:
+                        yield f"data: {mapped.model_dump_json()}\n\n"
+
+                yield 'data: {"event": "done"}\n\n'
+            except Exception as exc:
+                error_data = json_mod.dumps({"event": "run_error", "data": {"error": str(exc)}})
+                yield f"data: {error_data}\n\n"
+
+        return StreamingResponse(
+            _stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @router.get(
         "/agents/{name}/threads/{thread_id}/history",

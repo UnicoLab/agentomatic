@@ -43,15 +43,20 @@ The unified platform starts serving your API endpoints at `http://localhost:8000
 
 Agentomatic Studio uses a **universal adapter system** to provide the best possible debugging experience for every agent framework:
 
-| Capability | LangGraph | LangChain | Custom / Raw Python | With Decorators |
-|---|:---:|:---:|:---:|:---:|
-| Graph Topology | ✅ Real graph | ✅ LCEL extraction or synthetic chain | ✅ Synthetic linear | ✅ Custom graph |
-| SSE Node Streaming | ✅ `astream_events` | ✅ `astream_events` (v2) | ✅ Trace-based | ✅ Custom stream |
-| Time-Travel History | ✅ Checkpointer | ✅ In-memory traces | ✅ In-memory traces | ✅ In-memory traces |
-| State Inspection | ✅ Checkpointer | ✅ Message + I/O capture | ✅ Last I/O capture | ✅ Custom provider |
-| State Mutation | ✅ `aupdate_state` | ⚠️ In-memory only | ⚠️ In-memory only | ⚠️ In-memory only |
-| Breakpoints | ✅ `interrupt_before` | ❌ | ❌ | ❌ |
-| HITL Support | ✅ Native | ❌ | ❌ | ❌ |
+| Capability | LangGraph | Deep Agent | LangChain | Custom / Raw Python | With Decorators |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Graph Topology | ✅ Real graph | ✅ Real graph + planning nodes | ✅ LCEL extraction or synthetic chain | ✅ Synthetic linear | ✅ Custom graph |
+| SSE Node Streaming | ✅ `astream_events` | ✅ `astream_events` + subagent events | ✅ `astream_events` (v2) | ✅ Trace-based | ✅ Custom stream |
+| Time-Travel History | ✅ Checkpointer | ✅ Checkpointer | ✅ In-memory traces | ✅ In-memory traces | ✅ In-memory traces |
+| State Inspection | ✅ Checkpointer | ✅ Checkpointer | ✅ Message + I/O capture | ✅ Last I/O capture | ✅ Custom provider |
+| State Mutation | ✅ `aupdate_state` | ✅ `aupdate_state` | ⚠️ In-memory only | ⚠️ In-memory only | ⚠️ In-memory only |
+| Breakpoints | ✅ `interrupt_before` | ✅ Interrupt + middleware | ❌ | ❌ | ❌ |
+| HITL Support | ✅ Native | ✅ Native + resume | ❌ | ❌ | ❌ |
+| Subagent Tracking | ❌ | ✅ `subagent_start/end` | ❌ | ❌ | ❌ |
+| Task Planning | ❌ | ✅ `task_update` events | ❌ | ❌ | ❌ |
+
+!!! tip "Using LangChain Deep Agents?"
+    See the dedicated **[Deep Agent Integration Guide](deep-agents.md)** for setup, subagent tracking, HITL interrupts, and the `deepagent` scaffold template.
 
 !!! note "Adapter Selection is Automatic"
     The Studio automatically selects the best adapter based on the `framework` field in your agent's manifest. You don't need to configure anything — just set `framework="langgraph"`, `"langchain"`, or `"custom"` in your `AgentManifest`.

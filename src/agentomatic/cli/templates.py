@@ -1,7 +1,7 @@
 """Agent scaffolding templates.
 
 Each template is a dict mapping relative file paths to their content.
-Templates: basic, full, rag, chatbot, custom.
+Templates: basic, full, rag, chatbot, custom, deepagent.
 """
 
 from __future__ import annotations
@@ -94,6 +94,18 @@ def _chatbot_graph_py(name: str) -> str:
     return f'''"""Chatbot graph for {name} with memory."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom langgraph.graph import END, StateGraph\n\nfrom agentomatic import BaseAgentState\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("respond", nodes.respond)\n    g.set_entry_point("respond")\n    g.add_edge("respond", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
 
 
+# --- Deep Agent template ---
+
+
+def _deepagent_init_py(name: str, description: str, keywords: str) -> str:
+    return f'''"""Agent: {name} (Deep Agent harness)."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\nfrom agentomatic import AgentManifest\n\nmanifest = AgentManifest(\n    name="{name}",\n    slug="agent-{name}",\n    description="{description}",\n    intent_keywords=[{keywords}],\n    framework="langgraph",\n)\n\n\ndef graph_fn():\n    """Return the compiled deep agent graph."""\n    from .agent import create_agent\n    return create_agent()\n\n\nasync def node_fn(state: dict[str, Any]) -> dict[str, Any]:\n    """Invoke the deep agent."""\n    return await graph_fn().ainvoke(state)\n'''
+
+
+def _deepagent_agent_py(name: str) -> str:
+    safe_title = name.replace("_", " ").title()
+    return f'''"""Deep Agent definition for {name}.\n\nUses LangChain\'s `deepagents` harness for planning, tools,\nsubagent delegation, and context management.\n"""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\n\ndef internet_search(query: str, max_results: int = 5) -> str:\n    """Search the internet for information.\n\n    Args:\n        query: Search query string.\n        max_results: Maximum number of results.\n\n    Returns:\n        Search results as text.\n    """\n    # TODO: Replace with real search (Tavily, SerpAPI, etc.)\n    return f"Search results for: {{query}} ({{max_results}} results)"\n\n\n@lru_cache(maxsize=1)\ndef create_agent():\n    """Create and compile the deep agent."""\n    from deepagents import create_deep_agent\n\n    return create_deep_agent(\n        model="openai:gpt-4o",  # Change to your preferred model\n        system_prompt=(\n            "You are {safe_title}, "\n            "an expert AI assistant. Be thorough and accurate."\n        ),\n        tools=[internet_search],\n    )\n'''
+
+
 # --- Custom (no LangGraph) template ---
 
 
@@ -110,6 +122,7 @@ TEMPLATES: dict[str, str] = {
     "full": "All overwrite files — config, schemas, api, tools, prompts",
     "rag": "RAG agent — retrieve → generate pipeline",
     "chatbot": "Conversational agent with memory",
+    "deepagent": "Deep Agent — planning, tools, subagents (requires deepagents package)",
     "custom": "Framework-agnostic — no LangGraph dependency",
 }
 
@@ -174,6 +187,16 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "nodes.py": _chatbot_nodes_py(name),
             "config.py": _config_py(name),
             **common,
+        }
+
+    elif template == "deepagent":
+        return {
+            "__init__.py": _deepagent_init_py(name, f"{title} deep agent", keywords),
+            "agent.py": _deepagent_agent_py(name),
+            "config.py": _config_py(name),
+            ".env.example": _env_example(name),
+            "README.md": _readme_md(name, template),
+            "prompts.json": _prompts_json(),
         }
 
     elif template == "custom":

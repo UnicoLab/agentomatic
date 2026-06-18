@@ -47,11 +47,18 @@ def resolve_adapter(
         logger.debug(f"Using custom studio adapter for agent '{agent.name}'")
         return custom
 
-    # 2. LangGraph agents → full adapter
+    # 2. LangGraph agents (including deep_agent) → full adapter
     if agent.graph_fn is not None:
         from agentomatic.studio.adapters.langgraph import LangGraphAdapter
 
         logger.debug(f"Using LangGraph studio adapter for agent '{agent.name}'")
+        return LangGraphAdapter(agent=agent, store=store)
+
+    # 2b. Manifest declares langgraph/deepagent but no graph_fn — try LangGraph adapter
+    if getattr(agent.manifest, "framework", "") in ("langgraph", "deepagent"):
+        from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+        logger.debug(f"Using LangGraph studio adapter (framework hint) for agent '{agent.name}'")
         return LangGraphAdapter(agent=agent, store=store)
 
     # 3. LangChain agents → enhanced adapter
