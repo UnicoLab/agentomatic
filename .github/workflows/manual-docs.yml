@@ -69,11 +69,11 @@ jobs:
           git fetch origin gh-pages:gh-pages --force || echo "No gh-pages branch exists yet — mike will create it"
 
           if [[ "${{ inputs.UPDATE_LATEST }}" == "true" ]]; then
-            uv run mike deploy --push --update-aliases --force "$VERSION" latest
-            uv run mike set-default --push latest
+            uv run mike deploy --push --update-aliases --ignore-remote-status "$VERSION" latest
+            uv run mike set-default --push --ignore-remote-status latest
             echo "✓ Deployed v${VERSION} as 'latest' (set as default)"
           else
-            uv run mike deploy --push --force "$VERSION"
+            uv run mike deploy --push --ignore-remote-status "$VERSION"
             echo "✓ Deployed v${VERSION} (latest alias NOT updated)"
           fi
 

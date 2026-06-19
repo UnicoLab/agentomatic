@@ -284,7 +284,7 @@ jobs:
           VERSION="${{ needs.semantic-release.outputs.new_version }}"
           echo "Deploying documentation for version $VERSION"
           git fetch origin gh-pages:gh-pages --force || echo "No gh-pages branch exists yet — mike will create it"
-          uv run mike deploy --push --update-aliases --force "$VERSION" latest
-          uv run mike set-default --push latest
+          uv run mike deploy --push --update-aliases --ignore-remote-status "$VERSION" latest
+          uv run mike set-default --push --ignore-remote-status latest
           echo "✓ Deployed docs v${VERSION} (aliased as 'latest', set as default)"
 

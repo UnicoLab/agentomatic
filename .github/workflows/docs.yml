@@ -61,4 +61,4 @@ jobs:
         run: |
           echo "Retrying documentation deployment..."
           git fetch origin gh-pages:gh-pages --force
-          uv run mike deploy --push --update-aliases --force dev
+          uv run mike deploy --push --update-aliases --ignore-remote-status dev
