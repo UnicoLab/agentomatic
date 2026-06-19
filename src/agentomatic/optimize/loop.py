@@ -74,6 +74,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agentomatic.optimize.events import (
+    CallbackManager,
+    EventData,
+    OptimizationCallback,
+    OptimizationEvent,
+)
+
 try:
     from loguru import logger as _logger
 except ImportError:
@@ -367,6 +374,8 @@ class PromptOptimizationLoop:
         language: str = "English",
         strategy: str = "iterative",
         rewrite_llm: Any = None,
+        callbacks: list[OptimizationCallback] | None = None,
+        acceptance_policy: str = "best",
     ):
         self.agent_name = agent_name
         self.invoke_fn = invoke_fn
@@ -376,6 +385,12 @@ class PromptOptimizationLoop:
         self.language = language
         self.strategy = strategy
         self.rewrite_llm = rewrite_llm
+        self.acceptance_policy = acceptance_policy
+        self._callbacks = CallbackManager(callbacks)
+
+        if not self._callbacks:
+            from agentomatic.optimize.progress import auto_progress_callback
+            self._callbacks.add(auto_progress_callback())
 
         if strategy not in _STRATEGY_PROMPTS:
             raise ValueError(f"Unknown strategy '{strategy}'. Available: {AVAILABLE_STRATEGIES}")
@@ -430,14 +445,38 @@ class PromptOptimizationLoop:
             f"Threshold: {self.threshold:.0%}"
         )
 
+        await self._callbacks.emit(
+            OptimizationEvent.RUN_START,
+            EventData(
+                agent=self.agent_name,
+                experiment_id=result.experiment_id,
+                total_steps=steps,
+            )
+        )
+
         for step_idx in range(steps):
             t_step = time.time()
 
             _logger.info("")
             _logger.info(f"┌─── Step {step_idx + 1}/{steps} " + "─" * 35)
 
+            await self._callbacks.emit(
+                OptimizationEvent.STEP_START,
+                EventData(
+                    agent=self.agent_name,
+                    experiment_id=result.experiment_id,
+                    step_idx=step_idx,
+                    total_steps=steps,
+                    best_score=result.best_score,
+                    baseline_score=result.baseline_score,
+                    score_history=[s.avg_score for s in result.steps],
+                )
+            )
+
             # ── 1. Evaluate ──────────────────────────────────────────
-            step_results, avg_score, accuracy = await self._evaluate(dataset, current_prompt)
+            step_results, avg_score, accuracy = await self._evaluate(
+                dataset, current_prompt, result.experiment_id, step_idx
+            )
             elapsed = time.time() - t_step
 
             step = StepResult(
@@ -469,6 +508,33 @@ class PromptOptimizationLoop:
                 f"({n_pass}/{len(step_results)}) | Time: {elapsed:.1f}s"
             )
 
+            await self._callbacks.emit(
+                OptimizationEvent.STEP_COMPLETE,
+                EventData(
+                    agent=self.agent_name,
+                    experiment_id=result.experiment_id,
+                    step_idx=step_idx,
+                    total_steps=steps,
+                    score=avg_score,
+                    best_score=result.best_score,
+                    baseline_score=result.baseline_score,
+                    elapsed_seconds=elapsed,
+                    accuracy=accuracy,
+                )
+            )
+
+            # Rewrite acceptance policy: reject regressions
+            if self.acceptance_policy == "best" and avg_score < result.best_score and step_idx > 0:
+                _logger.info(
+                    f"│ 📉 Regression detected (score {avg_score:.1%} < best {result.best_score:.1%}). "
+                    f"Reverting to best prompt for next rewrite."
+                )
+                current_prompt = result.best_prompt
+                # We also need to rewrite based on the failures of the BEST prompt, not the regression
+                best_step_res = result.steps[result.best_step]
+                step_results = best_step_res.results
+                avg_score = best_step_res.avg_score
+
             # ── 2. Early stopping ────────────────────────────────────
             if avg_score >= target_score:
                 _logger.info(f"│ 🎯 Target score {target_score:.0%} reached!")
@@ -497,6 +563,15 @@ class PromptOptimizationLoop:
                 f"│ 📝 Analysing {len(failures)} failures, {len(successes)} successes — rewriting…"
             )
 
+            await self._callbacks.emit(
+                OptimizationEvent.REWRITE_START,
+                EventData(
+                    agent=self.agent_name,
+                    experiment_id=result.experiment_id,
+                    step_idx=step_idx,
+                )
+            )
+
             new_prompt = await self._rewrite_prompt(
                 current_prompt, failures, successes, avg_score, step_idx
             )
@@ -504,13 +579,45 @@ class PromptOptimizationLoop:
             if new_prompt and new_prompt.strip() != current_prompt.strip():
                 current_prompt = new_prompt
                 _logger.info(f"│ ✅ Prompt updated ({len(new_prompt)} chars)")
+                await self._callbacks.emit(
+                    OptimizationEvent.REWRITE_ACCEPTED,
+                    EventData(
+                        agent=self.agent_name,
+                        experiment_id=result.experiment_id,
+                        step_idx=step_idx,
+                        prompt=new_prompt,
+                        prompt_length=len(new_prompt),
+                    )
+                )
             else:
                 _logger.info("│ ⚠️  Rewrite unchanged — keeping current prompt")
+                await self._callbacks.emit(
+                    OptimizationEvent.REWRITE_REJECTED,
+                    EventData(
+                        agent=self.agent_name,
+                        experiment_id=result.experiment_id,
+                        step_idx=step_idx,
+                        accept_reason="Rewrite produced identical or empty prompt",
+                    )
+                )
 
             _logger.info("└" + "─" * 45)
 
         result.total_elapsed = time.time() - t_total
         _logger.info(result.summary())
+
+        await self._callbacks.emit(
+            OptimizationEvent.RUN_COMPLETE,
+            EventData(
+                agent=self.agent_name,
+                experiment_id=result.experiment_id,
+                best_score=result.best_score,
+                baseline_score=result.baseline_score,
+                improvement=result.improvement,
+                elapsed_seconds=result.total_elapsed,
+                total_steps=steps,
+            )
+        )
 
         return result
 
@@ -522,6 +629,8 @@ class PromptOptimizationLoop:
         self,
         dataset: list[dict],
         prompt: str,
+        experiment_id: str = "",
+        step_idx: int = 0,
     ) -> tuple[list[dict], float, float]:
         """Evaluate every dataset sample with the given prompt."""
         results: list[dict] = []
@@ -551,14 +660,29 @@ class PromptOptimizationLoop:
             if score >= self.threshold:
                 correct += 1
 
-            results.append(
-                {
-                    "query": dp.get("query", ""),
-                    "expected": expected,
-                    "actual": actual[:500],
-                    "category": dp.get("category", "general"),
-                    "score": round(score, 4),
-                }
+            dp_context = {k: v for k, v in dp.items() if k not in ("query", "expected_response")}
+
+            res_dict = {
+                "query": dp.get("query", ""),
+                "expected": expected,
+                "actual": actual[:1000],  # Give more context
+                "category": dp.get("category", "general"),
+                "score": round(score, 4),
+                "dp_context": dp_context,
+            }
+            results.append(res_dict)
+
+            await self._callbacks.emit(
+                OptimizationEvent.SAMPLE_RESULT,
+                EventData(
+                    agent=self.agent_name,
+                    experiment_id=experiment_id,
+                    step_idx=step_idx,
+                    query=res_dict["query"],
+                    expected=res_dict["expected"],
+                    response=res_dict["actual"][:500],
+                    sample_score=res_dict["score"],
+                )
             )
 
         n = len(results)
@@ -585,25 +709,26 @@ class PromptOptimizationLoop:
         try:
             strategy_system = _STRATEGY_PROMPTS[self.strategy]
 
+            def _format_sample(s: dict) -> str:
+                base = (
+                    f"  Query: {s['query'][:200]}\n"
+                    f"  Expected: {s['expected'][:200]}\n"
+                    f"  Got: {s['actual'][:300]}\n"
+                    f"  Score: {s['score']:.0%}"
+                )
+                if s.get("dp_context"):
+                    ctx = json.dumps(s["dp_context"], default=str)[:300]
+                    base += f"\n  Context: {ctx}"
+                return base
+
             # Build analysis text
             failure_text = (
-                "\n\n".join(
-                    f"  Query: {f['query'][:100]}\n"
-                    f"  Expected: {f['expected'][:150]}\n"
-                    f"  Got: {f['actual'][:150]}\n"
-                    f"  Score: {f['score']:.0%}"
-                    for f in failures[:5]
-                )
+                "\n\n".join(_format_sample(f) for f in failures[:5])
                 or "(none — all samples passed)"
             )
 
             success_text = (
-                "\n\n".join(
-                    f"  Query: {s['query'][:100]}\n"
-                    f"  Response: {s['actual'][:150]}\n"
-                    f"  Score: {s['score']:.0%}"
-                    for s in successes[:3]
-                )
+                "\n\n".join(_format_sample(s) for s in successes[:3])
                 or "(none)"
             )
 

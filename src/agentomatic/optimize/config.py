@@ -40,12 +40,33 @@ Example::
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+def escape_braces(text: str, preserve: list[str] | None = None) -> str:
+    """Escape literal braces while preserving specific template variables.
+    
+    Replaces '{' with '{{' and '}' with '}}', except for variables listed in `preserve` 
+    (e.g., 'query' for '{query}'). This prevents KeyError during subsequent .format() calls
+    on system prompts that contain literal JSON or markdown code blocks.
+    """
+    if not text:
+        return text
+    
+    # First escape all
+    escaped = text.replace("{", "{{").replace("}", "}}")
+    
+    # Then unescape the specific variables we want to preserve
+    if preserve:
+        for var in preserve:
+            escaped = escaped.replace(f"{{{{{var}}}}}", f"{{{var}}}")
+            
+    return escaped
 
 # =====================================================================
 # Runtime configuration
@@ -87,6 +108,16 @@ class PromptRuntimeConfig:
     model_choice: str | None = None  # e.g. "ollama/qwen2.5:7b"
     fallback_model: str | None = None  # automatic fallback model
     routing_config: dict[str, Any] = field(default_factory=dict)  # A/B weights, local/remote
+
+    @property
+    def safe_system_prompt(self) -> str:
+        """Returns the system prompt with literal braces safely escaped.
+        
+        Assumes the system prompt does not contain runtime format variables.
+        Useful when passing the system prompt into LangChain or other formatters
+        that might crash on literal JSON blocks.
+        """
+        return escape_braces(self.system_prompt)
 
     # -- serialization ---------------------------------------------------
 

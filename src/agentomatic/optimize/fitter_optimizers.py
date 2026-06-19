@@ -21,7 +21,7 @@ Usage::
 
     optimizer = resolve_fitter_optimizer("rewrite", model="ollama/qwen2.5:7b")
     candidates = await optimizer.propose(
-        baseline=baseline_config,
+        current_config=baseline_config,
         eval_results=results,
         dataset_sample=samples,
         search_space=space,
@@ -41,13 +41,16 @@ import asyncio
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from agentomatic.optimize.config import PromptCandidate, PromptRuntimeConfig
 from agentomatic.optimize.llm_caller import LLMCaller
 from agentomatic.optimize.search_space import PromptSearchSpace
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.context import OptimizationContext
 
 # =====================================================================
 # Perspectives used by MIPRO-like instruction generation
@@ -72,9 +75,9 @@ _MIPRO_PERSPECTIVES: list[str] = [
 class BaseFitterOptimizer(ABC):
     """Abstract base class for all fitter optimizers.
 
-    Every concrete subclass must implement :meth:`propose`, which takes a
-    baseline configuration and evaluation context and returns a list of
-    :class:`PromptCandidate` objects for the fitter loop to evaluate.
+    Every concrete subclass must implement :meth:`propose`, which takes
+    the current-best configuration and evaluation context and returns a
+    list of :class:`PromptCandidate` objects for the fitter to evaluate.
 
     Attributes:
         name: Short identifier for the strategy (used in logging and
@@ -85,8 +88,9 @@ class BaseFitterOptimizer(ABC):
         class MyOptimizer(BaseFitterOptimizer):
             name: str = "my_opt"
 
-            async def propose(self, baseline, eval_results, dataset_sample,
-                              search_space, iteration=0):
+            async def propose(self, current_config, eval_results,
+                              dataset_sample, search_space,
+                              iteration=0, context=None):
                 return [
                     PromptCandidate(
                         name=f"my_{iteration:03d}",
@@ -104,23 +108,25 @@ class BaseFitterOptimizer(ABC):
     @abstractmethod
     async def propose(
         self,
-        baseline: PromptRuntimeConfig,
+        current_config: PromptRuntimeConfig,
         eval_results: list[dict[str, Any]],
         dataset_sample: list[dict[str, Any]],
         search_space: PromptSearchSpace,
         iteration: int = 0,
+        context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
-        """Generate candidate configurations from *baseline* and evaluation context.
+        """Generate candidate configurations from evaluation context.
 
         Parameters
         ----------
-        baseline:
+        current_config:
             The current best configuration to improve upon.
         eval_results:
-            Per-sample evaluation results from the most recent evaluation
-            round.  Each dict typically contains ``"query"``, ``"response"``,
+            Per-sample evaluation results from the most recent round.
+            Each dict typically contains ``"query"``, ``"response"``,
             ``"expected"``, ``"score"``, and optionally ``"feedback"``,
-            ``"reason"``, or ``"details"``.
+            ``"reason"``, ``"retrieval_context"``, ``"tool_calls"``,
+            ``"reasoning"``.
         dataset_sample:
             A sample of the evaluation dataset (raw examples).
         search_space:
@@ -128,6 +134,10 @@ class BaseFitterOptimizer(ABC):
             changed.
         iteration:
             Current iteration number in the outer optimisation loop.
+        context:
+            Rich :class:`OptimizationContext` with score history,
+            failure clusters, dimensional scores, and pipeline
+            metadata.  ``None`` for backward compatibility.
 
         Returns
         -------
@@ -159,7 +169,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
 
         opt = RewriteOptimizer(model="ollama/qwen2.5:7b", max_failures=5)
         candidates = await opt.propose(
-            baseline=cfg, eval_results=results,
+            current_config=cfg, eval_results=results,
             dataset_sample=samples, search_space=space, iteration=1,
         )
         assert len(candidates) == 1
@@ -172,20 +182,23 @@ class RewriteOptimizer(BaseFitterOptimizer):
 
     async def propose(
         self,
-        baseline: PromptRuntimeConfig,
+        current_config: PromptRuntimeConfig,
         eval_results: list[dict[str, Any]],
         dataset_sample: list[dict[str, Any]],
         search_space: PromptSearchSpace,
         iteration: int = 0,
+        context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
         """Rewrite the system prompt based on failure/success analysis.
 
         Workflow:
         1. Sort results by score (ascending) to surface failures.
-        2. Build a detailed failure analysis string.
+        2. Build a detailed failure analysis string with pipeline context.
         3. Identify success patterns from top-scoring results.
-        4. Ask the LLM to produce an improved prompt.
-        5. Return a single ``PromptCandidate``.
+        4. Include score history and dimensional trends (if available).
+        5. Ask the LLM to reason step-by-step then produce an improved
+           prompt.
+        6. Return a single ``PromptCandidate``.
 
         Returns
         -------
@@ -203,65 +216,169 @@ class RewriteOptimizer(BaseFitterOptimizer):
         failures = scored[: self.max_failures]
         successes = scored[-max(3, self.max_failures) :]
 
-        # -- build failure analysis --------------------------------------
+        # -- build failure analysis with pipeline context ----------------
         failure_lines: list[str] = []
         for idx, fail in enumerate(failures, 1):
             failure_lines.append(f"### Failure {idx}")
             failure_lines.append(f"- Query: {fail.get('query', 'N/A')}")
-            failure_lines.append(f"- Response: {fail.get('response', 'N/A')[:300]}")
-            failure_lines.append(f"- Expected: {fail.get('expected', 'N/A')[:300]}")
-            failure_lines.append(f"- Score: {fail.get('score', 0.0):.3f}")
-            issues = fail.get("feedback") or fail.get("reason") or fail.get("details", "")
+            failure_lines.append(
+                f"- Response: {fail.get('response', 'N/A')[:300]}"
+            )
+            failure_lines.append(
+                f"- Expected: {str(fail.get('expected', 'N/A'))[:300]}"
+            )
+            failure_lines.append(
+                f"- Score: {fail.get('score', 0.0):.3f}"
+            )
+            issues = (
+                fail.get("feedback")
+                or fail.get("reason")
+                or fail.get("details", "")
+            )
             if issues:
                 failure_lines.append(f"- Issues: {issues}")
+            # Dimensional scores
+            dims = fail.get("dimensions", {})
+            if dims:
+                dim_str = ", ".join(
+                    f"{k}={v:.3f}" for k, v in dims.items()
+                )
+                failure_lines.append(f"- Dimensions: {dim_str}")
+            # Retrieval context
+            ret_ctx = fail.get("retrieval_context", [])
+            if ret_ctx:
+                docs = "; ".join(str(d)[:100] for d in ret_ctx[:3])
+                failure_lines.append(f"- Retrieved docs: {docs}")
+            # Tool calls
+            tool_calls = fail.get("tool_calls", [])
+            if tool_calls:
+                tools = ", ".join(
+                    str(t.get("name", t)) for t in tool_calls[:3]
+                )
+                failure_lines.append(f"- Tool calls: {tools}")
+            # Reasoning
+            reasoning = fail.get("reasoning", "")
+            if reasoning:
+                failure_lines.append(
+                    f"- Agent reasoning: {str(reasoning)[:200]}"
+                )
             failure_lines.append("")
-        failure_analysis = "\n".join(failure_lines) if failure_lines else "No failures identified."
+        failure_analysis = (
+            "\n".join(failure_lines)
+            if failure_lines
+            else "No failures identified."
+        )
 
         # -- build success patterns --------------------------------------
         success_lines: list[str] = []
         for idx, suc in enumerate(successes, 1):
             success_lines.append(f"### Success {idx}")
             success_lines.append(f"- Query: {suc.get('query', 'N/A')}")
-            success_lines.append(f"- Score: {suc.get('score', 0.0):.3f}")
-            success_lines.append(f"- Response snippet: {suc.get('response', '')[:200]}")
+            success_lines.append(
+                f"- Score: {suc.get('score', 0.0):.3f}"
+            )
+            success_lines.append(
+                f"- Response snippet: {suc.get('response', '')[:200]}"
+            )
             success_lines.append("")
-        success_patterns = "\n".join(success_lines) if success_lines else "No strong successes."
-
-        # -- build the rewrite prompt ------------------------------------
-        prompt = (
-            "You are an expert prompt engineer. Your task is to REWRITE a "
-            "system prompt to improve its performance on the evaluation task.\n\n"
-            "## Current System Prompt\n"
-            "```\n"
-            f"{baseline.system_prompt}\n"
-            "```\n\n"
-            "## Failure Analysis (lowest-scoring results)\n"
-            f"{failure_analysis}\n\n"
-            "## Success Patterns (highest-scoring results)\n"
-            f"{success_patterns}\n\n"
-            "## Instructions\n"
-            "1. Carefully analyse why the current prompt fails on the failure cases.\n"
-            "2. Identify what makes the success cases work well.\n"
-            "3. Write an IMPROVED system prompt that:\n"
-            "   - Addresses the root causes of each failure type\n"
-            "   - Preserves the patterns that lead to high scores\n"
-            "   - Adds explicit instructions for edge cases\n"
-            "   - Is clear, specific, and actionable\n"
-            "4. Keep the core task/role the same — improve HOW the task is done.\n\n"
-            "Reply with ONLY the new system prompt text (no explanation, "
-            "no markdown fences).\n"
+        success_patterns = (
+            "\n".join(success_lines)
+            if success_lines
+            else "No strong successes."
         )
 
-        new_prompt = await LLMCaller.call(
+        # -- build context sections (score history, dims, clusters) ------
+        context_sections = ""
+        if context is not None:
+            parts: list[str] = []
+            # Score history / trends
+            history = context.format_score_history(max_rounds=5)
+            if history and history != "No previous rounds.":
+                parts.append(
+                    f"## Score History (recent rounds)\n{history}"
+                )
+                parts.append(
+                    f"Trend: {context.format_score_sparkline()}"
+                )
+            # Dimensional breakdown
+            dim_table = context.format_dimension_table()
+            if dim_table and "No per-dimension" not in dim_table:
+                parts.append(
+                    f"## Per-Dimension Scores\n{dim_table}"
+                )
+            # Failure clusters
+            clusters = context.format_failure_clusters()
+            if clusters and "No failure clusters" not in clusters:
+                parts.append(
+                    f"## Failure Clusters\n{clusters}"
+                )
+            if parts:
+                context_sections = "\n\n".join(parts) + "\n\n"
+
+        # -- build the rewrite prompt with chain-of-thought --------------
+        prompt = (
+            "You are an expert prompt engineer. Your task is to REWRITE a "
+            "system prompt to improve its performance.\n\n"
+            f"## Current System Prompt\n```\n"
+            f"{current_config.system_prompt}\n```\n\n"
+        )
+        if context_sections:
+            prompt += context_sections
+        prompt += (
+            f"## Failure Analysis (lowest-scoring results)\n"
+            f"{failure_analysis}\n\n"
+            f"## Success Patterns (highest-scoring results)\n"
+            f"{success_patterns}\n\n"
+            "## Instructions\n"
+            "First, THINK step-by-step in a <thinking> block:\n"
+            "1. What are the ROOT CAUSES of each failure type?\n"
+            "2. What patterns do the successful cases share?\n"
+            "3. What specific instructions are missing or "
+            "ambiguous?\n"
+            "4. How do the score trends inform what to change?\n"
+            "5. What concrete changes will address each failure "
+            "while preserving successes?\n\n"
+            "Then write the IMPROVED system prompt that:\n"
+            "- Addresses the root causes of each failure type\n"
+            "- Preserves the patterns that lead to high scores\n"
+            "- Adds explicit instructions for edge cases\n"
+            "- Is clear, specific, and actionable\n"
+            "- Keeps the core task/role the same\n\n"
+            "Reply with your <thinking> analysis followed by the "
+            "new system prompt after a '---' separator.\n"
+        )
+
+        raw_response = await LLMCaller.call(
             self.model,
             prompt,
             temperature=0.7,
-            max_tokens=2000,
+            max_tokens=3000,
         )
 
+        # Extract the prompt after the separator (or use full response)
+        new_prompt = raw_response.strip()
+        if "---" in new_prompt:
+            parts_split = new_prompt.split("---", 1)
+            new_prompt = parts_split[-1].strip()
+        # Strip any remaining <thinking> tags
+        if "<thinking>" in new_prompt:
+            # Take content after closing tag
+            if "</thinking>" in new_prompt:
+                new_prompt = new_prompt.split(
+                    "</thinking>", 1
+                )[-1].strip()
+        # Strip markdown fences
+        if new_prompt.startswith("```"):
+            lines = new_prompt.split("\n")
+            end = -1 if lines[-1].strip() == "```" else len(lines)
+            new_prompt = "\n".join(lines[1:end]).strip()
+
         if not new_prompt.strip():
-            logger.warning("RewriteOptimizer: LLM returned empty rewrite — keeping baseline")
-            new_prompt = baseline.system_prompt
+            logger.warning(
+                "RewriteOptimizer: LLM returned empty rewrite — "
+                "keeping current config"
+            )
+            new_prompt = current_config.system_prompt
 
         # -- determine mutation notes ------------------------------------
         mutation_notes = (
@@ -270,22 +387,33 @@ class RewriteOptimizer(BaseFitterOptimizer):
             f"{sum(f.get('score', 0) for f in failures) / max(len(failures), 1):.3f}) "
             f"and {len(successes)} successes."
         )
+        if context is not None:
+            mutation_notes += (
+                f" Context: {len(context.score_history)} rounds "
+                f"history, baseline={context.baseline_score:.3f}, "
+                f"current={context.current_score:.3f}."
+            )
 
         candidate = PromptCandidate(
             name=f"rewrite_{iteration:03d}",
             config=PromptRuntimeConfig(
                 system_prompt=new_prompt,
-                user_template=baseline.user_template,
-                few_shot_examples=list(baseline.few_shot_examples),
-                output_contract=baseline.output_contract,
-                model_params=dict(baseline.model_params),
-                rag_params=dict(baseline.rag_params),
-                tool_params=dict(baseline.tool_params),
+                user_template=current_config.user_template,
+                few_shot_examples=list(
+                    current_config.few_shot_examples
+                ),
+                output_contract=current_config.output_contract,
+                model_params=dict(current_config.model_params),
+                rag_params=dict(current_config.rag_params),
+                tool_params=dict(current_config.tool_params),
             ),
             source="rewrite",
             mutation_notes=mutation_notes,
         )
-        logger.debug("RewriteOptimizer: produced candidate '{}'", candidate.name)
+        logger.debug(
+            "RewriteOptimizer: produced candidate '{}'",
+            candidate.name,
+        )
         return [candidate]
 
 
@@ -310,7 +438,7 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
 
         opt = FewShotBootstrapOptimizer(n_candidates=8, k_examples=3)
         candidates = await opt.propose(
-            baseline=cfg, eval_results=results,
+            current_config=cfg, eval_results=results,
             dataset_sample=samples, search_space=space,
         )
         assert len(candidates) <= 3  # returns top 3
@@ -324,11 +452,12 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
 
     async def propose(
         self,
-        baseline: PromptRuntimeConfig,
+        current_config: PromptRuntimeConfig,
         eval_results: list[dict[str, Any]],
         dataset_sample: list[dict[str, Any]],
         search_space: PromptSearchSpace,
         iteration: int = 0,
+        context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
         """Generate few-shot candidates from scored evaluation results.
 
@@ -408,13 +537,13 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
             candidate = PromptCandidate(
                 name=f"fewshot_{iteration:03d}_{rank}",
                 config=PromptRuntimeConfig(
-                    system_prompt=baseline.system_prompt,
-                    user_template=baseline.user_template,
+                    system_prompt=current_config.system_prompt,
+                    user_template=current_config.user_template,
                     few_shot_examples=few_shot,
-                    output_contract=baseline.output_contract,
-                    model_params=dict(baseline.model_params),
-                    rag_params=dict(baseline.rag_params),
-                    tool_params=dict(baseline.tool_params),
+                    output_contract=current_config.output_contract,
+                    model_params=dict(current_config.model_params),
+                    rag_params=dict(current_config.rag_params),
+                    tool_params=dict(current_config.tool_params),
                 ),
                 source="few_shot_bootstrap",
                 mutation_notes=(
@@ -464,7 +593,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             n_few_shot_candidates=3,
         )
         candidates = await opt.propose(
-            baseline=cfg, eval_results=results,
+            current_config=cfg, eval_results=results,
             dataset_sample=samples, search_space=space,
         )
         assert all(c.source == "mipro_like" for c in candidates)
@@ -478,11 +607,12 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
 
     async def propose(
         self,
-        baseline: PromptRuntimeConfig,
+        current_config: PromptRuntimeConfig,
         eval_results: list[dict[str, Any]],
         dataset_sample: list[dict[str, Any]],
         search_space: PromptSearchSpace,
         iteration: int = 0,
+        context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
         """Generate candidates combining instructions, few-shot, and params.
 
@@ -515,7 +645,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
         # -- 2. Generate instruction variants in parallel ----------------
         instruction_tasks = [
             self._generate_instruction_variant(
-                current_prompt=baseline.system_prompt,
+                current_prompt=current_config.system_prompt,
                 failure_summary=failure_summary,
                 samples=dataset_sample,
                 variant_idx=i,
@@ -535,7 +665,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
                 instructions.append(text)
         if not instructions:
             logger.warning("MIPROLikeOptimizer: all instruction variants failed — using baseline")
-            instructions = [baseline.system_prompt]
+            instructions = [current_config.system_prompt]
 
         logger.debug("MIPROLikeOptimizer: got {} valid instructions", len(instructions))
 
@@ -546,7 +676,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             k_examples=min(4, len(eval_results)),
         )
         fs_candidates = await bootstrap.propose(
-            baseline=baseline,
+            current_config=current_config,
             eval_results=eval_results,
             dataset_sample=dataset_sample,
             search_space=search_space,
@@ -570,7 +700,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
         if self.fuse_top_k >= 2 and len(instructions) >= 2:
             fused = await self._fuse_instructions(
                 instructions[: self.fuse_top_k],
-                baseline.system_prompt,
+                current_config.system_prompt,
             )
             if fused:
                 instructions.insert(0, fused)
@@ -585,18 +715,18 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
 
                 # Pick a param combo (cycle through available ones)
                 params = param_combos[candidate_idx % len(param_combos)]
-                merged_params = {**baseline.model_params, **params}
+                merged_params = {**current_config.model_params, **params}
 
                 candidate = PromptCandidate(
                     name=f"mipro_{iteration:03d}_{candidate_idx:02d}",
                     config=PromptRuntimeConfig(
                         system_prompt=instr,
-                        user_template=baseline.user_template,
+                        user_template=current_config.user_template,
                         few_shot_examples=list(fs_set),
-                        output_contract=baseline.output_contract,
+                        output_contract=current_config.output_contract,
                         model_params=merged_params,
-                        rag_params=dict(baseline.rag_params),
-                        tool_params=dict(baseline.tool_params),
+                        rag_params=dict(current_config.rag_params),
+                        tool_params=dict(current_config.tool_params),
                     ),
                     source="mipro_like",
                     mutation_notes=(
@@ -763,7 +893,7 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
             n_mutations=3,
         )
         candidates = await opt.propose(
-            baseline=cfg, eval_results=results,
+            current_config=cfg, eval_results=results,
             dataset_sample=samples, search_space=space,
         )
         for c in candidates:
@@ -788,11 +918,12 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
 
     async def propose(
         self,
-        baseline: PromptRuntimeConfig,
+        current_config: PromptRuntimeConfig,
         eval_results: list[dict[str, Any]],
         dataset_sample: list[dict[str, Any]],
         search_space: PromptSearchSpace,
         iteration: int = 0,
+        context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
         """Generate targeted prompt mutations from evaluation feedback.
 
@@ -837,7 +968,7 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
         # -- 4. Generate mutations in parallel ---------------------------
         mutation_tasks = [
             self._generate_mutation(
-                current_prompt=baseline.system_prompt,
+                current_prompt=current_config.system_prompt,
                 feedback_summary=feedback_summary,
                 aspect=aspects[i % len(aspects)],
                 mutation_idx=i,
@@ -864,12 +995,14 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
                 name=f"gepa_{iteration:03d}_{idx}",
                 config=PromptRuntimeConfig(
                     system_prompt=new_prompt,
-                    user_template=baseline.user_template,
-                    few_shot_examples=list(baseline.few_shot_examples),
-                    output_contract=baseline.output_contract,
-                    model_params=dict(baseline.model_params),
-                    rag_params=dict(baseline.rag_params),
-                    tool_params=dict(baseline.tool_params),
+                    user_template=current_config.user_template,
+                    few_shot_examples=list(
+                        current_config.few_shot_examples
+                    ),
+                    output_contract=current_config.output_contract,
+                    model_params=dict(current_config.model_params),
+                    rag_params=dict(current_config.rag_params),
+                    tool_params=dict(current_config.tool_params),
                 ),
                 source="gepa_like",
                 mutation_notes=(
@@ -1087,11 +1220,12 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
 
     async def propose(
         self,
-        baseline: PromptRuntimeConfig,
+        current_config: PromptRuntimeConfig,
         eval_results: list[dict[str, Any]],
         dataset_sample: list[dict[str, Any]],
         search_space: PromptSearchSpace,
         iteration: int = 0,
+        context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
         """Generate candidates by sampling parameter combinations.
 
@@ -1119,21 +1253,26 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
         if search_space.optimize_model_params:
             combos = search_space.sample_params(10, "model")
             for combo in combos:
-                merged = {**baseline.model_params, **combo}
-                changes = {k: v for k, v in combo.items() if baseline.model_params.get(k) != v}
+                merged = {**current_config.model_params, **combo}
+                changes = {
+                    k: v for k, v in combo.items()
+                    if current_config.model_params.get(k) != v
+                }
                 if not changes:
                     continue
 
                 candidate = PromptCandidate(
                     name=f"param_{iteration:03d}_m{candidate_idx:02d}",
                     config=PromptRuntimeConfig(
-                        system_prompt=baseline.system_prompt,
-                        user_template=baseline.user_template,
-                        few_shot_examples=list(baseline.few_shot_examples),
-                        output_contract=baseline.output_contract,
+                        system_prompt=current_config.system_prompt,
+                        user_template=current_config.user_template,
+                        few_shot_examples=list(
+                            current_config.few_shot_examples
+                        ),
+                        output_contract=current_config.output_contract,
                         model_params=merged,
-                        rag_params=dict(baseline.rag_params),
-                        tool_params=dict(baseline.tool_params),
+                        rag_params=dict(current_config.rag_params),
+                        tool_params=dict(current_config.tool_params),
                     ),
                     source="param_search",
                     mutation_notes=(
@@ -1147,21 +1286,26 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
         if search_space.optimize_rag_params:
             combos = search_space.sample_params(10, "rag")
             for combo in combos:
-                merged = {**baseline.rag_params, **combo}
-                changes = {k: v for k, v in combo.items() if baseline.rag_params.get(k) != v}
+                merged = {**current_config.rag_params, **combo}
+                changes = {
+                    k: v for k, v in combo.items()
+                    if current_config.rag_params.get(k) != v
+                }
                 if not changes:
                     continue
 
                 candidate = PromptCandidate(
                     name=f"param_{iteration:03d}_r{candidate_idx:02d}",
                     config=PromptRuntimeConfig(
-                        system_prompt=baseline.system_prompt,
-                        user_template=baseline.user_template,
-                        few_shot_examples=list(baseline.few_shot_examples),
-                        output_contract=baseline.output_contract,
-                        model_params=dict(baseline.model_params),
+                        system_prompt=current_config.system_prompt,
+                        user_template=current_config.user_template,
+                        few_shot_examples=list(
+                            current_config.few_shot_examples
+                        ),
+                        output_contract=current_config.output_contract,
+                        model_params=dict(current_config.model_params),
                         rag_params=merged,
-                        tool_params=dict(baseline.tool_params),
+                        tool_params=dict(current_config.tool_params),
                     ),
                     source="param_search",
                     mutation_notes=(
@@ -1175,20 +1319,25 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
         if search_space.optimize_tool_params:
             combos = search_space.sample_params(10, "tool")
             for combo in combos:
-                merged = {**baseline.tool_params, **combo}
-                changes = {k: v for k, v in combo.items() if baseline.tool_params.get(k) != v}
+                merged = {**current_config.tool_params, **combo}
+                changes = {
+                    k: v for k, v in combo.items()
+                    if current_config.tool_params.get(k) != v
+                }
                 if not changes:
                     continue
 
                 candidate = PromptCandidate(
                     name=f"param_{iteration:03d}_t{candidate_idx:02d}",
                     config=PromptRuntimeConfig(
-                        system_prompt=baseline.system_prompt,
-                        user_template=baseline.user_template,
-                        few_shot_examples=list(baseline.few_shot_examples),
-                        output_contract=baseline.output_contract,
-                        model_params=dict(baseline.model_params),
-                        rag_params=dict(baseline.rag_params),
+                        system_prompt=current_config.system_prompt,
+                        user_template=current_config.user_template,
+                        few_shot_examples=list(
+                            current_config.few_shot_examples
+                        ),
+                        output_contract=current_config.output_contract,
+                        model_params=dict(current_config.model_params),
+                        rag_params=dict(current_config.rag_params),
                         tool_params=merged,
                     ),
                     source="param_search",

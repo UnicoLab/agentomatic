@@ -869,7 +869,7 @@ class TestFitterOptimizers:
             model_param_space={"temperature": [0.0, 0.5]},
         )
         candidates = await opt.propose(
-            baseline=baseline,
+            current_config=baseline,
             eval_results=[],
             dataset_sample=[],
             search_space=space,
@@ -893,7 +893,7 @@ class TestFitterOptimizers:
             model_param_space={"temperature": [0.5]},
         )
         candidates = await opt.propose(
-            baseline=baseline,
+            current_config=baseline,
             eval_results=[],
             dataset_sample=[],
             search_space=space,

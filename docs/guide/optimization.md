@@ -207,6 +207,58 @@ result.apply()
 
 ---
 
+## 🔭 Observability & Callbacks
+
+To give you a perfect understanding of what is happening during a multi-hour optimization run, Agentomatic uses a rich event system (`CallbackManager`) embedded into `PromptFitter` and `PromptOptimizationLoop`.
+
+### 1. Terminal Progress (Rich)
+
+By default, optimization runs use a `RichProgressCallback` if `rich` is installed. It provides:
+- A live progress bar for overall rounds and step-level evaluations.
+- Real-time score trends using a block sparkline (e.g. `📈 ▁▂▃▅▇`).
+- Metrics on candidates evaluated, failures found, and score deltas.
+
+If `rich` is not available, it gracefully degrades to a log-based `LogProgressCallback`.
+
+### 2. TUI Dashboard (Textual)
+
+For maximum observability, you can spin up an interactive terminal dashboard. If you have `textual` installed, pass `dashboard=True` to the `PromptFitter`.
+
+```python
+from agentomatic.optimize import PromptFitter
+
+fitter = PromptFitter(
+    agent="my_agent",
+    dataset=dataset,
+    contract=eval_contract,
+    metrics=my_metrics,
+    dashboard=True  # Opens the Textual TUI
+)
+
+result = await fitter.fit()
+```
+
+The TUI provides:
+- Live metrics and per-dimension scores
+- A candidate evaluation table
+- Event logging pane
+- Real-time performance chart
+
+### 3. Custom Callbacks
+
+You can hook into the event stream directly without subclassing any optimizers. Implement the `OptimizationCallback` protocol and pass your callbacks to the `PromptFitter` or `PromptOptimizationLoop`.
+
+```python
+from agentomatic.optimize.events import OptimizationCallback, OptimizationEvent, EventData
+
+class MyNotifier(OptimizationCallback):
+    async def on_event(self, event: OptimizationEvent, data: EventData) -> None:
+        if event == OptimizationEvent.RUN_COMPLETE:
+            send_slack_message(f"Optimization finished. Best score: {data.best_score}")
+
+fitter = PromptFitter(..., callbacks=[MyNotifier()])
+```
+
 ## 📊 Interactive HTML Reports
 
 Every optimization run generates a rich, interactive HTML report comparing prompt versions side-by-side. The report includes:

@@ -53,8 +53,22 @@ from agentomatic.optimize.config import (
     PromptFitResult,
     PromptRuntimeConfig,
 )
+from agentomatic.optimize.context import (
+    DatasetSummary,
+    OptimizationContext,
+    RoundStats,
+)
 from agentomatic.optimize.dataset import Dataset
-from agentomatic.optimize.failure_analysis import DimensionAnalyzer, FailureClusterer
+from agentomatic.optimize.events import (
+    CallbackManager,
+    EventData,
+    OptimizationCallback,
+    OptimizationEvent,
+)
+from agentomatic.optimize.failure_analysis import (
+    DimensionAnalyzer,
+    FailureClusterer,
+)
 from agentomatic.optimize.metrics import (
     BaseMetric,
     CompositeMetric,
@@ -162,6 +176,8 @@ class PromptFitter:
         concurrency: int = 5,
         experiment_dir: str = ".optimize",
         auto_report: bool = True,
+        callbacks: list[OptimizationCallback] | None = None,
+        dashboard: bool = False,
     ) -> None:
         # Public configuration
         self.agent = agent
@@ -191,15 +207,40 @@ class PromptFitter:
             resolve_fitter_optimizer,
         )
 
-        self._optimizer: BaseFitterOptimizer = resolve_fitter_optimizer(
-            optimizer,
-            model=task_model,
-            rewrite_model=self.rewrite_model,
+        self._optimizer: BaseFitterOptimizer = (
+            resolve_fitter_optimizer(
+                optimizer,
+                model=task_model,
+                rewrite_model=self.rewrite_model,
+            )
         )
 
         # Failure analysis
         self._failure_clusterer = FailureClusterer(model=task_model)
         self._dimension_analyzer = DimensionAnalyzer()
+
+        # Callback / event system
+        self._callbacks = CallbackManager(callbacks)
+        if dashboard:
+            try:
+                from agentomatic.optimize.dashboard import (
+                    DashboardCallback,
+                    launch_dashboard,
+                )
+
+                dcb = DashboardCallback()
+                self._callbacks.add(dcb)
+                launch_dashboard(dcb)
+            except Exception as exc:
+                logger.warning(
+                    "Dashboard launch failed: {}", exc
+                )
+        if not self._callbacks:
+            from agentomatic.optimize.progress import (
+                auto_progress_callback,
+            )
+
+            self._callbacks.add(auto_progress_callback())
 
     # ================================================================
     # Public API
@@ -259,12 +300,24 @@ class PromptFitter:
         experiment_id = uuid.uuid4().hex[:12]
         t0 = time.perf_counter()
         trials: list[dict[str, Any]] = []
+        score_history: list[RoundStats] = []
 
         logger.info(
             "🚀 PromptFitter.fit — experiment={} agent={} max_trials={}",
             experiment_id,
             self.agent,
             self.max_trials,
+        )
+        await self._callbacks.emit(
+            OptimizationEvent.FIT_START,
+            EventData(
+                agent=self.agent,
+                experiment_id=experiment_id,
+                optimizer_name=self._optimizer.name,
+                total_rounds=max(
+                    1, self.max_trials // _CANDIDATES_PER_ROUND
+                ),
+            ),
         )
 
         # ── Step 1: Load baseline config ─────────────────────────────
@@ -276,16 +329,31 @@ class PromptFitter:
         )
 
         # ── Step 2: Evaluate baseline on validation set ──────────────
-        logger.info("📊 Step 2/10 — Evaluating baseline on valset ({} pts)", len(valset))
-        baseline_score, baseline_dims, baseline_details = await self._evaluate_config(
-            baseline_config,
-            valset,
-            metric,
+        logger.info(
+            "📊 Step 2/10 — Evaluating baseline on valset ({} pts)",
+            len(valset),
+        )
+        baseline_score, baseline_dims, baseline_details = (
+            await self._evaluate_config(
+                baseline_config,
+                valset,
+                metric,
+            )
         )
         logger.info("📊 Baseline score: {:.4f}", baseline_score)
         if baseline_dims:
             for dim, val in baseline_dims.items():
                 logger.debug("   {}: {:.4f}", dim, val)
+        await self._callbacks.emit(
+            OptimizationEvent.BASELINE_EVALUATED,
+            EventData(
+                agent=self.agent,
+                experiment_id=experiment_id,
+                score=baseline_score,
+                baseline_score=baseline_score,
+                dimensions=dict(baseline_dims),
+            ),
+        )
 
         # ── Step 3: Cluster failures ─────────────────────────────────
         logger.info("🔍 Step 3/10 — Clustering baseline failures")
@@ -324,9 +392,12 @@ class PromptFitter:
         best_dims = dict(baseline_dims)
         no_improvement_rounds = 0
 
-        max_rounds = max(1, self.max_trials // _CANDIDATES_PER_ROUND)
+        max_rounds = max(
+            1, self.max_trials // _CANDIDATES_PER_ROUND
+        )
         logger.info(
-            "🔄 Starting optimisation: {} rounds × {} candidates = {} max evals",
+            "🔄 Starting optimisation: {} rounds × {} candidates"
+            " = {} max evals",
             max_rounds,
             _CANDIDATES_PER_ROUND,
             max_rounds * _CANDIDATES_PER_ROUND,
@@ -337,9 +408,31 @@ class PromptFitter:
         train_points = [dp.to_dict() for dp in trainset]
 
         # Prepare minibatch
-        minibatch_size = max(_MINIBATCH_MIN, int(len(val_points) * _MINIBATCH_FRACTION))
+        minibatch_size = max(
+            _MINIBATCH_MIN,
+            int(len(val_points) * _MINIBATCH_FRACTION),
+        )
         minibatch_points = val_points[:minibatch_size]
         minibatch_dataset = Dataset.from_list(minibatch_points)
+
+        # Build dataset summary for context
+        dataset_summary = DatasetSummary(
+            n_samples=len(val_points),
+            avg_query_length=(
+                sum(
+                    len(str(p.get("query", "")))
+                    for p in val_points
+                )
+                // max(len(val_points), 1)
+            ),
+            avg_expected_length=(
+                sum(
+                    len(str(p.get("expected", "")))
+                    for p in val_points
+                )
+                // max(len(val_points), 1)
+            ),
+        )
 
         logger.info(
             "   Minibatch: {} / {} points ({:.0%})",
@@ -354,16 +447,55 @@ class PromptFitter:
             round_t0 = time.perf_counter()
             round_num = round_idx + 1
             logger.info("── Round {}/{} ──", round_num, max_rounds)
+            await self._callbacks.emit(
+                OptimizationEvent.ROUND_START,
+                EventData(
+                    agent=self.agent,
+                    experiment_id=experiment_id,
+                    round_idx=round_idx,
+                    total_rounds=max_rounds,
+                    best_score=best_score,
+                    baseline_score=baseline_score,
+                    score_history=[
+                        rs.score for rs in score_history
+                    ],
+                ),
+            )
 
-            # ── Step 4: Generate candidates ──────────────────────────
-            logger.info("   💡 Step 4 — Proposing {} candidates", _CANDIDATES_PER_ROUND)
+            # ── Build OptimizationContext for the optimizer ───────
+            opt_context = OptimizationContext(
+                baseline_score=baseline_score,
+                baseline_dims=dict(baseline_dims),
+                current_score=best_score,
+                current_dims=dict(best_dims),
+                score_history=list(score_history),
+                failure_clusters=failure_clusters_raw,
+                eval_details=eval_results,
+                dataset_summary=dataset_summary,
+                metric_names=(
+                    [wm.name for wm in metric.metrics]
+                    if isinstance(metric, CompositeMetric)
+                    else [getattr(metric, "name", "metric")]
+                ),
+                round_idx=round_idx,
+                total_rounds=max_rounds,
+            )
+
+            # ── Step 4: Generate candidates ──────────────────────
+            logger.info(
+                "   💡 Step 4 — Proposing {} candidates",
+                _CANDIDATES_PER_ROUND,
+            )
             try:
-                candidates: list[PromptCandidate] = await self._optimizer.propose(
-                    current_config=best_config,
-                    eval_results=eval_results,
-                    dataset_sample=train_points[:20],
-                    search_space=self._search_space,
-                    iteration=round_idx,
+                candidates: list[PromptCandidate] = (
+                    await self._optimizer.propose(
+                        current_config=best_config,
+                        eval_results=eval_results,
+                        dataset_sample=train_points[:20],
+                        search_space=self._search_space,
+                        iteration=round_idx,
+                        context=opt_context,
+                    )
                 )
             except Exception as exc:
                 logger.error("   Candidate proposal failed: {}", exc)
@@ -397,7 +529,9 @@ class PromptFitter:
                     )
                     cand.composite_score = cand_score
                     cand.scores = dict(cand_dims)
-                    candidate_scores.append((cand, cand_score, cand_dims))
+                    candidate_scores.append(
+                        (cand, cand_score, cand_dims)
+                    )
 
                     trials.append(
                         {
@@ -409,6 +543,19 @@ class PromptFitter:
                             "dimensions": dict(cand_dims),
                             "mutation_notes": cand.mutation_notes,
                         }
+                    )
+                    await self._callbacks.emit(
+                        OptimizationEvent.CANDIDATE_EVALUATED,
+                        EventData(
+                            agent=self.agent,
+                            experiment_id=experiment_id,
+                            round_idx=round_idx,
+                            candidate_name=cand.name,
+                            candidate_source=cand.source,
+                            score=cand_score,
+                            best_score=best_score,
+                            dimensions=dict(cand_dims),
+                        ),
                     )
                     logger.info(
                         "      {} ({}): {:.4f}",
@@ -494,10 +641,27 @@ class PromptFitter:
                             cand.name,
                             reason,
                         )
+                        await self._callbacks.emit(
+                            OptimizationEvent.CANDIDATE_ACCEPTED,
+                            EventData(
+                                agent=self.agent,
+                                experiment_id=experiment_id,
+                                round_idx=round_idx,
+                                candidate_name=cand.name,
+                                score=full_score,
+                                best_score=best_score,
+                                accept_reason=reason,
+                                improvement=(
+                                    full_score - best_score
+                                ),
+                            ),
+                        )
                         best_config = cand.config
                         best_score = full_score
                         best_dims = dict(full_dims)
-                        eval_results = self._build_eval_results(full_details, metric)
+                        eval_results = self._build_eval_results(
+                            full_details, metric
+                        )
                         round_improved = True
                     else:
                         logger.info(
@@ -505,8 +669,27 @@ class PromptFitter:
                             cand.name,
                             reason,
                         )
-                        dim_table = self._dimension_analyzer.format_table(comparisons)
-                        logger.debug("      Dimension table:\n{}", dim_table)
+                        await self._callbacks.emit(
+                            OptimizationEvent.CANDIDATE_REJECTED,
+                            EventData(
+                                agent=self.agent,
+                                experiment_id=experiment_id,
+                                round_idx=round_idx,
+                                candidate_name=cand.name,
+                                score=full_score,
+                                best_score=best_score,
+                                accept_reason=reason,
+                            ),
+                        )
+                        dim_table = (
+                            self._dimension_analyzer.format_table(
+                                comparisons
+                            )
+                        )
+                        logger.debug(
+                            "      Dimension table:\n{}",
+                            dim_table,
+                        )
 
                 except Exception as exc:
                     logger.warning(
@@ -518,7 +701,8 @@ class PromptFitter:
             if round_improved:
                 no_improvement_rounds = 0
                 logger.info(
-                    "   📈 Round {} best: {:.4f} (Δ {:.4f} vs baseline)",
+                    "   📈 Round {} best: {:.4f}"
+                    " (Δ {:.4f} vs baseline)",
                     round_num,
                     best_score,
                     best_score - baseline_score,
@@ -527,13 +711,55 @@ class PromptFitter:
                 no_improvement_rounds += 1
                 if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
                     logger.warning(
-                        "   ⏹️  Early stop: {} rounds without improvement",
+                        "   ⏹️  Early stop: {} rounds without"
+                        " improvement",
                         _EARLY_STOP_PATIENCE,
+                    )
+                    await self._callbacks.emit(
+                        OptimizationEvent.EARLY_STOP,
+                        EventData(
+                            agent=self.agent,
+                            experiment_id=experiment_id,
+                            round_idx=round_idx,
+                            best_score=best_score,
+                        ),
                     )
                     break
 
             round_elapsed = time.perf_counter() - round_t0
-            logger.info("   ⏱️  Round {} completed in {:.1f}s", round_num, round_elapsed)
+            logger.info(
+                "   ⏱️  Round {} completed in {:.1f}s",
+                round_num,
+                round_elapsed,
+            )
+            score_history.append(
+                RoundStats(
+                    round_idx=round_idx,
+                    score=best_score,
+                    dims=dict(best_dims),
+                    accepted=round_improved,
+                    n_candidates=len(candidates)
+                    if candidates
+                    else 0,
+                    elapsed_seconds=round_elapsed,
+                )
+            )
+            await self._callbacks.emit(
+                OptimizationEvent.ROUND_END,
+                EventData(
+                    agent=self.agent,
+                    experiment_id=experiment_id,
+                    round_idx=round_idx,
+                    total_rounds=max_rounds,
+                    score=best_score,
+                    best_score=best_score,
+                    baseline_score=baseline_score,
+                    elapsed_seconds=round_elapsed,
+                    score_history=[
+                        rs.score for rs in score_history
+                    ],
+                ),
+            )
 
         # ── Step 8: Produce param suggestions ────────────────────────
         logger.info("📝 Step 8/10 — Producing param suggestions")
@@ -640,6 +866,19 @@ class PromptFitter:
 
         if test_score is not None:
             logger.info("🧪 Test score: {:.4f}", test_score)
+
+        await self._callbacks.emit(
+            OptimizationEvent.FIT_COMPLETE,
+            EventData(
+                agent=self.agent,
+                experiment_id=experiment_id,
+                score=best_score,
+                baseline_score=baseline_score,
+                best_score=best_score,
+                improvement=best_score - baseline_score,
+                elapsed_seconds=time.perf_counter() - t0,
+            ),
+        )
 
         return result
 
