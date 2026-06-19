@@ -39,14 +39,9 @@ if TYPE_CHECKING:
 # ------------------------------------------------------------------
 _HAS_TEXTUAL = False
 try:
-    from textual.app import App, ComposeResult
-    from textual.containers import Horizontal, Vertical
-    from textual.widgets import (
-        DataTable,
-        ProgressBar,
-        RichLog,
-        Static,
-    )
+    from textual.app import App, ComposeResult  # type: ignore
+    from textual.containers import Horizontal, Vertical  # type: ignore
+    from textual.widgets import DataTable, Footer, Header, ProgressBar, RichLog, Static  # type: ignore
 
     _HAS_TEXTUAL = True
 except ImportError:  # pragma: no cover

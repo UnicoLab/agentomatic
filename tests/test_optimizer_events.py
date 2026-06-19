@@ -45,7 +45,7 @@ async def test_loop_emits_events():
     import agentomatic.optimize.loop as loop_module
 
     original_load = loop_module._load_dataset
-    loop_module._load_dataset = lambda p: [{"query": "q", "expected_response": "e"}]
+    loop_module._load_dataset = lambda p: [{"query": "q", "expected_response": "e"}]  # type: ignore
 
     cb = MagicMock(spec=OptimizationCallback)
     cb.on_event = AsyncMock()

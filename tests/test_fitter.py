@@ -243,7 +243,7 @@ class TestPromptFitResult:
             agent="test_agent",
         )
         defaults.update(overrides)
-        return PromptFitResult(**defaults)
+        return PromptFitResult(**defaults)  # type: ignore[arg-type]
 
     def test_absolute_improvement(self):
         result = self._make_result()

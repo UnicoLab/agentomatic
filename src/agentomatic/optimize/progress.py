@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from loguru import logger
 
@@ -431,7 +431,7 @@ class RichProgressCallback:
 # Handler dispatch table — avoids a long if/elif chain.
 _RICH_HANDLERS: dict[
     OptimizationEvent,
-    object,
+    Any,
 ] = {}
 
 if _RICH_AVAILABLE:
@@ -575,6 +575,10 @@ class LogProgressCallback:
         )
 
     @staticmethod
+    def _on_early_stop(data: EventData) -> None:
+        logger.info("Early stop triggered")
+
+    @staticmethod
     def _on_rewrite_accepted(data: EventData) -> None:
         logger.info(
             "Rewrite accepted | prompt_length={} Δ={:+.4f}",
@@ -592,20 +596,9 @@ class LogProgressCallback:
 
 
 # Handler dispatch table for LogProgressCallback.
-_LOG_HANDLERS: dict[OptimizationEvent, object] = {
+_LOG_HANDLERS: dict[OptimizationEvent, Any] = {
     OptimizationEvent.FIT_START: LogProgressCallback._on_fit_start,
     OptimizationEvent.RUN_START: LogProgressCallback._on_fit_start,
-    OptimizationEvent.BASELINE_EVALUATED: (LogProgressCallback._on_baseline_evaluated),
-    OptimizationEvent.ROUND_START: (LogProgressCallback._on_round_start),
-    OptimizationEvent.STEP_START: (LogProgressCallback._on_step_start),
-    OptimizationEvent.CANDIDATE_EVALUATED: (LogProgressCallback._on_candidate_evaluated),
-    OptimizationEvent.CANDIDATE_ACCEPTED: (LogProgressCallback._on_candidate_accepted),
-    OptimizationEvent.CANDIDATE_REJECTED: (LogProgressCallback._on_candidate_rejected),
-    OptimizationEvent.ROUND_END: (LogProgressCallback._on_round_end),
-    OptimizationEvent.STEP_COMPLETE: (LogProgressCallback._on_step_complete),
-    OptimizationEvent.FIT_COMPLETE: (LogProgressCallback._on_fit_complete),
-    OptimizationEvent.RUN_COMPLETE: (LogProgressCallback._on_fit_complete),
-    OptimizationEvent.REWRITE_ACCEPTED: (LogProgressCallback._on_rewrite_accepted),
     OptimizationEvent.REWRITE_REJECTED: (LogProgressCallback._on_rewrite_rejected),
 }
 
