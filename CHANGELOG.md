@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.5.0 (2026-06-19)
+
+### Features
+
+- **studio**: Sync Studio UI v0.2.0 + fix run_tracker output
+  ([`54b17b7`](https://github.com/UnicoLab/agentomatic/commit/54b17b7ef2f662a7ae3b52e3abcf78cf8df53239))
+
+- fix(studio): run_tracker now stores actual agent output instead of input state - fix(studio):
+  include thread_id in run_start event data for frontend tracking - feat(studio): sync Studio UI
+  v0.2.0 with SSE fixes and UX improvements - chore: include pending changes from previous sessions
+  (docs, CI, bugfixes)
+
+
 ## v0.4.1 (2026-06-18)
 
 ### Bug Fixes
