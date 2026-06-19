@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.5.1 (2026-06-19)
+
+### Bug Fixes
+
+- **ci**: Remove unsupported --force flag from mike deploy commands
+  ([`a798262`](https://github.com/UnicoLab/agentomatic/commit/a79826287ad8ce5988346c3c36452adc90c25c99))
+
+mike v2 does not support --force, causing 'unrecognized arguments' error and docs deployment failure
+  during release. Replace with --ignore-remote-status for robustness across all workflow files: -
+  release.yml (deploy-docs job) - manual-docs.yml (both deploy paths) - docs.yml (retry step)
+
+- **ci**: Resolve lint, format, and type-check failures
+  ([`4316914`](https://github.com/UnicoLab/agentomatic/commit/4316914beafac25b67106ae807e50344b62a0224))
+
+- Fix indentation bug in langgraph adapter where checkpointer access was outside the None-guard,
+  causing mypy union-attr errors - Remove unused imports (asyncio, AsyncMock, RegisteredAgent) in
+  tests - Sort import blocks in test_bugfixes_041.py - Apply ruff format to 6 files (memory_manager,
+  router_factory, middleware/__init__, optimize/config, optimize/optimizer, tests) - Replace
+  hardcoded version assertions with dynamic semver validation to prevent test failures on every
+  version bump
+
+
 ## v0.5.0 (2026-06-19)
 
 ### Features

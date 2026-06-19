@@ -1,6 +1,6 @@
 [project]
 name = "agentomatic"
-version = "0.5.0"
+version = "0.5.1"
 description = "Drop agents, not code — zero-code multi-agent API platform framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -79,6 +79,7 @@ Documentation = "https://unicolab.github.io/agentomatic"
 Repository = "https://github.com/UnicoLab/agentomatic"
 Issues = "https://github.com/UnicoLab/agentomatic/issues"
 Changelog = "https://github.com/UnicoLab/agentomatic/blob/main/CHANGELOG.md"
+
 
 
 
