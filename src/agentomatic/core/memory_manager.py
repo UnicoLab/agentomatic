@@ -62,6 +62,7 @@ except ImportError:
         def __init__(self, content: str = "", **kwargs: Any) -> None:
             super().__init__(content=content, type="system", **kwargs)
 
+
 # Default summary system prompt
 _SUMMARY_SYSTEM_PROMPT = (
     "You are a conversation summarizer. Condense the following conversation "

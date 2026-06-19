@@ -33,4 +33,3 @@ def __getattr__(name: str) -> Any:
         mod = importlib.import_module(module_path, package=__name__)
         return getattr(mod, attr)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-

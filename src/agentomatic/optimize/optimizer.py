@@ -314,9 +314,7 @@ class OptimizationResult:
 
         # JSON results
         json_path = out / "optimization_results.json"
-        json_path.write_text(
-            json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=str)
-        )
+        json_path.write_text(json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=str))
         logger.info(f"📄 Results saved to {json_path}")
 
         # HTML report

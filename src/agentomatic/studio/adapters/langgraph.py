@@ -216,12 +216,12 @@ class LangGraphAdapter(StudioAdapter):
                 checkpointer = getattr(graph, "checkpointer", None)
                 if checkpointer is not None:
                     cfg = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
-                if hasattr(checkpointer, "aget_tuple"):
-                    cp_tuple = await checkpointer.aget_tuple(cfg)
-                elif hasattr(checkpointer, "get_tuple"):
-                    cp_tuple = checkpointer.get_tuple(cfg)
-                else:
-                    cp_tuple = None
+                    if hasattr(checkpointer, "aget_tuple"):
+                        cp_tuple = await checkpointer.aget_tuple(cfg)
+                    elif hasattr(checkpointer, "get_tuple"):
+                        cp_tuple = checkpointer.get_tuple(cfg)
+                    else:
+                        cp_tuple = None
 
                 if cp_tuple:
                     state_data = cp_tuple.checkpoint or {}

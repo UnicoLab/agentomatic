@@ -641,10 +641,12 @@ def create_default_router(
                 # langchain_core not installed — use plain dicts
                 lc_messages_plain: list[dict[str, str]] = []
                 for msg in request.messages:
-                    lc_messages_plain.append({
-                        "role": msg.get("role", "user"),
-                        "content": msg.get("content", ""),
-                    })
+                    lc_messages_plain.append(
+                        {
+                            "role": msg.get("role", "user"),
+                            "content": msg.get("content", ""),
+                        }
+                    )
                 lc_messages_plain.append({"role": "user", "content": request.content})
                 state["messages"] = lc_messages_plain
             history_loaded = len(request.messages)

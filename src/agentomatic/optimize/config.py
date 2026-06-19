@@ -469,8 +469,7 @@ class PromptFitResult:
 
         json_path = out / "fit_result.json"
         json_path.write_text(
-            json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=str)
-            + "\n",
+            json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=str) + "\n",
             encoding="utf-8",
         )
         logger.info("Saved fit result to {}", json_path.resolve())

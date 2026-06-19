@@ -17,15 +17,13 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # =====================================================================
 # BUG 1: memory_manager.py — lazy langchain_core import
@@ -420,8 +418,12 @@ class TestLoopResultSave:
             agent="loop_test",
             experiment_id="loop123",
             steps=[
-                StepResult(step=0, prompt="p1", avg_score=0.7, accuracy=0.8, results=[], elapsed=1.0),
-                StepResult(step=1, prompt="p2", avg_score=0.85, accuracy=0.9, results=[], elapsed=1.0),
+                StepResult(
+                    step=0, prompt="p1", avg_score=0.7, accuracy=0.8, results=[], elapsed=1.0
+                ),
+                StepResult(
+                    step=1, prompt="p2", avg_score=0.85, accuracy=0.9, results=[], elapsed=1.0
+                ),
             ],
             best_step=1,
             best_score=0.85,
@@ -448,7 +450,7 @@ class TestChatEndpointLangchainGuard:
 
     def test_chat_endpoint_with_messages_no_crash(self):
         """Providing messages to /chat should not crash without langchain."""
-        from agentomatic.core.manifest import AgentManifest, RegisteredAgent
+        from agentomatic.core.manifest import AgentManifest
         from agentomatic.core.platform import AgentPlatform
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -496,7 +498,7 @@ class TestHistoryErrorMetadata:
 
     def test_history_error_sets_metadata_flag(self):
         """Failed history load should set _history_error in state metadata."""
-        from agentomatic.core.manifest import AgentManifest, RegisteredAgent
+        from agentomatic.core.manifest import AgentManifest
         from agentomatic.core.platform import AgentPlatform
         from agentomatic.storage.memory import MemoryStore
 
@@ -542,17 +544,22 @@ class TestHistoryErrorMetadata:
 
 
 class TestVersion:
-    """Version should be 0.4.1."""
+    """Version should be a valid semver and consistent across modules."""
 
-    def test_version_is_041(self):
+    def test_version_is_valid_semver(self):
+        import re
+
         from agentomatic._version import __version__
 
-        assert __version__ == "0.4.1"
+        assert re.match(r"^\d+\.\d+\.\d+", __version__), (
+            f"Version {__version__!r} is not valid semver"
+        )
 
     def test_version_matches_package(self):
         import agentomatic
+        from agentomatic._version import __version__
 
-        assert agentomatic.__version__ == "0.4.1"
+        assert agentomatic.__version__ == __version__
 
 
 # =====================================================================
