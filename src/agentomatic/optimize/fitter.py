@@ -207,12 +207,10 @@ class PromptFitter:
             resolve_fitter_optimizer,
         )
 
-        self._optimizer: BaseFitterOptimizer = (
-            resolve_fitter_optimizer(
-                optimizer,
-                model=task_model,
-                rewrite_model=self.rewrite_model,
-            )
+        self._optimizer: BaseFitterOptimizer = resolve_fitter_optimizer(
+            optimizer,
+            model=task_model,
+            rewrite_model=self.rewrite_model,
         )
 
         # Failure analysis
@@ -232,9 +230,7 @@ class PromptFitter:
                 self._callbacks.add(dcb)
                 launch_dashboard(dcb)
             except Exception as exc:
-                logger.warning(
-                    "Dashboard launch failed: {}", exc
-                )
+                logger.warning("Dashboard launch failed: {}", exc)
         if not self._callbacks:
             from agentomatic.optimize.progress import (
                 auto_progress_callback,
@@ -314,9 +310,7 @@ class PromptFitter:
                 agent=self.agent,
                 experiment_id=experiment_id,
                 optimizer_name=self._optimizer.name,
-                total_rounds=max(
-                    1, self.max_trials // _CANDIDATES_PER_ROUND
-                ),
+                total_rounds=max(1, self.max_trials // _CANDIDATES_PER_ROUND),
             ),
         )
 
@@ -333,12 +327,10 @@ class PromptFitter:
             "📊 Step 2/10 — Evaluating baseline on valset ({} pts)",
             len(valset),
         )
-        baseline_score, baseline_dims, baseline_details = (
-            await self._evaluate_config(
-                baseline_config,
-                valset,
-                metric,
-            )
+        baseline_score, baseline_dims, baseline_details = await self._evaluate_config(
+            baseline_config,
+            valset,
+            metric,
         )
         logger.info("📊 Baseline score: {:.4f}", baseline_score)
         if baseline_dims:
@@ -392,12 +384,9 @@ class PromptFitter:
         best_dims = dict(baseline_dims)
         no_improvement_rounds = 0
 
-        max_rounds = max(
-            1, self.max_trials // _CANDIDATES_PER_ROUND
-        )
+        max_rounds = max(1, self.max_trials // _CANDIDATES_PER_ROUND)
         logger.info(
-            "🔄 Starting optimisation: {} rounds × {} candidates"
-            " = {} max evals",
+            "🔄 Starting optimisation: {} rounds × {} candidates = {} max evals",
             max_rounds,
             _CANDIDATES_PER_ROUND,
             max_rounds * _CANDIDATES_PER_ROUND,
@@ -419,18 +408,10 @@ class PromptFitter:
         dataset_summary = DatasetSummary(
             n_samples=len(val_points),
             avg_query_length=(
-                sum(
-                    len(str(p.get("query", "")))
-                    for p in val_points
-                )
-                // max(len(val_points), 1)
+                sum(len(str(p.get("query", ""))) for p in val_points) // max(len(val_points), 1)
             ),
             avg_expected_length=(
-                sum(
-                    len(str(p.get("expected", "")))
-                    for p in val_points
-                )
-                // max(len(val_points), 1)
+                sum(len(str(p.get("expected", ""))) for p in val_points) // max(len(val_points), 1)
             ),
         )
 
@@ -456,9 +437,7 @@ class PromptFitter:
                     total_rounds=max_rounds,
                     best_score=best_score,
                     baseline_score=baseline_score,
-                    score_history=[
-                        rs.score for rs in score_history
-                    ],
+                    score_history=[rs.score for rs in score_history],
                 ),
             )
 
@@ -487,15 +466,13 @@ class PromptFitter:
                 _CANDIDATES_PER_ROUND,
             )
             try:
-                candidates: list[PromptCandidate] = (
-                    await self._optimizer.propose(
-                        current_config=best_config,
-                        eval_results=eval_results,
-                        dataset_sample=train_points[:20],
-                        search_space=self._search_space,
-                        iteration=round_idx,
-                        context=opt_context,
-                    )
+                candidates: list[PromptCandidate] = await self._optimizer.propose(
+                    current_config=best_config,
+                    eval_results=eval_results,
+                    dataset_sample=train_points[:20],
+                    search_space=self._search_space,
+                    iteration=round_idx,
+                    context=opt_context,
                 )
             except Exception as exc:
                 logger.error("   Candidate proposal failed: {}", exc)
@@ -529,9 +506,7 @@ class PromptFitter:
                     )
                     cand.composite_score = cand_score
                     cand.scores = dict(cand_dims)
-                    candidate_scores.append(
-                        (cand, cand_score, cand_dims)
-                    )
+                    candidate_scores.append((cand, cand_score, cand_dims))
 
                     trials.append(
                         {
@@ -651,17 +626,13 @@ class PromptFitter:
                                 score=full_score,
                                 best_score=best_score,
                                 accept_reason=reason,
-                                improvement=(
-                                    full_score - best_score
-                                ),
+                                improvement=(full_score - best_score),
                             ),
                         )
                         best_config = cand.config
                         best_score = full_score
                         best_dims = dict(full_dims)
-                        eval_results = self._build_eval_results(
-                            full_details, metric
-                        )
+                        eval_results = self._build_eval_results(full_details, metric)
                         round_improved = True
                     else:
                         logger.info(
@@ -681,11 +652,7 @@ class PromptFitter:
                                 accept_reason=reason,
                             ),
                         )
-                        dim_table = (
-                            self._dimension_analyzer.format_table(
-                                comparisons
-                            )
-                        )
+                        dim_table = self._dimension_analyzer.format_table(comparisons)
                         logger.debug(
                             "      Dimension table:\n{}",
                             dim_table,
@@ -701,8 +668,7 @@ class PromptFitter:
             if round_improved:
                 no_improvement_rounds = 0
                 logger.info(
-                    "   📈 Round {} best: {:.4f}"
-                    " (Δ {:.4f} vs baseline)",
+                    "   📈 Round {} best: {:.4f} (Δ {:.4f} vs baseline)",
                     round_num,
                     best_score,
                     best_score - baseline_score,
@@ -711,8 +677,7 @@ class PromptFitter:
                 no_improvement_rounds += 1
                 if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
                     logger.warning(
-                        "   ⏹️  Early stop: {} rounds without"
-                        " improvement",
+                        "   ⏹️  Early stop: {} rounds without improvement",
                         _EARLY_STOP_PATIENCE,
                     )
                     await self._callbacks.emit(
@@ -738,9 +703,7 @@ class PromptFitter:
                     score=best_score,
                     dims=dict(best_dims),
                     accepted=round_improved,
-                    n_candidates=len(candidates)
-                    if candidates
-                    else 0,
+                    n_candidates=len(candidates) if candidates else 0,
                     elapsed_seconds=round_elapsed,
                 )
             )
@@ -755,9 +718,7 @@ class PromptFitter:
                     best_score=best_score,
                     baseline_score=baseline_score,
                     elapsed_seconds=round_elapsed,
-                    score_history=[
-                        rs.score for rs in score_history
-                    ],
+                    score_history=[rs.score for rs in score_history],
                 ),
             )
 

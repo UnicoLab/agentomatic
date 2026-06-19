@@ -390,6 +390,7 @@ class PromptOptimizationLoop:
 
         if not self._callbacks:
             from agentomatic.optimize.progress import auto_progress_callback
+
             self._callbacks.add(auto_progress_callback())
 
         if strategy not in _STRATEGY_PROMPTS:
@@ -451,7 +452,7 @@ class PromptOptimizationLoop:
                 agent=self.agent_name,
                 experiment_id=result.experiment_id,
                 total_steps=steps,
-            )
+            ),
         )
 
         for step_idx in range(steps):
@@ -470,7 +471,7 @@ class PromptOptimizationLoop:
                     best_score=result.best_score,
                     baseline_score=result.baseline_score,
                     score_history=[s.avg_score for s in result.steps],
-                )
+                ),
             )
 
             # ── 1. Evaluate ──────────────────────────────────────────
@@ -520,7 +521,7 @@ class PromptOptimizationLoop:
                     baseline_score=result.baseline_score,
                     elapsed_seconds=elapsed,
                     accuracy=accuracy,
-                )
+                ),
             )
 
             # Rewrite acceptance policy: reject regressions
@@ -569,7 +570,7 @@ class PromptOptimizationLoop:
                     agent=self.agent_name,
                     experiment_id=result.experiment_id,
                     step_idx=step_idx,
-                )
+                ),
             )
 
             new_prompt = await self._rewrite_prompt(
@@ -587,7 +588,7 @@ class PromptOptimizationLoop:
                         step_idx=step_idx,
                         prompt=new_prompt,
                         prompt_length=len(new_prompt),
-                    )
+                    ),
                 )
             else:
                 _logger.info("│ ⚠️  Rewrite unchanged — keeping current prompt")
@@ -598,7 +599,7 @@ class PromptOptimizationLoop:
                         experiment_id=result.experiment_id,
                         step_idx=step_idx,
                         accept_reason="Rewrite produced identical or empty prompt",
-                    )
+                    ),
                 )
 
             _logger.info("└" + "─" * 45)
@@ -616,7 +617,7 @@ class PromptOptimizationLoop:
                 improvement=result.improvement,
                 elapsed_seconds=result.total_elapsed,
                 total_steps=steps,
-            )
+            ),
         )
 
         return result
@@ -682,7 +683,7 @@ class PromptOptimizationLoop:
                     expected=res_dict["expected"],
                     response=res_dict["actual"][:500],
                     sample_score=res_dict["score"],
-                )
+                ),
             )
 
         n = len(results)
@@ -727,10 +728,7 @@ class PromptOptimizationLoop:
                 or "(none — all samples passed)"
             )
 
-            success_text = (
-                "\n\n".join(_format_sample(s) for s in successes[:3])
-                or "(none)"
-            )
+            success_text = "\n\n".join(_format_sample(s) for s in successes[:3]) or "(none)"
 
             human_msg = (
                 f"Response language constraint: ALL responses MUST be in {self.language}.\n\n"

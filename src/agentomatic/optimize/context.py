@@ -22,7 +22,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # =====================================================================
 # Score history per round
 # =====================================================================
@@ -158,9 +157,7 @@ class OptimizationContext:
         if not self.score_history:
             return f"📊 baseline={self.baseline_score:.3f}"
 
-        scores = [self.baseline_score] + [
-            rs.score for rs in self.score_history
-        ]
+        scores = [self.baseline_score] + [rs.score for rs in self.score_history]
         parts = [f"{s:.3f}" for s in scores]
         trend = "📈" if scores[-1] > scores[0] else "📉"
         return f"{trend} {' → '.join(parts)}"
@@ -171,25 +168,19 @@ class OptimizationContext:
         Returns:
             Multi-line table of dimension scores with deltas.
         """
-        all_dims = sorted(
-            set(self.baseline_dims) | set(self.current_dims)
-        )
+        all_dims = sorted(set(self.baseline_dims) | set(self.current_dims))
         if not all_dims:
             return "No per-dimension scores available."
 
         lines: list[str] = [
-            f"  {'Dimension':<20} {'Baseline':>10} {'Current':>10} "
-            f"{'Delta':>10}",
+            f"  {'Dimension':<20} {'Baseline':>10} {'Current':>10} {'Delta':>10}",
             f"  {'─' * 20} {'─' * 10} {'─' * 10} {'─' * 10}",
         ]
         for dim in all_dims:
             base = self.baseline_dims.get(dim, 0.0)
             curr = self.current_dims.get(dim, 0.0)
             delta = curr - base
-            lines.append(
-                f"  {dim:<20} {base:>10.4f} {curr:>10.4f} "
-                f"{delta:>+10.4f}"
-            )
+            lines.append(f"  {dim:<20} {base:>10.4f} {curr:>10.4f} {delta:>+10.4f}")
         return "\n".join(lines)
 
     def format_failure_clusters(self) -> str:
@@ -207,10 +198,7 @@ class OptimizationContext:
             count = cluster.get("count", 0)
             fix = cluster.get("suggested_fix", "N/A")
             severity = cluster.get("severity", 0.0)
-            lines.append(
-                f"  {i}. [{severity:.2f}] {label} ({count} cases): "
-                f"{fix[:120]}"
-            )
+            lines.append(f"  {i}. [{severity:.2f}] {label} ({count} cases): {fix[:120]}")
         return "\n".join(lines)
 
     def format_eval_details_for_rewrite(
@@ -249,48 +237,32 @@ class OptimizationContext:
                 score = f.get("score", f.get("avg_score", 0.0))
                 lines.append(f"\n**Failure {idx}** (score: {score:.3f})")
                 lines.append(f"- Query: {f.get('query', 'N/A')[:300]}")
-                lines.append(
-                    f"- Expected: {str(f.get('expected', 'N/A'))[:300]}"
-                )
-                lines.append(
-                    f"- Response: {f.get('response', 'N/A')[:300]}"
-                )
+                lines.append(f"- Expected: {str(f.get('expected', 'N/A'))[:300]}")
+                lines.append(f"- Response: {f.get('response', 'N/A')[:300]}")
 
-                feedback = (
-                    f.get("feedback")
-                    or f.get("reason")
-                    or f.get("details", "")
-                )
+                feedback = f.get("feedback") or f.get("reason") or f.get("details", "")
                 if feedback:
                     lines.append(f"- Feedback: {str(feedback)[:250]}")
 
                 dims = f.get("dimensions", {})
                 if dims:
-                    dim_str = ", ".join(
-                        f"{k}={v:.3f}" for k, v in dims.items()
-                    )
+                    dim_str = ", ".join(f"{k}={v:.3f}" for k, v in dims.items())
                     lines.append(f"- Dimensions: {dim_str}")
 
                 # Pipeline context
                 ret_ctx = f.get("retrieval_context", [])
                 if ret_ctx:
-                    docs = "; ".join(
-                        str(d)[:100] for d in ret_ctx[:3]
-                    )
+                    docs = "; ".join(str(d)[:100] for d in ret_ctx[:3])
                     lines.append(f"- Retrieved docs: {docs}")
 
                 tool_calls = f.get("tool_calls", [])
                 if tool_calls:
-                    tools = ", ".join(
-                        str(t.get("name", t)) for t in tool_calls[:3]
-                    )
+                    tools = ", ".join(str(t.get("name", t)) for t in tool_calls[:3])
                     lines.append(f"- Tool calls: {tools}")
 
                 reasoning = f.get("reasoning", "")
                 if reasoning:
-                    lines.append(
-                        f"- Reasoning: {str(reasoning)[:200]}"
-                    )
+                    lines.append(f"- Reasoning: {str(reasoning)[:200]}")
 
         # ── Successes ────────────────────────────────────────────────
         if successes:
@@ -299,8 +271,6 @@ class OptimizationContext:
                 score = s.get("score", s.get("avg_score", 0.0))
                 lines.append(f"\n**Success {idx}** (score: {score:.3f})")
                 lines.append(f"- Query: {s.get('query', 'N/A')[:200]}")
-                lines.append(
-                    f"- Response: {s.get('response', 'N/A')[:200]}"
-                )
+                lines.append(f"- Response: {s.get('response', 'N/A')[:200]}")
 
         return "\n".join(lines)

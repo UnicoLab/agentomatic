@@ -221,28 +221,16 @@ class RewriteOptimizer(BaseFitterOptimizer):
         for idx, fail in enumerate(failures, 1):
             failure_lines.append(f"### Failure {idx}")
             failure_lines.append(f"- Query: {fail.get('query', 'N/A')}")
-            failure_lines.append(
-                f"- Response: {fail.get('response', 'N/A')[:300]}"
-            )
-            failure_lines.append(
-                f"- Expected: {str(fail.get('expected', 'N/A'))[:300]}"
-            )
-            failure_lines.append(
-                f"- Score: {fail.get('score', 0.0):.3f}"
-            )
-            issues = (
-                fail.get("feedback")
-                or fail.get("reason")
-                or fail.get("details", "")
-            )
+            failure_lines.append(f"- Response: {fail.get('response', 'N/A')[:300]}")
+            failure_lines.append(f"- Expected: {str(fail.get('expected', 'N/A'))[:300]}")
+            failure_lines.append(f"- Score: {fail.get('score', 0.0):.3f}")
+            issues = fail.get("feedback") or fail.get("reason") or fail.get("details", "")
             if issues:
                 failure_lines.append(f"- Issues: {issues}")
             # Dimensional scores
             dims = fail.get("dimensions", {})
             if dims:
-                dim_str = ", ".join(
-                    f"{k}={v:.3f}" for k, v in dims.items()
-                )
+                dim_str = ", ".join(f"{k}={v:.3f}" for k, v in dims.items())
                 failure_lines.append(f"- Dimensions: {dim_str}")
             # Retrieval context
             ret_ctx = fail.get("retrieval_context", [])
@@ -252,40 +240,24 @@ class RewriteOptimizer(BaseFitterOptimizer):
             # Tool calls
             tool_calls = fail.get("tool_calls", [])
             if tool_calls:
-                tools = ", ".join(
-                    str(t.get("name", t)) for t in tool_calls[:3]
-                )
+                tools = ", ".join(str(t.get("name", t)) for t in tool_calls[:3])
                 failure_lines.append(f"- Tool calls: {tools}")
             # Reasoning
             reasoning = fail.get("reasoning", "")
             if reasoning:
-                failure_lines.append(
-                    f"- Agent reasoning: {str(reasoning)[:200]}"
-                )
+                failure_lines.append(f"- Agent reasoning: {str(reasoning)[:200]}")
             failure_lines.append("")
-        failure_analysis = (
-            "\n".join(failure_lines)
-            if failure_lines
-            else "No failures identified."
-        )
+        failure_analysis = "\n".join(failure_lines) if failure_lines else "No failures identified."
 
         # -- build success patterns --------------------------------------
         success_lines: list[str] = []
         for idx, suc in enumerate(successes, 1):
             success_lines.append(f"### Success {idx}")
             success_lines.append(f"- Query: {suc.get('query', 'N/A')}")
-            success_lines.append(
-                f"- Score: {suc.get('score', 0.0):.3f}"
-            )
-            success_lines.append(
-                f"- Response snippet: {suc.get('response', '')[:200]}"
-            )
+            success_lines.append(f"- Score: {suc.get('score', 0.0):.3f}")
+            success_lines.append(f"- Response snippet: {suc.get('response', '')[:200]}")
             success_lines.append("")
-        success_patterns = (
-            "\n".join(success_lines)
-            if success_lines
-            else "No strong successes."
-        )
+        success_patterns = "\n".join(success_lines) if success_lines else "No strong successes."
 
         # -- build context sections (score history, dims, clusters) ------
         context_sections = ""
@@ -294,24 +266,16 @@ class RewriteOptimizer(BaseFitterOptimizer):
             # Score history / trends
             history = context.format_score_history(max_rounds=5)
             if history and history != "No previous rounds.":
-                parts.append(
-                    f"## Score History (recent rounds)\n{history}"
-                )
-                parts.append(
-                    f"Trend: {context.format_score_sparkline()}"
-                )
+                parts.append(f"## Score History (recent rounds)\n{history}")
+                parts.append(f"Trend: {context.format_score_sparkline()}")
             # Dimensional breakdown
             dim_table = context.format_dimension_table()
             if dim_table and "No per-dimension" not in dim_table:
-                parts.append(
-                    f"## Per-Dimension Scores\n{dim_table}"
-                )
+                parts.append(f"## Per-Dimension Scores\n{dim_table}")
             # Failure clusters
             clusters = context.format_failure_clusters()
             if clusters and "No failure clusters" not in clusters:
-                parts.append(
-                    f"## Failure Clusters\n{clusters}"
-                )
+                parts.append(f"## Failure Clusters\n{clusters}")
             if parts:
                 context_sections = "\n\n".join(parts) + "\n\n"
 
@@ -364,9 +328,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
         if "<thinking>" in new_prompt:
             # Take content after closing tag
             if "</thinking>" in new_prompt:
-                new_prompt = new_prompt.split(
-                    "</thinking>", 1
-                )[-1].strip()
+                new_prompt = new_prompt.split("</thinking>", 1)[-1].strip()
         # Strip markdown fences
         if new_prompt.startswith("```"):
             lines = new_prompt.split("\n")
@@ -374,10 +336,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
             new_prompt = "\n".join(lines[1:end]).strip()
 
         if not new_prompt.strip():
-            logger.warning(
-                "RewriteOptimizer: LLM returned empty rewrite — "
-                "keeping current config"
-            )
+            logger.warning("RewriteOptimizer: LLM returned empty rewrite — keeping current config")
             new_prompt = current_config.system_prompt
 
         # -- determine mutation notes ------------------------------------
@@ -399,9 +358,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
             config=PromptRuntimeConfig(
                 system_prompt=new_prompt,
                 user_template=current_config.user_template,
-                few_shot_examples=list(
-                    current_config.few_shot_examples
-                ),
+                few_shot_examples=list(current_config.few_shot_examples),
                 output_contract=current_config.output_contract,
                 model_params=dict(current_config.model_params),
                 rag_params=dict(current_config.rag_params),
@@ -996,9 +953,7 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
                 config=PromptRuntimeConfig(
                     system_prompt=new_prompt,
                     user_template=current_config.user_template,
-                    few_shot_examples=list(
-                        current_config.few_shot_examples
-                    ),
+                    few_shot_examples=list(current_config.few_shot_examples),
                     output_contract=current_config.output_contract,
                     model_params=dict(current_config.model_params),
                     rag_params=dict(current_config.rag_params),
@@ -1255,8 +1210,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
             for combo in combos:
                 merged = {**current_config.model_params, **combo}
                 changes = {
-                    k: v for k, v in combo.items()
-                    if current_config.model_params.get(k) != v
+                    k: v for k, v in combo.items() if current_config.model_params.get(k) != v
                 }
                 if not changes:
                     continue
@@ -1266,9 +1220,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     config=PromptRuntimeConfig(
                         system_prompt=current_config.system_prompt,
                         user_template=current_config.user_template,
-                        few_shot_examples=list(
-                            current_config.few_shot_examples
-                        ),
+                        few_shot_examples=list(current_config.few_shot_examples),
                         output_contract=current_config.output_contract,
                         model_params=merged,
                         rag_params=dict(current_config.rag_params),
@@ -1287,10 +1239,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
             combos = search_space.sample_params(10, "rag")
             for combo in combos:
                 merged = {**current_config.rag_params, **combo}
-                changes = {
-                    k: v for k, v in combo.items()
-                    if current_config.rag_params.get(k) != v
-                }
+                changes = {k: v for k, v in combo.items() if current_config.rag_params.get(k) != v}
                 if not changes:
                     continue
 
@@ -1299,9 +1248,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     config=PromptRuntimeConfig(
                         system_prompt=current_config.system_prompt,
                         user_template=current_config.user_template,
-                        few_shot_examples=list(
-                            current_config.few_shot_examples
-                        ),
+                        few_shot_examples=list(current_config.few_shot_examples),
                         output_contract=current_config.output_contract,
                         model_params=dict(current_config.model_params),
                         rag_params=merged,
@@ -1321,8 +1268,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
             for combo in combos:
                 merged = {**current_config.tool_params, **combo}
                 changes = {
-                    k: v for k, v in combo.items()
-                    if current_config.tool_params.get(k) != v
+                    k: v for k, v in combo.items() if current_config.tool_params.get(k) != v
                 }
                 if not changes:
                     continue
@@ -1332,9 +1278,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     config=PromptRuntimeConfig(
                         system_prompt=current_config.system_prompt,
                         user_template=current_config.user_template,
-                        few_shot_examples=list(
-                            current_config.few_shot_examples
-                        ),
+                        few_shot_examples=list(current_config.few_shot_examples),
                         output_contract=current_config.output_contract,
                         model_params=dict(current_config.model_params),
                         rag_params=dict(current_config.rag_params),
