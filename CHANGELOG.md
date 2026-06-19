@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v0.6.0 (2026-06-19)
+
+### Chores
+
+- **optimize**: Fix linting errors in tests and config
+  ([`2dc3830`](https://github.com/UnicoLab/agentomatic/commit/2dc38309961c3daf1b11505e74dc9efc832dd60f))
+
+- **optimize**: Fix mypy arg-type error in test_fitter
+  ([`092995a`](https://github.com/UnicoLab/agentomatic/commit/092995ac55b27f1582c785df0f947f45941c6b78))
+
+- **optimize**: Fix unused imports in dashboard
+  ([`c6aae12`](https://github.com/UnicoLab/agentomatic/commit/c6aae124a179993a69e872dd79bf67ffc116248c))
+
+### Features
+
+- **optimize**: Integrate event callbacks and TUI dashboards
+  ([`13ab8e9`](https://github.com/UnicoLab/agentomatic/commit/13ab8e97009a3c0eaf990c2706a78949cda1538d))
+
+- Add comprehensive EventData and OptimizationEvent system - Add RichProgressCallback and Textual
+  DashboardCallback - Pass deep context payload to rewrite LLM - Implement regression rejection via
+  acceptance_policy - Support brace-safe system prompt formatting - Expand documentation and unit
+  tests for optimizer observability
+
+
 ## v0.5.1 (2026-06-19)
 
 ### Bug Fixes
