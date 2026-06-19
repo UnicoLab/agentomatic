@@ -449,3 +449,29 @@ class PromptFitResult:
         logger.info("Wrote runtime config to {}", config_path.resolve())
 
         return version
+
+    def save(self, directory: str | Path) -> Path:
+        """Save the full result as JSON to *directory*.
+
+        This is a convenience method that writes the entire
+        :meth:`to_dict` output as ``fit_result.json``.  Use
+        :meth:`apply` to additionally write ``prompts.json`` and
+        ``runtime_config.json`` for the agent.
+
+        Args:
+            directory: Output directory (created if needed).
+
+        Returns:
+            Path to the written JSON file.
+        """
+        out = Path(directory)
+        out.mkdir(parents=True, exist_ok=True)
+
+        json_path = out / "fit_result.json"
+        json_path.write_text(
+            json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=str)
+            + "\n",
+            encoding="utf-8",
+        )
+        logger.info("Saved fit result to {}", json_path.resolve())
+        return json_path

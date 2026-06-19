@@ -15,7 +15,9 @@ except ImportError:
     def add_messages(left, right):  # type: ignore[misc]
         """Fallback: simple list concatenation."""
         if left is None:
-            return right
+            return right if right is not None else []
+        if right is None:
+            return left
         return left + right
 
 

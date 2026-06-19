@@ -198,6 +198,11 @@ _collector: FeedbackCollector | None = None
 def get_collector() -> FeedbackCollector:
     global _collector
     if _collector is None:
+        logger.warning(
+            "📝 FeedbackCollector initialized without a storage backend — "
+            "feedback will be kept in a volatile in-memory buffer only. "
+            "Pass a store via set_collector() or enable_feedback + store to persist."
+        )
         _collector = FeedbackCollector()
     return _collector
 

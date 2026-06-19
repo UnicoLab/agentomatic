@@ -66,9 +66,10 @@ class LangGraphAdapter(StudioAdapter):
     def capabilities(self) -> list[str]:
         caps = ["graph", "streaming"]
         try:
-            graph = self._agent.graph_fn()
-            if getattr(graph, "checkpointer", None) is not None:
-                caps.extend(["checkpoints", "state", "breakpoints"])
+            if self._agent.graph_fn is not None:
+                graph = self._agent.graph_fn()
+                if getattr(graph, "checkpointer", None) is not None:
+                    caps.extend(["checkpoints", "state", "breakpoints"])
         except Exception:
             pass
         if self._agent.manifest.framework == "langgraph":
@@ -76,13 +77,15 @@ class LangGraphAdapter(StudioAdapter):
 
         # Detect deep_agent capabilities from graph node names
         try:
-            drawable = graph.get_graph()
-            node_names = [
-                getattr(n, "name", str(k)).lower()
-                for k, n in getattr(drawable, "nodes", {}).items()
-            ]
-            if any("write_todo" in n or "task" in n for n in node_names):
-                caps.append("deep_agent")
+            if self._agent.graph_fn is not None:
+                graph = self._agent.graph_fn()
+                drawable = graph.get_graph()
+                node_names = [
+                    getattr(n, "name", str(k)).lower()
+                    for k, n in getattr(drawable, "nodes", {}).items()
+                ]
+                if any("write_todo" in n or "task" in n for n in node_names):
+                    caps.append("deep_agent")
                 caps.append("subagents")
                 caps.append("planning")
         except Exception:
@@ -95,6 +98,8 @@ class LangGraphAdapter(StudioAdapter):
     # ------------------------------------------------------------------
 
     async def get_graph(self) -> StudioGraphTopology:
+        if self._agent.graph_fn is None:
+            raise ValueError(f"LangGraph agent '{self.agent_name}' has no graph_fn")
         graph = self._agent.graph_fn()
         drawable = graph.get_graph()
 
@@ -161,6 +166,8 @@ class LangGraphAdapter(StudioAdapter):
         breakpoints: list[str] | None = None,
         checkpoint_id: str | None = None,
     ) -> AsyncGenerator[StudioRunEvent, None]:
+        if self._agent.graph_fn is None:
+            raise ValueError(f"LangGraph agent '{self.agent_name}' has no graph_fn")
         graph = self._agent.graph_fn()
         config = dict(config or {})
 
@@ -204,10 +211,11 @@ class LangGraphAdapter(StudioAdapter):
         checkpoint_id: str | None = None
 
         try:
-            graph = self._agent.graph_fn()
-            checkpointer = getattr(graph, "checkpointer", None)
-            if checkpointer is not None:
-                cfg = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+            if self._agent.graph_fn is not None:
+                graph = self._agent.graph_fn()
+                checkpointer = getattr(graph, "checkpointer", None)
+                if checkpointer is not None:
+                    cfg = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
                 if hasattr(checkpointer, "aget_tuple"):
                     cp_tuple = await checkpointer.aget_tuple(cfg)
                 elif hasattr(checkpointer, "get_tuple"):
@@ -253,11 +261,12 @@ class LangGraphAdapter(StudioAdapter):
         merged = {**(current.state if current else {}), **updates}
 
         try:
-            graph = self._agent.graph_fn()
-            if hasattr(graph, "update_state"):
-                cfg = {"configurable": {"thread_id": thread_id}}
-                await graph.aupdate_state(cfg, updates)
-                logger.debug(f"State updated via LangGraph checkpointer for {thread_id}")
+            if self._agent.graph_fn is not None:
+                graph = self._agent.graph_fn()
+                if hasattr(graph, "update_state"):
+                    cfg = {"configurable": {"thread_id": thread_id}}
+                    await graph.aupdate_state(cfg, updates)
+                    logger.debug(f"State updated via LangGraph checkpointer for {thread_id}")
         except Exception as exc:
             logger.warning(f"LangGraph update_state failed: {exc}")
 

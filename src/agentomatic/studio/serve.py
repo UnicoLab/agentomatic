@@ -24,6 +24,17 @@ from loguru import logger
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
+# ── Runtime FastAPI imports ──────────────────────────────────────────
+# These MUST live at module level so that ``from __future__ import
+# annotations`` (which turns every annotation into a lazy string) can
+# still be resolved by FastAPI's dependency-injection machinery.
+# When they were imported *locally* inside ``mount_studio_ui()``,
+# FastAPI could not find ``Request`` in the module globals and fell
+# back to treating it as a required query parameter → 422.
+from fastapi import Request  # noqa: E402
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
 # Directory containing the built React app (index.html, static/js, static/css)
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -53,10 +64,6 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
         )
         return
 
-    from fastapi import Request
-    from fastapi.responses import FileResponse, HTMLResponse
-    from fastapi.staticfiles import StaticFiles
-
     # Normalise prefix
     prefix = path_prefix.rstrip("/")
 
@@ -72,7 +79,7 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
         )
 
     # Serve root-level assets (favicon, manifest, robots.txt, etc.)
-    @app.get(f"{prefix}/{{filename:path}}")
+    @app.get(f"{prefix}/{{filename:path}}", response_model=None)
     async def studio_spa(request: Request, filename: str) -> FileResponse | HTMLResponse:
         """Serve Studio UI files or fallback to index.html for SPA routing."""
         # Try to serve the exact file
@@ -84,10 +91,8 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
 
     # Redirect /studio/ui to /studio/ui/ for consistency
     @app.get(prefix, include_in_schema=False)
-    async def studio_root_redirect() -> HTMLResponse:
+    async def studio_root_redirect() -> RedirectResponse:
         """Redirect bare path to trailing-slash version."""
-        from fastapi.responses import RedirectResponse
-
-        return RedirectResponse(url=f"{prefix}/")  # type: ignore[return-value]
+        return RedirectResponse(url=f"{prefix}/")
 
     logger.info(f"🎨 Studio UI mounted at {prefix}/")

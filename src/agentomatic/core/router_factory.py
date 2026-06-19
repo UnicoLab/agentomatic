@@ -622,20 +622,31 @@ def create_default_router(
         history_loaded = 0
         if request.messages is not None:
             # User supplied their own messages — use them directly
-            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+            try:
+                from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-            lc_messages: list[Any] = []
-            for msg in request.messages:
-                role = msg.get("role", "user")
-                content_val = msg.get("content", "")
-                if role == "assistant":
-                    lc_messages.append(AIMessage(content=content_val))
-                elif role == "system":
-                    lc_messages.append(SystemMessage(content=content_val))
-                else:
-                    lc_messages.append(HumanMessage(content=content_val))
-            lc_messages.append(HumanMessage(content=request.content))
-            state["messages"] = lc_messages
+                lc_messages: list[Any] = []
+                for msg in request.messages:
+                    role = msg.get("role", "user")
+                    content_val = msg.get("content", "")
+                    if role == "assistant":
+                        lc_messages.append(AIMessage(content=content_val))
+                    elif role == "system":
+                        lc_messages.append(SystemMessage(content=content_val))
+                    else:
+                        lc_messages.append(HumanMessage(content=content_val))
+                lc_messages.append(HumanMessage(content=request.content))
+                state["messages"] = lc_messages
+            except ImportError:
+                # langchain_core not installed — use plain dicts
+                lc_messages_plain: list[dict[str, str]] = []
+                for msg in request.messages:
+                    lc_messages_plain.append({
+                        "role": msg.get("role", "user"),
+                        "content": msg.get("content", ""),
+                    })
+                lc_messages_plain.append({"role": "user", "content": request.content})
+                state["messages"] = lc_messages_plain
             history_loaded = len(request.messages)
         elif memory_mgr and request.include_history:
             try:
@@ -656,6 +667,7 @@ def create_default_router(
                 history_loaded = max(0, len(messages) - 1)
             except Exception as exc:
                 logger.warning(f"History loading failed for chat: {exc}")
+                state["metadata"]["_history_error"] = str(exc)
 
         # Run before_node hooks
         for hook in registry.before_node_hooks:

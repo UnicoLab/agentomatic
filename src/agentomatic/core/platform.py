@@ -141,6 +141,7 @@ class AgentPlatform:
         self._on_shutdown: list[Callable[..., Any]] = []
         self._extra_routers: list[tuple[str, Any, dict[str, Any]]] = []
         self._app: FastAPI | None = None
+        self._discovered: bool = False  # guard against double discovery
 
     # ------------------------------------------------------------------
     # Factory helpers
@@ -233,6 +234,31 @@ class AgentPlatform:
         self._on_shutdown.append(fn)
         return fn
 
+    def discover_agents(self) -> None:
+        """Manually trigger agent discovery from the configured folder.
+
+        This is useful for testing scenarios, embedding, or any context
+        where the async lifespan startup may not have run yet.  Safe to
+        call multiple times — subsequent calls are no-ops.
+
+        Example::
+
+            platform = AgentPlatform.from_folder("agents/")
+            platform.discover_agents()  # synchronous discovery
+            app = platform.build()
+        """
+        if self._discovered:
+            return
+
+        # Ensure agents directory is importable
+        parent = str(self.agents_dir.parent)
+        if parent not in sys.path:
+            sys.path.insert(0, parent)
+
+        prefix = self.package_prefix or self.agents_dir.name
+        self._registry.discover(self.agents_dir, prefix)
+        self._discovered = True
+
     # ------------------------------------------------------------------
     # Custom routers
     # ------------------------------------------------------------------
@@ -261,7 +287,22 @@ class AgentPlatform:
         """
         platform = self  # capture for closure
 
-        # Track which agents are already pre-registered (programmatic)
+        # Ensure agents directory is importable BEFORE build so
+        # programmatic and synchronous access to agents works.
+        parent = str(platform.agents_dir.parent)
+        if parent not in sys.path:
+            sys.path.insert(0, parent)
+
+        # Eagerly discover agents so they are available immediately
+        # after build() returns — no need to wait for lifespan startup.
+        # This also fixes TestClient scenarios where lifespan may not
+        # fully trigger.
+        if not platform._discovered:
+            prefix = platform.package_prefix or platform.agents_dir.name
+            platform._registry.discover(platform.agents_dir, prefix)
+            platform._discovered = True
+
+        # Track which agents are already registered (programmatic + discovered)
         _pre_registered = set(platform._registry.list_names())
 
         @asynccontextmanager
@@ -277,14 +318,11 @@ class AgentPlatform:
                 await platform._store.initialize()
                 logger.info("🗄️ Storage backend initialized")
 
-            # Ensure agents directory is importable
-            parent = str(platform.agents_dir.parent)
-            if parent not in sys.path:
-                sys.path.insert(0, parent)
-
-            # Auto-discover agents from folder (skips already-registered)
-            prefix = platform.package_prefix or platform.agents_dir.name
-            platform._registry.discover(platform.agents_dir, prefix)
+            # Re-discover in lifespan only if not already done (hot-reload)
+            if not platform._discovered:
+                prefix = platform.package_prefix or platform.agents_dir.name
+                platform._registry.discover(platform.agents_dir, prefix)
+                platform._discovered = True
 
             # Auto-generate + mount routers for NEWLY discovered agents
             for name, agent in platform._registry.all().items():
@@ -577,6 +615,16 @@ class AgentPlatform:
 
                 if is_studio_available():
                     mount_studio_ui(app)
+
+                    # Convenience redirects: /studio → /studio/ui/
+                    from fastapi.responses import RedirectResponse
+
+                    @app.get("/studio", include_in_schema=False)
+                    @app.get("/studio/", include_in_schema=False)
+                    async def _studio_redirect() -> RedirectResponse:
+                        return RedirectResponse(url="/studio/ui/")
+
+                    logger.info("🎨 Studio UI + redirects mounted")
                 else:
                     logger.info(
                         "🎨 Studio API is running but UI assets not bundled. "

@@ -20,6 +20,11 @@ jobs:
   docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
+    # Skip on release commits — the release workflow deploys versioned docs
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    concurrency:
+      group: deploy-docs
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4

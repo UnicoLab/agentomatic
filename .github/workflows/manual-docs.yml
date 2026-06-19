@@ -7,9 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       RELEASE_VERSION:
-        required: true
+        required: false
         type: string
-        description: "Release version for documentation (e.g. 0.2.0)"
+        default: ""
+        description: "Release version (e.g. 0.4.0). Leave blank to use the current version from pyproject.toml."
       UPDATE_LATEST:
         required: true
         type: boolean
@@ -21,8 +22,11 @@ permissions:
 
 jobs:
   deploy-docs:
-    name: Deploy Docs (v${{ inputs.RELEASE_VERSION }})
+    name: Deploy Documentation
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-docs
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
@@ -40,45 +44,40 @@ jobs:
       - name: Install docs dependencies
         run: uv sync --group docs
 
+      - name: Resolve version
+        id: version
+        run: |
+          INPUT_VERSION="${{ inputs.RELEASE_VERSION }}"
+          if [ -z "$INPUT_VERSION" ]; then
+            VERSION=$(uv run python -c "from agentomatic._version import __version__; print(__version__)")
+            echo "Auto-detected version: ${VERSION}"
+          else
+            VERSION="$INPUT_VERSION"
+            echo "Using provided version: ${VERSION}"
+          fi
+          echo "value=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Configure git
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-      - name: Fetch gh-pages branch
-        run: |
-          git fetch origin gh-pages:gh-pages || echo "No gh-pages branch exists yet — mike will create it"
-
       - name: Deploy versioned docs
-        id: deploy_docs
         run: |
-          VERSION="${{ inputs.RELEASE_VERSION }}"
+          VERSION="${{ steps.version.outputs.value }}"
           echo "Deploying documentation for version ${VERSION}"
-
-          if [[ "${{ inputs.UPDATE_LATEST }}" == "true" ]]; then
-            uv run mike deploy --push --update-aliases "$VERSION" latest
-            uv run mike set-default --push latest
-            echo "✓ Deployed v${VERSION} as 'latest'"
-          else
-            uv run mike deploy --push "$VERSION"
-            echo "✓ Deployed v${VERSION} (latest alias NOT updated)"
-          fi
-        continue-on-error: true
-
-      - name: Retry docs deployment on failure
-        if: steps.deploy_docs.outcome == 'failure'
-        run: |
-          VERSION="${{ inputs.RELEASE_VERSION }}"
-          echo "Retrying documentation deployment..."
-          git fetch origin gh-pages:gh-pages --force
+          git fetch origin gh-pages:gh-pages --force || echo "No gh-pages branch exists yet — mike will create it"
 
           if [[ "${{ inputs.UPDATE_LATEST }}" == "true" ]]; then
             uv run mike deploy --push --update-aliases --force "$VERSION" latest
             uv run mike set-default --push latest
+            echo "✓ Deployed v${VERSION} as 'latest' (set as default)"
           else
             uv run mike deploy --push --force "$VERSION"
+            echo "✓ Deployed v${VERSION} (latest alias NOT updated)"
           fi
 
       - name: List deployed versions
         run: |
+          echo "📚 All deployed documentation versions:"
           uv run mike list || echo "Could not list versions"

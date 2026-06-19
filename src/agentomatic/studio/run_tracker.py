@@ -171,6 +171,7 @@ class RunTracker:
             timestamp=_now_iso(),
             data={
                 "agent": run.agent_name,
+                "thread_id": thread_id,
                 "input": run.input,
                 "capabilities": adapter.capabilities,
             },
@@ -179,15 +180,19 @@ class RunTracker:
         yield f"data: {start_event.model_dump_json()}\n\n"
 
         try:
+            last_output: dict[str, Any] = {}
             async for event in adapter.stream_execution(state, config, breakpoints, checkpoint_id):
                 # Stamp the run_id onto adapter events
                 event.run_id = run_id
                 self.add_event(run_id, event)
                 yield f"data: {event.model_dump_json()}\n\n"
+                # Track the latest node_end output as the run result
+                if event.event == "node_end" and event.data:
+                    last_output = event.data
 
             # -- Run complete --
             duration = (time.monotonic() - start_time) * 1000
-            self.complete_run(run_id, state, duration)
+            self.complete_run(run_id, last_output or state, duration)
 
             run = self._runs.get(run_id)
             complete_event = StudioRunEvent(

@@ -299,6 +299,41 @@ class OptimizationResult:
             ],
         }
 
+    def save(self, directory: str | Path) -> tuple[Path, Path | None]:
+        """Save results as JSON + optional HTML report.
+
+        Args:
+            directory: Output directory (created if needed).
+
+        Returns:
+            ``(json_path, html_path)`` tuple.  ``html_path`` is ``None``
+            if the report generator is unavailable.
+        """
+        out = Path(directory)
+        out.mkdir(parents=True, exist_ok=True)
+
+        # JSON results
+        json_path = out / "optimization_results.json"
+        json_path.write_text(
+            json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=str)
+        )
+        logger.info(f"📄 Results saved to {json_path}")
+
+        # HTML report
+        html_path: Path | None = None
+        try:
+            from agentomatic.optimize.report import generate_html_report
+
+            report_out = out / f"optimization_report_{self.experiment_id}.html"
+            html_path_str = generate_html_report(self, output_path=str(report_out))
+            if html_path_str:
+                html_path = Path(html_path_str)
+                logger.info(f"📊 Report saved to {html_path}")
+        except Exception as exc:
+            logger.warning(f"HTML report generation failed: {exc}")
+
+        return json_path, html_path
+
 
 # =====================================================================
 # Prompt Optimizer — Main Engine

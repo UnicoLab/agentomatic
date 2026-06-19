@@ -47,6 +47,12 @@ async def create_lifespan(
 ) -> AsyncIterator[Callable[[FastAPI], Any]]:
     """Create a FastAPI lifespan context manager.
 
+    .. deprecated::
+        This function is retained for backward compatibility but is no
+        longer used by :meth:`AgentPlatform.build`, which creates its own
+        inline lifespan.  Prefer :meth:`AgentPlatform.on_startup` /
+        :meth:`AgentPlatform.on_shutdown` hooks instead.
+
     Startup sequence:
       1. Configure logging
       2. Discover agents

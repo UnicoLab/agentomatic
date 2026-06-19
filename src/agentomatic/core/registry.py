@@ -89,6 +89,10 @@ class AgentRegistry:
             manifest=manifest,
             node_fn=node_fn,
             module_path=module_path,
+            _studio_graph_fn=getattr(mod, "studio_graph_topology", None),
+            _studio_state_fn=getattr(mod, "studio_state_provider", None),
+            # Also look for a stream provider if it exists
+            _studio_stream_fn=getattr(mod, "studio_stream_provider", None),
         )
 
         # Discover optional enhancements

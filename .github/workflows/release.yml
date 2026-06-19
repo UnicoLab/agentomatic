@@ -250,9 +250,12 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   deploy-docs:
     name: Deploy Release Docs
-    needs: [semantic-release, pypi-publish]
-    if: needs.semantic-release.outputs.released == 'true' && !failure()
+    needs: [semantic-release]
+    if: needs.semantic-release.outputs.released == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-docs
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
@@ -275,25 +278,13 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-      - name: Fetch gh-pages branch
-        run: |
-          git fetch origin gh-pages:gh-pages || echo "No gh-pages branch exists yet — mike will create it"
-
       - name: Deploy versioned docs
         id: deploy_docs
         run: |
           VERSION="${{ needs.semantic-release.outputs.new_version }}"
           echo "Deploying documentation for version $VERSION"
-          uv run mike deploy --push --update-aliases "$VERSION" latest
-          uv run mike set-default --push latest
-          echo "✓ Deployed docs v${VERSION} (aliased as 'latest')"
-        continue-on-error: true
-
-      - name: Retry docs deployment on failure
-        if: steps.deploy_docs.outcome == 'failure'
-        run: |
-          VERSION="${{ needs.semantic-release.outputs.new_version }}"
-          echo "Retrying documentation deployment..."
-          git fetch origin gh-pages:gh-pages --force
+          git fetch origin gh-pages:gh-pages --force || echo "No gh-pages branch exists yet — mike will create it"
           uv run mike deploy --push --update-aliases --force "$VERSION" latest
           uv run mike set-default --push latest
+          echo "✓ Deployed docs v${VERSION} (aliased as 'latest', set as default)"
+

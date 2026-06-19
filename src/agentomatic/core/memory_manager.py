@@ -21,15 +21,46 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-)
 from loguru import logger
 
 from agentomatic.storage.base import BaseStore
+
+# langchain_core is an optional dependency — provide lightweight fallbacks
+# so the module can be imported without it.  The real classes are used when
+# langchain_core is installed; the fallbacks store role + content only.
+try:
+    from langchain_core.messages import (
+        AIMessage,
+        BaseMessage,
+        HumanMessage,
+        SystemMessage,
+    )
+
+    HAS_LANGCHAIN = True
+except ImportError:
+    HAS_LANGCHAIN = False
+
+    class BaseMessage:  # type: ignore[no-redef]
+        """Minimal stand-in when langchain_core is not installed."""
+
+        def __init__(self, content: str = "", **kwargs: Any) -> None:
+            self.content = content
+            self.type = kwargs.get("type", "base")
+
+        def __repr__(self) -> str:
+            return f"{self.__class__.__name__}(content={self.content!r})"
+
+    class HumanMessage(BaseMessage):  # type: ignore[no-redef]
+        def __init__(self, content: str = "", **kwargs: Any) -> None:
+            super().__init__(content=content, type="human", **kwargs)
+
+    class AIMessage(BaseMessage):  # type: ignore[no-redef]
+        def __init__(self, content: str = "", **kwargs: Any) -> None:
+            super().__init__(content=content, type="ai", **kwargs)
+
+    class SystemMessage(BaseMessage):  # type: ignore[no-redef]
+        def __init__(self, content: str = "", **kwargs: Any) -> None:
+            super().__init__(content=content, type="system", **kwargs)
 
 # Default summary system prompt
 _SUMMARY_SYSTEM_PROMPT = (

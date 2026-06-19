@@ -58,6 +58,12 @@ class RegisteredAgent:
     config: Any = None
     prompt_manager: PromptManager | None = None
 
+    # Studio hooks (set programmatically or via decorators)
+    _studio_graph_fn: Callable[..., Any] | None = field(default=None, repr=False)
+    _studio_state_fn: Callable[..., Any] | None = field(default=None, repr=False)
+    _studio_stream_fn: Callable[..., Any] | None = field(default=None, repr=False)
+    _studio_adapter: Any = field(default=None, repr=False)
+
     @property
     def name(self) -> str:
         """Return the agent's short machine name."""
