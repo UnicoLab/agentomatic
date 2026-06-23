@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.7.0 (2026-06-23)
+
+### Bug Fixes
+
+- **lint**: Fix pre-commit ruff and UP038 unsafe fixes
+  ([`5cf9a16`](https://github.com/UnicoLab/agentomatic/commit/5cf9a1653b0764ebb7ce76d56982cc0ddc1aeccf))
+
+- **lint**: Resolve mypy and ruff errors for 0.7.0 release
+  ([`16c4b24`](https://github.com/UnicoLab/agentomatic/commit/16c4b24c3f0bc3b901fb2f072333687d22dd7a0a))
+
+- **stacks**: Ensure pydantic-settings singleton syncs with StackConfig environment injection
+  ([`3c8d6fb`](https://github.com/UnicoLab/agentomatic/commit/3c8d6fb5069da0d6fe2ab14967e711876935bd1f))
+
+### Features
+
+- **release**: V0.5.1 production readiness, ML plugins, class-based agents, and deep documentation
+  ([`f04bd7a`](https://github.com/UnicoLab/agentomatic/commit/f04bd7aeaaef29b14e7579e4f9d3d28176484452))
+
+
 ## v0.6.0 (2026-06-19)
 
 ### Chores
