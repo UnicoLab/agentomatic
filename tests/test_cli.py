@@ -33,8 +33,9 @@ class TestBasicTemplate:
     def test_basic_files(self):
         files = get_template_files("basic", "test_agent")
         assert "__init__.py" in files
-        assert "graph.py" in files
-        assert "nodes.py" in files
+        assert "agent.py" in files
+        assert "graph.py" not in files
+        assert "nodes.py" not in files
         assert "prompts.json" in files
         assert "langgraph.json" in files
         assert ".env.example" in files
@@ -43,22 +44,16 @@ class TestBasicTemplate:
     def test_basic_init_content(self):
         files = get_template_files("basic", "my_agent")
         init = files["__init__.py"]
-        assert "AgentManifest" in init
-        assert 'name="my_agent"' in init
-        assert "node_fn" in init
+        assert "Agent package" in init
 
-    def test_basic_graph_content(self):
+    def test_basic_agent_content(self):
         files = get_template_files("basic", "my_agent")
-        graph = files["graph.py"]
-        assert "StateGraph" in graph
-        assert "get_graph" in graph
-        assert "build_graph" in graph
-
-    def test_basic_nodes_content(self):
-        files = get_template_files("basic", "my_agent")
-        nodes = files["nodes.py"]
-        assert "async def process" in nodes
-        assert "current_query" in nodes
+        agent = files["agent.py"]
+        assert "BaseGraphAgent" in agent
+        assert "MyAgentState" in agent
+        assert "class MyAgentAgent" in agent
+        assert "build_graph" in agent
+        assert "def process" in agent
 
 
 class TestFullTemplate:
@@ -94,31 +89,27 @@ class TestRagTemplate:
         files = get_template_files("rag", "kb_search")
         assert "config.py" in files
         assert "tools.py" in files
+        assert "agent.py" in files
 
-    def test_rag_graph(self):
+    def test_rag_agent(self):
         files = get_template_files("rag", "kb_search")
-        graph = files["graph.py"]
-        assert "retrieve" in graph
-        assert "generate" in graph
-
-    def test_rag_nodes(self):
-        files = get_template_files("rag", "kb_search")
-        nodes = files["nodes.py"]
-        assert "async def retrieve" in nodes
-        assert "async def generate" in nodes
-        assert "citations" in nodes
+        agent = files["agent.py"]
+        assert "def retrieve" in agent
+        assert "def generate" in agent
+        assert "citations" in agent
 
 
 class TestChatbotTemplate:
     def test_chatbot_files(self):
         files = get_template_files("chatbot", "assistant")
         assert "config.py" in files
+        assert "agent.py" in files
 
-    def test_chatbot_nodes(self):
+    def test_chatbot_agent(self):
         files = get_template_files("chatbot", "assistant")
-        nodes = files["nodes.py"]
-        assert "async def respond" in nodes
-        assert "messages" in nodes
+        agent = files["agent.py"]
+        assert "def respond" in agent
+        assert "messages" in agent
 
 
 class TestCustomTemplate:
@@ -162,8 +153,9 @@ class TestScaffolding:
             (target / rel_path).write_text(content)
 
         assert (target / "__init__.py").exists()
-        assert (target / "graph.py").exists()
-        assert (target / "nodes.py").exists()
+        assert (target / "agent.py").exists()
+        assert not (target / "graph.py").exists()
+        assert not (target / "nodes.py").exists()
         assert (target / "prompts.json").exists()
 
     def test_write_full_template(self, tmp_dir):
@@ -180,6 +172,14 @@ class TestScaffolding:
     def test_all_templates_produce_files(self, tmp_dir):
         for template in TEMPLATES:
             files = get_template_files(template, f"agent_{template}")
+            if template == "pipeline":
+                # Pipeline template produces only pipeline.yaml + README
+                assert "pipeline.yaml" in files
+                continue
+            if template == "class":
+                # Class template produces agent.py + dataset + train
+                assert "agent.py" in files
+                continue
             assert len(files) >= 3, f"Template {template} produced too few files"
             assert "__init__.py" in files, f"Template {template} missing __init__.py"
 

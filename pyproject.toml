@@ -52,7 +52,10 @@ telemetry = [
     "opentelemetry-instrumentation-fastapi>=0.40",
     "opentelemetry-instrumentation-httpx>=0.40",
 ]
-all = ["agentomatic[langgraph,ollama,metrics,db,cli,studio,optimize,telemetry]"]
+dotenv = ["python-dotenv>=1.0"]
+security = ["pyjwt[crypto]>=2.8", "cryptography>=42.0"]
+swarm = ["langgraph-swarm>=0.1"]
+all = ["agentomatic[langgraph,ollama,metrics,db,cli,studio,optimize,telemetry,dotenv,security,swarm]"]
 docs = [
     "mkdocs-material>=9.5",
     "mike>=2.1",
@@ -98,6 +101,8 @@ dev = [
     "build>=1.0",
     "twine>=6.0",
     "python-semantic-release>=9.0",
+    "mike>=2.2.0",
+    "mkdocs-material>=9.7.6",
 ]
 docs = [
     "mkdocs-material>=9.5",
@@ -190,11 +195,17 @@ exclude_lines = [
 # ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.11"
+plugins = ["pydantic.mypy"]
 warn_return_any = false
 warn_unused_configs = true
 check_untyped_defs = true
 explicit_package_bases = true
 mypy_path = "src"
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 # Pydantic models with Field(default=...) trigger false call-arg errors
 [[tool.mypy.overrides]]

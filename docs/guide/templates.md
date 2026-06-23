@@ -7,7 +7,7 @@
 
 ---
 
-Agentomatic ships with **6 templates** for rapid agent creation. Each template generates a complete, runnable agent package with the right files, structure, and boilerplate for your use case.
+Agentomatic ships with **9 templates** for rapid agent creation. Each template generates a complete, runnable agent package with the right files, structure, and boilerplate for your use case.
 
 ---
 
@@ -44,8 +44,12 @@ Both commands create the agent folder at `agents/my_agent/` with all necessary f
 | **`chatbot`** | 8 | LangGraph | ✅ | ✅ | ❌ | ❌ | Conversational agents with memory |
 | **`deepagent`** | 6 | LangGraph | ❌¹ | ✅ | ✅ | ❌ | Autonomous planning with sub-agents |
 | **`custom`** | 4 | Custom | ❌ | ❌ | ❌ | ❌ | Framework-agnostic, minimal deps |
+| **`swarm`** | 12 | LangGraph | ✅ | ✅ | ❌ | ❌ | Multi-agent delegation and handoffs |
+| **`pipeline`** | 2 | YAML | ❌ | ❌ | ❌ | ❌ | Multi-agent workflow composition |
+| **`class`** | 4 | Built-in | ✅² | ❌ | ❌ | ❌ | ML lifecycle: compile/fit/evaluate |
 
 ¹ *Deep agent uses `agent.py` with `create_deep_agent()` instead of `graph.py`*
+² *Class agent uses `AgentGraph` (built-in runtime) — no LangGraph dependency*
 
 ---
 
@@ -401,6 +405,341 @@ agents/simple/
 
 ---
 
+### `swarm` — Multi-Agent Delegation
+
+A swarm-style agent pre-configured for delegation and handoffs between agents. Includes delegation config, security policy, eval scaffolding, and a model card.
+
+```bash
+agentomatic init coordinator --template swarm
+```
+
+```text
+agents/coordinator/
+├── __init__.py          # Manifest + graph_fn + node_fn (delegation_targets)
+├── graph.py             # Swarm graph with delegation support
+├── nodes.py             # process() node function
+├── config.py            # Pydantic config
+├── delegation.py        # Delegation targets + handoff tools
+├── security.py          # Agent security policy
+├── evals.py             # Evaluation test cases
+├── model_card.yaml      # Agent model card
+├── prompts.json         # v1/v2 prompt templates
+├── langgraph.json       # LangGraph Studio config
+├── .env.example         # Environment variable template
+└── README.md            # Agent documentation
+```
+
+??? example "Generated swarm `__init__.py`"
+
+    ```python
+    """Agent: coordinator (swarm participant)."""
+    from __future__ import annotations
+    from typing import Any
+    from agentomatic import AgentManifest
+
+    manifest = AgentManifest(
+        name="coordinator",
+        slug="agent-coordinator",
+        description="Coordinator swarm agent",
+        intent_keywords=["coordinator", "swarm", "delegation"],
+        framework="langgraph",
+        delegation_targets=[],  # Add agent names to delegate to
+    )
+
+    def graph_fn():
+        """Return the compiled swarm agent graph."""
+        from .graph import get_graph
+        return get_graph()
+
+    async def node_fn(state: dict[str, Any]) -> dict[str, Any]:
+        """Invoke the swarm agent."""
+        return await graph_fn().ainvoke(state)
+    ```
+
+??? example "Generated swarm `graph.py`"
+
+    ```python
+    """Swarm graph for coordinator with delegation support."""
+    from __future__ import annotations
+    from functools import lru_cache
+    from langgraph.graph import END, StateGraph
+    from langgraph.prebuilt import create_react_agent
+    from agentomatic import BaseAgentState
+    from agentomatic.delegation import AgentDelegator
+    from . import nodes
+    from .delegation import DELEGATION_TARGETS
+
+    def build_graph() -> StateGraph:
+        g = StateGraph(BaseAgentState)
+        g.add_node("process", nodes.process)
+        g.set_entry_point("process")
+        g.add_edge("process", END)
+        return g
+
+    @lru_cache(maxsize=1)
+    def get_graph():
+        return build_graph().compile()
+    ```
+
+??? example "Generated `delegation.py`"
+
+    ```python
+    """Delegation configuration for coordinator agent."""
+    from __future__ import annotations
+    from agentomatic.delegation import create_agent_handoff
+
+    # Define which agents this agent can delegate to
+    DELEGATION_TARGETS: list[str] = []
+
+    def get_handoff_tools() -> list:
+        """Get handoff tools for delegation targets."""
+        return [
+            create_agent_handoff(
+                target, description=f"Delegate to {target}"
+            )
+            for target in DELEGATION_TARGETS
+        ]
+    ```
+
+!!! tip "Configuring Delegation"
+    Add agent names to `DELEGATION_TARGETS` in `delegation.py` and to `delegation_targets` in the manifest to enable inter-agent handoffs.
+
+---
+
+### `pipeline` — Multi-Agent Workflow
+
+A YAML-based pipeline definition for composing multiple agents into a sequential workflow. No Python code needed — just declare the steps.
+
+```bash
+agentomatic init data_pipeline --template pipeline
+```
+
+```text
+agents/data_pipeline/
+├── pipeline.yaml        # Pipeline definition (steps, conditions, I/O)
+└── README.md            # Pipeline documentation
+```
+
+??? example "Generated `pipeline.yaml`"
+
+    ```yaml
+    # data_pipeline Pipeline
+    # Documentation: https://agentomatic.dev/pipelines
+
+    name: data_pipeline
+    description: "Multi-agent pipeline for data_pipeline"
+    version: "1.0.0"
+
+    # Input/output contract (optional)
+    input:
+      query: str
+
+    output:
+      response: str
+
+    # Pipeline steps
+    steps:
+      # Step 1: Plan the approach
+      - name: plan
+        agent: planner
+        input:
+          current_query: "$.input.query"
+        output:
+          plan: "$.response"
+
+      # Step 2: Execute the plan
+      - name: execute
+        agent: executor
+        input:
+          current_query: "$.steps.plan.plan"
+
+      # Step 3: Review the result
+      - name: review
+        agent: reviewer
+        condition: >
+          len(ctx.steps.execute.output.get('response', '')) > 0
+        on_error: skip
+
+    # Error handling
+    on_error: continue
+    timeout: 120.0
+    ```
+
+!!! info "Pipeline Interfaces"
+    Pipelines can be defined via **YAML**, **Builder API**, or **Flow decorators**. The `pipeline` template generates the YAML variant. See the [Pipelines guide](../guide/pipelines.md) for all three interfaces.
+
+---
+
+### `class` — Class-Based Agent with ML Lifecycle
+
+Define agents as Python classes with an ML-inspired lifecycle: `compile()` → `fit()` → `evaluate()` → `transform()`. Uses the built-in `AgentGraph` runtime — no LangGraph dependency.
+
+```bash
+agentomatic init analyzer --template class
+```
+
+```text
+agents/analyzer/
+├── __init__.py          # AgentManifest + node_fn for auto-discovery
+├── agent.py             # BaseGraphAgent subclass with build_graph()
+├── llm.py               # LLM configuration
+├── prompts.json         # Prompt templates
+├── dataset.jsonl        # Sample training/test dataset
+├── train.py             # ML-like training script
+├── .env.example         # Environment config
+└── README.md            # Agent documentation
+```
+
+??? example "Generated `agent.py`"
+
+    ```python
+    """Class-based agent: analyzer."""
+    from __future__ import annotations
+
+    from dataclasses import dataclass, field
+    from typing import Any
+
+    from agentomatic.agents import BaseGraphAgent
+
+
+    @dataclass
+    class AnalyzerState:
+        """Agent state — per-run transient data."""
+
+        request: str = ""
+        context: list[str] = field(default_factory=list)
+        output: dict[str, Any] = field(default_factory=dict)
+
+
+    class AnalyzerAgent(BaseGraphAgent[AnalyzerState]):
+        """ML-like class agent for analyzer.
+
+        Usage::
+
+            agent = AnalyzerAgent(llm=my_llm)
+            result = agent.transform({"request": "Hello"})
+        """
+
+        agent_name = "analyzer"
+        agent_description = "Analyzer agent"
+
+        def __init__(self, *, llm: Any = None) -> None:
+            super().__init__()
+            self.llm = llm
+            self.system_prompt = "You are a helpful assistant."
+
+        # --- Graph Definition (LangGraph-style) ---
+
+        def build_graph(self):
+            """Wire the execution graph."""
+            g = self.new_graph()
+            g.add_node("process", self.process)
+            g.add_node("generate", self.generate)
+            g.set_entry_point("process")
+            g.add_edge("process", "generate")
+            g.set_finish_point("generate")
+            return g.compile()
+
+        # --- Node Methods ---
+
+        def process(self, state: AnalyzerState) -> AnalyzerState:
+            """Process the input request."""
+            state.context = [f"Processed: {state.request}"]
+            return state
+
+        def generate(
+            self, state: AnalyzerState,
+        ) -> AnalyzerState:
+            """Generate the final output."""
+            state.output = {
+                "response": f"Result for: {state.request}",
+                "agent_type": "analyzer",
+            }
+            return state
+
+        # --- State Conversion ---
+
+        def input_to_state(
+            self, input_data: dict[str, Any],
+        ) -> AnalyzerState:
+            return AnalyzerState(
+                request=input_data.get("request", ""),
+            )
+
+        def state_to_output(
+            self, state: AnalyzerState,
+        ) -> dict[str, Any]:
+            return state.output
+    ```
+
+??? example "Generated `dataset.jsonl`"
+
+    ```jsonl
+    {"id": "analyzer_001", "split": "train", "input": {"request": "Help me with task planning"}, "expected_output": {"response": "Here is a plan..."}, "metadata": {"domain": "general", "difficulty": "easy"}}
+    {"id": "analyzer_002", "split": "train", "input": {"request": "Summarize this document"}, "expected_output": {"response": "Summary: ..."}, "metadata": {"domain": "general", "difficulty": "medium"}}
+    {"id": "analyzer_003", "split": "test", "input": {"request": "Analyze the risks"}, "expected_output": {"response": "Risks identified: ..."}, "metadata": {"domain": "general", "difficulty": "hard"}}
+    ```
+
+??? example "Generated `train.py`"
+
+    ```python
+    """Train script for analyzer — ML-like workflow."""
+    from __future__ import annotations
+
+    from pathlib import Path
+
+    from .agent import AnalyzerAgent
+
+    from agentomatic.agents import AgentDataset
+    from agentomatic.agents.metrics import (
+        ContainsTermsMetric,
+        ExactKeyMatchMetric,
+    )
+    from agentomatic.agents.optimizers import NoOpOptimizer
+
+
+    def main() -> None:
+        """Run the ML-like training workflow."""
+        # 1. Create agent
+        agent = AnalyzerAgent(llm=None)
+
+        # 2. Load dataset
+        data_path = Path(__file__).parent / "dataset.jsonl"
+        dataset = AgentDataset.from_jsonl(str(data_path))
+        print(f"Loaded {len(dataset)} examples")
+
+        # 3. Compile
+        metrics = [
+            ExactKeyMatchMetric(["response"]),
+            ContainsTermsMetric(["Result"]),
+        ]
+        agent.compile(dataset, metrics, optimizer=NoOpOptimizer())
+
+        # 4. Fit
+        agent.fit(dataset)
+
+        # 5. Evaluate
+        report = agent.evaluate(dataset.test, metrics)
+        print(report.summary())
+
+        # 6. Inference
+        result = agent.transform({"request": "Test query"})
+        print(f"Output: {result}")
+
+        # 7. Save
+        agent.save("compiled/analyzer")
+        print("Done!")
+
+
+    if __name__ == "__main__":
+        main()
+    ```
+
+!!! info "No LangGraph Required"
+    Class agents use the built-in `AgentGraph` runtime. Wire your graph in `build_graph()` using `new_graph()` — no need for `langgraph` or `StateGraph`.
+
+---
+
 ## 🤔 Which Template Should I Use?
 
 ```mermaid
@@ -410,13 +749,18 @@ flowchart TD
     A --> D["Conversational<br/>chatbot?"]
     A --> E["Knowledge base<br/>Q&A?"]
     A --> F["Autonomous<br/>researcher?"]
+    A --> G2["Multi-agent<br/>delegation?"]
+    A --> H2["ML-like agent<br/>with training?"]
 
     B -->|Yes| G["custom"]
     C -->|Simple pipeline| H["basic"]
     C -->|Need all overrides| I["full"]
+    C -->|YAML composition| M["pipeline"]
     D -->|Yes| J["chatbot"]
     E -->|Yes| K["rag"]
     F -->|Yes| L["deepagent"]
+    G2 -->|Yes| N["swarm"]
+    H2 -->|Yes| O["class"]
 
     style G fill:#f3e5f5
     style H fill:#e8f5e9
@@ -424,6 +768,9 @@ flowchart TD
     style J fill:#fff3e0
     style K fill:#fce4ec
     style L fill:#e0f2f1
+    style M fill:#e8eaf6
+    style N fill:#fbe9e7
+    style O fill:#f1f8e9
 ```
 
 | If you need... | Use template |
@@ -434,6 +781,9 @@ flowchart TD
 | Multi-turn conversation with memory | `chatbot` |
 | Autonomous planning with tools | `deepagent` |
 | No LangGraph, pure Python | `custom` |
+| Multi-agent delegation and handoffs | `swarm` |
+| YAML-based multi-agent workflow | `pipeline` |
+| ML lifecycle: compile → fit → evaluate | `class` |
 
 ---
 

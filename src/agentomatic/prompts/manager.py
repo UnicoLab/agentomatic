@@ -57,3 +57,75 @@ class PromptManager:
     def reload(self, path: Path) -> None:
         """Reload prompts from disk."""
         self.load_from_file(path)
+
+    # -----------------------------------------------------------------
+    # LangChain integration
+    # -----------------------------------------------------------------
+
+    def as_langchain_template(
+        self,
+        version: str = "v1",
+        prompt_type: str = "system",
+    ) -> Any:
+        """Convert a prompt version to a LangChain ``PromptTemplate``.
+
+        Requires ``langchain-core`` to be installed.
+
+        Args:
+            version: Prompt version key (e.g. ``"v1"``).
+            prompt_type: Prompt type within the version (e.g. ``"system"``).
+
+        Returns:
+            A ``PromptTemplate`` instance, or ``None`` if the version/type
+            is not found or ``langchain-core`` is not installed.
+        """
+        raw = self.get_prompt(version, prompt_type)
+        if raw is None:
+            return None
+        try:
+            from langchain_core.prompts import PromptTemplate
+
+            return PromptTemplate.from_template(raw)
+        except ImportError:
+            logger.warning(
+                "langchain-core is not installed — returning None. "
+                "Install with: pip install langchain-core"
+            )
+            return None
+
+    def as_chat_template(
+        self,
+        version: str = "v1",
+    ) -> Any:
+        """Convert a prompt version to a LangChain ``ChatPromptTemplate``.
+
+        Builds a chat template from the ``"system"`` and ``"user_template"``
+        entries in the given version.  Requires ``langchain-core``.
+
+        Args:
+            version: Prompt version key.
+
+        Returns:
+            A ``ChatPromptTemplate`` instance, or ``None`` if the version
+            is missing or ``langchain-core`` is not installed.
+        """
+        version_data = self._prompts.get(version)
+        if version_data is None:
+            return None
+        try:
+            from langchain_core.prompts import ChatPromptTemplate
+
+            messages: list[tuple[str, str]] = []
+            if "system" in version_data:
+                messages.append(("system", version_data["system"]))
+            if "user_template" in version_data:
+                messages.append(("human", version_data["user_template"]))
+            if not messages:
+                return None
+            return ChatPromptTemplate.from_messages(messages)
+        except ImportError:
+            logger.warning(
+                "langchain-core is not installed — returning None. "
+                "Install with: pip install langchain-core"
+            )
+            return None

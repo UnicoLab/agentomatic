@@ -73,70 +73,68 @@ src/agentomatic/
 
 ## Creating Agents
 
-### Agent Structure
+### Agent Structure (Class-based Pattern - Recommended)
 
-Every agent is a Python package in the `agents/` directory:
+The primary and recommended way to build an Agentomatic agent is by subclassing `BaseGraphAgent`. This approach provides better encapsulation, allows easy injection of dependencies (like LLMs or databases) in `__init__`, and minimizes boilerplate.
+
+Every agent is a Python package or module in the `agents/` directory:
 
 ```
 agents/
 └── my_agent/
-    ├── __init__.py          # REQUIRED: manifest + node_fn/graph_fn
-    ├── graph.py             # LangGraph StateGraph definition
-    ├── nodes.py             # Node processing functions
+    ├── __init__.py          # Optional: Python package init
+    ├── agent.py             # REQUIRED: Contains your BaseGraphAgent subclass
     ├── config.py            # Optional: agent-specific config
-    ├── prompts.json         # Optional: versioned prompt templates
-    └── tools.py             # Optional: LangChain-compatible tools
+    └── prompts.json         # Optional: versioned prompt templates
 ```
 
-### Agent Manifest (Required)
+### Example: Class-based Agent (`agent.py`)
 
 ```python
-# agents/my_agent/__init__.py
-from agentomatic import AgentManifest
+# agents/my_agent/agent.py
+from dataclasses import dataclass, field
+from typing import Any
+from agentomatic.agents import BaseGraphAgent
 
-manifest = AgentManifest(
-    name="my_agent",                    # Machine name (must match folder)
-    slug="agent-my-agent",              # URL-safe slug
-    description="What this agent does", # Human-readable
-    intent_keywords=["search", "help"], # For intent routing
-    framework="langgraph",              # "langgraph" | "langchain" | "custom"
-)
+@dataclass
+class MyAgentState:
+    request: str = ""
+    output: dict[str, Any] = field(default_factory=dict)
+
+class MyAgentAgent(BaseGraphAgent[MyAgentState]):
+    # These properties automatically populate the AgentManifest
+    agent_name = "my_agent"
+    agent_description = "A helpful class-based agent"
+    agent_framework = "graph_agent"
+
+    def __init__(self, *, llm: Any = None):
+        super().__init__()
+        self.llm = llm  # easily inject dependencies!
+
+    def build_graph(self):
+        # Build the LangGraph execution graph
+        g = self.new_graph()
+        g.add_node("process", self.process)
+        g.set_entry_point("process")
+        g.set_finish_point("process")
+        return g.compile()
+
+    def process(self, state: MyAgentState) -> MyAgentState:
+        state.output = {"response": f"Hello! You said: {state.request}"}
+        return state
+
+    def input_to_state(self, input_data: dict[str, Any]) -> MyAgentState:
+        return MyAgentState(request=input_data.get("current_query", ""))
+
+    def state_to_output(self, state: MyAgentState) -> dict[str, Any]:
+        return state.output
 ```
 
-### Entry Points
+Agentomatic's registry will automatically discover the `MyAgentAgent` class, instantiate it, and expose it via REST endpoints and the Studio.
 
-Choose ONE:
+### Legacy Functional Pattern (LangGraph Dict)
 
-```python
-# Option 1: graph_fn — Returns compiled LangGraph (PREFERRED for LangGraph agents)
-def graph_fn():
-    from .graph import get_graph
-    return get_graph()
-
-# Option 2: node_fn — Direct async function (for custom/simple agents)
-async def node_fn(state: dict) -> dict:
-    return {"response": "Hello!"}
-```
-
-### LangGraph Agent Pattern
-
-```python
-# agents/my_agent/graph.py
-from functools import lru_cache
-from langgraph.graph import StateGraph, END
-from agentomatic import BaseAgentState
-
-def build_graph() -> StateGraph:
-    g = StateGraph(BaseAgentState)
-    g.add_node("process", process_node)
-    g.set_entry_point("process")
-    g.add_edge("process", END)
-    return g
-
-@lru_cache(maxsize=1)
-def get_graph():
-    return build_graph().compile()
-```
+You can still use the older dict-based pattern where you export `manifest` and `node_fn` or `graph_fn` in `__init__.py`. This is generated if you use `agentomatic init --template legacy_dict`.
 
 ### Deep Agent Pattern
 
@@ -153,6 +151,42 @@ def create_agent():
         tools=[my_tool],
     )
 ```
+
+## Creating ML Plugins
+
+Agentomatic supports classical ML models (PyTorch, TensorFlow, Scikit-learn) via `BaseMLPlugin`. These plugins are auto-discovered from a `plugins/` directory and mapped to strict Pydantic REST endpoints.
+
+```python
+# plugins/sentiment/plugin.py
+from pydantic import BaseModel, Field
+from agentomatic.plugins import BaseMLPlugin
+
+class SentimentInput(BaseModel):
+    text: str
+
+class SentimentOutput(BaseModel):
+    sentiment: str
+    confidence: float
+
+class SentimentPlugin(BaseMLPlugin[SentimentInput, SentimentOutput]):
+    plugin_name = "sentiment_analyzer"
+    plugin_description = "A classical ML model plugin."
+    plugin_version = "1.0.0"
+
+    async def load_model(self) -> None:
+        # Load weights into self.model
+        self.model = ...
+        await super().load_model()
+
+    async def predict(self, inputs: SentimentInput) -> SentimentOutput:
+        # Run inference
+        return SentimentOutput(sentiment="positive", confidence=0.99)
+```
+
+The platform auto-generates:
+- `POST /api/v1/plugins/sentiment_analyzer/predict` (strictly typed by Pydantic)
+- `GET /api/v1/plugins/sentiment_analyzer/model_card`
+- `GET /api/v1/plugins/sentiment_analyzer/health`
 
 ## BaseAgentState
 

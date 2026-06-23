@@ -24,6 +24,13 @@ With storage::
         enable_auth=True,
         auth_api_key="secret",
     )
+
+With stacks (v0.6)::
+
+    from agentomatic import AgentPlatform
+
+    platform = AgentPlatform.from_folder("agents/", stack="local")
+    app = platform.build()
 """
 
 from __future__ import annotations
@@ -36,6 +43,7 @@ from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 from agentomatic.core.memory_manager import ConversationMemoryManager
 from agentomatic.core.platform import AgentPlatform
 from agentomatic.core.registry import AgentRegistry
+from agentomatic.core.schemas import SchemaValidator
 from agentomatic.core.state import BaseAgentState
 from agentomatic.prompts import PromptManager
 
@@ -45,6 +53,24 @@ from agentomatic.protocols.decorators import APIResponse, handle_api_errors, log
 # Studio
 from agentomatic.studio import GraphInspector, RunTracker
 
+# Pipelines (lazy — avoids hard failure if yaml not installed)
+try:
+    from agentomatic.pipelines import Pipeline, PipelineConfig, PipelineResult
+except ImportError:
+    Pipeline = None  # type: ignore[assignment,misc]
+    PipelineConfig = None  # type: ignore[assignment,misc]
+    PipelineResult = None  # type: ignore[assignment,misc]
+
+# Class-owned graph agents (v0.7)
+from agentomatic.agents import (
+    AgentDataset,
+    AgentExample,
+    AgentGraph,
+    BaseGraphAgent,
+    GraphBuilder,
+    agent_node,
+)
+
 __all__ = [
     # Core
     "AgentPlatform",
@@ -53,6 +79,7 @@ __all__ = [
     "AgentRegistry",
     "BaseAgentState",
     "ConversationMemoryManager",
+    "SchemaValidator",
     # Protocols
     "APIResponse",
     "handle_api_errors",
@@ -62,6 +89,17 @@ __all__ = [
     # Studio
     "GraphInspector",
     "RunTracker",
+    # Pipelines
+    "Pipeline",
+    "PipelineConfig",
+    "PipelineResult",
+    # Class-owned graph agents (v0.7)
+    "BaseGraphAgent",
+    "AgentGraph",
+    "GraphBuilder",
+    "agent_node",
+    "AgentDataset",
+    "AgentExample",
     # Version
     "__version__",
 ]

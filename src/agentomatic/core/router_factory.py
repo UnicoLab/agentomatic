@@ -270,6 +270,11 @@ def create_default_router(
 
     router = APIRouter()
 
+    # ── Schema Validator (v0.6) ─────────────────────────────────────
+    _schema_validator = None
+    if agent and agent.schema_validator:
+        _schema_validator = agent.schema_validator
+
     # ── Memory Manager ────────────────────────────────────────────
     memory_mgr = None
     if thread_store:
@@ -408,6 +413,15 @@ def create_default_router(
     async def invoke(request: Any) -> Any:
         """Invoke agent synchronously."""
         agent = _get_agent()
+
+        # v0.6: Schema validation
+        if _schema_validator and _schema_validator.has_request_schema:
+            try:
+                request_data = request.model_dump() if hasattr(request, "model_dump") else {}
+                _schema_validator.validate_input(request_data)
+            except Exception as val_err:
+                raise HTTPException(422, detail=str(val_err))
+
         state = _build_initial_state(request)
         thread_id = state.get("thread_id", "")
         query = state.get("current_query", "")
@@ -462,9 +476,16 @@ def create_default_router(
                     assistant_metadata={"prompt_version": state.get("prompt_version")},
                 )
 
-            return _extract_response(
+            response = _extract_response(
                 result, agent.slug, duration_ms, prompt_version=state.get("prompt_version")
             )
+
+            # v0.6: Validate output (advisory — logs warnings but doesn't block)
+            if _schema_validator and _schema_validator.has_response_schema:
+                response_data = response.model_dump() if hasattr(response, "model_dump") else {}
+                _schema_validator.validate_output(response_data)
+
+            return response
         except AgentSuspendedException as exc:
             if thread_store:
                 await thread_store.save_suspended_state(

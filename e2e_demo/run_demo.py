@@ -24,6 +24,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from agentomatic._version import __version__
+
 # ── Step 1: Test bare import ─────────────────────────────────────────
 print("=" * 60)
 print("  🧪 Agentomatic v0.4.1 — E2E Demo")
@@ -37,8 +39,6 @@ try:
 except ImportError as e:
     print(f"   ❌ Import FAILED: {e}")
     sys.exit(1)
-
-from agentomatic._version import __version__
 
 print(f"   ✅ Version: {__version__}")
 
@@ -80,7 +80,7 @@ echo_manifest = AgentManifest(
     description="Echo agent — returns input as-is",
 )
 platform.register_agent(manifest=echo_manifest, node_fn=echo_fn)
-print(f"   ✅ Registered 'echo' agent")
+print("   ✅ Registered 'echo' agent")
 
 # ── Step 5: Set Studio hooks (BUG 11 fix — dataclass fields) ────────
 print("\n5️⃣  Testing Studio hooks on RegisteredAgent...")
@@ -98,7 +98,7 @@ else:
 # ── Step 6: Build the app ───────────────────────────────────────────
 print("\n6️⃣  Building FastAPI app...")
 app = platform.build()
-print(f"   ✅ App built successfully")
+print("   ✅ App built successfully")
 print(f"   📋 Total agents: {platform.registry.count}")
 print(f"   📋 Agent names: {platform.registry.list_names()}")
 

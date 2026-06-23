@@ -20,6 +20,7 @@ from .router_factory import (
     UpdateThreadRequest,
     create_default_router,
 )
+from .schemas import SchemaValidator
 from .state import BaseAgentState
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "ForkThreadRequest",
     "RegisteredAgent",
     "RejectSuspendedRequest",
+    "SchemaValidator",
     "UpdateThreadRequest",
     "configure_logging",
     "create_default_router",

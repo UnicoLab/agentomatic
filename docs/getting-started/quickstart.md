@@ -95,9 +95,8 @@ This creates a self-contained agent package under `agents/`:
 
 ```text
 agents/my_chatbot/
-├── __init__.py      # Manifest declaration + execution entrypoint
-├── graph.py         # LangGraph StateGraph pipeline definition
-├── nodes.py         # Node logic functions (LLM calls, processing)
+├── __init__.py      # Optional Python package init
+├── agent.py         # REQUIRED: Contains your BaseGraphAgent subclass
 ├── config.py        # Pydantic configuration (model, temperature, etc.)
 ├── prompts.json     # Versioned system and user prompt templates
 ├── langgraph.json   # LangGraph Studio local settings
@@ -125,68 +124,46 @@ agents/my_chatbot/
 
 Agentomatic supports multiple agent frameworks. Here's a quickstart for each:
 
-=== "LangGraph Agent"
+=== "Class-Based Agent (Recommended)"
 
-    The default and most feature-rich option. Define a `StateGraph` and expose it via `graph_fn`:
+    The default and most feature-rich option. Subclass `BaseGraphAgent`:
 
-    ```python title="agents/my_chatbot/__init__.py"
-    from agentomatic import AgentManifest
-    from .graph import get_graph
-
-    manifest = AgentManifest(
-        name="my_chatbot",
-        slug="my-chatbot",
-        description="A conversational chatbot powered by LangGraph.",
-        intent_keywords=["chat", "help", "question"],
-        version="1.0.0",
-        framework="langgraph",  # (1)!
-    )
-
-    def graph_fn():  # (2)!
-        """Return the compiled LangGraph StateGraph."""
-        return get_graph()
-    ```
-
-    1. Tells Agentomatic to use the LangGraph adapter for Studio visualization
-    2. `graph_fn` is called lazily — the graph is built on first request
-
-    ```python title="agents/my_chatbot/graph.py"
-    from langgraph.graph import StateGraph, END
-    from agentomatic import BaseAgentState
-    from .nodes import greet, respond
-
-    def get_graph():
-        builder = StateGraph(BaseAgentState)
-        builder.add_node("greet", greet)
-        builder.add_node("respond", respond)
-        builder.set_entry_point("greet")
-        builder.add_edge("greet", "respond")
-        builder.add_edge("respond", END)
-        return builder.compile()
-    ```
-
-    ```python title="agents/my_chatbot/nodes.py"
+    ```python title="agents/my_chatbot/agent.py"
+    from dataclasses import dataclass, field
     from typing import Any
-    from langchain_ollama import ChatOllama
-    from langchain_core.messages import HumanMessage
+    from agentomatic.agents import BaseGraphAgent
 
-    async def greet(state: dict[str, Any]) -> dict[str, Any]:
-        """Set the agent type and log the greeting step."""
-        return {
-            "agent_type": "agent-my_chatbot",
-            "steps_taken": ["greet"],
-        }
+    @dataclass
+    class ChatbotState:
+        request: str = ""
+        output: dict[str, Any] = field(default_factory=dict)
 
-    async def respond(state: dict[str, Any]) -> dict[str, Any]:
-        """Call the LLM and return a response."""
-        llm = ChatOllama(model="mistral:7b", temperature=0.7)
-        query = state.get("current_query", "")
-        result = await llm.ainvoke([HumanMessage(content=query)])
-        return {
-            "response": result.content,
-            "steps_taken": ["respond"],
-        }
+    class ChatbotAgent(BaseGraphAgent[ChatbotState]):
+        agent_name = "my_chatbot"
+        agent_description = "A conversational chatbot powered by LangGraph."
+        agent_framework = "graph_agent"
+
+        def build_graph(self):
+            g = self.new_graph()
+            g.add_node("process", self.process)
+            g.set_entry_point("process")
+            g.set_finish_point("process")
+            return g.compile()
+
+        def process(self, state: ChatbotState) -> ChatbotState:
+            state.output = {
+                "response": f"Hello! You said: {state.request}",
+                "agent_type": "agent-my_chatbot",
+            }
+            return state
+
+        def input_to_state(self, input_data: dict[str, Any]) -> ChatbotState:
+            return ChatbotState(request=input_data.get("current_query", ""))
+
+        def state_to_output(self, state: ChatbotState) -> dict[str, Any]:
+            return state.output
     ```
+
 
 === "LangChain LCEL Agent"
 

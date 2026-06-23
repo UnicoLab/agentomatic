@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+if TYPE_CHECKING:
+    from agentomatic.stacks.manager import StackManager
+
 _llm_instance: Any = None
+_named_instances: dict[str, Any] = {}
 _failover_count: int = 0
 _llm_lock = threading.Lock()
 
@@ -124,11 +128,92 @@ def _build_dummy_llm() -> Any:
 
 
 def reset_llm() -> None:
-    """Reset the LLM singleton."""
-    global _llm_instance, _failover_count
+    """Reset the LLM singleton and all named instances."""
+    global _llm_instance, _failover_count, _named_instances
     with _llm_lock:
         _llm_instance = None
+        _named_instances.clear()
         _failover_count = 0
+
+
+def get_named_llm(name: str, provider: str, **kwargs: Any) -> Any:
+    """Get or create a named LLM instance.
+
+    Unlike :func:`get_llm`, this function maintains a registry of named
+    instances so multiple LLM configurations can coexist (e.g. ``"default"``,
+    ``"fast"``, ``"judge"``).
+
+    Args:
+        name: Unique name for this LLM instance.
+        provider: Provider identifier (``"ollama"``, ``"openai"``, etc.).
+        **kwargs: Provider-specific parameters.
+
+    Returns:
+        An LLM instance.
+    """
+    if name in _named_instances:
+        return _named_instances[name]
+
+    with _llm_lock:
+        if name in _named_instances:
+            return _named_instances[name]
+        try:
+            instance = _build_llm(provider, **kwargs)
+            _named_instances[name] = instance
+            logger.debug(f"Created named LLM instance '{name}' ({provider})")
+        except Exception as exc:
+            logger.warning(f"Failed to build LLM '{name}' ({provider}): {exc}. Using dummy.")
+            instance = _build_dummy_llm()
+            _named_instances[name] = instance
+        return instance
+
+
+def get_llm_for_agent(
+    agent_name: str,
+    role: str = "default",
+    stack_manager: StackManager | None = None,
+) -> Any:
+    """Get an LLM instance for a specific agent and role.
+
+    Resolution order:
+      1. Agent's ``llm_config`` maps *role* → stack profile name.
+      2. Stack's ``llm[profile_name]`` provides provider / model / credentials.
+      3. Falls back to the stack's ``"default"`` profile.
+      4. Falls back to the global :func:`get_llm` singleton.
+
+    Args:
+        agent_name: Name of the requesting agent.
+        role: Logical role (``"default"``, ``"fast"``, ``"judge"``, …).
+        stack_manager: Optional :class:`StackManager` for stack resolution.
+
+    Returns:
+        An LLM instance.
+    """
+    if stack_manager is None:
+        return get_llm()
+
+    try:
+        entry = stack_manager.get_llm_config(role)
+    except (ValueError, KeyError):
+        try:
+            entry = stack_manager.get_llm_config("default")
+        except (ValueError, KeyError):
+            logger.debug(
+                f"No stack LLM config for agent={agent_name} role={role}, "
+                "falling back to global LLM"
+            )
+            return get_llm()
+
+    instance_name = f"{agent_name}:{role}"
+    return get_named_llm(
+        name=instance_name,
+        provider=entry.provider,
+        model=entry.model,
+        temperature=entry.temperature,
+        api_key=entry.api_key,
+        base_url=entry.base_url,
+        **entry.extra,
+    )
 
 
 async def invoke_with_retry(

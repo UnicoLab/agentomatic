@@ -84,9 +84,11 @@ nav:
     - Your First Agent: getting-started/first-agent.md
   - User Guide:
     - Agent Structure: guide/agent-structure.md
+    - Class-Based Agents: guide/class-agents.md
     - Input & Output Schemas: guide/schemas.md
     - Prompt Management: guide/prompts.md
     - Templates: guide/templates.md
+    - Pipelines: guide/pipelines.md
     - Configuration: guide/configuration.md
     - Storage Backends: guide/storage.md
     - Middleware: guide/middleware.md
@@ -94,6 +96,11 @@ nav:
     - Advanced Platform Features: guide/platform-features.md
     - Prompt Optimization: guide/optimization.md
     - Telemetry & Feedback: guide/telemetry.md
+    - ML Plugins: guide/ml-plugins.md
+    - Configuration Stacks: guide/stacks.md
+    - LLM Providers & Failover: guide/llm-providers.md
+    - Security & Zero Trust: guide/security.md
+    - Swarm Delegation: guide/delegation.md
   - Debugging:
     - Agentomatic Studio: guide/studio.md
     - Deep Agent Integration: guide/deep-agents.md
@@ -104,5 +111,6 @@ nav:
   - Architecture:
     - Overview: architecture/overview.md
     - API Reference: architecture/api-reference.md
+    - Frontend API Guide: FRONTEND_API_GUIDE.md
   - Contributing: contributing.md
   - Changelog: changelog.md

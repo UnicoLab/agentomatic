@@ -25,6 +25,7 @@ Commands:
   demo      Launch a quick demo with Studio.
   ui        Launch the Chainlit debug UI.
   optimize  Run automatic prompt tuning loops.
+  pipeline  Manage and run agent pipelines.
 ```
 
 !!! tip "Rich terminal output"
@@ -45,6 +46,7 @@ Commands:
 | **Debug** | [`test`](#agentomatic-test), [`ui`](#agentomatic-ui) | Interactive testing and chat UI |
 | **Inspect** | [`list`](#agentomatic-list), [`inspect`](#agentomatic-inspect), [`doctor`](#agentomatic-doctor) | Discover, validate, and diagnose |
 | **Optimize** | [`optimize`](#agentomatic-optimize) | Automatic prompt tuning |
+| **Pipeline** | [`pipeline run`](#agentomatic-pipeline-run), [`pipeline validate`](#agentomatic-pipeline-validate), [`pipeline list`](#agentomatic-pipeline-list) | Manage and run agent pipelines |
 
 ---
 
@@ -61,7 +63,7 @@ Arguments:
   NAME  Agent name (snake_case)  [required]
 
 Options:
-  -t, --template [basic|full|rag|chatbot|custom]
+  -t, --template [basic|full|rag|chatbot|deepagent|custom|swarm|pipeline|class]
                           Template to use (interactive picker if omitted)
   -d, --dir TEXT          Agents parent directory  [default: agents]
   -f, --force             Overwrite existing agent directory
@@ -75,7 +77,11 @@ Options:
 | `chatbot` | Multi-turn conversational bot | Same as basic + history management |
 | `rag` | Retrieval-Augmented Generation | Same as basic + `tools.py`, vector store setup |
 | `full` | All features enabled | All files including `schemas.py`, `api.py`, `tools.py` |
+| `deepagent` | Autonomous planning with sub-agents | `__init__.py`, `agent.py`, `config.py`, `delegation.py`, `prompts.json` |
 | `custom` | Minimal scaffold for raw Python | `__init__.py`, `config.py`, `prompts.json` |
+| `swarm` | Multi-agent delegation and handoffs | `__init__.py`, `graph.py`, `nodes.py`, `delegation.py`, `security.py`, `evals.py` |
+| `pipeline` | YAML-based multi-agent workflow | `pipeline.yaml`, `README.md` |
+| `class` | Class agent with ML lifecycle | `agent.py`, `dataset.jsonl`, `train.py`, `README.md` |
 
 #### Examples
 
@@ -522,6 +528,104 @@ Options:
 
 !!! info "HTML Reports"
     By default, each optimization run generates an interactive HTML report in `optimization_reports/` showing score progression, prompt diffs, and per-sample results. Disable with `--no-report`.
+
+---
+
+## Pipeline Commands
+
+### `agentomatic pipeline run`
+
+Execute a pipeline defined in `pipeline.yaml`. Runs each step sequentially, invoking the referenced agents through the platform API.
+
+```text
+Usage: agentomatic pipeline run [OPTIONS] PIPELINE
+
+Arguments:
+  PIPELINE  Path to pipeline.yaml or agent name  [required]
+
+Options:
+  --input TEXT            JSON input data (or @file.json)
+  --agents-dir TEXT       Agents folder to scan  [default: agents]
+  --host TEXT             Platform API base URL  [default: http://localhost:8000]
+  --timeout FLOAT         Max execution time in seconds  [default: 120.0]
+  --dry-run               Validate and print steps without executing
+  --verbose               Show step-by-step execution details
+```
+
+#### Examples
+
+=== "Run with JSON input"
+
+    ```bash
+    agentomatic pipeline run agents/my_pipeline/pipeline.yaml \
+      --input '{"query": "Analyze Q3 results"}'
+    ```
+
+=== "Run with input file"
+
+    ```bash
+    agentomatic pipeline run my_pipeline --input @input.json
+    ```
+
+=== "Dry run (validate only)"
+
+    ```bash
+    agentomatic pipeline run my_pipeline --dry-run --verbose
+    ```
+
+---
+
+### `agentomatic pipeline validate`
+
+Validate a pipeline YAML file for structural correctness, agent references, and schema compatibility.
+
+```text
+Usage: agentomatic pipeline validate [OPTIONS] PIPELINE
+
+Arguments:
+  PIPELINE  Path to pipeline.yaml or agent name  [required]
+
+Options:
+  --agents-dir TEXT   Agents folder to scan  [default: agents]
+  --strict            Fail on warnings (missing agents, unused outputs)
+```
+
+#### Example
+
+```bash
+agentomatic pipeline validate agents/my_pipeline/pipeline.yaml --strict
+```
+
+```text
+✅ Pipeline "my_pipeline" is valid
+   Steps: 3 (plan → execute → review)
+   Agents: planner, executor, reviewer
+   Timeout: 120.0s
+```
+
+---
+
+### `agentomatic pipeline list`
+
+List all discovered pipelines in the agents directory.
+
+```text
+Usage: agentomatic pipeline list [OPTIONS]
+
+Options:
+  --agents-dir TEXT   Agents folder to scan  [default: agents]
+```
+
+#### Example Output
+
+```text
+╭────────────────── 🔗 Pipelines in agents ──────────────────╮
+│ Name           │ Steps │ Agents           │ Version │
+├────────────────┼───────┼──────────────────┼─────────┤
+│ data_pipeline  │ 3     │ planner, exec…   │ 1.0.0   │
+│ review_flow    │ 2     │ analyzer, rev…   │ 1.0.0   │
+╰────────────────┴───────┴──────────────────┴─────────╯
+```
 
 ---
 

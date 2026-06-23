@@ -38,6 +38,7 @@ graph TB
         A2["Agent B\n(LangChain)\nnode_fn → LCEL chain"]
         A3["Agent C\n(Raw Python)\nnode_fn → async callable"]
         A4["Agent D\n(Deep Agent)\ngraph_fn → Subagent graph"]
+        A5["Agent E\n(Class Agent)\nBaseGraphAgent → AgentGraph"]
     end
 
     subgraph "Studio Adapter Layer"
@@ -79,12 +80,14 @@ graph TB
     REG --> A2
     REG --> A3
     REG --> A4
+    REG --> A5
 
     %% Agent → Adapter
     A1 --> LGA
     A2 --> LCA
     A3 --> GA
     A4 --> LGA
+    A5 --> GA
 
     %% Storage
     RF --> MM --> SQL
@@ -468,6 +471,161 @@ spec:
 
 ---
 
+## Class-Agent Architecture (v0.7)
+
+The **Class-Owned Graph Agent** system introduces an alternative agent paradigm: define agents as Python classes with an ML-inspired lifecycle, using a built-in graph runtime that requires no LangGraph dependency.
+
+### Component Overview
+
+```mermaid
+graph TB
+    subgraph "Platform Integration"
+        AP["AgentPlatform"]
+        REG["AgentRegistry"]
+        RA["RegisteredAgent"]
+    end
+
+    subgraph "Class-Agent System"
+        BGA["BaseGraphAgent\n(user subclass)"]
+        BG["build_graph()\nnew_graph()"]
+        GB["GraphBuilder\nLangGraph-compatible API"]
+        AG["AgentGraph\nlightweight runtime"]
+    end
+
+    subgraph "Mixins"
+        GEM["GraphExecutionMixin\ncompile · transform"]
+        DSM["DatasetMixin\nload · split · iterate"]
+        EVM["EvaluationMixin\nevaluate · report"]
+        OPM["OptimizationMixin\nfit · optimize"]
+        SRM["SerializationMixin\nsave · load_compiled"]
+        TRM["TracingMixin\nTraceEvent logging"]
+    end
+
+    subgraph "ML Lifecycle"
+        DS["AgentDataset\nAgentExample"]
+        MET["Metrics\nExactKeyMatch\nContainsTerms\nCallable"]
+        OPT["Optimizers\nNoOp · GridSearch\nPromptFitterBridge"]
+    end
+
+    subgraph "Registration"
+        RCA["register_class_agent()"]
+        DISC["Auto-discovery\n(agent.py)"]
+    end
+
+    %% Class agent construction
+    BGA --> AN
+    AN --> GB
+    GB --> AG
+
+    %% Mixins compose into BaseGraphAgent
+    GEM --> BGA
+    DSM --> BGA
+    EVM --> BGA
+    OPM --> BGA
+    SRM --> BGA
+    TRM --> BGA
+
+    %% ML lifecycle
+    DS --> EVM
+    DS --> OPM
+    MET --> EVM
+    OPT --> OPM
+
+    %% Registration into platform
+    BGA --> RCA
+    DISC --> RCA
+    RCA --> RA
+    RA --> REG
+    REG --> AP
+
+    style BGA fill:#51cf66,color:#fff
+    style AG fill:#51cf66,color:#fff
+    style AP fill:#4a9eff,color:#fff
+    style REG fill:#4a9eff,color:#fff
+```
+
+### ML Lifecycle
+
+Class agents follow a training-inspired workflow:
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Agent as BaseGraphAgent
+    participant Graph as AgentGraph
+    participant DS as AgentDataset
+    participant Opt as Optimizer
+
+    Dev->>Agent: compile(dataset, metrics, optimizer)
+    Agent->>Graph: Build graph from build_graph()
+    Agent->>Agent: Store metrics + optimizer refs
+
+    Dev->>Agent: fit(dataset)
+    Agent->>Opt: optimize(agent, dataset)
+    Opt-->>Agent: Optimized parameters
+
+    Dev->>Agent: evaluate(test_split, metrics)
+    loop Each example
+        Agent->>Graph: Execute graph
+        Graph-->>Agent: Output
+        Agent->>Agent: Score with metrics
+    end
+    Agent-->>Dev: EvaluationReport
+
+    Dev->>Agent: transform(input_data)
+    Agent->>Graph: Execute compiled graph
+    Graph-->>Agent: State
+    Agent-->>Dev: Output dict
+
+    Dev->>Agent: save("path/")
+    Agent-->>Dev: Serialized state + config
+```
+
+### Key Classes
+
+| Class | Module | Purpose |
+|---|---|---|
+| `BaseGraphAgent[S]` | `agentomatic.agents` | Abstract base — subclass to define your agent |
+| `build_graph()` | `BaseGraphAgent` | Primary override — wire nodes with `new_graph()` |
+| `GraphBuilder` | `agentomatic.agents.builder` | LangGraph-compatible API for graph construction |
+| `AgentGraph` | `agentomatic.agents.graph` | Lightweight graph runtime (sync + async) |
+| `AgentDataset` | `agentomatic.agents.types` | JSONL-backed dataset with train/test splits |
+| `AgentExample` | `agentomatic.agents.types` | Single input/expected-output pair |
+| `TraceEvent` | `agentomatic.agents.types` | Per-node execution trace event |
+| `register_class_agent()` | `AgentRegistry` | Register a class agent into the platform |
+
+### Integration with Platform
+
+Class agents integrate with the platform through `register_class_agent()`, which wraps the agent's `transform()` method as a standard `node_fn` and registers it as a `RegisteredAgent`:
+
+```python
+from __future__ import annotations
+
+from agentomatic.agents import BaseGraphAgent
+
+
+class MyAgent(BaseGraphAgent[MyState]):
+    agent_name = "my_agent"
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("process", self.process)
+        g.set_entry_point("process")
+        g.set_finish_point("process")
+        return g.compile()
+
+    # ... methods ...
+
+# Register into the platform
+agent = MyAgent(llm=my_llm)
+agent.compile(dataset, metrics)
+registry.register_class_agent(agent)
+```
+
+Alternatively, the platform auto-discovers class agents via `agent.py` files using the `agentomatic init --template class` scaffold.
+
+---
+
 ## Extension Points
 
 Agentomatic is designed for extensibility at every layer:
@@ -499,3 +657,5 @@ Agentomatic is designed for extensibility at every layer:
 8. **Schema discovery** — Custom Pydantic models auto-integrate into OpenAPI docs
 9. **Checkpoint bridge** — Single storage backend for threads, messages, and LangGraph checkpoints
 10. **HITL as first-class** — Suspend/resume built into the router factory, not bolted on
+11. **Class agents** — ML lifecycle (`compile`/`fit`/`evaluate`/`transform`) with zero framework deps
+12. **Composable pipelines** — YAML, Builder, and decorator interfaces for multi-agent orchestration

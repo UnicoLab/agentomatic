@@ -28,17 +28,21 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "aiosqlite" },
+    { name = "cryptography" },
     { name = "deepeval" },
     { name = "holysheet" },
     { name = "langchain-core" },
     { name = "langchain-ollama" },
     { name = "langgraph" },
+    { name = "langgraph-swarm" },
     { name = "ollama" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "python-dotenv" },
     { name = "questionary" },
     { name = "rich" },
     { name = "sqlalchemy", extra = ["asyncio"] },
@@ -75,6 +79,9 @@ docs = [
     { name = "mkdocs-material" },
     { name = "pymdown-extensions" },
 ]
+dotenv = [
+    { name = "python-dotenv" },
+]
 langchain = [
     { name = "langchain" },
     { name = "langchain-community" },
@@ -98,6 +105,13 @@ optimize = [
     { name = "deepeval" },
     { name = "holysheet" },
 ]
+security = [
+    { name = "cryptography" },
+    { name = "pyjwt", extra = ["crypto"] },
+]
+swarm = [
+    { name = "langgraph-swarm" },
+]
 telemetry = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -114,6 +128,8 @@ vertex = [
 [package.dev-dependencies]
 dev = [
     { name = "build" },
+    { name = "mike" },
+    { name = "mkdocs-material" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -132,12 +148,13 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry"], marker = "extra == 'all'" },
+    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry", "dotenv", "security", "swarm"], marker = "extra == 'all'" },
     { name = "aiosqlite", marker = "extra == 'db'", specifier = ">=0.20" },
     { name = "asyncpg", marker = "extra == 'db-postgres'", specifier = ">=0.30" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "chainlit", marker = "extra == 'ui'", specifier = ">=2.0" },
     { name = "click", specifier = ">=8.1.0" },
+    { name = "cryptography", marker = "extra == 'security'", specifier = ">=42.0" },
     { name = "deepeval", marker = "extra == 'optimize'", specifier = ">=2.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "holysheet", marker = "extra == 'optimize'", specifier = ">=0.1" },
@@ -151,6 +168,7 @@ requires-dist = [
     { name = "langchain-openai", marker = "extra == 'azure'", specifier = ">=0.3" },
     { name = "langchain-openai", marker = "extra == 'openai'", specifier = ">=0.3" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=0.4" },
+    { name = "langgraph-swarm", marker = "extra == 'swarm'", specifier = ">=0.1" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
@@ -165,11 +183,13 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], marker = "extra == 'db-postgres'", specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'security'", specifier = ">=2.8" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14" },
+    { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0" },
     { name = "python-multipart", specifier = ">=0.0.12" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "questionary", marker = "extra == 'cli'", specifier = ">=2.0" },
@@ -181,11 +201,13 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.12" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
-provides-extras = ["langgraph", "langchain", "ollama", "openai", "azure", "vertex", "metrics", "db", "db-postgres", "cli", "ui", "studio", "optimize", "telemetry", "all", "docs", "dev"]
+provides-extras = ["langgraph", "langchain", "ollama", "openai", "azure", "vertex", "metrics", "db", "db-postgres", "cli", "ui", "studio", "optimize", "telemetry", "dotenv", "security", "swarm", "all", "docs", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "build", specifier = ">=1.0" },
+    { name = "mike", specifier = ">=2.2.0" },
+    { name = "mkdocs-material", specifier = ">=9.7.6" },
     { name = "mypy", specifier = ">=1.13" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=8" },
@@ -2371,6 +2393,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b4/2b/bd8ac26d4e97f6df88ef05ce5b6a38945a3903e1025d926f4752aa88aa97/langgraph_sdk-0.4.2.tar.gz", hash = "sha256:b88f0f5f6328ac0680d6790614a905b2bcfa257f2276dba4e38f0e86db0aa738", size = 348327, upload-time = "2026-06-01T17:51:19.856Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/05/aac507337cceae773c2cc9ab91eb6301963af7aeeb55b4217a00e15aff17/langgraph_sdk-0.4.2-py3-none-any.whl", hash = "sha256:75fa5096c1177ce39c847096a8fe3745ffd480ddb412995f836e9f5f884c43dd", size = 160521, upload-time = "2026-06-01T17:51:18.849Z" },
+]
+
+[[package]]
+name = "langgraph-swarm"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain" },
+    { name = "langchain-core" },
+    { name = "langgraph" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/9c/b76ce5eb38584097e671464632fdb854ab28457dd9e8ec3912f7208a1d9a/langgraph_swarm-0.1.0.tar.gz", hash = "sha256:e0f189fc2471d06108fc293da05771d0106d72f755cd130ee37d579561942479", size = 12432, upload-time = "2025-12-04T19:04:05.56Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/49/1f/a2fd04e6ba6f34609ae37a290b198f37155516ed67e34c12948c5a742437/langgraph_swarm-0.1.0-py3-none-any.whl", hash = "sha256:7020b9a1ba6959b8ddd0168e49b236e8f9967ea40a8a2ccd14c28ec57fe6c227", size = 10227, upload-time = "2025-12-04T19:04:04.72Z" },
 ]
 
 [[package]]

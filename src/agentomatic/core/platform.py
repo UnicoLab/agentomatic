@@ -8,9 +8,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+
+from agentomatic.plugins.registry import PluginRegistry
+from agentomatic.plugins.router import create_plugin_router
 
 from .lifespan import configure_logging
 from .manifest import AgentManifest, RegisteredAgent
@@ -18,6 +21,8 @@ from .registry import AgentRegistry
 from .router_factory import create_default_router
 
 if TYPE_CHECKING:
+    from agentomatic.security.jwt_auth import JWTConfig
+    from agentomatic.stacks.manager import StackConfig, StackManager
     from agentomatic.storage.base import BaseStore
 
 
@@ -51,6 +56,7 @@ class AgentPlatform:
     def __init__(
         self,
         agents_dir: str | Path = "agents/",
+        plugins_dir: str | Path = "plugins/",
         *,
         title: str = "Agentomatic Platform",
         description: str = "Multi-agent API platform powered by Agentomatic",
@@ -79,11 +85,18 @@ class AgentPlatform:
         summarize_after: int = 30,
         # --- Studio ---
         enable_studio: bool = False,
+        # --- v0.6: Stacks & Security ---
+        stack: str | StackConfig | None = None,
+        stacks_dir: str | Path = "stacks/",
+        enable_jwt_auth: bool = False,
+        jwt_config: JWTConfig | None = None,
+        enable_zero_trust: bool = False,
     ) -> None:
         """Initialise the platform.
 
         Args:
             agents_dir: Filesystem path containing agent packages.
+            plugins_dir: Filesystem path containing plugin packages.
             title: Application title shown in docs.
             description: Application description shown in docs.
             version: Semantic version string.
@@ -104,8 +117,14 @@ class AgentPlatform:
             enable_telemetry: Auto-configure OpenTelemetry tracing (default ``True``).
             enable_studio: Mount the Studio debug API and UI (default ``False``).
             middleware: Custom middleware list ``[(MiddlewareClass, {kwargs}), ...]``.
+            stack: Active stack name or :class:`StackConfig` (default: auto-detect).
+            stacks_dir: Directory containing stack YAML files.
+            enable_jwt_auth: Add JWT/OAuth2 auth middleware.
+            jwt_config: JWT configuration (required when ``enable_jwt_auth=True``).
+            enable_zero_trust: Enable zero-trust policy enforcement.
         """
         self.agents_dir = Path(agents_dir).resolve()
+        self.plugins_dir = Path(plugins_dir).resolve()
         self.title = title
         self.description = description
         self.version = version
@@ -131,17 +150,65 @@ class AgentPlatform:
         self._enable_studio = enable_studio
         self._custom_middleware = middleware or []
 
+        # v0.6: Stacks & Security
+        self._stack_manager: StackManager | None = None
+        self._enable_jwt_auth = enable_jwt_auth
+        self._jwt_config = jwt_config
+        self._enable_zero_trust = enable_zero_trust
+        self._init_stack(stack, stacks_dir)
+
         # Memory config
         self._max_history_messages = max_history_messages
         self._summarize_after = summarize_after
 
         # Internal
         self._registry = AgentRegistry()
+        self._plugin_registry = PluginRegistry()
         self._on_startup: list[Callable[..., Any]] = []
         self._on_shutdown: list[Callable[..., Any]] = []
         self._extra_routers: list[tuple[str, Any, dict[str, Any]]] = []
         self._app: FastAPI | None = None
         self._discovered: bool = False  # guard against double discovery
+        self._plugins_discovered: bool = False
+
+    def _init_stack(
+        self,
+        stack: str | StackConfig | None,
+        stacks_dir: str | Path,
+    ) -> None:
+        """Initialise the stack manager if a stack is requested."""
+        import os
+
+        from agentomatic.config.settings import load_environment
+
+        # Always try to load .env
+        load_environment()
+
+        if stack is None:
+            # Auto-detect: AGENTOMATIC_STACK env > .agentomatic-stack file
+            stack_name = os.environ.get("AGENTOMATIC_STACK", "")
+            if not stack_name:
+                stack_file = Path(".agentomatic-stack")
+                if stack_file.exists():
+                    stack_name = stack_file.read_text().strip()
+            if stack_name:
+                stack = stack_name
+
+        if stack is not None:
+            from agentomatic.stacks.manager import StackConfig, StackManager
+
+            if isinstance(stack, str):
+                self._stack_manager = StackManager(stacks_dir=stacks_dir)
+                try:
+                    self._stack_manager.load(stack)
+                    logger.info(f"📦 Loaded stack: {stack}")
+                except Exception as exc:
+                    logger.warning(f"Failed to load stack '{stack}': {exc}")
+                    self._stack_manager = None
+            elif isinstance(stack, StackConfig):
+                self._stack_manager = StackManager(stacks_dir=stacks_dir)
+                self._stack_manager._active_stack = stack
+                logger.info(f"📦 Using provided stack: {stack.name}")
 
     # ------------------------------------------------------------------
     # Factory helpers
@@ -302,6 +369,11 @@ class AgentPlatform:
             platform._registry.discover(platform.agents_dir, prefix)
             platform._discovered = True
 
+        if not platform._plugins_discovered:
+            plugin_prefix = platform.package_prefix or platform.plugins_dir.name
+            platform._plugin_registry.discover(platform.plugins_dir, plugin_prefix)
+            platform._plugins_discovered = True
+
         # Track which agents are already registered (programmatic + discovered)
         _pre_registered = set(platform._registry.list_names())
 
@@ -323,6 +395,20 @@ class AgentPlatform:
                 prefix = platform.package_prefix or platform.agents_dir.name
                 platform._registry.discover(platform.agents_dir, prefix)
                 platform._discovered = True
+
+            if not platform._plugins_discovered:
+                plugin_prefix = platform.package_prefix or platform.plugins_dir.name
+                platform._plugin_registry.discover(platform.plugins_dir, plugin_prefix)
+                platform._plugins_discovered = True
+
+            # --- Load ML Plugins ---
+            logger.info("🧠 Loading ML Model Plugins...")
+            for name, plugin in platform._plugin_registry.list_plugins().items():
+                try:
+                    await plugin.load_model()
+                    logger.info(f"  ✅ Plugin '{name}' loaded successfully")
+                except Exception as e:
+                    logger.error(f"  ❌ Failed to load plugin '{name}': {e}")
 
             # Auto-generate + mount routers for NEWLY discovered agents
             for name, agent in platform._registry.all().items():
@@ -401,6 +487,17 @@ class AgentPlatform:
             app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
             logger.info("🔒 Auth middleware enabled")
 
+        # JWT Auth (v0.6)
+        if self._enable_jwt_auth:
+            try:
+                from agentomatic.security.jwt_auth import JWTAuthMiddleware, JWTConfig
+
+                jwt_cfg = self._jwt_config or JWTConfig(enabled=True)
+                app.add_middleware(JWTAuthMiddleware, config=jwt_cfg)
+                logger.info("🔐 JWT auth middleware enabled")
+            except Exception as exc:
+                logger.warning(f"JWT auth setup failed: {exc}")
+
         # Rate limiting
         if self._enable_rate_limit:
             from agentomatic.middleware.rate_limit import RateLimitMiddleware
@@ -433,6 +530,21 @@ class AgentPlatform:
             set_collector(collector)
             logger.info("📝 Feedback collection enabled")
 
+        # Zero Trust Enforcer (v0.6)
+        if self._enable_zero_trust:
+            try:
+                from agentomatic.security.zero_trust import ZeroTrustEnforcer
+
+                enforcer = ZeroTrustEnforcer(require_auth_globally=self._enable_auth)
+                # Register per-agent security policies
+                for name, agent in self._registry.all().items():
+                    if agent.security_policy is not None:
+                        enforcer.register_policy(name, agent.security_policy)
+                app.state.zero_trust_enforcer = enforcer
+                logger.info("🛡️ Zero-trust enforcement enabled")
+            except Exception as exc:
+                logger.warning(f"Zero-trust setup failed: {exc}")
+
         # OpenTelemetry auto-instrumentation
         if self._enable_telemetry:
             try:
@@ -460,6 +572,52 @@ class AgentPlatform:
                     prefix=f"{self.api_prefix}/{name}",
                     tags=[name.title()],
                 )
+
+        # ------------------------------------------------------------------
+        # Mount Plugin API Routes
+        # ------------------------------------------------------------------
+        plugins_router = APIRouter(prefix=self.api_prefix + "/plugins")
+        for plugin_name, plugin in self._plugin_registry.list_plugins().items():
+            plugin_router = create_plugin_router(plugin)
+            plugins_router.include_router(
+                plugin_router,
+                prefix=f"/{plugin_name}",
+            )
+            logger.info(f"🔌 Mounted plugin endpoints for: {plugin_name}")
+        app.include_router(plugins_router)
+
+        # ------------------------------------------------------------------
+        # Pipeline auto-discovery and mounting
+        # ------------------------------------------------------------------
+        try:
+            from agentomatic.pipelines.loader import PipelineLoader
+            from agentomatic.pipelines.router import create_pipeline_router
+
+            pipelines: dict[str, Any] = {}
+
+            # Discover from pipelines/ directory
+            pipelines_dir = self.agents_dir.parent / "pipelines"
+            if pipelines_dir.exists():
+                pipelines.update(PipelineLoader.discover_pipelines(pipelines_dir))
+
+            # Discover from agents/*/pipeline.yaml
+            agents_pipelines = PipelineLoader.discover_pipelines(self.agents_dir)
+            pipelines.update(agents_pipelines)
+
+            if pipelines:
+                pipeline_router = create_pipeline_router(pipelines, self._registry)
+                app.include_router(
+                    pipeline_router,
+                    prefix=self.api_prefix,
+                    tags=["Pipelines"],
+                )
+                logger.info(
+                    f"🔁 Mounted {len(pipelines)} pipeline(s): {', '.join(pipelines.keys())}"
+                )
+        except ImportError:
+            logger.debug("Pipeline module not available — skipping")
+        except Exception as exc:
+            logger.warning(f"Pipeline discovery failed: {exc}")
 
         # ------------------------------------------------------------------
         # Platform-level endpoints

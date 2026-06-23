@@ -17,7 +17,6 @@ from typing import Any
 
 from agentomatic import AgentManifest
 
-
 # ── Manifest ────────────────────────────────────────────────────────
 manifest = AgentManifest(
     name="greeter",

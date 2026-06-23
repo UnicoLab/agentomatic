@@ -5,6 +5,8 @@ from __future__ import annotations
 from .llm import (
     get_failover_count,
     get_llm,
+    get_llm_for_agent,
+    get_named_llm,
     get_structured_llm,
     invoke_with_retry,
     record_failover,
@@ -14,6 +16,8 @@ from .llm import (
 __all__ = [
     "get_failover_count",
     "get_llm",
+    "get_llm_for_agent",
+    "get_named_llm",
     "get_structured_llm",
     "invoke_with_retry",
     "record_failover",

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
+from loguru import logger
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -115,3 +119,44 @@ def reset_settings() -> None:
     """Reset settings singleton (for testing)."""
     global _settings
     _settings = None
+
+
+def load_environment(env_file: str | Path | None = None) -> None:
+    """Load environment variables from a ``.env`` file.
+
+    Uses ``python-dotenv`` if available; otherwise relies on
+    pydantic-settings' built-in ``.env`` support.  Supports
+    stack-specific ``.env`` files.
+
+    Args:
+        env_file: Path to the ``.env`` file.  Defaults to ``".env"``.
+    """
+    target = str(env_file or ".env")
+    try:
+        from dotenv import load_dotenv
+
+        loaded = load_dotenv(target, override=True)
+        if loaded:
+            logger.debug(f"Loaded environment from {target}")
+        else:
+            logger.debug(f"No .env file found at {target}")
+    except ImportError:
+        logger.debug(
+            "python-dotenv not installed — relying on pydantic-settings. "
+            "Install with: pip install python-dotenv"
+        )
+
+
+def get_settings_from_dict(overrides: dict[str, Any]) -> PlatformSettings:
+    """Create a ``PlatformSettings`` instance with explicit overrides.
+
+    This is used by the :class:`StackManager` to build settings from a
+    loaded stack configuration.
+
+    Args:
+        overrides: Nested dict matching ``PlatformSettings`` structure.
+
+    Returns:
+        A fresh ``PlatformSettings`` instance.
+    """
+    return PlatformSettings(**overrides)  # type: ignore[call-arg]

@@ -1,6 +1,9 @@
-from langgraph.graph import StateGraph, START, END
 from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
 from agentomatic.core.registry import agent
+
 
 class State(TypedDict):
     messages: list[str]

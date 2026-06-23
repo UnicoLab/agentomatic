@@ -5,6 +5,37 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Class-Owned Graph Agents (v0.7)**
+  - `BaseGraphAgent` — define agents as Python classes with ML lifecycle
+  - `build_graph()` + `new_graph()` — LangGraph-style graph wiring (primary API)
+  - `GraphBuilder` with LangGraph-compatible aliases: `add_node()`, `add_edge()`,
+    `set_entry_point()`, `set_finish_point()`, `add_conditional_edge()`, `compile()`
+  - `@agent_node` decorator — optional fallback for simple linear chains
+  - `AgentGraph` — lightweight internal graph runtime (no LangGraph dependency)
+  - `AgentDataset` / `AgentExample` — rich evaluation datasets with JSONL I/O
+  - Evaluation metrics: `ExactKeyMatchMetric`, `ContainsTermsMetric`, `CallableMetric`
+  - Optimizers: `NoOpOptimizer`, `GridSearchOptimizer`, `PromptFitterBridge`
+  - ML lifecycle: `compile()` → `fit()` → `evaluate()` → `transform()`
+  - Per-node observability with `TraceEvent` tracing
+  - Serialization: `save()`/`load_compiled()` for compiled agent state
+  - Auto-discovery: class agents found via `agent.py` or `__init__.py` bridge
+  - Registry integration: `register_class_agent()` + `_discover_class_agent()`
+  - `agentomatic init --template class` generates full package with
+    `__init__.py`, `agent.py`, `llm.py`, `prompts.json`, `train.py`
+  - 200 tests covering graph, dataset, metrics, lifecycle, and API aliases
+
+- **Agent Pipelines / Composition DSL**
+  - YAML, Builder, and Flow (decorator) interfaces
+  - Parallel, sequential, conditional, loop, and transform steps
+  - Auto-schema detection and delegation
+  - 99 tests with full platform integration
+
+---
+
 ## [0.3.0] - 2026-06-18
 
 ### Added

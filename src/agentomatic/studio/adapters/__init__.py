@@ -68,7 +68,14 @@ def resolve_adapter(
         logger.debug(f"Using LangChain studio adapter for agent '{agent.name}'")
         return LangChainAdapter(agent=agent, store=store)
 
-    # 4. Everything else → generic trace adapter
+    # 4. AgentGraph (Class-based) agents -> native adapter
+    if getattr(agent.manifest, "framework", "") == "graph_agent":
+        from agentomatic.studio.adapters.graph_agent import GraphAgentAdapter
+
+        logger.debug(f"Using GraphAgent studio adapter for agent '{agent.name}'")
+        return GraphAgentAdapter(agent=agent, store=store)
+
+    # 5. Everything else → generic trace adapter
     from agentomatic.studio.adapters.generic import GenericAdapter
 
     logger.debug(f"Using generic studio adapter for agent '{agent.name}'")

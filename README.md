@@ -33,7 +33,8 @@ Build, trace, optimize, and time-travel debug production-ready AI agent APIs in 
 | 🚀 **Rich API Surface** | Natively handles `invoke`, `stream`, `chat`, `A2A`, `health`, `config`, `threads`, `memory`, and `feedback`. |
 | 🗄️ **Pluggable Storage** | Use `MemoryStore`, `SQLAlchemy`, or plug in your own custom persistence layer. |
 | 🔐 **Enterprise Middleware** | High-performance pipeline with JWT Auth, dynamic rate limiting, and Prometheus telemetry — all toggleable. |
-| 📦 **Scaffolding Templates** | Jumpstart development with 5 templates: `basic`, `full`, `rag`, `chatbot`, and `custom`. |
+| 📦 **Scaffolding Templates** | Jumpstart development with 9 templates: `basic`, `full`, `rag`, `chatbot`, `deepagent`, `custom`, `swarm`, `pipeline`, `class`. |
+| 🧬 **Class-Based Agents** | Define agents as Python classes with ML lifecycle: `compile()` → `fit()` → `evaluate()` → `transform()`. |
 | 🤖 **A2A Protocol** | True Agent-to-Agent communication flows integrated out of the box. |
 | 🔌 **Framework Agnostic** | Fully supports LangGraph, LangChain, or raw Python execution logic. |
 | 🩺 **Beautiful CLI** | A rich terminal experience with commands like `doctor`, `inspect`, and `test`. |
@@ -111,13 +112,12 @@ curl -X POST http://localhost:8000/api/v1/my_agent/invoke \
 
 ## 📂 Agent Structure
 
-Only `__init__.py` is required. Everything else is optional overrides:
+Only `agent.py` is required. Everything else is optional overrides:
 
 ```
 agents/my_agent/
-├── __init__.py      ← REQUIRED: manifest + node_fn
-├── graph.py         ← Optional: LangGraph StateGraph
-├── nodes.py         ← Optional: node functions
+├── __init__.py      ← Optional: Python package init
+├── agent.py         ← REQUIRED: Contains your BaseGraphAgent subclass
 ├── config.py        ← Optional: Pydantic config
 ├── schemas.py       ← Optional: custom request/response models
 ├── tools.py         ← Optional: LangChain tools
@@ -140,7 +140,11 @@ agentomatic init my_agent --template <template>
 | `full` | 11 | All override files — config, schemas, api, tools |
 | `rag` | 9 | Retrieve → Generate pipeline |
 | `chatbot` | 8 | Conversational with memory |
+| `deepagent` | 6 | Autonomous planning with sub-agents |
 | `custom` | 4 | Framework-agnostic — no LangGraph |
+| `swarm` | 10+ | Multi-agent delegation and handoffs |
+| `pipeline` | 2 | Multi-agent workflow composition (YAML) |
+| `class` | 4 | **NEW** Python class with ML lifecycle |
 
 ## 🖥️ CLI
 
@@ -158,6 +162,54 @@ agentomatic init my_agent --template <template>
   doctor           Environment health check
   optimize <name>  Run prompt optimization
   ui               Launch Chainlit debug UI standalone
+  pipeline         Pipeline management commands
+```
+
+## 🧬 Class-Based Agents (NEW)
+
+Define agents as Python classes with LangGraph-style graph wiring and ML lifecycle:
+
+```python
+from dataclasses import dataclass, field
+from agentomatic import BaseGraphAgent
+
+@dataclass
+class MyState:
+    query: str = ""
+    output: dict = field(default_factory=dict)
+
+class MyAgent(BaseGraphAgent[MyState]):
+    agent_name = "my_agent"
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("process", self.process)
+        g.add_node("format", self.format_out)
+        g.set_entry_point("process")
+        g.add_edge("process", "format")
+        g.set_finish_point("format")
+        return g.compile()
+
+    def process(self, state):
+        state.output = {"response": f"Hello! You asked: {state.query}"}
+        return state
+
+    def format_out(self, state):
+        return state
+
+    def input_to_state(self, data):
+        return MyState(query=data.get("query", ""))
+
+    def state_to_output(self, state):
+        return state.output
+
+# ML-like workflow
+agent = MyAgent()
+result = agent.transform({"query": "Hello!"})
+agent.compile(dataset, metrics)
+agent.fit(dataset)
+report = agent.evaluate(dataset.test, metrics)
+agent.save("compiled/v1")
 ```
 
 ## 🎨 Agentomatic Studio
@@ -178,6 +230,36 @@ The unified server will bind to `http://localhost:8000` and mount the studio at 
 - **Conditional Breakpoints**: Right-click graph nodes to intercept flow before execution triggers.
 - **Time-Travel History**: Rewind to any state checkpoint and replay from historical forks.
 - **Live State Editing**: Mutate graph state payloads on the fly during a breakpoint pause.
+
+## 🧠 ML Model Plugins (NEW)
+
+Agentomatic isn't just for LLMs. Wrap classical ML models (Scikit-Learn, PyTorch, PyMC) securely with auto-generated REST endpoints:
+
+```python
+from agentomatic.plugins import BaseMLPlugin
+from pydantic import BaseModel
+
+class IrisInput(BaseModel):
+    sepal_length: float
+    sepal_width: float
+    petal_length: float
+    petal_width: float
+
+class IrisPlugin(BaseMLPlugin[IrisInput, dict]):
+    async def load_model(self):
+        # Load sklearn model from disk
+        import joblib
+        self.model = joblib.load("iris_model.pkl")
+
+    async def predict(self, inputs: IrisInput) -> dict:
+        prediction = self.model.predict([[
+            inputs.sepal_length, inputs.sepal_width, 
+            inputs.petal_length, inputs.petal_width
+        ]])
+        return {"species": prediction[0]}
+```
+
+Place it in `plugins/` and Agentomatic auto-discovers it alongside your AI agents!
 
 ## ⚙️ Configuration
 

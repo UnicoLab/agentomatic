@@ -112,7 +112,20 @@ def cli():
 @click.option(
     "--template",
     "-t",
-    type=click.Choice(["basic", "full", "rag", "chatbot", "deepagent", "custom"]),
+    type=click.Choice(
+        [
+            "basic",
+            "full",
+            "rag",
+            "chatbot",
+            "deepagent",
+            "custom",
+            "swarm",
+            "pipeline",
+            "class",
+            "plugin",
+        ]
+    ),
     default=None,
     help="Template to use (default: interactive selection)",
 )
@@ -182,12 +195,19 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
     click.echo(f"   📦 Files: {len(files)}")
     click.echo()
 
+    if template == "plugin":
+        edit_file = "plugin.py"
+    elif template in ["legacy_dict", "custom"]:
+        edit_file = "nodes.py" if template == "legacy_dict" else "__init__.py"
+    else:
+        edit_file = "agent.py"
+
     if HAS_RICH:
         console.print(
             Panel(
                 f"[bold]Next steps:[/bold]\n\n"
                 f"  1. [cyan]cd {agents_dir}[/cyan]\n"
-                f"  2. Edit [yellow]{name}/nodes.py[/yellow] with your logic\n"
+                f"  2. Edit [yellow]{name}/{edit_file}[/yellow] with your logic\n"
                 f"  3. [cyan]agentomatic run[/cyan] to start\n"
                 f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
                 f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs",
@@ -197,7 +217,7 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
         )
     else:
         click.echo("Next steps:")
-        click.echo(f"  1. Edit {name}/nodes.py with your logic")
+        click.echo(f"  1. Edit {name}/{edit_file} with your logic")
         click.echo("  2. agentomatic run")
         click.echo(f"  3. agentomatic test {name}")
 
@@ -209,6 +229,7 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
 
 @cli.command()
 @click.option("--agents-dir", default="agents", help="Agents directory")
+@click.option("--plugins-dir", default="plugins", help="Plugins directory")
 @click.option("--host", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", type=int, default=8000, help="Port to listen on")
 @click.option("--reload", is_flag=True, help="Enable auto-reload")
@@ -218,6 +239,7 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
 @click.option("--studio", is_flag=True, help="Enable Agentomatic Studio debug UI at /studio/ui")
 def run(
     agents_dir: str,
+    plugins_dir: str,
     host: str,
     port: int,
     reload: bool,
@@ -228,11 +250,12 @@ def run(
 ) -> None:
     """Run the platform with Rich status output."""
     _print_banner()
-    logger.info(f"Starting platform from {agents_dir}...")
+    logger.info(f"Starting platform from {agents_dir} (plugins: {plugins_dir})...")
 
     from agentomatic import AgentPlatform
 
     kwargs: dict[str, Any] = {
+        "plugins_dir": plugins_dir,
         "title": title or "Agentomatic Platform",
         "log_level": log_level,
         "enable_studio": studio,
@@ -341,6 +364,12 @@ def list_agents(agents_dir: str) -> None:
             except Exception:
                 pass
 
+            # v0.6: Detect enhanced features
+            info["has_llm"] = (entry / "llm.py").exists()
+            info["has_delegation"] = (entry / "delegation.py").exists()
+            info["has_security"] = (entry / "security.py").exists()
+            info["has_schemas"] = (entry / "schemas.py").exists()
+
             agents.append(info)
 
     if not agents:
@@ -353,6 +382,9 @@ def list_agents(agents_dir: str) -> None:
         table.add_column("Files", justify="center")
         table.add_column("Manifest", justify="center")
         table.add_column("Graph", justify="center")
+        table.add_column("LLM", justify="center")
+        table.add_column("Delegation", justify="center")
+        table.add_column("Security", justify="center")
 
         for a in agents:
             table.add_row(
@@ -360,13 +392,24 @@ def list_agents(agents_dir: str) -> None:
                 str(a.get("files", "?")),
                 "✅" if a.get("has_manifest") else "❌",
                 "✅" if a.get("has_graph") else "—",
+                "✅" if a.get("has_llm") else "—",
+                "✅" if a.get("has_delegation") else "—",
+                "✅" if a.get("has_security") else "—",
             )
 
         console.print(table)
     else:
         click.echo(f"📂 {agents_path}")
         for a in agents:
-            click.echo(f"  🤖 {a['name']} ({a.get('files', '?')} files)")
+            features = []
+            if a.get("has_llm"):
+                features.append("llm")
+            if a.get("has_delegation"):
+                features.append("delegation")
+            if a.get("has_security"):
+                features.append("security")
+            feat_str = f" [{', '.join(features)}]" if features else ""
+            click.echo(f"  🤖 {a['name']} ({a.get('files', '?')} files){feat_str}")
 
     _echo(f"\n   Total: {len(agents)} agent(s)")
 
@@ -527,12 +570,98 @@ def inspect(name: str, agents_dir: str) -> None:
                     border_style="blue",
                 )
             )
+
+        # v0.6 panels
+        llm_file = target / "llm.py"
+        if llm_file.exists():
+            console.print(Panel(llm_file.read_text(), title="llm.py", border_style="magenta"))
+
+        delegation_file = target / "delegation.py"
+        if delegation_file.exists():
+            console.print(
+                Panel(
+                    delegation_file.read_text(),
+                    title="delegation.py",
+                    border_style="magenta",
+                )
+            )
+
+        security_file = target / "security.py"
+        if security_file.exists():
+            console.print(
+                Panel(
+                    security_file.read_text(),
+                    title="security.py",
+                    border_style="red",
+                )
+            )
+
+        schemas_file = target / "schemas.py"
+        if schemas_file.exists():
+            console.print(
+                Panel(
+                    schemas_file.read_text(),
+                    title="schemas.py",
+                    border_style="yellow",
+                )
+            )
+
+        evals_file = target / "evals.py"
+        if evals_file.exists():
+            console.print(
+                Panel(
+                    evals_file.read_text(),
+                    title="evals.py",
+                    border_style="blue",
+                )
+            )
+
+        # Summary table
+        cap_table = Table(title="Agent Capabilities", show_lines=True)
+        cap_table.add_column("Feature", style="bold")
+        cap_table.add_column("Status", justify="center")
+        capabilities = [
+            ("Graph (graph.py)", (target / "graph.py").exists()),
+            ("Config (config.py)", (target / "config.py").exists()),
+            ("Prompts (prompts.json)", (target / "prompts.json").exists()),
+            ("LLM Config (llm.py)", (target / "llm.py").exists()),
+            ("Schemas (schemas.py)", (target / "schemas.py").exists()),
+            ("Delegation (delegation.py)", (target / "delegation.py").exists()),
+            ("Security (security.py)", (target / "security.py").exists()),
+            ("Evals (evals.py)", (target / "evals.py").exists()),
+            ("Model Card (model_card.yaml)", (target / "model_card.yaml").exists()),
+            ("Custom API (api.py)", (target / "api.py").exists()),
+            ("Tools (tools.py)", (target / "tools.py").exists()),
+        ]
+        for feat, exists in capabilities:
+            cap_table.add_row(
+                feat,
+                "[green]✅[/green]" if exists else "[dim]—[/dim]",
+            )
+        console.print(cap_table)
     else:
         click.echo(f"🔍 Agent: {name}")
         click.echo(f"   Path: {target}")
         click.echo(f"   Files: {len(files)}")
         for f in files:
             click.echo(f"   📄 {f.relative_to(target)}")
+        click.echo("\n   Agent Capabilities:")
+        capabilities = [
+            ("Graph (graph.py)", (target / "graph.py").exists()),
+            ("Config (config.py)", (target / "config.py").exists()),
+            ("Prompts (prompts.json)", (target / "prompts.json").exists()),
+            ("LLM Config (llm.py)", (target / "llm.py").exists()),
+            ("Schemas (schemas.py)", (target / "schemas.py").exists()),
+            ("Delegation (delegation.py)", (target / "delegation.py").exists()),
+            ("Security (security.py)", (target / "security.py").exists()),
+            ("Evals (evals.py)", (target / "evals.py").exists()),
+            ("Model Card (model_card.yaml)", (target / "model_card.yaml").exists()),
+            ("Custom API (api.py)", (target / "api.py").exists()),
+            ("Tools (tools.py)", (target / "tools.py").exists()),
+        ]
+        for feat, exists in capabilities:
+            status = "✅" if exists else "—"
+            click.echo(f"   {status} {feat}")
 
 
 # =====================================================================
@@ -571,6 +700,10 @@ def doctor(agents_dir: str) -> None:
         ("chainlit", "ui"),
         ("sqlalchemy", "db"),
         ("prometheus_client", "metrics"),
+        ("dotenv", "dotenv"),
+        ("jwt", "security"),
+        ("cryptography", "security"),
+        ("langgraph_swarm", "swarm"),
     ]:
         try:
             mod = importlib.import_module(pkg)
@@ -588,6 +721,24 @@ def doctor(agents_dir: str) -> None:
         checks.append(("Agents directory", True, f"{count} agent(s) in {agents_path}"))
     else:
         checks.append(("Agents directory", False, f"Not found: {agents_path}"))
+
+    # Stacks directory
+    stacks_path = Path("stacks")
+    if stacks_path.exists():
+        yaml_count = len(list(stacks_path.glob("*.yaml"))) + len(list(stacks_path.glob("*.yml")))
+        checks.append(("Stacks directory", True, f"{yaml_count} stack(s) in {stacks_path}"))
+    else:
+        checks.append(("Stacks directory", False, "Not found — run: agentomatic stack init"))
+
+    # Active stack
+    active_file = Path(".agentomatic-stack")
+    if active_file.exists():
+        active_name = active_file.read_text().strip()
+        checks.append(("Active stack", True, active_name))
+    else:
+        checks.append(
+            ("Active stack", False, "No active stack — run: agentomatic stack use <name>")
+        )
 
     if HAS_RICH:
         table = Table(title="🩺 Environment Health Check", show_lines=True)
@@ -742,6 +893,383 @@ def optimize(
     if auto_apply:
         version = result.apply()
         logger.success(f"Applied as '{version}'")
+
+
+# =====================================================================
+# STACK — Multi-environment stack management
+# =====================================================================
+
+
+@cli.group()
+def stack():
+    """Manage environment stacks (local, remote, custom)."""
+    pass
+
+
+@stack.command("init")
+@click.option(
+    "--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory (default: stacks)"
+)
+def stack_init(stacks_dir: str) -> None:
+    """Create default stack configuration files."""
+    from agentomatic.stacks.defaults import get_default_stack_yaml
+
+    stacks_path = Path(stacks_dir)
+    stacks_path.mkdir(parents=True, exist_ok=True)
+
+    created = []
+    for stack_name in ["local", "remote"]:
+        file_path = stacks_path / f"{stack_name}.yaml"
+        if file_path.exists():
+            _print_warning(f"Stack '{stack_name}' already exists at {file_path}")
+            continue
+        content = get_default_stack_yaml(stack_name)
+        file_path.write_text(content)
+        created.append(stack_name)
+
+    if created:
+        _print_success(f"Created stack(s): {', '.join(created)} in {stacks_path}/")
+    else:
+        _echo("All default stacks already exist.")
+
+    _echo("")
+    _echo(
+        "  Next: [cyan]agentomatic stack use local[/cyan]"
+        if HAS_RICH
+        else "  Next: agentomatic stack use local"
+    )
+
+
+@stack.command("list")
+@click.option("--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory")
+def stack_list(stacks_dir: str) -> None:
+    """List available stacks."""
+    stacks_path = Path(stacks_dir)
+    _print_banner()
+
+    if not stacks_path.exists():
+        _print_warning(f"No stacks directory found at {stacks_path}")
+        _echo("  Run: agentomatic stack init")
+        return
+
+    yaml_files = sorted(stacks_path.glob("*.yaml")) + sorted(stacks_path.glob("*.yml"))
+    if not yaml_files:
+        _print_warning("No stack files found")
+        return
+
+    # Check active stack
+    active = ""
+    active_file = Path(".agentomatic-stack")
+    if active_file.exists():
+        active = active_file.read_text().strip()
+
+    if HAS_RICH:
+        table = Table(title="📦 Available Stacks", show_lines=True)
+        table.add_column("Name", style="bold cyan")
+        table.add_column("Active", justify="center")
+        table.add_column("Path")
+
+        for f in yaml_files:
+            name = f.stem
+            is_active = "✅" if name == active else "—"
+            table.add_row(name, is_active, str(f))
+
+        console.print(table)
+    else:
+        click.echo("📦 Available Stacks:")
+        for f in yaml_files:
+            name = f.stem
+            marker = " (active)" if name == active else ""
+            click.echo(f"  • {name}{marker} — {f}")
+
+
+@stack.command("show")
+@click.argument("name")
+@click.option("--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory")
+def stack_show(name: str, stacks_dir: str) -> None:
+    """Show the contents of a stack configuration."""
+    stacks_path = Path(stacks_dir)
+    stack_file = stacks_path / f"{name}.yaml"
+    if not stack_file.exists():
+        stack_file = stacks_path / f"{name}.yml"
+
+    if not stack_file.exists():
+        _print_error(f"Stack '{name}' not found in {stacks_path}")
+        return
+
+    content = stack_file.read_text()
+    if HAS_RICH:
+        from rich.syntax import Syntax
+
+        console.print(
+            Panel(
+                Syntax(content, "yaml", theme="monokai"),
+                title=f"📦 Stack: {name}",
+                border_style="cyan",
+            )
+        )
+    else:
+        click.echo(f"📦 Stack: {name}")
+        click.echo(content)
+
+
+@stack.command("use")
+@click.argument("name")
+@click.option("--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory")
+def stack_use(name: str, stacks_dir: str) -> None:
+    """Set the active stack for this project."""
+    stacks_path = Path(stacks_dir)
+    stack_file = stacks_path / f"{name}.yaml"
+    if not stack_file.exists():
+        stack_file = stacks_path / f"{name}.yml"
+
+    if not stack_file.exists():
+        _print_error(f"Stack '{name}' not found in {stacks_path}")
+        return
+
+    active_file = Path(".agentomatic-stack")
+    active_file.write_text(name)
+    _print_success(f"Active stack set to '{name}'")
+    _echo(f"  Stack file: {stack_file}")
+
+
+# =====================================================================
+# Pipeline Commands
+# =====================================================================
+
+
+@cli.group()
+def pipeline():
+    """Manage and execute pipelines."""
+
+
+@pipeline.command("list")
+@click.option("--dir", "pipelines_dir", default=".", help="Project root directory")
+def pipeline_list(pipelines_dir: str) -> None:
+    """List discovered pipelines."""
+    from pathlib import Path
+
+    try:
+        from agentomatic.pipelines.loader import PipelineLoader
+    except ImportError:
+        _print_error("Pipeline module not available.")
+        return
+
+    root = Path(pipelines_dir).resolve()
+    pipelines: dict = {}
+    for d in [root / "pipelines", root / "agents"]:
+        if d.exists():
+            pipelines.update(PipelineLoader.discover_pipelines(d))
+
+    if not pipelines:
+        _echo("No pipelines found.")
+        _echo("  Create a pipeline.yaml in pipelines/ or agents/<name>/")
+        return
+
+    try:
+        from rich.table import Table
+
+        table = Table(title="📋 Discovered Pipelines")
+        table.add_column("Name", style="cyan bold")
+        table.add_column("Version")
+        table.add_column("Steps", style="magenta")
+        table.add_column("Agents", style="green")
+        table.add_column("Description")
+
+        for _name, config in sorted(pipelines.items()):
+            agents = sorted(config.get_agent_names())
+            table.add_row(
+                config.name,
+                config.version,
+                str(len(config.steps)),
+                ", ".join(agents) if agents else "—",
+                config.description[:60] or "—",
+            )
+        console.print(table)
+    except ImportError:
+        for name, config in sorted(pipelines.items()):
+            agents = sorted(config.get_agent_names())
+            _echo(f"  {name} (v{config.version}) — {len(config.steps)} steps")
+            if agents:
+                _echo(f"    agents: {', '.join(agents)}")
+
+
+@pipeline.command("validate")
+@click.argument("name")
+@click.option("--dir", "pipelines_dir", default=".", help="Project root directory")
+@click.option("--agents-dir", default="agents", help="Agents directory")
+def pipeline_validate(name: str, pipelines_dir: str, agents_dir: str) -> None:
+    """Validate a pipeline configuration."""
+    import sys
+    from pathlib import Path
+
+    try:
+        from agentomatic.core.registry import AgentRegistry
+        from agentomatic.pipelines.engine import PipelineEngine
+        from agentomatic.pipelines.loader import PipelineLoader
+    except ImportError:
+        _print_error("Pipeline module not available.")
+        return
+
+    root = Path(pipelines_dir).resolve()
+    pipelines: dict = {}
+    for d in [root / "pipelines", root / agents_dir]:
+        if d.exists():
+            pipelines.update(PipelineLoader.discover_pipelines(d))
+
+    if name not in pipelines:
+        _print_error(f"Pipeline '{name}' not found. Available: {list(pipelines.keys())}")
+        return
+
+    config = pipelines[name]
+    registry = AgentRegistry()
+    ad = root / agents_dir
+    if ad.exists():
+        parent = str(ad.parent)
+        if parent not in sys.path:
+            sys.path.insert(0, parent)
+        registry.discover(ad, ad.name)
+
+    engine = PipelineEngine(config, registry)
+    errors = engine.validate()
+
+    if errors:
+        _print_error(f"Pipeline '{name}' has {len(errors)} error(s):")
+        for err in errors:
+            _echo(f"  ❌ {err}")
+    else:
+        _print_success(f"Pipeline '{name}' is valid ✅")
+        _echo(f"  Steps: {', '.join(config.step_names)}")
+        _echo(f"  Agents: {', '.join(sorted(config.get_agent_names()))}")
+
+
+@pipeline.command("visualize")
+@click.argument("name")
+@click.option("--dir", "pipelines_dir", default=".", help="Project root directory")
+def pipeline_visualize(name: str, pipelines_dir: str) -> None:
+    """Print a Mermaid diagram of the pipeline."""
+    import sys
+    from pathlib import Path
+
+    try:
+        from agentomatic.core.registry import AgentRegistry
+        from agentomatic.pipelines.engine import PipelineEngine
+        from agentomatic.pipelines.loader import PipelineLoader
+    except ImportError:
+        _print_error("Pipeline module not available.")
+        return
+
+    root = Path(pipelines_dir).resolve()
+    pipelines: dict = {}
+    for d in [root / "pipelines", root / "agents"]:
+        if d.exists():
+            pipelines.update(PipelineLoader.discover_pipelines(d))
+
+    if name not in pipelines:
+        _print_error(f"Pipeline '{name}' not found.")
+        return
+
+    config = pipelines[name]
+    registry = AgentRegistry()
+    ad = root / "agents"
+    if ad.exists():
+        parent = str(ad.parent)
+        if parent not in sys.path:
+            sys.path.insert(0, parent)
+        registry.discover(ad, ad.name)
+
+    engine = PipelineEngine(config, registry)
+    mermaid = engine.visualize()
+
+    try:
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        console.print(
+            Panel(
+                Syntax(mermaid, "mermaid"),
+                title=f"🔁 Pipeline: {name}",
+                border_style="blue",
+            )
+        )
+    except ImportError:
+        _echo(f"--- Pipeline: {name} ---")
+        _echo(mermaid)
+
+
+@pipeline.command("run")
+@click.argument("name")
+@click.option("--input", "input_json", default="{}", help="JSON input")
+@click.option("--dir", "pipelines_dir", default=".", help="Project root")
+@click.option("--agents-dir", default="agents", help="Agents directory")
+def pipeline_run(name: str, input_json: str, pipelines_dir: str, agents_dir: str) -> None:
+    """Execute a pipeline from the CLI."""
+    import asyncio
+    import json
+    import sys
+    from pathlib import Path
+
+    try:
+        from agentomatic.core.registry import AgentRegistry
+        from agentomatic.pipelines.engine import PipelineEngine
+        from agentomatic.pipelines.loader import PipelineLoader
+    except ImportError:
+        _print_error("Pipeline module not available.")
+        return
+
+    root = Path(pipelines_dir).resolve()
+    pipelines: dict = {}
+    for d in [root / "pipelines", root / agents_dir]:
+        if d.exists():
+            pipelines.update(PipelineLoader.discover_pipelines(d))
+
+    if name not in pipelines:
+        _print_error(f"Pipeline '{name}' not found.")
+        return
+
+    try:
+        input_data = json.loads(input_json)
+    except json.JSONDecodeError as exc:
+        _print_error(f"Invalid JSON input: {exc}")
+        return
+
+    config = pipelines[name]
+    registry = AgentRegistry()
+    ad = root / agents_dir
+    if ad.exists():
+        parent = str(ad.parent)
+        if parent not in sys.path:
+            sys.path.insert(0, parent)
+        registry.discover(ad, ad.name)
+
+    engine = PipelineEngine(config, registry)
+    errors = engine.validate()
+    if errors:
+        _print_error("Pipeline validation failed:")
+        for err in errors:
+            _echo(f"  ❌ {err}")
+        return
+
+    _echo(f"🚀 Running pipeline '{name}'...")
+    result = asyncio.run(engine.run(input_data))
+
+    try:
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        output_json = json.dumps(result.model_dump(), indent=2, default=str)
+        status = "✅" if result.succeeded else "❌"
+        console.print(
+            Panel(
+                Syntax(output_json, "json"),
+                title=(f"{status} Pipeline: {name} ({result.duration_ms:.0f}ms)"),
+                border_style="green" if result.succeeded else "red",
+            )
+        )
+    except ImportError:
+        _echo(f"Status: {result.status.value}")
+        _echo(f"Duration: {result.duration_ms:.0f}ms")
+        _echo(f"Output: {result.output}")
 
 
 # =====================================================================

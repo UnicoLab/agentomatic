@@ -47,20 +47,18 @@ class TestAgentManifest:
 class TestRegisteredAgent:
     """Test RegisteredAgent."""
 
-    def test_health_check_no_callable(self):
-        import asyncio
-
+    @pytest.mark.asyncio
+    async def test_health_check_no_callable(self):
         from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 
         m = AgentManifest(name="empty", slug="empty-agent")
         agent = RegisteredAgent(manifest=m)
-        result = asyncio.get_event_loop().run_until_complete(agent.health_check())
+        result = await agent.health_check()
         assert result["status"] == "degraded"
         assert result["node_fn_ready"] is False
 
-    def test_health_check_with_node_fn(self):
-        import asyncio
-
+    @pytest.mark.asyncio
+    async def test_health_check_with_node_fn(self):
         from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 
         async def dummy_fn(state):
@@ -68,7 +66,7 @@ class TestRegisteredAgent:
 
         m = AgentManifest(name="test", slug="test-agent")
         agent = RegisteredAgent(manifest=m, node_fn=dummy_fn)
-        result = asyncio.get_event_loop().run_until_complete(agent.health_check())
+        result = await agent.health_check()
         assert result["status"] == "healthy"
         assert result["node_fn_ready"] is True
 
@@ -196,9 +194,8 @@ class TestCircuitBreaker:
         cb = CircuitBreaker("test", failure_threshold=3)
         assert cb.state == CircuitState.CLOSED
 
-    def test_opens_after_threshold(self):
-        import asyncio
-
+    @pytest.mark.asyncio
+    async def test_opens_after_threshold(self):
         from agentomatic.observability.concurrency import (
             CircuitBreaker,
             CircuitBreakerOpen,
@@ -207,45 +204,39 @@ class TestCircuitBreaker:
 
         cb = CircuitBreaker("test", failure_threshold=2)
 
-        async def fail_twice():
-            for _ in range(2):
-                try:
-                    async with cb():
-                        raise ValueError("fail")
-                except ValueError:
-                    pass
-            assert cb.state == CircuitState.OPEN
-            with pytest.raises(CircuitBreakerOpen):
+        for _ in range(2):
+            try:
                 async with cb():
-                    pass
+                    raise ValueError("fail")
+            except ValueError:
+                pass
 
-        asyncio.get_event_loop().run_until_complete(fail_twice())
+        assert cb.state == CircuitState.OPEN
+        with pytest.raises(CircuitBreakerOpen):
+            async with cb():
+                pass
 
 
 class TestMemoryStore:
     """Test MemoryStore."""
 
-    def test_thread_lifecycle(self):
-        import asyncio
-
+    @pytest.mark.asyncio
+    async def test_thread_lifecycle(self):
         from agentomatic.storage.memory import MemoryStore
 
         store = MemoryStore()
 
-        async def run():
-            thread = await store.create_thread("t1", "user1", "agent1")
-            assert thread["id"] == "t1"
+        thread = await store.create_thread("t1", "user1", "agent1")
+        assert thread["id"] == "t1"
 
-            await store.add_message("t1", "user", "Hello!")
-            await store.add_message("t1", "assistant", "Hi there!")
+        await store.add_message("t1", "user", "Hello!")
+        await store.add_message("t1", "assistant", "Hi there!")
 
-            messages = await store.get_messages("t1")
-            assert len(messages) == 2
+        messages = await store.get_messages("t1")
+        assert len(messages) == 2
 
-            threads = await store.list_threads(agent_name="agent1")
-            assert len(threads) == 1
-
-        asyncio.get_event_loop().run_until_complete(run())
+        threads = await store.list_threads(agent_name="agent1")
+        assert len(threads) == 1
 
 
 class TestMetrics:

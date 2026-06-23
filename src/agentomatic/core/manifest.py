@@ -28,6 +28,9 @@ class AgentManifest:
         is_subagent: Whether this agent is routable by an orchestrator.
         framework: Agent framework type ('langgraph', 'langchain', 'custom').
         metadata: Arbitrary metadata (used in A2A agent cards).
+        llm_config: Maps logical roles to stack LLM profile names.
+        security_policy: Name of the security policy class in ``security.py``.
+        delegation_targets: Agent names this agent is allowed to delegate to.
     """
 
     name: str
@@ -38,6 +41,11 @@ class AgentManifest:
     is_subagent: bool = True
     framework: str = "langgraph"  # 'langgraph' | 'langchain' | 'custom'
     metadata: dict[str, Any] = field(default_factory=dict)
+    llm_config: dict[str, str] = field(
+        default_factory=lambda: {"default": "default"},
+    )
+    security_policy: str = ""
+    delegation_targets: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -57,6 +65,12 @@ class RegisteredAgent:
     router: APIRouter | None = None
     config: Any = None
     prompt_manager: PromptManager | None = None
+
+    # v0.6 enhancements
+    llm_config: Any = None  # AgentLLMConfig from agent's llm.py
+    schema_validator: Any = None  # SchemaValidator from agent's schemas.py
+    security_policy: Any = None  # AgentSecurityPolicy from agent's security.py
+    delegation_config: Any = None  # Delegation config from agent's delegation.py
 
     # Studio hooks (set programmatically or via decorators)
     _studio_graph_fn: Callable[..., Any] | None = field(default=None, repr=False)

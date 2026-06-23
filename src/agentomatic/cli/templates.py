@@ -1,22 +1,183 @@
 """Agent scaffolding templates.
 
 Each template is a dict mapping relative file paths to their content.
-Templates: basic, full, rag, chatbot, custom, deepagent.
+Templates: basic, full, rag, chatbot, custom, deepagent, legacy_dict.
 """
 
 from __future__ import annotations
 
 
-def _init_py(name: str, description: str, keywords: str, framework: str = "langgraph") -> str:
-    return f'''"""Agent: {name}."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\nfrom agentomatic import AgentManifest\n\nmanifest = AgentManifest(\n    name="{name}",\n    slug="agent-{name}",\n    description="{description}",\n    intent_keywords=[{keywords}],\n    framework="{framework}",\n)\n\n\nasync def node_fn(state: dict[str, Any]) -> dict[str, Any]:\n    from .graph import get_graph\n    return await get_graph().ainvoke(state)\n'''
+def _class_agent_py(name: str, template: str = "basic") -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+
+    if template == "rag":
+        return f'''"""RAG class-based agent: {name}."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from agentomatic.agents import BaseGraphAgent
 
 
-def _graph_py(name: str) -> str:
-    return f'''"""LangGraph graph for {name}."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom langgraph.graph import END, StateGraph\n\nfrom agentomatic import BaseAgentState\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("process", nodes.process)\n    g.set_entry_point("process")\n    g.add_edge("process", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
+@dataclass
+class {title}State:
+    """Agent state — per-run transient data."""
+    request: str = ""
+    citations: list[dict[str, Any]] = field(default_factory=list)
+    output: dict[str, Any] = field(default_factory=dict)
 
 
-def _nodes_py(name: str) -> str:
-    return f'''"""Node functions for {name}."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\n\nasync def process(state: dict[str, Any]) -> dict[str, Any]:\n    query = state.get("current_query", "")\n    return {{\n        "response": f"Hello from {name}! You asked: {{query}}",\n        "agent_type": "agent-{name}",\n        "suggestions": ["Tell me more", "Help me with something else"],\n    }}\n'''
+class {title}Agent(BaseGraphAgent[{title}State]):
+    """RAG class agent for {name}."""
+
+    agent_name = "{name}"
+    agent_description = "RAG agent"
+
+    def __init__(self, *, llm: Any = None) -> None:
+        super().__init__()
+        self.llm = llm
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("retrieve", self.retrieve)
+        g.add_node("generate", self.generate)
+        g.set_entry_point("retrieve")
+        g.add_edge("retrieve", "generate")
+        g.set_finish_point("generate")
+        return g.compile()
+
+    def retrieve(self, state: {title}State) -> {title}State:
+        # TODO: Replace with real vector search
+        state.citations = [
+            {{"content": f"Document about {{state.request}}", "source": "knowledge_base"}}
+        ]
+        return state
+
+    def generate(self, state: {title}State) -> {title}State:
+        context = "\\n".join(d.get("content", "") for d in state.citations)
+        state.output = {{
+            "response": f"Based on the knowledge base: Answer to '{{state.request}}' using context: {{context}}",
+            "agent_type": "{name}",
+            "citations": state.citations,
+        }}
+        return state
+
+    def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
+        return {title}State(request=input_data.get("current_query", ""))
+
+    def state_to_output(self, state: {title}State) -> dict[str, Any]:
+        return state.output
+'''
+    elif template == "chatbot":
+        return f'''"""Chatbot class-based agent: {name}."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from agentomatic.agents import BaseGraphAgent
+
+
+@dataclass
+class {title}State:
+    """Agent state — per-run transient data."""
+    request: str = ""
+    messages: list[Any] = field(default_factory=list)
+    output: dict[str, Any] = field(default_factory=dict)
+
+
+class {title}Agent(BaseGraphAgent[{title}State]):
+    """Chatbot class agent for {name}."""
+
+    agent_name = "{name}"
+    agent_description = "Chatbot agent"
+
+    def __init__(self, *, llm: Any = None) -> None:
+        super().__init__()
+        self.llm = llm
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("respond", self.respond)
+        g.set_entry_point("respond")
+        g.set_finish_point("respond")
+        return g.compile()
+
+    def respond(self, state: {title}State) -> {title}State:
+        history_len = len(state.messages)
+        state.output = {{
+            "response": f"[Turn {{history_len + 1}}] You said: {{state.request}}",
+            "agent_type": "{name}",
+            "suggestions": ["Tell me more", "Change topic", "Goodbye"],
+        }}
+        return state
+
+    def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
+        return {title}State(
+            request=input_data.get("current_query", ""),
+            messages=input_data.get("messages", [])
+        )
+
+    def state_to_output(self, state: {title}State) -> dict[str, Any]:
+        return state.output
+'''
+    else:
+        # Basic / Full
+        return f'''"""Basic class-based agent: {name}."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from agentomatic.agents import BaseGraphAgent
+
+
+@dataclass
+class {title}State:
+    """Agent state — per-run transient data."""
+    request: str = ""
+    context: list[str] = field(default_factory=list)
+    output: dict[str, Any] = field(default_factory=dict)
+
+
+class {title}Agent(BaseGraphAgent[{title}State]):
+    """Class agent for {name}.
+
+    Usage::
+        agent = {title}Agent(llm=my_llm)
+        result = agent.transform({{"current_query": "Hello"}})
+    """
+
+    agent_name = "{name}"
+    agent_description = "{title} agent"
+
+    def __init__(self, *, llm: Any = None) -> None:
+        super().__init__()
+        self.llm = llm
+        self.system_prompt = "You are a helpful assistant."
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("process", self.process)
+        g.set_entry_point("process")
+        g.set_finish_point("process")
+        return g.compile()
+
+    def process(self, state: {title}State) -> {title}State:
+        state.context = [f"Processed: {{state.request}}"]
+        state.output = {{
+            "response": f"Result for: {{state.request}}",
+            "agent_type": "{name}",
+        }}
+        return state
+
+    def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
+        return {title}State(request=input_data.get("current_query", ""))
+
+    def state_to_output(self, state: {title}State) -> dict[str, Any]:
+        return state.output
+'''
 
 
 def _config_py(name: str) -> str:
@@ -69,29 +230,7 @@ def _env_example(name: str) -> str:
 
 def _readme_md(name: str, template: str) -> str:
     title = name.replace("_", " ").title()
-    return f"""# {title} Agent\n\nGenerated with `agentomatic init {name} --template {template}`.\n\n## Quick Start\n\n```bash\n# Start the platform\nagentomatic run\n\n# Test the agent\ncurl -X POST http://localhost:8000/api/v1/{name}/invoke \\\n  -H "Content-Type: application/json" \\\n  -d '{{"query": "Hello!"}}'\n```\n\n## Files\n\n| File | Purpose |\n|------|---------|\n| `__init__.py` | Agent manifest and entry point |\n| `graph.py` | LangGraph state graph |\n| `nodes.py` | Node processing functions |\n| `config.py` | Agent-specific configuration |\n| `prompts.json` | Versioned prompt templates |\n| `langgraph.json` | LangGraph Studio config |\n"""
-
-
-# --- RAG-specific templates ---
-
-
-def _rag_nodes_py(name: str) -> str:
-    return f'''"""RAG node functions for {name}."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\n\nasync def retrieve(state: dict[str, Any]) -> dict[str, Any]:\n    """Retrieve relevant documents."""\n    query = state.get("current_query", "")\n    # TODO: Replace with real vector search\n    docs = [\n        {{"content": f"Document about {{query}}", "source": "knowledge_base"}},\n    ]\n    return {{"citations": docs, "steps_taken": ["retrieved_docs"]}}\n\n\nasync def generate(state: dict[str, Any]) -> dict[str, Any]:\n    """Generate response using retrieved context."""\n    query = state.get("current_query", "")\n    citations = state.get("citations", [])\n    context = "\\n".join(d.get("content", "") for d in citations)\n    return {{\n        "response": f"Based on the knowledge base: Answer to '{{query}}' using context: {{context}}",\n        "agent_type": "agent-{name}",\n        "steps_taken": ["generated_response"],\n    }}\n'''
-
-
-def _rag_graph_py(name: str) -> str:
-    return f'''"""RAG graph for {name}: retrieve -> generate."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom langgraph.graph import END, StateGraph\n\nfrom agentomatic import BaseAgentState\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("retrieve", nodes.retrieve)\n    g.add_node("generate", nodes.generate)\n    g.set_entry_point("retrieve")\n    g.add_edge("retrieve", "generate")\n    g.add_edge("generate", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
-
-
-# --- Chatbot-specific templates ---
-
-
-def _chatbot_nodes_py(name: str) -> str:
-    return f'''"""Chatbot node functions for {name} with conversation memory."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\n\nasync def respond(state: dict[str, Any]) -> dict[str, Any]:\n    """Generate a conversational response."""\n    query = state.get("current_query", "")\n    messages = state.get("messages", [])\n    history_len = len(messages)\n\n    # TODO: Replace with real LLM call\n    return {{\n        "response": f"[Turn {{history_len + 1}}] You said: {{query}}",\n        "agent_type": "agent-{name}",\n        "suggestions": ["Tell me more", "Change topic", "Goodbye"],\n    }}\n'''
-
-
-def _chatbot_graph_py(name: str) -> str:
-    return f'''"""Chatbot graph for {name} with memory."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom langgraph.graph import END, StateGraph\n\nfrom agentomatic import BaseAgentState\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("respond", nodes.respond)\n    g.set_entry_point("respond")\n    g.add_edge("respond", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
+    return f"""# {title} Agent\n\nGenerated with `agentomatic init {name} --template {template}`.\n\n## Quick Start\n\n```bash\n# Start the platform\nagentomatic run\n\n# Test the agent\ncurl -X POST http://localhost:8000/api/v1/{name}/invoke \\\n  -H "Content-Type: application/json" \\\n  -d '{{"query": "Hello!"}}'\n```\n\n## Files\n\n| File | Purpose |\n|------|---------|\n| `agent.py` | Agent class definition |\n| `config.py` | Agent-specific configuration |\n| `prompts.json` | Versioned prompt templates |\n| `langgraph.json` | LangGraph Studio config |\n"""
 
 
 # --- Deep Agent template ---
@@ -113,25 +252,96 @@ def _custom_init_py(name: str, description: str, keywords: str) -> str:
     return f'''"""Agent: {name} (framework-agnostic)."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\nfrom agentomatic import AgentManifest\n\nmanifest = AgentManifest(\n    name="{name}",\n    slug="agent-{name}",\n    description="{description}",\n    intent_keywords=[{keywords}],\n    framework="custom",\n)\n\n\nasync def node_fn(state: dict[str, Any]) -> dict[str, Any]:\n    """Process the request directly — no graph framework needed."""\n    query = state.get("current_query", "")\n    return {{\n        "response": f"Hello from {name}! You asked: {{query}}",\n        "agent_type": "agent-{name}",\n    }}\n'''
 
 
+# --- Legacy Dict Pattern ---
+def _legacy_init_py(
+    name: str, description: str, keywords: str, framework: str = "langgraph"
+) -> str:
+    return f'''"""Agent: {name}."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\nfrom agentomatic import AgentManifest\n\nmanifest = AgentManifest(\n    name="{name}",\n    slug="agent-{name}",\n    description="{description}",\n    intent_keywords=[{keywords}],\n    framework="{framework}",\n)\n\n\nasync def node_fn(state: dict[str, Any]) -> dict[str, Any]:\n    from .graph import get_graph\n    return await get_graph().ainvoke(state)\n'''
+
+
+def _legacy_graph_py(name: str) -> str:
+    return f'''"""LangGraph graph for {name}."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom langgraph.graph import END, StateGraph\n\nfrom agentomatic import BaseAgentState\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("process", nodes.process)\n    g.set_entry_point("process")\n    g.add_edge("process", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
+
+
+def _legacy_nodes_py(name: str) -> str:
+    return f'''"""Node functions for {name}."""\nfrom __future__ import annotations\n\nfrom typing import Any\n\n\nasync def process(state: dict[str, Any]) -> dict[str, Any]:\n    query = state.get("current_query", "")\n    return {{\n        "response": f"Hello from {name}! You asked: {{query}}",\n        "agent_type": "agent-{name}",\n        "suggestions": ["Tell me more", "Help me with something else"],\n    }}\n'''
+
+
 # =====================================================================
 # Template Registry
 # =====================================================================
 
 TEMPLATES: dict[str, str] = {
-    "basic": "Minimal agent — 3 files, quick start",
-    "full": "All overwrite files — config, schemas, api, tools, prompts",
-    "rag": "RAG agent — retrieve → generate pipeline",
-    "chatbot": "Conversational agent with memory",
+    "basic": "Minimal class-based agent (recommended) — 1 file, quick start",
+    "full": "All overwrite files — class agent with config, schemas, api, tools, prompts",
+    "rag": "RAG class-based agent — retrieve → generate pipeline",
+    "chatbot": "Conversational class-based agent with memory",
     "deepagent": "Deep Agent — planning, tools, subagents (requires deepagents package)",
     "custom": "Framework-agnostic — no LangGraph dependency",
+    "legacy_dict": "Legacy functional agent — 3 files (__init__, graph, nodes)",
+    "plugin": "ML Model Plugin — wrap classical ML models with auto-generated REST endpoints",
 }
+
+
+# --- ML Plugin template ---
+
+
+def _plugin_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""ML Model Plugin: {name}."""
+from __future__ import annotations
+
+from typing import Any
+from pydantic import BaseModel, Field
+from agentomatic.plugins import BaseMLPlugin
+
+class {title}Input(BaseModel):
+    """Input schema for {name}."""
+    text: str = Field(..., description="Input text to process")
+
+class {title}Output(BaseModel):
+    """Output schema for {name}."""
+    result: str = Field(..., description="Processing result")
+    confidence: float = Field(0.0, description="Model confidence score")
+
+class {title}Plugin(BaseMLPlugin[{title}Input, {title}Output]):
+    """Classical ML model wrapper for {name}."""
+
+    async def load_model(self) -> None:
+        """Load the ML model weights into memory.
+        This is called automatically during platform startup.
+        """
+        # TODO: Load your model here (e.g., joblib.load, torch.load)
+        self.model = "dummy_model_instance"
+
+    async def predict(self, inputs: {title}Input) -> {title}Output:
+        """Run inference using the loaded model."""
+        # TODO: Run your actual model prediction here
+        return {title}Output(
+            result=f"Processed: {{inputs.text}}",
+            confidence=0.95
+        )
+
+    def model_card(self) -> dict[str, Any]:
+        """Return metadata about the model."""
+        return {{
+            "name": "{name}",
+            "version": "1.0.0",
+            "framework": "custom"
+        }}
+'''
+
+
+def _plugin_readme(name: str) -> str:
+    title = name.replace("_", " ").title()
+    return f"""# {title} Plugin\n\nGenerated with `agentomatic init {name} --template plugin`.\n\n## Quick Start\n\nPlace this folder inside your `plugins/` directory. When you run `agentomatic run --plugins-dir plugins`, the platform will automatically discover this plugin and mount its REST endpoints.\n\n## Endpoints\n\n- `POST /api/v1/plugins/{name}/predict`\n- `GET /api/v1/plugins/{name}/health`\n- `GET /api/v1/plugins/{name}/model_card`\n"""
 
 
 def get_template_files(template: str, name: str) -> dict[str, str]:
     """Get all files for a given template.
 
     Args:
-        template: Template name (basic, full, rag, chatbot, custom).
+        template: Template name.
         name: Agent name.
 
     Returns:
@@ -150,17 +360,15 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     if template == "basic":
         return {
-            "__init__.py": _init_py(name, description, keywords),
-            "graph.py": _graph_py(name),
-            "nodes.py": _nodes_py(name),
+            "__init__.py": '"""Agent package."""\\n',
+            "agent.py": _class_agent_py(name, "basic"),
             **common,
         }
 
     elif template == "full":
         return {
-            "__init__.py": _init_py(name, description, keywords),
-            "graph.py": _graph_py(name),
-            "nodes.py": _nodes_py(name),
+            "__init__.py": '"""Agent package."""\\n',
+            "agent.py": _class_agent_py(name, "full"),
             "config.py": _config_py(name),
             "schemas.py": _schemas_py(name),
             "tools.py": _tools_py(name),
@@ -170,11 +378,8 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "rag":
         return {
-            "__init__.py": _init_py(
-                name, f"{title} RAG agent", f'"{name}", "search", "knowledge"'
-            ),
-            "graph.py": _rag_graph_py(name),
-            "nodes.py": _rag_nodes_py(name),
+            "__init__.py": '"""Agent package."""\\n',
+            "agent.py": _class_agent_py(name, "rag"),
             "config.py": _config_py(name),
             "tools.py": _tools_py(name),
             **common,
@@ -182,9 +387,8 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "chatbot":
         return {
-            "__init__.py": _init_py(name, f"{title} chatbot", f'"{name}", "chat", "conversation"'),
-            "graph.py": _chatbot_graph_py(name),
-            "nodes.py": _chatbot_nodes_py(name),
+            "__init__.py": '"""Agent package."""\\n',
+            "agent.py": _class_agent_py(name, "chatbot"),
             "config.py": _config_py(name),
             **common,
         }
@@ -205,6 +409,21 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             ".env.example": _env_example(name),
             "README.md": _readme_md(name, template),
             "prompts.json": _prompts_json(),
+        }
+
+    elif template == "legacy_dict":
+        return {
+            "__init__.py": _legacy_init_py(name, description, keywords),
+            "graph.py": _legacy_graph_py(name),
+            "nodes.py": _legacy_nodes_py(name),
+            **common,
+        }
+
+    elif template == "plugin":
+        return {
+            "__init__.py": '"""ML Model Plugin package."""\\n',
+            "plugin.py": _plugin_py(name),
+            "README.md": _plugin_readme(name),
         }
 
     else:
