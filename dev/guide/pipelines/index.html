@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/telemetry/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/pipelines/">
       
       
-        <link rel="prev" href="../optimization/">
+        <link rel="prev" href="../templates/">
       
       
-        <link rel="next" href="../ml-plugins/">
+        <link rel="next" href="../configuration/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Telemetry & Feedback - Agentomatic</title>
+        <title>Pipelines - Agentomatic</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#telemetry-feedback" class="md-skip">
+        <a href="#agent-pipelines" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Telemetry & Feedback
+              Pipelines
             
           </span>
         </div>
@@ -804,10 +804,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../pipelines/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -823,6 +850,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Step Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputoutput-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input/Output Contracts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaffolding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧪 Scaffolding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📖 Further Reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1000,37 +1130,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Telemetry & Feedback
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
         
   
   
@@ -1046,193 +1149,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#1-opentelemetry-auto-instrumentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📡 1. OpenTelemetry Auto-Instrumentation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="📡 1. OpenTelemetry Auto-Instrumentation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#trace-spans-metadata" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trace Spans &amp; Metadata
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuring-exporters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuring Exporters
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#adding-custom-spans-in-agent-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adding Custom Spans in Agent Code
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-agent-metrics-instrumentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📊 2. Agent Metrics &amp; Instrumentation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="📊 2. Agent Metrics &amp; Instrumentation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#core-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#context-based-tracking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Context-Based Tracking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#concurrency-primitives-circuit-breakers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Concurrency Primitives &amp; Circuit Breakers
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-feedback-collection-loop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        💬 3. Feedback Collection Loop
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="💬 3. Feedback Collection Loop">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#submitting-feedback-client-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Submitting Feedback (Client Example)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-the-optimizeinvoke-endpoint" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ⚡ 4. The /optimize/invoke Endpoint
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="⚡ 4. The /optimize/invoke Endpoint">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#request-payload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Payload
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#response-payload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Response Payload
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1873,22 +1789,44 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-opentelemetry-auto-instrumentation" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📡 1. OpenTelemetry Auto-Instrumentation
+        🚀 Quick Start
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="📡 1. OpenTelemetry Auto-Instrumentation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Step Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Configuration">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#trace-spans-metadata" class="md-nav__link">
+  <a href="#inputoutput-contracts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Trace Spans &amp; Metadata
+        Input/Output Contracts
       
     </span>
   </a>
@@ -1896,21 +1834,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#configuring-exporters" class="md-nav__link">
+  <a href="#error-handling" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuring Exporters
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#adding-custom-spans-in-agent-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adding Custom Spans in Agent Code
+        Error Handling
       
     </span>
   </a>
@@ -1923,119 +1850,24 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-agent-metrics-instrumentation" class="md-nav__link">
+  <a href="#scaffolding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        📊 2. Agent Metrics &amp; Instrumentation
+        🧪 Scaffolding
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="📊 2. Agent Metrics &amp; Instrumentation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#core-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#context-based-tracking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Context-Based Tracking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#concurrency-primitives-circuit-breakers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Concurrency Primitives &amp; Circuit Breakers
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-feedback-collection-loop" class="md-nav__link">
+  <a href="#further-reading" class="md-nav__link">
     <span class="md-ellipsis">
       
-        💬 3. Feedback Collection Loop
+        📖 Further Reading
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="💬 3. Feedback Collection Loop">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#submitting-feedback-client-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Submitting Feedback (Client Example)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-the-optimizeinvoke-endpoint" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ⚡ 4. The /optimize/invoke Endpoint
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="⚡ 4. The /optimize/invoke Endpoint">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#request-payload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Payload
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#response-payload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Response Payload
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2059,180 +1891,134 @@
   
 
 
-<h1 id="telemetry-feedback">Telemetry &amp; Feedback<a class="headerlink" href="#telemetry-feedback" title="Permanent link">&para;</a></h1>
+<h1 id="agent-pipelines">Agent Pipelines<a class="headerlink" href="#agent-pipelines" title="Permanent link">&para;</a></h1>
 <div align="center">
   <img src="../assets/logo.png" width="200" alt="agentomatic logo">
-  <h3>Observability and Reinforcement Loop</h3>
+  <h3>Compose Multi-Agent Workflows with Zero Boilerplate</h3>
 </div>
 
 <hr />
-<p>Agentomatic provides built-in, production-grade <strong>OpenTelemetry tracing</strong>, <strong>Prometheus metrics</strong>, and <strong>feedback collection</strong> loops. This ensures you can monitor agent behaviors, track latency, audit costs, and capture user corrections to continuously improve your prompts.</p>
+<p>Agent Pipelines allow you to chain multiple agents into complex workflows using <strong>YAML</strong>, <strong>Builder API</strong>, or <strong>Flow decorators</strong>. Pipelines handle orchestration, error handling, and data passing automatically.</p>
 <hr />
-<h2 id="1-opentelemetry-auto-instrumentation">📡 1. OpenTelemetry Auto-Instrumentation<a class="headerlink" href="#1-opentelemetry-auto-instrumentation" title="Permanent link">&para;</a></h2>
-<p>When enabled, Agentomatic auto-instruments the execution stack. It tracks requests, trace spans, database queries, and downstream API calls (e.g. LLM invocations).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># Enabled by default</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+<h2 id="quick-start">🚀 Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">YAML</label><label for="__tabbed_1_2">Builder API</label><label for="__tabbed_1_3">Flow Decorators</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># pipeline.yaml</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">research_pipeline</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Research</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">summarize&quot;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">research</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">researcher</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">summarize</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">summarizer</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;len(ctx.steps.research.output.get(&#39;response&#39;,</span><span class="nv"> </span><span class="s">&#39;&#39;))</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0&quot;</span>
 </code></pre></div>
-<h3 id="trace-spans-metadata">Trace Spans &amp; Metadata<a class="headerlink" href="#trace-spans-metadata" title="Permanent link">&para;</a></h3>
-<p>Agentomatic automatically generates spans for every phase of execution:</p>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.pipelines</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineBuilder</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">PipelineBuilder</span><span class="p">(</span><span class="s2">&quot;research_pipeline&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="s2">&quot;research&quot;</span><span class="p">,</span> <span class="n">agent</span><span class="o">=</span><span class="s2">&quot;researcher&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="s2">&quot;summarize&quot;</span><span class="p">,</span> <span class="n">agent</span><span class="o">=</span><span class="s2">&quot;summarizer&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="o">.</span><span class="n">build</span><span class="p">()</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.pipelines.flow</span><span class="w"> </span><span class="kn">import</span> <span class="n">flow</span><span class="p">,</span> <span class="n">step</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nd">@flow</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;research_pipeline&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">ResearchPipeline</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nd">@step</span><span class="p">(</span><span class="n">agent</span><span class="o">=</span><span class="s2">&quot;researcher&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">research</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="nd">@step</span><span class="p">(</span><span class="n">agent</span><span class="o">=</span><span class="s2">&quot;summarizer&quot;</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="s2">&quot;research&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">summarize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span> <span class="o">...</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="step-types">📊 Step Types<a class="headerlink" href="#step-types" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Span Name</th>
-<th>Attributes</th>
+<th>Type</th>
 <th>Description</th>
+<th>Example</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>agentomatic.agent.invoke</code></td>
-<td><code>agent_name</code>, <code>user_id</code>, <code>thread_id</code>, <code>version</code></td>
-<td>Overall time spent inside the agent execution.</td>
+<td><strong>Sequential</strong></td>
+<td>Steps run one after another</td>
+<td>Default behavior</td>
 </tr>
 <tr>
-<td><code>agentomatic.llm.call</code></td>
-<td><code>provider</code>, <code>model</code>, <code>prompt_tokens</code>, <code>completion_tokens</code></td>
-<td>Time spent executing LLM completions.</td>
+<td><strong>Parallel</strong></td>
+<td>Multiple agents run concurrently</td>
+<td><code>type: parallel</code></td>
 </tr>
 <tr>
-<td><code>agentomatic.rag.retrieve</code></td>
-<td><code>query</code>, <code>doc_count</code>, <code>latency_ms</code></td>
-<td>Vector database document retrieval span.</td>
+<td><strong>Conditional</strong></td>
+<td>Steps run only if condition is met</td>
+<td><code>condition: "..."</code></td>
 </tr>
 <tr>
-<td><code>http.request</code></td>
-<td><code>http.method</code>, <code>http.status_code</code>, <code>http.target</code></td>
-<td>Client HTTP requests and outgoing requests made via <code>httpx</code>.</td>
+<td><strong>Loop</strong></td>
+<td>Steps repeat until condition</td>
+<td><code>type: loop</code></td>
+</tr>
+<tr>
+<td><strong>Transform</strong></td>
+<td>Apply a Python function</td>
+<td><code>type: transform</code></td>
 </tr>
 </tbody>
 </table>
-<h3 id="configuring-exporters">Configuring Exporters<a class="headerlink" href="#configuring-exporters" title="Permanent link">&para;</a></h3>
-<p>To route traces to APM backends (like <strong>Jaeger</strong>, <strong>Datadog</strong>, <strong>Honeycomb</strong>, or <strong>Google Cloud Trace</strong>), configure OTLP environment variables:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Production Exporter Setup</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_SERVICE_NAME</span><span class="o">=</span><span class="s2">&quot;agentomatic-platform&quot;</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_EXPORTER_OTLP_ENDPOINT</span><span class="o">=</span><span class="s2">&quot;http://jaeger-collector:4317&quot;</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_TRACES_SAMPLER</span><span class="o">=</span><span class="s2">&quot;parentbased_traceidratio&quot;</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_TRACES_SAMPLER_ARG</span><span class="o">=</span><span class="s2">&quot;0.1&quot;</span><span class="w">  </span><span class="c1"># Sample 10% of traces in production</span>
+<hr />
+<h2 id="configuration">🔧 Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="inputoutput-contracts">Input/Output Contracts<a class="headerlink" href="#inputoutput-contracts" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">input</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">query</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">context</span><span class="p">:</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">object</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">output</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">response</span><span class="p">:</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">array</span>
 </code></pre></div>
-<blockquote>
-<p>💡 <em>If no OTLP variables are defined, Agentomatic defaults to console logging, dumping trace summaries into standard output for development.</em></p>
-</blockquote>
-<h3 id="adding-custom-spans-in-agent-code">Adding Custom Spans in Agent Code<a class="headerlink" href="#adding-custom-spans-in-agent-code" title="Permanent link">&para;</a></h3>
-<p>You can instrument custom processing nodes or helper functions in your agent folder (e.g., <code>nodes.py</code> or <code>tools.py</code>) using the <code>@traced</code> decorator:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.observability.telemetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">traced</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nd">@traced</span><span class="p">(</span><span class="s2">&quot;support_agent.query_kb&quot;</span><span class="p">)</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">query_knowledge_base</span><span class="p">(</span><span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="c1"># This automatically records a span named &#39;support_agent.query_kb&#39;</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="c1"># and tracks any exceptions raised during execution.</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">return</span> <span class="k">await</span> <span class="n">vector_store</span><span class="o">.</span><span class="n">similarity_search</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+<h3 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">continue</span><span class="w">  </span><span class="c1"># or &#39;fail_fast&#39;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">120.0</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">risky_step</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_agent</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">retry</span><span class="p">:</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">      </span><span class="nt">max_attempts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">      </span><span class="nt">delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
 </code></pre></div>
 <hr />
-<h2 id="2-agent-metrics-instrumentation">📊 2. Agent Metrics &amp; Instrumentation<a class="headerlink" href="#2-agent-metrics-instrumentation" title="Permanent link">&para;</a></h2>
-<p>Agentomatic comes equipped with Prometheus instruments for tracking agent-specific metrics. If <code>prometheus_client</code> is not installed, it falls back to a graceful no-op dummy state.</p>
-<h3 id="core-metrics">Core Metrics<a class="headerlink" href="#core-metrics" title="Permanent link">&para;</a></h3>
-<p>The framework records the following counters, gauges, and histograms:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.observability.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">AGENT_INVOCATION_COUNT</span><span class="p">,</span>  <span class="c1"># Counter: [&quot;agent_name&quot;, &quot;status&quot;]</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">AGENT_DURATION</span><span class="p">,</span>          <span class="c1"># Histogram: [&quot;agent_name&quot;]</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">LLM_DURATION</span><span class="p">,</span>            <span class="c1"># Histogram: [&quot;provider&quot;, &quot;model&quot;]</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">ERROR_COUNT</span><span class="p">,</span>             <span class="c1"># Counter: [&quot;error_type&quot;, &quot;agent_name&quot;]</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">ACTIVE_AGENTS</span><span class="p">,</span>           <span class="c1"># Gauge: Concurrent active agent runs</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">)</span>
+<h2 id="scaffolding">🧪 Scaffolding<a class="headerlink" href="#scaffolding" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>agentomatic<span class="w"> </span>init<span class="w"> </span>my_pipeline<span class="w"> </span>--template<span class="w"> </span>pipeline
 </code></pre></div>
-<h3 id="context-based-tracking">Context-Based Tracking<a class="headerlink" href="#context-based-tracking" title="Permanent link">&para;</a></h3>
-<p>Track agent run durations and statuses in your code using the async context manager <code>track_agent_invocation</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.observability.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">track_agent_invocation</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run_analytics</span><span class="p">(</span><span class="n">agent_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">track_agent_invocation</span><span class="p">(</span><span class="n">agent_name</span><span class="p">):</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="c1"># ACTIVE_AGENTS increments</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="k">await</span> <span class="n">process_graph</span><span class="p">()</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="c1"># SUCCESS increments</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="c1"># DURATION is observed and ACTIVE_AGENTS decrements</span>
-</code></pre></div>
-<h3 id="concurrency-primitives-circuit-breakers">Concurrency Primitives &amp; Circuit Breakers<a class="headerlink" href="#concurrency-primitives-circuit-breakers" title="Permanent link">&para;</a></h3>
-<p>Protect external APIs and rate-limited LLM providers using built-in circuit breakers and semaphores:</p>
+<p>This creates a <code>pipeline.yaml</code> with a sample multi-step workflow ready to customize.</p>
+<hr />
+<h2 id="further-reading">📖 Further Reading<a class="headerlink" href="#further-reading" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>AgentSemaphore</strong>: Limit concurrent executions per agent.</li>
-<li><strong>CircuitBreaker</strong>: Automatically trip and fail fast when external services experience consecutive failures.</li>
+<li><a href="../templates/">Templates</a> — all available scaffolding templates</li>
+<li><a href="../class-agents/">Class-Based Agents</a> — define agents as Python classes</li>
+<li><a href="../../architecture/overview/">Architecture Overview</a> — how pipelines fit in</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.observability.concurrency</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitBreaker</span><span class="p">,</span> <span class="n">AgentSemaphore</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># 1. Initialize a circuit breaker</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">llm_breaker</span> <span class="o">=</span> <span class="n">CircuitBreaker</span><span class="p">(</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;llm_provider&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">failure_threshold</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>   <span class="c1"># Trip after 5 failures</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">reset_timeout</span><span class="o">=</span><span class="mf">60.0</span><span class="p">,</span>    <span class="c1"># Reset connection attempt after 60s</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">)</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># 2. Wrap LLM calls</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">async</span> <span class="k">with</span> <span class="n">llm_breaker</span><span class="o">.</span><span class="n">call</span><span class="p">():</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">chat_llm</span><span class="o">.</span><span class="n">ainvoke</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-</code></pre></div>
-<hr />
-<h2 id="3-feedback-collection-loop">💬 3. Feedback Collection Loop<a class="headerlink" href="#3-feedback-collection-loop" title="Permanent link">&para;</a></h2>
-<p>Gather real-user feedback directly through your agent API. </p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Auto-registers feedback endpoints</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;sqlite+aiosqlite:///data.db&quot;</span><span class="p">)</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">)</span>
-</code></pre></div>
-<p>When enabled, Agentomatic mounts these three endpoints for <strong>every registered agent</strong>:
-1. <code>POST /api/v1/{agent}/feedback</code> — Submit a rating (1-5), comment, or correct answer.
-2. <code>GET /api/v1/{agent}/feedback</code> — List historical feedback entries.
-3. <code>GET /api/v1/{agent}/feedback/export</code> — Export logs as a JSONL dataset.</p>
-<h3 id="submitting-feedback-client-example">Submitting Feedback (Client Example)<a class="headerlink" href="#submitting-feedback-client-example" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># Submit a thumbs-down correction to train the optimizer</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="s2">&quot;http://localhost:8000/api/v1/support_agent/feedback&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="n">json</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>            <span class="s2">&quot;query&quot;</span><span class="p">:</span> <span class="s2">&quot;How do I reset my password?&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>            <span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="s2">&quot;Use the settings panel.&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>            <span class="s2">&quot;correction&quot;</span><span class="p">:</span> <span class="s2">&quot;Click &#39;Forgot Password&#39; on the login screen.&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>            <span class="s2">&quot;rating&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>            <span class="s2">&quot;feedback_type&quot;</span><span class="p">:</span> <span class="s2">&quot;correction&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>        <span class="p">}</span>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="p">)</span>
-</code></pre></div>
-<hr />
-<h2 id="4-the-optimizeinvoke-endpoint">⚡ 4. The <code>/optimize/invoke</code> Endpoint<a class="headerlink" href="#4-the-optimizeinvoke-endpoint" title="Permanent link">&para;</a></h2>
-<p>For automated evaluation and prompt tuning, standard response text is not enough. Evaluation metrics like <code>faithfulness</code> or <code>context_recall</code> require access to intermediate contexts and steps.</p>
-<p>Agentomatic mounts a dedicated <code>POST /api/v1/{agent}/optimize/invoke</code> endpoint which returns <strong>the full pipeline context</strong>:</p>
-<h3 id="request-payload">Request Payload<a class="headerlink" href="#request-payload" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;What are the working hours?&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">&quot;system_prompt_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a concise office assistant...&quot;</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">}</span>
-</code></pre></div>
-<h3 id="response-payload">Response Payload<a class="headerlink" href="#response-payload" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">&quot;response&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Working hours are 9:00 AM to 5:00 PM.&quot;</span><span class="p">,</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">&quot;retrieval_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="s2">&quot;Office Policy: Standard business hours are 9 AM to 5 PM.&quot;</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">&quot;tool_calls&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="p">{</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;search_handbook&quot;</span><span class="p">,</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">      </span><span class="nt">&quot;args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hours&quot;</span><span class="p">},</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">      </span><span class="nt">&quot;result&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="nt">&quot;steps_taken&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;search_db&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;format_reply&quot;</span><span class="p">],</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">  </span><span class="nt">&quot;reasoning&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Retrieved working hours from office policy docs.&quot;</span><span class="p">,</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span><span class="nt">&quot;citations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;handbook_policy.pdf&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;page&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">}],</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="nt">&quot;duration_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">341.2</span><span class="p">,</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
-<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="p">}</span>
-</code></pre></div>
-<p>The <code>PromptOptimizer</code> automatically utilizes this endpoint when running optimization loops. It fetches intermediate retrieval context and tool logs, enabling deep evaluation scores.</p>
 
 
 
