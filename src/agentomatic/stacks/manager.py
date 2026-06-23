@@ -242,6 +242,7 @@ class StackManager:
             os.environ.setdefault(key, value)
 
         from agentomatic.config.settings import reset_settings
+
         reset_settings()
 
         self._active_stack = stack

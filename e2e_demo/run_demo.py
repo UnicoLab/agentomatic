@@ -170,7 +170,9 @@ def run_tests():
     check("POST /echo/invoke", resp.status_code == 200, f"status={resp.status_code}")
     if resp.status_code == 200:
         data = resp.json()
-        check("  echo response", "Echo:" in data.get("response", ""), data.get("response", "")[:80])
+        check(
+            "  echo response", "Echo:" in data.get("response", ""), data.get("response", "")[:80]
+        )
 
     # Test: Chat endpoint with messages (BUG 3 fix)
     resp = client.post(
@@ -184,7 +186,9 @@ def run_tests():
             ],
         },
     )
-    check("POST /greeter/chat (with messages)", resp.status_code == 200, f"status={resp.status_code}")
+    check(
+        "POST /greeter/chat (with messages)", resp.status_code == 200, f"status={resp.status_code}"
+    )
 
     # Test: Agent health
     resp = client.get("/api/v1/greeter/health")

@@ -8,9 +8,11 @@ from agentomatic.plugins import BaseMLPlugin
 class TextPayload(BaseModel):
     text: str = Field(..., description="The text to classify")
 
+
 class ClassificationResult(BaseModel):
     category: str = Field(..., description="The classified category")
     score: float = Field(..., description="Confidence score")
+
 
 class MyClassifier(BaseMLPlugin[TextPayload, ClassificationResult]):
     plugin_name = "my_classifier"

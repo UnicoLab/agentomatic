@@ -62,9 +62,11 @@ def create_plugin_router(plugin: BaseMLPlugin) -> APIRouter:
     sig = inspect.signature(predict_endpoint)
     params = list(sig.parameters.values())
     params[0] = params[0].replace(annotation=input_schema)
-    setattr(predict_endpoint, "__signature__", sig.replace(
-        parameters=params, return_annotation=output_schema
-    ))
+    setattr(
+        predict_endpoint,
+        "__signature__",
+        sig.replace(parameters=params, return_annotation=output_schema),
+    )
 
     router.add_api_route(
         "/predict",

@@ -137,7 +137,9 @@ class GraphExecutionMixin(Generic[StateT]):
 
         # Register nodes and track entrypoint / finish
         for node_name, method, meta in node_methods:
-            from typing import Callable, Any, cast
+            from collections.abc import Callable
+            from typing import Any, cast
+
             typed_method = cast(Callable[[Any], Any], method)
             builder.node(
                 node_name,
