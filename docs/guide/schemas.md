@@ -181,11 +181,11 @@ async def node_fn(state: dict) -> dict:
     # (By default, fields are mapped to state.get("current_query") or state.get("metadata"))
     location = state.get("metadata", {}).get("location")
     units = state.get("metadata", {}).get("units", "celsius")
-    
+
     # 2. Process and fetch data
     # (mocking execution logic here)
     temp = 22.5 if units == "celsius" else 72.5
-    
+
     # 3. Return a dict matching the WeatherAgentResponse schema structure
     return {
         "forecast_summary": f"Sunny and warm in {location}",
@@ -235,7 +235,7 @@ This ensures that your agent nodes only receive clean, well-formed data that adh
 
 ## 🌐 Swagger UI Integration
 
-When you register custom schemas, Agentomatic updates the OpenAPI definition for that specific agent. 
+When you register custom schemas, Agentomatic updates the OpenAPI definition for that specific agent.
 
 To view and interact with the custom schemas:
 1. Start the server: `agentomatic run --reload`
@@ -247,6 +247,6 @@ To view and interact with the custom schemas:
 
 ## 🤝 Agent-to-Agent (A2A) Discovery
 
-Custom schemas are also automatically serialized into the agent's **A2A Agent Card** at `GET /api/v1/agents/{agent_name}/card` (and the universal `.well-known/agent.json` directory). 
+Custom schemas are also automatically serialized into the agent's **A2A Agent Card** at `GET /api/v1/agents/{agent_name}/card` (and the universal `.well-known/agent.json` directory).
 
 This allows other agents running on the platform or external client orchestrators to programmatically read the exact types, required fields, and descriptions of what your agent expects and outputs, paving the way for autonomous collaboration.

@@ -223,7 +223,7 @@ pip install "agentomatic[studio]"
 agentomatic run --studio
 ```
 
-The unified server will bind to `http://localhost:8000` and mount the studio at `http://localhost:8000/studio/ui/`. 
+The unified server will bind to `http://localhost:8000` and mount the studio at `http://localhost:8000/studio/ui/`.
 
 **Key Studio Features**:
 - **Live Node Streaming**: Watch Server-Sent Events (SSE) transition node activity dynamically.
@@ -253,7 +253,7 @@ class IrisPlugin(BaseMLPlugin[IrisInput, dict]):
 
     async def predict(self, inputs: IrisInput) -> dict:
         prediction = self.model.predict([[
-            inputs.sepal_length, inputs.sepal_width, 
+            inputs.sepal_length, inputs.sepal_width,
             inputs.petal_length, inputs.petal_width
         ]])
         return {"species": prediction[0]}

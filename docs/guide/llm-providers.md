@@ -29,7 +29,7 @@ llm = get_llm(
 
 ## Failover Chains
 
-A key reliability feature of Agentomatic is the ability to automatically fallback to secondary or tertiary models if the primary provider goes down or rate-limits you. 
+A key reliability feature of Agentomatic is the ability to automatically fallback to secondary or tertiary models if the primary provider goes down or rate-limits you.
 
 You can define a failover chain using the `fallbacks` parameter:
 
@@ -47,7 +47,7 @@ llm = get_llm(
 )
 ```
 
-If OpenAI fails, the system will automatically route the request to `azure`. If `azure` fails, it will attempt `ollama`. 
+If OpenAI fails, the system will automatically route the request to `azure`. If `azure` fails, it will attempt `ollama`.
 
 ### Telemetry
 

@@ -19,7 +19,7 @@ Agent Pipelines allow you to chain multiple agents into complex workflows using 
     # pipeline.yaml
     name: research_pipeline
     description: "Research and summarize"
-    
+
     steps:
       - name: research
         agent: researcher

@@ -123,7 +123,7 @@ async with llm_breaker.call():
 
 ## 💬 3. Feedback Collection Loop
 
-Gather real-user feedback directly through your agent API. 
+Gather real-user feedback directly through your agent API.
 
 ```python
 platform = AgentPlatform.from_folder(

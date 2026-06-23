@@ -1,12 +1,12 @@
 # Stacks & Configuration Management
 
-Agentomatic allows you to bundle and manage multi-environment LLM configurations, databases, authentication, and feature flags into deployable units known as **Stacks**. 
+Agentomatic allows you to bundle and manage multi-environment LLM configurations, databases, authentication, and feature flags into deployable units known as **Stacks**.
 
 Stacks are defined using YAML files and managed using the `StackManager`. This allows you to smoothly transition from local development to staging and production without changing code.
 
 ## The StackManager
 
-The `StackManager` reads YAML stack files, applies environment variables, and interpolates `${ENV_VAR}` references automatically. 
+The `StackManager` reads YAML stack files, applies environment variables, and interpolates `${ENV_VAR}` references automatically.
 
 ### Loading a Stack
 
@@ -60,7 +60,7 @@ llm:
     model: "gpt-4o"
     temperature: 0.2
     api_key: "${OPENAI_API_KEY}"
-  
+
   fast:
     provider: "ollama"
     model: "llama3"

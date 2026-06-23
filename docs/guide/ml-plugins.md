@@ -48,7 +48,7 @@ class SentimentPlugin(BaseMLPlugin[SentimentInput, SentimentOutput]):
         """
         await asyncio.sleep(0.1)  # Simulate slow weight loading
         self.model_weights = {"positive": 0.99, "neutral": 0.5}
-        
+
         # You MUST call super().load_model() to mark the plugin as loaded
         await super().load_model()
 

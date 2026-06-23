@@ -110,14 +110,14 @@ async def custom_chat(query: str) -> APIResponse:
     agent = AgentRegistry().get("my_agent")
     if not agent:
         return APIResponse(success=False, message="Agent not found")
-        
+
     # Format user prompt
     user_prompt = agent.prompt_manager.format_prompt(
         version=agent.config.prompt_version,
         prompt_type="user_template",
         query=query
     )
-    
+
     return APIResponse(success=True, data={"prompt_used": user_prompt})
 ```
 
@@ -136,7 +136,7 @@ pm = PromptManager("my_agent", prompts_path)
 
 async def generate_response(state: dict[str, Any]) -> dict[str, Any]:
     query = state.get("current_query", "")
-    
+
     # Format prompt templates dynamically
     system_msg = pm.get_prompt(version="v1", prompt_type="system")
     user_msg = pm.format_prompt(
@@ -145,7 +145,7 @@ async def generate_response(state: dict[str, Any]) -> dict[str, Any]:
         query=query,
         context="No context"
     )
-    
+
     # Call your LLM model here using prompt templates...
     return {"response": "Processed output"}
 ```

@@ -750,4 +750,3 @@ To maintain consistency across documentation and code, use deployment-first term
 | Module | Deployment component | Components are parts of a deployed system |
 | Predictor | Agent version | Agents serve versioned configurations, not predictions |
 | Compiled artifact | Optimized config version | The artifact is a JSON config, not compiled code |
-

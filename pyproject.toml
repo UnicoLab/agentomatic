@@ -218,4 +218,3 @@ module = [
     "agentomatic.optimize.*",
 ]
 disable_error_code = ["call-arg", "override", "misc", "attr-defined"]
-

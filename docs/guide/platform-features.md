@@ -53,14 +53,14 @@ from agentomatic.core.router_factory import AgentSuspendedException
 
 async def financial_transfer_node(state: dict):
     metadata = state.get("metadata") or {}
-    
+
     # Check if we already have approval
     if metadata.get("hitl_approved"):
         return {
             "response": f"Successfully transferred ${state['amount']}",
             "metadata": metadata
         }
-    
+
     # Otherwise, suspend and wait for human confirmation
     raise AgentSuspendedException(
         approval_id=f"tx_{state['transaction_id']}",

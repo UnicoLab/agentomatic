@@ -287,4 +287,3 @@ jobs:
           uv run mike deploy --push --update-aliases --ignore-remote-status "$VERSION" latest
           uv run mike set-default --push --ignore-remote-status latest
           echo "✓ Deployed docs v${VERSION} (aliased as 'latest', set as default)"
-
