@@ -207,8 +207,15 @@ class AgentPlatform:
                     self._stack_manager = None
             elif isinstance(stack, StackConfig):
                 self._stack_manager = StackManager(stacks_dir=stacks_dir)
+                self._stack_manager.apply_dotenv(stack.env_file)
+                for key, value in stack.environment.items():
+                    os.environ.setdefault(key, value)
+                
+                from agentomatic.config.settings import reset_settings
+                reset_settings()
+                
                 self._stack_manager._active_stack = stack
-                logger.info(f"📦 Using provided stack: {stack.name}")
+                logger.info(f"📦 Loaded explicit StackConfig: {stack.name}")
 
     # ------------------------------------------------------------------
     # Factory helpers
