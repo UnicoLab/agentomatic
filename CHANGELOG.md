@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.9.0 (2026-06-24)
+
+### Features
+
+- **cli**: Add ml lifecycle templates for pipelines and plugins
+  ([`78e9512`](https://github.com/UnicoLab/agentomatic/commit/78e9512bc73132563daf61cbaf43eaeca26ec672))
+
+
 ## v0.8.0 (2026-06-24)
 
 ### Bug Fixes
