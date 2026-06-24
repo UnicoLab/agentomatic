@@ -1,6 +1,77 @@
 # CHANGELOG
 
 
+## v0.8.0 (2026-06-24)
+
+### Bug Fixes
+
+- **ci**: Add mypy overrides for optional dependency imports
+  ([`cae7bff`](https://github.com/UnicoLab/agentomatic/commit/cae7bfff94e2495800ebdc47ccab43606c241e67))
+
+Add ignore_missing_imports for optional packages (chainlit, litellm, opentelemetry, langchain
+  providers, holysheet, yaml) that may not be installed in CI environments. Fixes type check
+  pipeline failures.
+
+- **ci**: Suppress false call-arg errors for langchain provider constructors
+  ([`c4adae9`](https://github.com/UnicoLab/agentomatic/commit/c4adae952257d2d0ee21e009012f647f40900033))
+
+LangChain's Pydantic models (ChatOpenAI, AzureChatOpenAI) use dynamic init signatures that conflict
+  with pydantic-mypy plugin, causing false 'Unexpected keyword argument' errors when --all-extras
+  are installed. Add agentomatic.providers.* to the call-arg suppression overrides.
+
+### Code Style
+
+- **cli**: Fix ruff formatting in commands.py
+  ([`7499efd`](https://github.com/UnicoLab/agentomatic/commit/7499efdc43d85e7be4e5223a90c209b4d48d2b82))
+
+### Documentation
+
+- Major documentation overhaul with premium design and expanded content
+  ([`473671e`](https://github.com/UnicoLab/agentomatic/commit/473671e4296e650f23f0da5ac856c712c251d492))
+
+- Add custom CSS design system (Inter/JetBrains Mono fonts, gradient tables, animated cards, branded
+  code blocks, dark mode support) - Add announcement bar template override - Upgrade mkdocs.yml with
+  footer nav, breadcrumbs, TOC follow, tooltips, search share, inline highlighting, and 10+ new
+  markdown extensions - Fix homepage: test badge 393→846, endpoint count 12→26, add BaseGraphAgent
+  to public API table, add Class-Based Agents and Cookbook navigation cards - New pages: Concepts &
+  Glossary (461 lines), Testing Your Agents (833 lines), Cookbook & Recipes (1344 lines) - Expand
+  stubs: delegation.md (47→273), security.md (57→435), llm-providers.md (77→424) - Add
+  cross-references and troubleshooting to 8 existing pages - Rewrite templates.md: replace
+  non-existent swarm/pipeline/class templates with actual legacy_dict/plugin templates - Expand
+  first-agent.md with Steps 3-5, common mistakes, navigation - Add state dictionary explanation and
+  troubleshooting to quickstart.md - Add FAQ and Related Documentation to class-agents.md -
+  Restructure mkdocs.yml nav with Concepts, Cookbook, Testing, Advanced section
+
+### Features
+
+- **cli**: Add full ML lifecycle scaffolding to init --template full
+  ([`a9e1cbc`](https://github.com/UnicoLab/agentomatic/commit/a9e1cbcc95cd818288b2148a035f47ea3f859288))
+
+- Add eval.py: detailed evaluation with per-example reporting, JSON export,
+  --split/--compiled/--dataset flags, CallableMetric support - Add optimize.py: GridSearch param
+  sweep + PromptFitter bridge for LLM-powered prompt rewriting, --strategy grid|prompt - Add
+  predict.py: single query, batch JSONL, and interactive prediction modes with
+  --compiled/--input/--output flags - Add Makefile: convenience targets (train, eval, optimize,
+  predict, all) - Expand dataset.jsonl: 3 → 6 examples (4 train, 2 test) - Fix CLI --template
+  choices: remove non-existent swarm/pipeline/class, add legacy_dict (matches actual TEMPLATES
+  registry) - Update full template description to mention ML lifecycle scripts
+
+The 'full' template now generates 16 files covering the complete ML-like workflow: agent → config →
+  schemas → tools → dataset → train → eval → optimize → predict → Makefile
+
+- **cli**: Overhaul TUI with branded ASCII banner, categorized help, and ML lifecycle awareness
+  ([`f8f705b`](https://github.com/UnicoLab/agentomatic/commit/f8f705b3df894a1a703895c220595d91bbbbde55))
+
+- Add ASCII art banner with version number in Rich panels - Add --version / -V flag to show package
+  version - Replace plain click.group with Rich categorized command table (Agent Lifecycle,
+  Platform, ML & Optimization, Debug, Advanced) - Upgrade list command: detect class-based vs
+  functional agents, show Pattern/Framework/ML Lifecycle columns with T·E·O·D badges - Upgrade
+  inspect command: 3-section capabilities table (Core, ML Lifecycle, Advanced) with agent pattern
+  detection panel - Enhance init next-steps: show ML lifecycle commands for full template (train,
+  eval, optimize, predict, make all) - Polish doctor: detect agent.py alongside __init__.py for
+  counting - Polish all docstrings to be clear and descriptive
+
+
 ## v0.7.0 (2026-06-23)
 
 ### Bug Fixes
