@@ -268,12 +268,759 @@ def _legacy_nodes_py(name: str) -> str:
 
 
 # =====================================================================
+# Coordinator / Orchestrator Template
+# =====================================================================
+
+
+def _coordinator_agent_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Coordinator agent: {name}.
+
+Routes user queries to the appropriate specialist agent via delegation.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from agentomatic.agents import BaseGraphAgent
+
+
+@dataclass
+class {title}State:
+    """Coordinator state — per-run transient data."""
+
+    request: str = ""
+    classification: str = ""
+    delegated_to: str = ""
+    output: dict[str, Any] = field(default_factory=dict)
+
+
+class {title}Agent(BaseGraphAgent[{title}State]):
+    """Orchestrator that classifies queries and routes to specialist agents.
+
+    Delegation targets are defined in ``delegation.py``.
+    """
+
+    agent_name = "{name}"
+    agent_description = "Coordinator that routes queries to specialist agents"
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("classify", self.classify)
+        g.add_node("route", self.route)
+        g.set_entry_point("classify")
+        g.add_edge("classify", "route")
+        g.set_finish_point("route")
+        return g.compile()
+
+    def classify(self, state: {title}State) -> {title}State:
+        """Classify the user query to determine routing.
+
+        TODO: Replace keyword matching with an LLM classifier.
+        """
+        query = state.request.lower()
+        # Add your routing logic here
+        state.classification = "default"
+        return state
+
+    def route(self, state: {title}State) -> {title}State:
+        """Route to the appropriate specialist via delegation."""
+        from .delegation import get_handoff_tools
+
+        tools = get_handoff_tools()
+        if not tools:
+            state.output = {{"response": f"No delegation targets configured"}}
+            return state
+
+        # Pick the first tool as default, or match by classification
+        target_tool = tools[0]
+        for tool in tools:
+            tool_name = getattr(tool, "name", getattr(tool, "__name__", ""))
+            if state.classification in tool_name:
+                target_tool = tool
+                break
+
+        tool_name = getattr(target_tool, "name", getattr(target_tool, "__name__", ""))
+        state.delegated_to = tool_name
+        try:
+            result = target_tool(state.request)
+            state.output = {{
+                "response": result,
+                "routed_to": state.delegated_to,
+            }}
+        except Exception as exc:
+            state.output = {{
+                "response": f"Delegation failed: {{exc}}",
+                "routed_to": state.delegated_to,
+                "error": True,
+            }}
+        return state
+
+    def input_to_state(self, data: dict[str, Any]) -> {title}State:
+        return {title}State(request=data.get("current_query", ""))
+
+    def state_to_output(self, state: {title}State) -> dict[str, Any]:
+        return state.output
+'''
+
+
+def _coordinator_delegation_py(name: str) -> str:
+    return f'''"""Delegation configuration for {name}.
+
+This file is AUTO-DISCOVERED by the agentomatic registry.
+It must export:
+  - DELEGATION_TARGETS: list of agent names this agent can delegate to
+  - get_handoff_tools(): function that returns handoff tools
+"""
+from __future__ import annotations
+
+from agentomatic.delegation import AgentDelegator
+
+# ── Agents this coordinator is allowed to delegate to ──────────────
+# Add your specialist agent names here.
+DELEGATION_TARGETS = [
+    # "researcher",
+    # "writer",
+    # "coder",
+]
+
+
+def get_handoff_tools():
+    """Create handoff tools for all delegation targets.
+
+    Resolution order:
+    1. langgraph-swarm (in-process) if installed and use_swarm=True
+    2. HTTP via POST /api/v1/{{agent}}/invoke (fallback)
+
+    Returns:
+        List of LangChain-compatible handoff tools.
+    """
+    if not DELEGATION_TARGETS:
+        return []
+
+    delegator = AgentDelegator(use_swarm=True)
+    return delegator.create_handoffs(
+        targets=DELEGATION_TARGETS,
+        descriptions={{
+            # Add descriptions for each target:
+            # "researcher": "Delegate factual research questions",
+            # "writer": "Delegate content writing tasks",
+        }},
+    )
+'''
+
+
+def _coordinator_security_py(name: str) -> str:
+    return f'''"""Security policy for {name}.
+
+Auto-discovered by the registry. Enforces which agents
+this coordinator may delegate to via ZeroTrustEnforcer.
+"""
+from __future__ import annotations
+
+from agentomatic.security import AgentSecurityPolicy
+
+from .delegation import DELEGATION_TARGETS
+
+policy = AgentSecurityPolicy(
+    allowed_delegation_targets=DELEGATION_TARGETS,
+)
+'''
+
+
+# =====================================================================
+# Pipeline Template
+# =====================================================================
+
+
+def _pipeline_yaml(name: str) -> str:
+    return f"""# Pipeline: {name}
+# Auto-discovered from pipelines/ or agents/*/pipeline.yaml
+# API endpoint: POST /api/v1/pipelines/{name}/run
+
+name: {name}
+description: "Multi-step agent pipeline"
+version: "1.0.0"
+
+# Input contract
+input:
+  query:
+    type: string
+    required: true
+
+# Output contract
+output:
+  response:
+    type: string
+  steps_completed:
+    type: array
+
+# Pipeline steps — executed in order
+steps:
+  - name: classify
+    agent: classifier
+    description: "Classify the input query"
+
+  - name: process
+    agent: processor
+    description: "Process based on classification"
+    condition: "len(ctx.steps.classify.output.get('response', '')) > 0"
+
+  - name: format
+    agent: formatter
+    description: "Format the final response"
+
+# Error handling
+on_error: continue
+timeout: 120.0
+"""
+
+
+def _pipeline_readme(name: str) -> str:
+    title = name.replace("_", " ").title()
+    return f"""# {title} Pipeline
+
+## Overview
+
+A multi-step agent pipeline that chains agents together in a fixed order.
+
+## Folder Structure
+
+```
+pipelines/
+  {name}.yaml          \u2190 Pipeline definition (auto-discovered)
+agents/
+  classifier/          \u2190 Step 1 agent
+    agent.py
+  processor/           \u2190 Step 2 agent
+    agent.py
+  formatter/           \u2190 Step 3 agent
+    agent.py
+```
+
+## Usage
+
+### Start the platform
+
+```bash
+agentomatic run
+```
+
+### Call the pipeline
+
+```bash
+curl -X POST http://localhost:8000/api/v1/pipelines/{name}/run \\
+  -H "Content-Type: application/json" \\
+  -d \'{{"input": {{"query": "Hello, world!"}}}}\u0027
+```
+
+### Other endpoints
+
+```bash
+# List all pipelines
+curl http://localhost:8000/api/v1/pipelines
+
+# Validate before running
+curl http://localhost:8000/api/v1/pipelines/{name}/validate
+
+# Get Mermaid diagram
+curl http://localhost:8000/api/v1/pipelines/{name}/visualize
+```
+
+## Pipeline vs. Delegation
+
+| | Pipeline | Delegation |
+|---|---------|-----------|
+| Routing | Static \u2014 you define the order | Dynamic \u2014 the model decides |
+| Best for | Deterministic workflows | Open-ended routing |
+| API | `POST /api/v1/pipelines/{{name}}/run` | `POST /api/v1/{{agent}}/invoke` |
+"""
+
+
+def _pipeline_eval_py(name: str) -> str:
+    return f'''"""End-to-end evaluation script for the {name} pipeline.
+
+Runs the entire pipeline against a dataset and measures quality
+at both the pipeline level and per-step level.
+
+Usage::
+
+    python -m pipelines.{name}.eval
+    python -m pipelines.{name}.eval --dataset custom_dataset.jsonl
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import time
+from pathlib import Path
+from typing import Any
+
+DATA_DIR = Path(__file__).parent
+
+
+def load_dataset(path: str) -> list[dict[str, Any]]:
+    """Load evaluation examples from JSONL."""
+    examples = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                examples.append(json.loads(line))
+    return examples
+
+
+async def run_pipeline(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Execute the pipeline via HTTP API.
+
+    Requires the platform to be running: ``agentomatic run``
+    """
+    import httpx
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/pipelines/{name}/run",
+            json={{"input": input_data}},
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def score_result(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> dict[str, float]:
+    """Score a single pipeline result against expected output.
+
+    Customize these metrics for your use case.
+    """
+    scores = {{}}
+
+    # 1. Has response
+    scores["has_response"] = 1.0 if actual.get("output", {{}}).get("response") else 0.0
+
+    # 2. Status is success
+    scores["pipeline_success"] = 1.0 if actual.get("status") == "success" else 0.0
+
+    # 3. All steps completed
+    steps = actual.get("steps", {{}})
+    if steps:
+        completed = sum(1 for s in steps.values() if s.get("status") == "success")
+        scores["step_completion"] = completed / len(steps)
+    else:
+        scores["step_completion"] = 0.0
+
+    # 4. Custom: check expected output keys
+    if "expected_output" in expected:
+        exp = expected["expected_output"]
+        out = actual.get("output", {{}})
+        matching = sum(1 for k in exp if k in out)
+        scores["output_match"] = matching / len(exp) if exp else 1.0
+
+    return scores
+
+
+async def evaluate(dataset_path: str, split: str = "all") -> None:
+    """Run evaluation over the full dataset."""
+    examples = load_dataset(dataset_path)
+    print(f"\\nEvaluating pipeline '{name}' on {{len(examples)}} examples\\n")
+    print("-" * 60)
+
+    all_scores: list[dict[str, float]] = []
+    failures = 0
+
+    for i, example in enumerate(examples):
+        input_data = example.get("input", example)
+        t0 = time.perf_counter()
+
+        try:
+            result = await run_pipeline(input_data)
+            elapsed = (time.perf_counter() - t0) * 1000
+            scores = score_result(example, result)
+            all_scores.append(scores)
+
+            status = "PASS" if scores.get("pipeline_success", 0) == 1.0 else "FAIL"
+            if status == "FAIL":
+                failures += 1
+            print(
+                f"  [{{status}}] Example {{i + 1}} "
+                f"({{elapsed:.0f}}ms) — {{scores}}"
+            )
+        except Exception as exc:
+            failures += 1
+            elapsed = (time.perf_counter() - t0) * 1000
+            print(f"  [ERROR] Example {{i + 1}} ({{elapsed:.0f}}ms) — {{exc}}")
+            all_scores.append({{"pipeline_success": 0.0, "error": 1.0}})
+
+    # Aggregate scores
+    print("\\n" + "=" * 60)
+    print(f"\\n  Pipeline: {name}")
+    print(f"  Examples: {{len(examples)}}")
+    print(f"  Passed:   {{len(examples) - failures}}")
+    print(f"  Failed:   {{failures}}")
+    print(f"  Pass rate: {{(len(examples) - failures) / len(examples):.1%}}")
+
+    if all_scores:
+        avg_scores = {{}}
+        for key in all_scores[0]:
+            values = [s.get(key, 0.0) for s in all_scores]
+            avg_scores[key] = sum(values) / len(values)
+        print(f"\\n  Average scores:")
+        for k, v in avg_scores.items():
+            print(f"    {{k}}: {{v:.3f}}")
+
+    # Save report
+    report_path = DATA_DIR / "eval_report.json"
+    report = {{
+        "pipeline": "{name}",
+        "num_examples": len(examples),
+        "pass_rate": (len(examples) - failures) / len(examples),
+        "failures": failures,
+        "avg_scores": avg_scores if all_scores else {{}},
+    }}
+    report_path.write_text(json.dumps(report, indent=2))
+    print(f"\\n  Report saved to {{report_path}}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Evaluate {name} pipeline")
+    parser.add_argument(
+        "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
+        help="Path to evaluation dataset (JSONL)"
+    )
+    parser.add_argument(
+        "--split", choices=["test", "train", "all"], default="all",
+        help="Dataset split to evaluate"
+    )
+    args = parser.parse_args()
+
+    asyncio.run(evaluate(args.dataset, args.split))
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _pipeline_optimize_py(name: str) -> str:
+    return f'''"""Pipeline-level optimization for {name}.
+
+Tests different agent configurations, prompt versions, and pipeline
+parameters to find the best-performing combination.
+
+Usage::
+
+    python -m pipelines.{name}.optimize
+    python -m pipelines.{name}.optimize --strategy grid
+    python -m pipelines.{name}.optimize --strategy ablation
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import time
+from itertools import product
+from pathlib import Path
+from typing import Any
+
+DATA_DIR = Path(__file__).parent
+
+
+def load_dataset(path: str) -> list[dict[str, Any]]:
+    """Load optimization examples from JSONL."""
+    examples = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                examples.append(json.loads(line))
+    return examples
+
+
+async def run_pipeline_with_config(
+    input_data: dict[str, Any],
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute the pipeline with optional config overrides."""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/pipelines/{name}/run",
+            json={{
+                "input": input_data,
+                "metadata": metadata or {{}},
+            }},
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def score_result(result: dict[str, Any]) -> float:
+    """Score a pipeline result. Customize for your use case."""
+    if result.get("status") != "success":
+        return 0.0
+
+    score = 0.0
+    steps = result.get("steps", {{}})
+    if steps:
+        completed = sum(1 for s in steps.values() if s.get("status") == "success")
+        score += completed / len(steps) * 0.5  # 50% for step completion
+
+    if result.get("output", {{}}).get("response"):
+        score += 0.5  # 50% for having a response
+
+    return score
+
+
+async def grid_search(dataset_path: str) -> None:
+    """Run grid search over pipeline configurations."""
+    examples = load_dataset(dataset_path)
+    print(f"Grid search on {{len(examples)}} examples\\n")
+
+    # Define your parameter grid here
+    param_grid = {{
+        "timeout": [60.0, 120.0],
+        "on_error": ["fail_fast", "continue"],
+        # Add pipeline-specific parameters:
+        # "temperature": [0.1, 0.5, 0.8],
+        # "system_prompt": ["prompt_v1", "prompt_v2"],
+    }}
+
+    keys = list(param_grid.keys())
+    combos = list(product(*param_grid.values()))
+    print(f"Testing {{len(combos)}} configurations...\\n")
+
+    best_score = -1.0
+    best_config: dict[str, Any] = {{}}
+    results = []
+
+    for combo in combos:
+        config = dict(zip(keys, combo))
+        print(f"  Config: {{config}}")
+
+        scores = []
+        for example in examples[:5]:  # limit for speed
+            input_data = example.get("input", example)
+            try:
+                result = await run_pipeline_with_config(
+                    input_data, metadata={{"config_override": config}},
+                )
+                scores.append(score_result(result))
+            except Exception:
+                scores.append(0.0)
+
+        avg = sum(scores) / len(scores) if scores else 0.0
+        results.append({{"config": config, "avg_score": avg}})
+        print(f"    → avg score: {{avg:.3f}}\\n")
+
+        if avg > best_score:
+            best_score = avg
+            best_config = config
+
+    print("=" * 60)
+    print(f"\\nBest config (score={{best_score:.3f}}):")
+    for k, v in best_config.items():
+        print(f"  {{k}}: {{v}}")
+
+    # Save results
+    report_path = DATA_DIR / "optimize_report.json"
+    report_path.write_text(json.dumps({{
+        "pipeline": "{name}",
+        "best_config": best_config,
+        "best_score": best_score,
+        "all_results": results,
+    }}, indent=2))
+    print(f"\\nReport saved to {{report_path}}")
+
+
+async def ablation_study(dataset_path: str) -> None:
+    """Run ablation study — remove one step at a time to measure impact."""
+    examples = load_dataset(dataset_path)
+    print(f"Ablation study on {{len(examples)}} examples\\n")
+
+    # First run the full pipeline as baseline
+    baseline_scores = []
+    for example in examples[:5]:
+        input_data = example.get("input", example)
+        try:
+            result = await run_pipeline_with_config(input_data)
+            baseline_scores.append(score_result(result))
+        except Exception:
+            baseline_scores.append(0.0)
+
+    baseline = sum(baseline_scores) / len(baseline_scores) if baseline_scores else 0.0
+    print(f"  Baseline (all steps): {{baseline:.3f}}")
+
+    # Get pipeline steps
+    import httpx
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        config_resp = await client.get(
+            "http://localhost:8000/api/v1/pipelines/{name}/config"
+        )
+        config = config_resp.json()
+
+    steps = config.get("steps", [])
+    print(f"  Steps: {{[s.get('name', '?') for s in steps]}}\\n")
+
+    # Test without each step
+    for step in steps:
+        step_name = step.get("name", "unknown")
+        print(f"  Without '{{step_name}}':")
+        # Note: actual step skipping requires pipeline support
+        # This is a framework for your ablation logic
+        print(f"    → would skip step '{{step_name}}' and re-run")
+
+    print(f"\\nBaseline score: {{baseline:.3f}}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Optimize {name} pipeline")
+    parser.add_argument(
+        "--strategy", choices=["grid", "ablation"], default="grid",
+        help="Optimization strategy"
+    )
+    parser.add_argument(
+        "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
+        help="Path to dataset (JSONL)"
+    )
+    args = parser.parse_args()
+
+    if args.strategy == "grid":
+        asyncio.run(grid_search(args.dataset))
+    elif args.strategy == "ablation":
+        asyncio.run(ablation_study(args.dataset))
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _pipeline_dataset_jsonl(name: str) -> str:
+    return (
+        '{"input": {"query": "What is machine learning?"}, '
+        '"expected_output": {"response": "Machine learning is..."}, '
+        '"split": "test"}\n'
+        '{"input": {"query": "Explain neural networks"}, '
+        '"expected_output": {"response": "Neural networks are..."}, '
+        '"split": "test"}\n'
+        '{"input": {"query": "What is NLP?"}, '
+        '"expected_output": {"response": "NLP stands for..."}, '
+        '"split": "train"}\n'
+    )
+
+
+def _pipeline_run_py(name: str) -> str:
+    return f'''"""Run the {name} pipeline locally (without the platform server).
+
+Usage::
+
+    python -m pipelines.{name}.run "What is machine learning?"
+    python -m pipelines.{name}.run --input-file input.json
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+
+async def run_via_api(query: str) -> dict[str, Any]:
+    """Execute the pipeline via the platform REST API."""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/pipelines/{name}/run",
+            json={{"input": {{"query": query}}}},
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run {name} pipeline")
+    parser.add_argument("query", nargs="?", help="Query string")
+    parser.add_argument(
+        "--input-file", type=str, default=None,
+        help="JSON file with input data"
+    )
+    args = parser.parse_args()
+
+    if args.input_file:
+        input_data = json.loads(Path(args.input_file).read_text())
+        query = input_data.get("query", json.dumps(input_data))
+    elif args.query:
+        query = args.query
+    else:
+        print("Usage: python -m pipelines.{name}.run \\"your query\\"")
+        sys.exit(1)
+
+    print(f"Running pipeline '{name}'...")
+    print(f"  Query: {{query}}\\n")
+
+    result = asyncio.run(run_via_api(query))
+
+    print(f"  Status: {{result.get('status', 'unknown')}}")
+    print(f"  Duration: {{result.get('duration_ms', 0):.0f}}ms")
+    print(f"\\n  Output:")
+    print(json.dumps(result.get("output", {{}}), indent=4))
+
+    if result.get("steps"):
+        print(f"\\n  Steps:")
+        for step_name, step_data in result["steps"].items():
+            status = step_data.get("status", "?")
+            dur = step_data.get("duration_ms", 0)
+            print(f"    {{step_name}}: {{status}} ({{dur:.0f}}ms)")
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _pipeline_makefile(name: str) -> str:
+    return f""".PHONY: run validate eval optimize help
+
+help:  ## Show this help
+\t@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \\
+\t\tawk 'BEGIN {{FS = ":.*?## "}}; {{printf "\\033[36m%-15s\\033[0m %s\\n", $$1, $$2}}'
+
+run:  ## Run the pipeline via API
+\tpython -m pipelines.{name}.run "Hello world"
+
+validate:  ## Validate the pipeline
+\tcurl -s http://localhost:8000/api/v1/pipelines/{name}/validate | python -m json.tool
+
+eval:  ## Evaluate pipeline quality
+\tpython -m pipelines.{name}.eval
+
+optimize:  ## Optimize pipeline configuration
+\tpython -m pipelines.{name}.optimize --strategy grid
+
+visualize:  ## Get pipeline Mermaid diagram
+\tcurl -s http://localhost:8000/api/v1/pipelines/{name}/visualize | python -m json.tool
+
+all: validate eval optimize  ## Full lifecycle: validate → eval → optimize
+"""
+
+
+# =====================================================================
 # Template Registry
 # =====================================================================
 
 TEMPLATES: dict[str, str] = {
     "basic": "Minimal class-based agent (recommended) — 1 file, quick start",
     "full": "All files — class agent with config, schemas, tools, dataset, train/eval scripts",
+    "coordinator": "Orchestrator — classify & route queries to specialist agents via delegation",
+    "pipeline": "Pipeline — multi-step YAML workflow chaining multiple agents",
     "rag": "RAG class-based agent — retrieve → generate pipeline",
     "chatbot": "Conversational class-based agent with memory",
     "deepagent": "Deep Agent — planning, tools, subagents (requires deepagents package)",
@@ -335,6 +1082,140 @@ class {title}Plugin(BaseMLPlugin[{title}Input, {title}Output]):
 def _plugin_readme(name: str) -> str:
     title = name.replace("_", " ").title()
     return f"""# {title} Plugin\n\nGenerated with `agentomatic init {name} --template plugin`.\n\n## Quick Start\n\nPlace this folder inside your `plugins/` directory. When you run `agentomatic run --plugins-dir plugins`, the platform will automatically discover this plugin and mount its REST endpoints.\n\n## Endpoints\n\n- `POST /api/v1/plugins/{name}/predict`\n- `GET /api/v1/plugins/{name}/health`\n- `GET /api/v1/plugins/{name}/model_card`\n"""
+
+
+def _plugin_dataset_jsonl(name: str) -> str:
+    return (
+        '{"text": "Sample positive input", "label": 1}\n'
+        '{"text": "Sample negative input", "label": 0}\n'
+    )
+
+
+def _plugin_train_py(name: str) -> str:
+    return f'''"""Training script for {name} ML plugin.
+Demonstrates a standard classical ML training loop.
+"""
+import json
+from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def load_data(filepath: str) -> list[dict]:
+    with open(filepath) as f:
+        return [json.loads(line) for line in f]
+
+def train():
+    logger.info(f"Training {name} plugin...")
+    data = load_data("dataset.jsonl")
+    logger.info(f"Loaded {{len(data)}} training examples.")
+
+    # TODO: Implement classical ML training (e.g. Scikit-learn, PyTorch)
+    # X = [d["text"] for d in data]
+    # y = [d["label"] for d in data]
+    # model = LogisticRegression().fit(X, y)
+
+    logger.info("Saving model weights to disk...")
+    # TODO: joblib.dump(model, "model_weights.pkl")
+    logger.info("Training complete.")
+
+if __name__ == "__main__":
+    train()
+'''
+
+
+def _plugin_eval_py(name: str) -> str:
+    return f'''"""Evaluation script for {name} ML plugin.
+Evaluates the loaded model against a test dataset.
+"""
+import json
+import asyncio
+import logging
+from plugin import {name.replace("_", "").title()}Plugin, {name.replace("_", "").title()}Input
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+async def evaluate():
+    logger.info(f"Evaluating {name} plugin...")
+    plugin = {name.replace("_", "").title()}Plugin()
+    await plugin.load_model()
+
+    # Mock data loading
+    examples = [{{"text": "Test input", "expected_label": 1}}]
+
+    correct = 0
+    for ex in examples:
+        result = await plugin.predict({name.replace("_", "").title()}Input(text=ex["text"]))
+        # TODO: Compute real metrics like F1, Accuracy
+        if result.result:
+            correct += 1
+
+    logger.info(f"Accuracy: {{correct / len(examples):.2f}}")
+
+if __name__ == "__main__":
+    asyncio.run(evaluate())
+'''
+
+
+def _plugin_optimize_py(name: str) -> str:
+    return f'''"""Hyperparameter optimization script for {name} plugin."""
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def optimize():
+    logger.info(f"Optimizing {name} plugin hyperparameters...")
+    # TODO: Implement GridSearchCV, Optuna, or random search
+    # Best params -> retrain model -> save
+    logger.info("Optimization complete.")
+
+if __name__ == "__main__":
+    optimize()
+'''
+
+
+def _plugin_predict_py(name: str) -> str:
+    title = name.replace("_", "").title()
+    return f'''"""Local inference script for {name} plugin."""
+import asyncio
+from plugin import {title}Plugin, {title}Input
+
+async def predict(text: str):
+    plugin = {title}Plugin()
+    await plugin.load_model()
+    result = await plugin.predict({title}Input(text=text))
+    print(f"Result: {{result.result}}")
+    print(f"Confidence: {{result.confidence}}")
+
+if __name__ == "__main__":
+    import sys
+    text = sys.argv[1] if len(sys.argv) > 1 else "Default input text"
+    asyncio.run(predict(text))
+'''
+
+
+def _plugin_makefile(name: str) -> str:
+    return f"""# Makefile for {name} plugin
+.PHONY: train eval optimize predict clean
+
+train:
+	python -m plugins.{name}.train
+
+eval:
+	python -m plugins.{name}.eval
+
+optimize:
+	python -m plugins.{name}.optimize
+
+predict:
+	python -m plugins.{name}.predict "Test input"
+
+clean:
+	rm -rf __pycache__ *.pkl *.pt
+"""
 
 
 def _dataset_jsonl(name: str) -> str:
@@ -861,6 +1742,27 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             **common,
         }
 
+    elif template == "coordinator":
+        return {
+            "__init__.py": '"""Agent package."""\\n',
+            "agent.py": _coordinator_agent_py(name),
+            "delegation.py": _coordinator_delegation_py(name),
+            "security.py": _coordinator_security_py(name),
+            "config.py": _config_py(name),
+            **common,
+        }
+
+    elif template == "pipeline":
+        return {
+            "pipeline.yaml": _pipeline_yaml(name),
+            "README.md": _pipeline_readme(name),
+            "dataset.jsonl": _dataset_jsonl(name),
+            "eval.py": _pipeline_eval_py(name),
+            "optimize.py": _pipeline_optimize_py(name),
+            "run.py": _pipeline_run_py(name),
+            "Makefile": _pipeline_makefile(name),
+        }
+
     elif template == "rag":
         return {
             "__init__.py": '"""Agent package."""\\n',
@@ -906,9 +1808,15 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "plugin":
         return {
-            "__init__.py": '"""ML Model Plugin package."""\\n',
+            "__init__.py": '"""ML Model Plugin package."""\n',
             "plugin.py": _plugin_py(name),
             "README.md": _plugin_readme(name),
+            "dataset.jsonl": _plugin_dataset_jsonl(name),
+            "train.py": _plugin_train_py(name),
+            "eval.py": _plugin_eval_py(name),
+            "optimize.py": _plugin_optimize_py(name),
+            "predict.py": _plugin_predict_py(name),
+            "Makefile": _plugin_makefile(name),
         }
 
     else:

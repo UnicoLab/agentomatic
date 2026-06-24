@@ -180,6 +180,8 @@ def cli(ctx: click.Context, version: bool) -> None:
         [
             "basic",
             "full",
+            "coordinator",
+            "pipeline",
             "rag",
             "chatbot",
             "deepagent",
@@ -261,33 +263,73 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
         edit_file = "plugin.py"
     elif template in ["legacy_dict", "custom"]:
         edit_file = "nodes.py" if template == "legacy_dict" else "__init__.py"
+    elif template == "pipeline":
+        edit_file = "pipeline.yaml"
     else:
         edit_file = "agent.py"
 
-    # Build next-steps text
-    steps = (
-        f"[bold]Next steps:[/bold]\n\n"
-        f"  1. [cyan]cd {agents_dir}[/cyan]\n"
-        f"  2. Edit [yellow]{name}/{edit_file}[/yellow] with your logic\n"
-        f"  3. [cyan]agentomatic run[/cyan] to start\n"
-        f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
-        f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs"
-    )
+    # Build default next-steps text for generic agents
+    if template == "pipeline":
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. Edit [yellow]{name}/pipeline.yaml[/yellow] — "
+            f"define steps and agents\n"
+            f"  2. Create the agents referenced in the pipeline:\n"
+            f"     [cyan]agentomatic init classifier --template basic[/cyan]\n"
+            f"     [cyan]agentomatic init processor --template basic[/cyan]\n"
+            f"  3. [cyan]agentomatic run[/cyan] — pipeline auto-discovered\n\n"
+            f"  [bold]API:[/bold]\n"
+            f"  [blue]POST /api/v1/pipelines/{name}/run[/blue]  "
+            f"[dim]— Execute the pipeline[/dim]\n"
+            f"  [blue]GET  /api/v1/pipelines/{name}/validate[/blue]  "
+            f"[dim]— Pre-flight check[/dim]\n"
+            f"  [blue]GET  /api/v1/pipelines[/blue]               "
+            f"[dim]— List all pipelines[/dim]"
+        )
+    else:
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. [cyan]cd {agents_dir}[/cyan]\n"
+            f"  2. Edit [yellow]{name}/{edit_file}[/yellow] with your logic\n"
+            f"  3. [cyan]agentomatic run[/cyan] to start\n"
+            f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
+            f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs"
+        )
 
-    if template == "full":
+    if template == "coordinator":
         steps += (
             f"\n\n"
-            f"[bold]ML Lifecycle:[/bold]\n\n"
-            f"  [cyan]python -m agents.{name}.train[/cyan]     "
-            f"[dim]— Compile, fit & save[/dim]\n"
-            f"  [cyan]python -m agents.{name}.eval[/cyan]      "
+            f"[bold]Delegation Setup:[/bold]\n\n"
+            f"  1. Create specialist agents:\n"
+            f"     [cyan]agentomatic init researcher --template basic[/cyan]\n"
+            f"     [cyan]agentomatic init writer --template basic[/cyan]\n"
+            f"  2. Edit [yellow]{name}/delegation.py[/yellow] — "
+            f"add targets to DELEGATION_TARGETS\n"
+            f"  3. [cyan]agentomatic run[/cyan] — all agents auto-discovered\n\n"
+            f"  [bold]API:[/bold] [blue]POST /api/v1/{name}/invoke[/blue]"
+        )
+
+    if template in ["full", "pipeline", "plugin"]:
+        prefix = (
+            "pipelines"
+            if template == "pipeline"
+            else ("plugins" if template == "plugin" else "agents")
+        )
+        steps += "\n\n[bold]ML Lifecycle:[/bold]\n\n"
+        if template in ["full", "plugin"]:
+            steps += (
+                f"  [cyan]python -m {prefix}.{name}.train[/cyan]     "
+                f"[dim]— Train & save model[/dim]\n"
+            )
+        steps += (
+            f"  [cyan]python -m {prefix}.{name}.eval[/cyan]      "
             f"[dim]— Evaluate quality[/dim]\n"
-            f"  [cyan]python -m agents.{name}.optimize[/cyan]  "
-            f"[dim]— Prompt optimization[/dim]\n"
-            f"  [cyan]python -m agents.{name}.predict[/cyan]   "
+            f"  [cyan]python -m {prefix}.{name}.optimize[/cyan]  "
+            f"[dim]— Prompt/Hyperparameter optimization[/dim]\n"
+            f"  [cyan]python -m {prefix}.{name}.predict[/cyan]   "
             f"[dim]— Batch / interactive inference[/dim]\n"
             f"  [cyan]make all[/cyan]                          "
-            f"[dim]— Full pipeline (train → eval)[/dim]"
+            f"[dim]— Full ML lifecycle[/dim]"
         )
 
     if HAS_RICH:
@@ -301,6 +343,11 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
             click.echo(f"  4. python -m agents.{name}.train")
             click.echo(f"  5. python -m agents.{name}.eval")
             click.echo(f"  6. python -m agents.{name}.optimize")
+        if template == "coordinator":
+            click.echo(f"  4. Edit {name}/delegation.py — add targets")
+            click.echo(f"  5. POST /api/v1/{name}/invoke")
+        if template == "pipeline":
+            click.echo(f"  4. POST /api/v1/pipelines/{name}/run")
 
 
 # =====================================================================

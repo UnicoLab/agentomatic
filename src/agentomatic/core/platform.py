@@ -585,6 +585,20 @@ class AgentPlatform:
         # Mount Plugin API Routes
         # ------------------------------------------------------------------
         plugins_router = APIRouter(prefix=self.api_prefix + "/plugins")
+
+        @plugins_router.get("", response_model=list[dict[str, Any]])
+        async def list_plugins() -> list[dict[str, Any]]:
+            """List all registered plugins."""
+            return [
+                {
+                    "name": p.plugin_name,
+                    "description": p.plugin_description,
+                    "version": p.plugin_version,
+                    "is_loaded": p.is_loaded,
+                }
+                for p in self._plugin_registry.list_plugins().values()
+            ]
+
         for plugin_name, plugin in self._plugin_registry.list_plugins().items():
             plugin_router = create_plugin_router(plugin)
             plugins_router.include_router(
