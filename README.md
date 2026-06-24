@@ -29,11 +29,11 @@ Build, trace, optimize, and time-travel debug production-ready AI agent APIs in 
 |---|---|
 | 🎯 **Agentomatic Studio** | Embedded visual agent debugger with graph rendering, live SSE node streaming, state mutation, and historical time-travel capabilities. |
 | ⚡ **Prompt Optimizer** | Enterprise-grade prompt and configuration fitting utilizing 5 distinct optimizers with deployment recommendations. |
-| 🔍 **Zero-Code Auto-Discovery** | Drop an agent folder → 25+ fully-documented REST endpoints appear automatically. |
+| 🔍 **Zero-Code Auto-Discovery** | Drop an agent folder → 26 fully-documented REST endpoints appear automatically. |
 | 🚀 **Rich API Surface** | Natively handles `invoke`, `stream`, `chat`, `A2A`, `health`, `config`, `threads`, `memory`, and `feedback`. |
 | 🗄️ **Pluggable Storage** | Use `MemoryStore`, `SQLAlchemy`, or plug in your own custom persistence layer. |
 | 🔐 **Enterprise Middleware** | High-performance pipeline with JWT Auth, dynamic rate limiting, and Prometheus telemetry — all toggleable. |
-| 📦 **Scaffolding Templates** | Jumpstart development with 9 templates: `basic`, `full`, `rag`, `chatbot`, `deepagent`, `custom`, `swarm`, `pipeline`, `class`. |
+| 📦 **Scaffolding Templates** | Jumpstart development with 8 templates: `basic`, `full`, `rag`, `chatbot`, `deepagent`, `custom`, `legacy_dict`, `plugin`. |
 | 🧬 **Class-Based Agents** | Define agents as Python classes with ML lifecycle: `compile()` → `fit()` → `evaluate()` → `transform()`. |
 | 🤖 **A2A Protocol** | True Agent-to-Agent communication flows integrated out of the box. |
 | 🔌 **Framework Agnostic** | Fully supports LangGraph, LangChain, or raw Python execution logic. |
@@ -134,17 +134,16 @@ agents/my_agent/
 agentomatic init my_agent --template <template>
 ```
 
-| Template | Files | Description |
-|----------|-------|-------------|
-| `basic` | 7 | Minimal agent — quick start |
-| `full` | 11 | All override files — config, schemas, api, tools |
-| `rag` | 9 | Retrieve → Generate pipeline |
-| `chatbot` | 8 | Conversational with memory |
-| `deepagent` | 6 | Autonomous planning with sub-agents |
-| `custom` | 4 | Framework-agnostic — no LangGraph |
-| `swarm` | 10+ | Multi-agent delegation and handoffs |
-| `pipeline` | 2 | Multi-agent workflow composition (YAML) |
-| `class` | 4 | **NEW** Python class with ML lifecycle |
+| Template | Description |
+|----------|-------------|
+| `basic` | Minimal class-based agent (recommended) — quick start |
+| `full` | All override files — class agent with config, schemas, api, tools, prompts |
+| `rag` | RAG class-based agent — retrieve → generate pipeline |
+| `chatbot` | Conversational class-based agent with memory |
+| `deepagent` | Deep Agent — planning, tools, subagents (requires deepagents package) |
+| `custom` | Framework-agnostic — no LangGraph dependency |
+| `legacy_dict` | Legacy functional agent — 3 files (`__init__`, graph, nodes) |
+| `plugin` | ML Model Plugin — wrap classical ML models with REST endpoints |
 
 ## 🖥️ CLI
 
@@ -167,7 +166,7 @@ agentomatic init my_agent --template <template>
 
 ## 🧬 Class-Based Agents (NEW)
 
-Define agents as Python classes with LangGraph-style graph wiring and ML lifecycle:
+Define agents as Python classes with built-in graph wiring and ML lifecycle:
 
 ```python
 from dataclasses import dataclass, field
@@ -214,7 +213,7 @@ agent.save("compiled/v1")
 
 ## 🎨 Agentomatic Studio
 
-Agentomatic ships with a built-in React-based visual studio designed for time-travel debugging, real-time node streaming, and state inspection for all underlying LangGraph agents.
+Agentomatic ships with a built-in React-based visual studio designed for time-travel debugging, real-time node streaming, and state inspection. Works with class-based agents, LangGraph, LangChain, and any custom framework via the adapter system.
 
 To use the studio, install the optional package dependencies and run with the `--studio` flag:
 

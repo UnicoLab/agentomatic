@@ -107,11 +107,14 @@ agents/my_chatbot/
 !!! note "Available Templates"
     | Template | Description |
     |----------|-------------|
-    | `basic` | Simple single-node agent with LLM call |
-    | `chatbot` | Multi-turn conversational bot with history |
-    | `rag` | Retrieval-Augmented Generation with vector store |
-    | `full` | All features: tools, RAG, config, custom schemas |
-    | `custom` | Minimal scaffold for non-LangGraph agents |
+    | `basic` | Minimal class-based agent (recommended) — quick start |
+    | `chatbot` | Conversational class-based agent with memory |
+    | `rag` | RAG class-based agent — retrieve → generate pipeline |
+    | `full` | All features: class agent with config, schemas, api, tools, prompts |
+    | `deepagent` | Deep Agent with planning, tools, subagents |
+    | `custom` | Framework-agnostic — no LangGraph dependency |
+    | `legacy_dict` | Legacy functional agent — `__init__.py` with `manifest` + `node_fn` |
+    | `plugin` | ML Model Plugin — wrap classical ML models with REST endpoints |
 
     Select interactively by omitting the `--template` flag:
     ```bash
@@ -140,7 +143,7 @@ Agentomatic supports multiple agent frameworks. Here's a quickstart for each:
 
     class ChatbotAgent(BaseGraphAgent[ChatbotState]):
         agent_name = "my_chatbot"
-        agent_description = "A conversational chatbot powered by LangGraph."
+        agent_description = "A conversational chatbot."
         agent_framework = "graph_agent"
 
         def build_graph(self):
@@ -484,14 +487,28 @@ Every registered agent gets a full suite of REST endpoints automatically:
 | `POST` | `/api/v1/{agent}/invoke/stream` | SSE streaming invocation |
 | `POST` | `/api/v1/{agent}/chat` | Multi-turn conversation with thread persistence |
 | `GET` | `/api/v1/{agent}/health` | Agent health check |
-| `GET` | `/api/v1/{agent}/config` | Read agent configuration |
-| `POST` | `/api/v1/{agent}/config` | Update agent configuration |
-| `GET` | `/api/v1/{agent}/prompts` | List prompt versions |
-| `POST` | `/api/v1/{agent}/prompts` | Update prompt templates |
+| `GET` | `/api/v1/{agent}/config` | Agent configuration |
+| `GET` | `/api/v1/{agent}/prompts` | Available prompt versions |
+| `GET` | `/api/v1/{agent}/card` | A2A agent card |
+| `POST` | `/api/v1/{agent}/a2a/tasks` | Submit A2A task |
+| `GET` | `/api/v1/{agent}/a2a/tasks/{id}` | Get A2A task status |
+| `POST` | `/api/v1/{agent}/threads` | Create thread |
 | `GET` | `/api/v1/{agent}/threads` | List conversation threads |
 | `GET` | `/api/v1/{agent}/threads/{id}` | Get thread history |
+| `PATCH` | `/api/v1/{agent}/threads/{id}` | Update thread |
+| `DELETE` | `/api/v1/{agent}/threads/{id}` | Delete thread |
+| `GET` | `/api/v1/{agent}/threads/{id}/messages` | Get messages |
+| `DELETE` | `/api/v1/{agent}/threads/{id}/messages` | Delete messages |
+| `GET` | `/api/v1/{agent}/threads/{id}/summary` | Get thread summary |
 | `POST` | `/api/v1/{agent}/feedback` | Submit user feedback |
 | `GET` | `/api/v1/{agent}/feedback` | Retrieve feedback entries |
+| `GET` | `/api/v1/{agent}/feedback/export` | Export feedback data |
+| `GET` | `/api/v1/{agent}/threads/{id}/pending` | Get pending HITL actions |
+| `POST` | `/api/v1/{agent}/threads/{id}/approve` | HITL approval |
+| `POST` | `/api/v1/{agent}/threads/{id}/reject` | HITL rejection |
+| `POST` | `/api/v1/{agent}/threads/{id}/fork` | Fork thread |
+| `GET` | `/api/v1/{agent}/threads/{id}/lineage` | Get thread lineage |
+| `POST` | `/api/v1/{agent}/optimize/invoke` | Optimization invocation |
 
 !!! info "Full endpoint documentation"
     Visit `http://localhost:8000/docs` for the interactive Swagger UI with all endpoints, schemas, and try-it-out functionality.
@@ -533,14 +550,78 @@ class AgentConfig(BaseModel):
 
 ---
 
+## :material-help-circle: Understanding the State Dictionary
+
+When Agentomatic receives a REST request and invokes your agent, it maps the request body fields into a **state dictionary**. Understanding this mapping is crucial:
+
+| REST Request Field | State Dict Key | Description |
+|--------------------|----------------|-------------|
+| `query` | `current_query` | The user's input text |
+| `user_id` | `user_id` | User identifier (default: `"default-user"`) |
+| `thread_id` | `thread_id` | Conversation thread (for multi-turn chat) |
+| `context` | `context` | Arbitrary context dict |
+| `metadata` | `metadata` | Request metadata dict |
+| `prompt_version` | `prompt_version` | Active prompt version (default: `"v1"`) |
+
+!!! tip "Class-based agents vs functional agents"
+    - **Class-based agents**: You control mapping via `input_to_state()` — use `input_data.get("current_query")` or any key you prefer
+    - **Functional agents** (`node_fn`): The state dict is passed directly with keys above — use `state.get("current_query")`
+
+---
+
+## :material-bug: Troubleshooting
+
+??? question "My agent isn't being discovered"
+    1. **Check the folder**: Your agent must be in the `agents/` directory (or wherever `--agents-dir` points)
+    2. **Check for errors**: Look at the console output for `❌ Failed to discover` messages
+    3. **Class agents**: Need `agent.py` with a `BaseGraphAgent` subclass
+    4. **Functional agents**: Need `__init__.py` with a `manifest` variable
+
+??? question "`ModuleNotFoundError` when starting"
+    This usually means a dependency is missing. Common fixes:
+    ```bash
+    pip install agentomatic[langgraph]  # For LangGraph-based agents
+    pip install agentomatic[ollama]     # For Ollama LLM provider
+    pip install agentomatic[all]        # Install everything
+    ```
+
+??? question "Agent returns empty response"
+    - **Class agents**: Make sure `state_to_output()` returns a dict with a `"response"` key
+    - **Functional agents**: Make sure `node_fn` returns a dict with a `"response"` key
+    - Check that your node methods actually **return** the updated state (`return state`)
+
+??? question "Port already in use"
+    ```bash
+    # Kill the existing process
+    lsof -ti :8000 | xargs kill -9
+    # Or use a different port
+    agentomatic run --port 8001
+    ```
+
+??? question "CORS errors from frontend"
+    Pass your frontend origin to the platform configuration:
+    ```python
+    platform = AgentPlatform.from_folder(
+        "agents/",
+        cors_origins=["http://localhost:3000"],
+    )
+    ```
+
+---
+
 ## :material-compass: What's Next?
 
 Now that your first agent is running, explore these resources:
 
+!!! tip "Recommended Learning Path"
+    **First Agent** → **Class-Based Agents** → **Cookbook** → **Configuration** → **Studio**
+
 | Topic | Description |
 |-------|-------------|
 | **[Your First Agent](first-agent.md)** | Step-by-step tutorial building an agent from scratch with annotated code |
-| **[Agent Structure](../guide/agent-structure.md)** | Deep dive into folder conventions, manifest fields, and override patterns |
+| **[Class-Based Agents](../guide/class-agents.md)** | Complete guide to `BaseGraphAgent`, graph wiring, ML lifecycle |
+| **[Cookbook & Recipes](../guide/cookbook.md)** | 10 copy-paste patterns: RAG, routing, HITL, schemas, ML plugins |
+| **[Agent Structure](../guide/agent-structure.md)** | Folder conventions, manifest fields, and auto-discovery |
 | **[Agentomatic Studio](../guide/studio.md)** | Visual debugging with graph view, state inspection, and time-travel |
 | **[Deep Agent Integration](../guide/deep-agents.md)** | Register and debug Deep Agent workflows with full Studio support |
 | **[Chat Interface](../guide/debug-ui.md)** | Chainlit-based conversational testing |
@@ -548,5 +629,6 @@ Now that your first agent is running, explore these resources:
 | **[Prompt Optimization](../guide/optimization.md)** | Auto-tune prompts with DSPy-inspired optimization |
 | **[Storage Backends](../guide/storage.md)** | Configure PostgreSQL, SQLite, or custom adapters |
 | **[Middleware](../guide/middleware.md)** | Auth, rate limiting, metrics, and custom middleware |
+| **[Configuration](../guide/configuration.md)** | Platform settings, CORS, environment variables |
 | **[CLI Reference](../cli/commands.md)** | Every command and flag documented |
-| **[Architecture](../architecture/overview.md)** | Platform internals, request flow, and design decisions |
+| **[API Reference](../architecture/api-reference.md)** | All 26 endpoints with request/response schemas |

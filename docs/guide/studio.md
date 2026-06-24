@@ -1,6 +1,6 @@
 # Agentomatic Studio :material-palette:
 
-Agentomatic Studio is a built-in visual development environment for debugging, inspecting, and tracing the execution of your agents in real-time. It works with **any agent framework** — LangGraph, LangChain, CrewAI, AutoGen, or raw Python — via a universal adapter system.
+Agentomatic Studio is a built-in visual development environment for debugging, inspecting, and tracing the execution of your agents in real-time. It works with **any agent framework** — LangGraph, LangChain, class-based (`BaseGraphAgent`), or any Python framework via `GenericAdapter` — through a universal adapter system.
 
 !!! info "Studio vs Chat Interface"
     Agentomatic provides **two** debug interfaces optimized for different workflows:
@@ -59,7 +59,7 @@ Agentomatic Studio uses a **universal adapter system** to provide the best possi
     See the dedicated **[Deep Agent Integration Guide](deep-agents.md)** for setup, subagent tracking, HITL interrupts, and the `deepagent` scaffold template.
 
 !!! note "Adapter Selection is Automatic"
-    The Studio automatically selects the best adapter based on the `framework` field in your agent's manifest. You don't need to configure anything — just set `framework="langgraph"`, `"langchain"`, or `"custom"` in your `AgentManifest`.
+    The Studio automatically selects the best adapter based on the `framework` field in your agent's manifest. You don't need to configure anything — just set `framework="langgraph"`, `"graph_agent"`, `"langchain"`, or `"custom"` in your `AgentManifest`.
 
 ---
 
@@ -421,6 +421,7 @@ graph TB
 
     subgraph Adapters["Framework Adapters"]
         LGA["LangGraphAdapter<br/>(full features)"]
+        GAA["GraphAgentAdapter<br/>(class-based agents)"]
         LCA["LangChainAdapter<br/>(LCEL + streaming)"]
         GA["GenericAdapter<br/>(trace-based)"]
         CA["CustomAdapter<br/>(user decorators)"]
@@ -429,6 +430,7 @@ graph TB
     UI --> SR
     SR --> AF
     AF --> LGA
+    AF --> GAA
     AF --> LCA
     AF --> GA
     AF --> CA
@@ -436,9 +438,10 @@ graph TB
 
 - **Studio Router**: Framework-agnostic FastAPI endpoints that delegate to adapters.
 - **Adapter Factory**: Automatically selects the best adapter based on the agent's `framework` field and available decorators.
-- **LangGraphAdapter**: Full-featured — uses `CompiledGraph` APIs natively for graph extraction, checkpoint state, breakpoints, and HITL.
-- **LangChainAdapter**: Extracts LCEL graphs via `.get_graph()`, streams via `astream_events`, and tracks messages per thread.
-- **GenericAdapter**: Trace-based — wraps `node_fn()` with timing and I/O capture for any Python agent.
+- **LangGraphAdapter**: Full-featured — uses `CompiledGraph` APIs natively for graph extraction, checkpoint state, breakpoints, and HITL. Triggered by `framework="langgraph"`.
+- **GraphAgentAdapter**: For class-based agents (`BaseGraphAgent`). Provides graph topology extraction, streaming, and trace support. Triggered by `framework="graph_agent"`.
+- **LangChainAdapter**: Extracts LCEL graphs via `.get_graph()`, streams via `astream_events`, and tracks messages per thread. Triggered by `framework="langchain"`.
+- **GenericAdapter**: Trace-based — wraps `node_fn()` with timing and I/O capture for any Python agent. Fallback for `framework="custom"` or unknown frameworks.
 - **Custom Adapter**: User-registered via `@studio_graph`, `@studio_state`, and `@studio_stream` decorators.
 
 ### API Endpoints

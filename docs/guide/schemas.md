@@ -250,3 +250,14 @@ To view and interact with the custom schemas:
 Custom schemas are also automatically serialized into the agent's **A2A Agent Card** at `GET /api/v1/agents/{agent_name}/card` (and the universal `.well-known/agent.json` directory).
 
 This allows other agents running on the platform or external client orchestrators to programmatically read the exact types, required fields, and descriptions of what your agent expects and outputs, paving the way for autonomous collaboration.
+
+---
+
+## 📚 Related Documentation
+
+| Topic | Link |
+|-------|------|
+| Agent folder structure | [Agent Structure](agent-structure.md) |
+| Class-based agents | [Class-Based Agents](class-agents.md) |
+| Full REST API reference | [API Reference](../architecture/api-reference.md) |
+| Frontend integration | [Frontend API Guide](../FRONTEND_API_GUIDE.md) |

@@ -9,6 +9,12 @@ copyright: Copyright &copy; 2024-2026 UnicoLab
 
 theme:
   name: material
+  custom_dir: docs/overrides
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  font:
+    text: Inter
+    code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
@@ -25,18 +31,25 @@ theme:
         icon: material/brightness-4
         name: Switch to dark mode
   features:
+    - announce.dismiss
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tracking
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.top
+    - navigation.footer
+    - navigation.path
     - search.suggest
     - search.highlight
+    - search.share
     - content.tabs.link
     - content.code.copy
     - content.code.annotate
+    - content.tooltips
+    - toc.follow
   icon:
     repo: fontawesome/brands/github
 
@@ -46,9 +59,15 @@ plugins:
       alias_type: symlink
       canonical_version: latest
 
+extra_css:
+  - stylesheets/extra.css
+
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -56,16 +75,28 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.details
   - pymdownx.snippets
+  - pymdownx.mark
+  - pymdownx.keys
+  - pymdownx.smartsymbols
   - admonition
   - attr_list
   - md_in_html
+  - def_list
+  - footnotes
+  - abbr
   - toc:
       permalink: true
+      toc_depth: 3
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
 
 extra:
   version:
@@ -73,30 +104,37 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/UnicoLab/agentomatic
+      name: Agentomatic on GitHub
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/agentomatic/
+      name: Agentomatic on PyPI
+  generator: false
 
 nav:
   - Home: index.md
   - Getting Started:
     - Installation: getting-started/installation.md
+    - Concepts & Glossary: getting-started/concepts.md
     - Quick Start: getting-started/quickstart.md
     - Your First Agent: getting-started/first-agent.md
   - User Guide:
-    - Agent Structure: guide/agent-structure.md
     - Class-Based Agents: guide/class-agents.md
+    - Agent Structure & Discovery: guide/agent-structure.md
+    - Cookbook & Recipes: guide/cookbook.md
+    - Templates: guide/templates.md
     - Input & Output Schemas: guide/schemas.md
     - Prompt Management: guide/prompts.md
-    - Templates: guide/templates.md
-    - Pipelines: guide/pipelines.md
     - Configuration: guide/configuration.md
     - Storage Backends: guide/storage.md
     - Middleware: guide/middleware.md
     - LangGraph Integration: guide/langgraph.md
-    - Advanced Platform Features: guide/platform-features.md
+    - ML Plugins: guide/ml-plugins.md
+    - Testing Your Agents: guide/testing.md
+  - Advanced:
+    - Platform Features: guide/platform-features.md
     - Prompt Optimization: guide/optimization.md
     - Telemetry & Feedback: guide/telemetry.md
-    - ML Plugins: guide/ml-plugins.md
+    - Pipelines: guide/pipelines.md
     - Configuration Stacks: guide/stacks.md
     - LLM Providers & Failover: guide/llm-providers.md
     - Security & Zero Trust: guide/security.md

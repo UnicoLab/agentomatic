@@ -27,7 +27,7 @@ graph TB
     subgraph "Agentomatic Platform Core"
         AP["AgentPlatform\nCentral orchestrator"]
         REG["AgentRegistry\nIn-memory agent store"]
-        RF["RouterFactory\nAuto-generated REST\n(20+ endpoints per agent)"]
+        RF["RouterFactory\nAuto-generated REST\n(26 endpoints per agent)"]
         SR["StudioRouter\nDebug API (/studio/*)"]
         MM["MemoryManager\nConversation history\nSummarization · Windowing"]
         FB["FeedbackCollector\nRatings · Corrections"]
@@ -152,7 +152,7 @@ An in-memory registry holding `RegisteredAgent` instances. Each agent carries:
 
 ### RouterFactory
 
-Auto-generates a full FastAPI router per agent with 20+ endpoints:
+Auto-generates a full FastAPI router per agent with 26 endpoints:
 
 | Category | Endpoints | Description |
 |---|---|---|
@@ -178,6 +178,7 @@ graph LR
 
     subgraph "Adapters"
         R -->|"graph_fn present?"| LG["LangGraphAdapter"]
+        R -->|"framework=graph_agent?"| GA["GraphAgentAdapter"]
         R -->|"framework=langchain?"| LC["LangChainAdapter"]
         R -->|"_studio_adapter set?"| CU["Custom Adapter"]
         R -->|"fallback"| GN["GenericAdapter"]
@@ -188,6 +189,9 @@ graph LR
         LG --> G2["✅ Checkpoints + Time-travel"]
         LG --> G3["✅ HITL Breakpoints"]
         LG --> G4["✅ SSE via astream_events"]
+        GA --> A1["✅ Graph Topology"]
+        GA --> A2["✅ SSE Streaming"]
+        GA --> A3["✅ Execution Traces"]
         LC --> L1["✅ LCEL Graph"]
         LC --> L2["✅ astream_events"]
         GN --> N1["✅ Synthetic Graph"]
@@ -327,7 +331,7 @@ graph TD
 
     REG --> SCHEMA["Discover custom schemas\n(schemas.py module)"]
 
-    SCHEMA --> ROUTER["RouterFactory creates\n20+ endpoints per agent"]
+    SCHEMA --> ROUTER["RouterFactory creates\n26 endpoints per agent"]
 
     ROUTER --> STUDIO["Studio adapter resolved\n(LangGraph/LangChain/Generic)"]
 

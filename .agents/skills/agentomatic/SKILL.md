@@ -26,12 +26,12 @@ pip install "agentomatic[all]"             # Everything
 
 ```
 src/agentomatic/
-├── __init__.py              # Public API: AgentPlatform, AgentManifest, BaseAgentState
+├── __init__.py              # Public API: AgentPlatform, AgentManifest, BaseAgentState, BaseGraphAgent, AgentGraph, GraphBuilder
 ├── core/
 │   ├── platform.py          # AgentPlatform — central orchestrator
 │   ├── registry.py          # AgentRegistry — agent registration and lookup
 │   ├── manifest.py          # AgentManifest model + RegisteredAgent dataclass
-│   ├── router_factory.py    # Auto-generates 20+ REST endpoints per agent
+│   ├── router_factory.py    # Auto-generates 26 REST endpoints per agent
 │   ├── state.py             # BaseAgentState — typed agent state
 │   ├── memory_manager.py    # ConversationMemoryManager
 │   └── lifespan.py          # FastAPI lifespan events
@@ -49,7 +49,7 @@ src/agentomatic/
 │   └── serve.py             # Static file serving for React UI
 ├── cli/
 │   ├── commands.py          # CLI: init, run, demo, list, inspect, doctor, optimize
-│   └── templates.py         # Scaffolding: basic, full, rag, chatbot, deepagent, custom
+│   └── templates.py         # Scaffolding: basic, full, rag, chatbot, deepagent, custom, legacy_dict, plugin
 ├── storage/
 │   ├── base.py              # BaseStore ABC
 │   ├── memory.py            # MemoryStore — in-memory dict
@@ -112,8 +112,8 @@ class MyAgentAgent(BaseGraphAgent[MyAgentState]):
         self.llm = llm  # easily inject dependencies!
 
     def build_graph(self):
-        # Build the LangGraph execution graph
-        g = self.new_graph()
+        # Build the execution graph
+        g = self.new_graph()  # returns GraphBuilder (agentomatic's own builder)
         g.add_node("process", self.process)
         g.set_entry_point("process")
         g.set_finish_point("process")
@@ -194,18 +194,20 @@ The standard state dictionary used across all agents:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `current_query` | `str` | The user's input query |
-| `user_id` | `str` | User identifier |
+| `messages` | `Annotated[list, add_messages]` | Conversation message history (parallel-safe) |
 | `thread_id` | `str` | Conversation thread ID |
-| `messages` | `list` | Conversation message history |
-| `context` | `dict` | Additional context |
-| `metadata` | `dict` | Request metadata |
-| `steps_taken` | `list[str]` | Execution trace |
-| `response` | `str` | Agent's final response |
-| `suggestions` | `list[str]` | Follow-up suggestions |
-| `citations` | `list[dict]` | Source citations |
-| `prompt_version` | `str` | Active prompt version |
-| `agent_type` | `str` | Which agent handled this |
+| `user_id` | `str` | User identifier |
+| `current_query` | `str` | The user's input query |
+| `response` | `Annotated[str, _last_value]` | Agent's final response (last-writer-wins) |
+| `agent_type` | `Annotated[str, _last_value]` | Which agent handled this (last-writer-wins) |
+| `suggestions` | `Annotated[list[str], operator.add]` | Follow-up suggestions (merged across branches) |
+| `citations` | `Annotated[list[dict], operator.add]` | Source citations (merged across branches) |
+| `routing_decision` | `Annotated[str, _last_value]` | Orchestrator routing target |
+| `context` | `Annotated[dict, _merge_dicts]` | Additional context (dict-merged) |
+| `prompt_version` | `Annotated[str, _last_value]` | Active prompt version |
+| `steps_taken` | `Annotated[list[str], operator.add]` | Execution trace (merged across branches) |
+| `metadata` | `Annotated[dict, _merge_dicts]` | Request metadata (dict-merged) |
+| `error` | `Annotated[str \| None, _last_value]` | Error message if any |
 
 ## Platform Configuration
 
@@ -229,13 +231,17 @@ app = platform.build()
 ## CLI Commands
 
 ```bash
-agentomatic init NAME [--template basic|full|rag|chatbot|deepagent|custom]
+agentomatic init NAME [--template basic|full|rag|chatbot|deepagent|custom|legacy_dict|plugin]
 agentomatic run [--studio] [--with-ui] [--port 8000] [--agents-dir agents/]
 agentomatic demo                    # Scaffold + run demo
 agentomatic list [--agents-dir]     # List registered agents
 agentomatic inspect NAME            # Inspect agent details
 agentomatic doctor                  # Verify installation
 agentomatic optimize NAME           # Run prompt optimization
+agentomatic test NAME               # Interactive agent testing
+agentomatic ui                      # Launch Chainlit chat UI
+agentomatic stack init              # Initialize stack configuration
+agentomatic stack list              # List available stacks
 ```
 
 ## Studio Integration
@@ -249,6 +255,7 @@ The Studio uses a universal adapter system:
 | Framework | Adapter | Capabilities |
 |-----------|---------|-------------|
 | LangGraph | `LangGraphAdapter` | graph, streaming, checkpoints, state, breakpoints, hitl |
+| Class Agent | `GraphAgentAdapter` | graph, streaming, traces |
 | Deep Agent | `LangGraphAdapter` | + deep_agent, subagents, planning |
 | LangChain | `LangChainAdapter` | streaming, traces, graph (LCEL) |
 | Custom | `GenericAdapter` | streaming, traces |
@@ -295,16 +302,32 @@ For each registered agent, these endpoints are created:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/v1/{name}/invoke` | Invoke agent |
-| `POST` | `/api/v1/{name}/stream` | Stream SSE response |
-| `POST` | `/api/v1/{name}/chat` | Chat with conversation memory |
+| `POST` | `/api/v1/{name}/invoke` | Synchronous invocation |
+| `POST` | `/api/v1/{name}/invoke/stream` | SSE streaming invocation |
+| `POST` | `/api/v1/{name}/chat` | Session-aware conversation with memory |
+| `GET` | `/api/v1/{name}/health` | Agent health check |
+| `GET` | `/api/v1/{name}/config` | Agent configuration |
+| `GET` | `/api/v1/{name}/prompts` | Available prompt versions |
+| `GET` | `/api/v1/{name}/card` | A2A agent card |
+| `POST` | `/api/v1/{name}/a2a/tasks` | A2A task submission |
+| `GET` | `/api/v1/{name}/a2a/tasks/{id}` | A2A task status |
+| `POST` | `/api/v1/{name}/threads` | Create thread |
 | `GET` | `/api/v1/{name}/threads` | List threads |
 | `GET` | `/api/v1/{name}/threads/{tid}` | Get thread |
+| `PATCH` | `/api/v1/{name}/threads/{tid}` | Update thread |
 | `DELETE` | `/api/v1/{name}/threads/{tid}` | Delete thread |
-| `POST` | `/api/v1/{name}/threads/{tid}/fork` | Fork thread |
-| `POST` | `/threads/{tid}/approve` | HITL approval |
+| `GET` | `/api/v1/{name}/threads/{tid}/messages` | Get messages |
+| `DELETE` | `/api/v1/{name}/threads/{tid}/messages` | Clear messages |
+| `GET` | `/api/v1/{name}/threads/{tid}/summary` | Conversation summary |
+| `POST` | `/api/v1/{name}/optimize/invoke` | Optimization invocation |
 | `POST` | `/api/v1/{name}/feedback` | Submit feedback |
-| `GET` | `/api/v1/{name}/suggestions` | Get suggestions |
+| `GET` | `/api/v1/{name}/feedback` | List feedback |
+| `GET` | `/api/v1/{name}/feedback/export` | Export feedback as JSONL |
+| `GET` | `/api/v1/{name}/threads/{tid}/pending` | Pending HITL approvals |
+| `POST` | `/api/v1/{name}/threads/{tid}/approve` | HITL approval |
+| `POST` | `/api/v1/{name}/threads/{tid}/reject` | HITL rejection |
+| `POST` | `/api/v1/{name}/threads/{tid}/fork` | Fork thread |
+| `GET` | `/api/v1/{name}/threads/{tid}/lineage` | Thread lineage tree |
 
 ## Testing Conventions
 

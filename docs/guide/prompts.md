@@ -149,3 +149,14 @@ async def generate_response(state: dict[str, Any]) -> dict[str, Any]:
     # Call your LLM model here using prompt templates...
     return {"response": "Processed output"}
 ```
+
+---
+
+## 📚 Related Documentation
+
+| Topic | Link |
+|-------|------|
+| Agent structure & discovery | [Agent Structure](agent-structure.md) |
+| Prompt optimization | [Optimization](optimization.md) |
+| A/B prompt routing | [Platform Features](platform-features.md) |
+| Class-based agent integration | [Class-Based Agents](class-agents.md) |

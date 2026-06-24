@@ -1115,3 +1115,15 @@ Events streamed via Studio's `/runs/stream` endpoint:
 | `run_complete` | — | Run execution finishes successfully |
 | `run_error` | — | Run execution failed (includes error) |
 | `done` | — | Stream complete |
+
+---
+
+## 📚 Related Documentation
+
+| Topic | Link |
+|-------|------|
+| Frontend integration guide | [Frontend API Guide](../FRONTEND_API_GUIDE.md) |
+| HITL workflows | [Platform Features](../guide/platform-features.md) |
+| Storage backends | [Storage Backends](../guide/storage.md) |
+| Studio debug API | [Agentomatic Studio](../guide/studio.md) |
+| Agent structure | [Agent Structure](../guide/agent-structure.md) |

@@ -25,7 +25,7 @@ Commands:
   demo      Launch a quick demo with Studio.
   ui        Launch the Chainlit debug UI.
   optimize  Run automatic prompt tuning loops.
-  pipeline  Manage and run agent pipelines.
+  stack     Manage environment stacks.
 ```
 
 !!! tip "Rich terminal output"
@@ -46,7 +46,7 @@ Commands:
 | **Debug** | [`test`](#agentomatic-test), [`ui`](#agentomatic-ui) | Interactive testing and chat UI |
 | **Inspect** | [`list`](#agentomatic-list), [`inspect`](#agentomatic-inspect), [`doctor`](#agentomatic-doctor) | Discover, validate, and diagnose |
 | **Optimize** | [`optimize`](#agentomatic-optimize) | Automatic prompt tuning |
-| **Pipeline** | [`pipeline run`](#agentomatic-pipeline-run), [`pipeline validate`](#agentomatic-pipeline-validate), [`pipeline list`](#agentomatic-pipeline-list) | Manage and run agent pipelines |
+| **Stacks** | [`stack init`](#agentomatic-stack-init), [`stack list`](#agentomatic-stack-list) | Multi-environment stack management |
 
 ---
 
@@ -63,7 +63,7 @@ Arguments:
   NAME  Agent name (snake_case)  [required]
 
 Options:
-  -t, --template [basic|full|rag|chatbot|deepagent|custom|swarm|pipeline|class]
+  -t, --template [basic|full|rag|chatbot|deepagent|custom|legacy_dict|plugin]
                           Template to use (interactive picker if omitted)
   -d, --dir TEXT          Agents parent directory  [default: agents]
   -f, --force             Overwrite existing agent directory
@@ -71,17 +71,16 @@ Options:
 
 #### Templates
 
-| Template | Description | Files Generated |
-|----------|-------------|-----------------|
-| `basic` | Single-node agent with LLM call | `__init__.py`, `graph.py`, `nodes.py`, `config.py`, `prompts.json` |
-| `chatbot` | Multi-turn conversational bot | Same as basic + history management |
-| `rag` | Retrieval-Augmented Generation | Same as basic + `tools.py`, vector store setup |
-| `full` | All features enabled | All files including `schemas.py`, `api.py`, `tools.py` |
-| `deepagent` | Autonomous planning with sub-agents | `__init__.py`, `agent.py`, `config.py`, `delegation.py`, `prompts.json` |
-| `custom` | Minimal scaffold for raw Python | `__init__.py`, `config.py`, `prompts.json` |
-| `swarm` | Multi-agent delegation and handoffs | `__init__.py`, `graph.py`, `nodes.py`, `delegation.py`, `security.py`, `evals.py` |
-| `pipeline` | YAML-based multi-agent workflow | `pipeline.yaml`, `README.md` |
-| `class` | Class agent with ML lifecycle | `agent.py`, `dataset.jsonl`, `train.py`, `README.md` |
+| Template | Description |
+|----------|-------------|
+| `basic` | Minimal class-based agent (recommended) — quick start |
+| `chatbot` | Conversational class-based agent with memory |
+| `rag` | RAG class-based agent — retrieve → generate pipeline |
+| `full` | All features: class agent with config, schemas, api, tools, prompts |
+| `deepagent` | Deep Agent with planning, tools, subagents |
+| `custom` | Framework-agnostic — no LangGraph dependency |
+| `legacy_dict` | Legacy functional agent — `__init__.py` with `manifest` + `node_fn` |
+| `plugin` | ML Model Plugin — wrap classical ML models with REST endpoints |
 
 #### Examples
 
@@ -131,14 +130,15 @@ Start the platform microservice. Runs a local `uvicorn` web server hosting the F
 Usage: agentomatic run [OPTIONS]
 
 Options:
-  --agents-dir TEXT   Agents folder to scan  [default: agents]
-  --host TEXT         Bind address  [default: 0.0.0.0]
-  --port INTEGER      Bind port  [default: 8000]
-  --reload            Auto-reload on code or config file changes
-  --title TEXT        Platform title
-  --log-level TEXT    Log level (DEBUG, INFO, WARNING, ERROR)  [default: INFO]
-  --with-ui           Mount the Chainlit chat UI at /chat
-  --studio            Enable Agentomatic Studio at /studio/ui/
+  --agents-dir TEXT    Agents folder to scan  [default: agents]
+  --plugins-dir TEXT   Plugins folder to scan  [default: plugins]
+  --host TEXT          Bind address  [default: 0.0.0.0]
+  --port INTEGER       Bind port  [default: 8000]
+  --reload             Auto-reload on code or config file changes
+  --title TEXT         Platform title
+  --log-level TEXT     Log level (DEBUG, INFO, WARNING, ERROR)  [default: INFO]
+  --with-ui            Mount the Chainlit chat UI at /chat
+  --studio             Enable Agentomatic Studio at /studio/ui/
 ```
 
 #### Examples
@@ -531,100 +531,53 @@ Options:
 
 ---
 
-## Pipeline Commands
+## Stack Commands
 
-### `agentomatic pipeline run`
+### `agentomatic stack init`
 
-Execute a pipeline defined in `pipeline.yaml`. Runs each step sequentially, invoking the referenced agents through the platform API.
-
-```text
-Usage: agentomatic pipeline run [OPTIONS] PIPELINE
-
-Arguments:
-  PIPELINE  Path to pipeline.yaml or agent name  [required]
-
-Options:
-  --input TEXT            JSON input data (or @file.json)
-  --agents-dir TEXT       Agents folder to scan  [default: agents]
-  --host TEXT             Platform API base URL  [default: http://localhost:8000]
-  --timeout FLOAT         Max execution time in seconds  [default: 120.0]
-  --dry-run               Validate and print steps without executing
-  --verbose               Show step-by-step execution details
-```
-
-#### Examples
-
-=== "Run with JSON input"
-
-    ```bash
-    agentomatic pipeline run agents/my_pipeline/pipeline.yaml \
-      --input '{"query": "Analyze Q3 results"}'
-    ```
-
-=== "Run with input file"
-
-    ```bash
-    agentomatic pipeline run my_pipeline --input @input.json
-    ```
-
-=== "Dry run (validate only)"
-
-    ```bash
-    agentomatic pipeline run my_pipeline --dry-run --verbose
-    ```
-
----
-
-### `agentomatic pipeline validate`
-
-Validate a pipeline YAML file for structural correctness, agent references, and schema compatibility.
+Create default stack configuration files for multi-environment management.
 
 ```text
-Usage: agentomatic pipeline validate [OPTIONS] PIPELINE
-
-Arguments:
-  PIPELINE  Path to pipeline.yaml or agent name  [required]
+Usage: agentomatic stack init [OPTIONS]
 
 Options:
-  --agents-dir TEXT   Agents folder to scan  [default: agents]
-  --strict            Fail on warnings (missing agents, unused outputs)
+  -d, --dir TEXT   Stacks directory  [default: stacks]
 ```
 
 #### Example
 
 ```bash
-agentomatic pipeline validate agents/my_pipeline/pipeline.yaml --strict
+agentomatic stack init
 ```
 
-```text
-✅ Pipeline "my_pipeline" is valid
-   Steps: 3 (plan → execute → review)
-   Agents: planner, executor, reviewer
-   Timeout: 120.0s
-```
+This creates default `local.yaml` and `remote.yaml` stack files in the `stacks/` directory.
 
 ---
 
-### `agentomatic pipeline list`
+### `agentomatic stack list`
 
-List all discovered pipelines in the agents directory.
+List all available stack configurations and show the currently active stack.
 
 ```text
-Usage: agentomatic pipeline list [OPTIONS]
+Usage: agentomatic stack list [OPTIONS]
 
 Options:
-  --agents-dir TEXT   Agents folder to scan  [default: agents]
+  -d, --dir TEXT   Stacks directory  [default: stacks]
 ```
 
 #### Example Output
 
+```bash
+agentomatic stack list
+```
+
 ```text
-╭────────────────── 🔗 Pipelines in agents ──────────────────╮
-│ Name           │ Steps │ Agents           │ Version │
-├────────────────┼───────┼──────────────────┼─────────┤
-│ data_pipeline  │ 3     │ planner, exec…   │ 1.0.0   │
-│ review_flow    │ 2     │ analyzer, rev…   │ 1.0.0   │
-╰────────────────┴───────┴──────────────────┴─────────╯
+╭─────────────── 📚 Stacks ───────────────╮
+│ Name    │ Active │
+├─────────┼────────┤
+│ local   │ ✅     │
+│ remote  │        │
+╰─────────┴────────╯
 ```
 
 ---

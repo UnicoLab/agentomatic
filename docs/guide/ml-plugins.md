@@ -83,6 +83,22 @@ Once you run `agentomatic run` (or `platform.build()`), Agentomatic will dynamic
 
 You can view these directly in the Swagger UI at `http://localhost:8000/docs`.
 
+## Scaffolding
+
+Generate a ready-to-use plugin with the CLI:
+
+```bash
+agentomatic init my_plugin --template plugin
+```
+
+This creates:
+
+```text
+plugins/my_plugin/
+├── plugin.py     # BaseMLPlugin subclass
+└── README.md     # Documentation
+```
+
 ## Framework Agnosticism
 
 Agentomatic has absolutely zero opinion on what you put inside `load_model()` and `predict()`. You can run blocking code like `sklearn.predict()` or async code like HTTP calls to external APIs. Agentomatic uses FastAPI, which automatically manages thread-pooling for synchronous code.

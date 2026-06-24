@@ -416,3 +416,38 @@ platform.run(
       FEATURES__ENABLE_AUTH: "true"
       FEATURES__ENABLE_METRICS: "true"
     ```
+
+---
+
+## ❓ Troubleshooting
+
+??? question "My environment variables aren't being loaded"
+    Check these common causes:
+    
+    1. **`.env` file location**: Must be in the project root (same directory as `main.py`)
+    2. **Variable prefix**: Platform variables must start with `AGENTOMATIC_` (e.g., `AGENTOMATIC_LOG_LEVEL`)
+    3. **Priority**: Environment variables always override `.env` file values
+    4. **Restart required**: `.env` changes require a server restart (no hot-reload)
+
+??? question "CORS errors from my frontend"
+    Pass your frontend's origin to `cors_origins`:
+    
+    ```python
+    platform = AgentPlatform.from_folder(
+        "agents/",
+        cors_origins=["http://localhost:3000", "https://app.example.com"],
+    )
+    ```
+
+---
+
+## 📚 Related Documentation
+
+| Topic | Link |
+|-------|------|
+| Middleware (auth, rate limiting) | [Middleware](middleware.md) |
+| Storage backends | [Storage Backends](storage.md) |
+| Configuration stacks | [Stacks](stacks.md) |
+| Security & JWT | [Security](security.md) |
+| LLM providers & failover | [LLM Providers](llm-providers.md) |
+| CLI `run` command options | [CLI Reference](../cli/commands.md) |

@@ -18,7 +18,7 @@ hide:
     <a href="https://pypi.org/project/agentomatic/"><img src="https://img.shields.io/pypi/v/agentomatic.svg" alt="PyPI version"></a>
     <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
     <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
-    <img src="https://img.shields.io/badge/tests-393%20passing-brightgreen.svg" alt="Tests passing">
+    <img src="https://img.shields.io/badge/tests-846%20passing-brightgreen.svg" alt="Tests passing">
     <img src="https://img.shields.io/badge/framework-LangGraph%20%7C%20LangChain%20%7C%20Deep%20Agent%20%7C%20Python-purple.svg" alt="Frameworks">
   </p>
 </div>
@@ -49,7 +49,7 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
 
     ---
 
-    Drop a folder with `__init__.py` + `manifest` into `agents/`. Agentomatic generates **12+ REST endpoints** per agent automatically — invoke, stream, chat, health, config, and more.
+    Drop a folder with `agent.py` (class-based) or `__init__.py` + `manifest` (functional) into `agents/`. Agentomatic generates **26 REST endpoints** per agent automatically — invoke, stream, chat, health, config, threads, feedback, HITL, A2A, and more.
 
     [:octicons-arrow-right-24: Agent Structure](guide/agent-structure.md)
 
@@ -189,7 +189,7 @@ graph TB
     subgraph Platform["AgentPlatform"]
         direction TB
         MW["Middleware Stack<br/>(Auth · Rate Limit · Metrics · Logging)"]
-        RF["Router Factory<br/>(auto-generates 12+ routes per agent)"]
+        RF["Router Factory<br/>(auto-generates 26 routes per agent)"]
         REG["Agent Registry<br/>(auto-discovery from agents/ folder)"]
         PM["Prompt Manager<br/>(hot-reload · versioning · optimization)"]
         STORE["Storage Backend<br/>(Memory · SQLite · PostgreSQL)"]
@@ -238,7 +238,7 @@ graph TB
 
 | Feature | **Agentomatic** | LangServe | AgentOps | Raw FastAPI |
 | :--- | :---: | :---: | :---: | :---: |
-| **Auto-generated REST API** | :material-check-bold:{ .success } 12+ routes/agent | :material-check:{ .success } Limited | :material-close:{ .error } — | :material-close:{ .error } Manual |
+| **Auto-generated REST API** | :material-check-bold:{ .success } 26 routes/agent | :material-check:{ .success } Limited | :material-close:{ .error } — | :material-close:{ .error } Manual |
 | **SSE streaming** | :material-check-bold:{ .success } Native | :material-check:{ .success } Built-in | :material-close:{ .error } — | :material-close:{ .error } Custom |
 | **Multi-framework support** | :material-check-bold:{ .success } LG · LC · DA · Py | :material-close:{ .error } LC only | :material-check:{ .success } Any | :material-close:{ .error } Manual |
 | **Visual debugging (Studio)** | :material-check-bold:{ .success } Built-in | :material-close:{ .error } — | :material-check:{ .success } Dashboard | :material-close:{ .error } — |
@@ -374,6 +374,7 @@ The main exports you'll use when building with Agentomatic:
 | `RunTracker` | `agentomatic` | Records execution history for time-travel debugging |
 | `MemoryStore` | `agentomatic.storage` | In-memory thread storage (development) |
 | `SQLAlchemyStore` | `agentomatic.storage` | SQL-based thread storage (production) |
+| `BaseGraphAgent` | `agentomatic.agents` | Base class for class-based agents with graph wiring |
 
 ```python title="main.py"
 from agentomatic import AgentPlatform, AgentManifest, BaseAgentState
@@ -443,6 +444,18 @@ app = platform.build()
     ---
 
     Deep dive into platform internals, request flow, adapters, and design decisions.
+
+- :material-code-braces:{ .lg .middle } **[Class-Based Agents](guide/class-agents.md)**
+
+    ---
+
+    Build agents as Python classes with typed state, graph wiring, and ML lifecycle.
+
+- :material-book-open-page-variant:{ .lg .middle } **[Cookbook & Recipes](guide/cookbook.md)**
+
+    ---
+
+    10 copy-paste patterns: RAG, routing, HITL, schemas, prompts, and ML plugins.
 
 </div>
 

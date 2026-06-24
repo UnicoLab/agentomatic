@@ -41,9 +41,9 @@ score against a test set, then serve predictions — all on the same object.
 
 === "build_graph() API (Recommended)"
 
-    The `build_graph()` API gives you explicit, LangGraph-style control
-    over the graph topology. Define nodes as plain methods and wire them
-    in `build_graph()`.
+    The `build_graph()` API gives you explicit control over the graph
+    topology using agentomatic's built-in `GraphBuilder`. Define nodes
+    as plain methods and wire them in `build_graph()`.
 
     ```python
     from __future__ import annotations
@@ -74,7 +74,7 @@ score against a test set, then serve predictions — all on the same object.
             self.llm = llm
             self.system_prompt = "You are a summarisation expert."
 
-        # --- graph wiring (LangGraph-style) ---
+        # --- graph wiring ---
 
         def build_graph(self):
             g = self.new_graph()
@@ -251,7 +251,7 @@ def generate(self, state: MyState) -> MyState:
     ...
 ```
 
-!!! info "LangGraph-Compatible API"
+!!! info "GraphBuilder API (LangGraph-Compatible)"
     `GraphBuilder` supports both fluent chaining and imperative styles:
 
     | LangGraph-style | Fluent-chain |
@@ -997,7 +997,7 @@ agents/my_agent/
             self.llm = llm
             self.system_prompt = "You are a helpful assistant."
 
-        # --- Graph Definition (LangGraph-style) ---
+        # --- Graph Definition ---
 
         def build_graph(self):
             """Wire the execution graph."""
@@ -1137,3 +1137,118 @@ agents/my_agent/
 | `agent_description` | `""` | Human-readable description |
 | `agent_version` | `"1.0.0"` | Semantic version |
 | `agent_framework` | `"graph_agent"` | Framework identifier |
+
+---
+
+## ❓ Common Mistakes & FAQ
+
+??? bug "Node method doesn't return state"
+    Every node method **must** return the updated state object. If you forget
+    `return state`, the graph will pass `None` to the next node.
+
+    ```python
+    # ❌ Wrong — missing return
+    def process(self, state: MyState) -> MyState:
+        state.output = {"response": "Hello"}
+
+    # ✅ Correct
+    def process(self, state: MyState) -> MyState:
+        state.output = {"response": "Hello"}
+        return state
+    ```
+
+??? bug "Forgot to call `super().__init__()`"
+    If you override `__init__`, you **must** call `super().__init__()` first:
+
+    ```python
+    def __init__(self, *, llm=None):
+        super().__init__()  # ← Don't forget this!
+        self.llm = llm
+    ```
+
+??? bug "Graph not rebuilding after code changes"
+    The graph is cached after the first `build_graph()` call. If you change
+    your graph topology, call `self.invalidate_graph()` to force a rebuild.
+
+??? question "Can I use async node methods?"
+    Yes! Both sync and async node methods work. The graph runtime handles
+    both:
+
+    ```python
+    async def process(self, state: MyState) -> MyState:
+        result = await some_async_llm_call(state.query)
+        state.output = {"response": result}
+        return state
+    ```
+
+??? question "How do I use class agents with `prompts.json`?"
+    Class agents work with all optional overrides. Place a `prompts.json`
+    in your agent's folder and use `PromptManager` in your node methods:
+
+    ```python
+    from agentomatic import PromptManager
+
+    class MyAgent(BaseGraphAgent[MyState]):
+        def __init__(self):
+            super().__init__()
+            self.prompts = PromptManager.from_file(
+                "agents/my_agent/prompts.json"
+            )
+
+        def generate(self, state):
+            prompt = self.prompts.format(
+                "v1", "user_template", query=state.query
+            )
+            # Use prompt with your LLM...
+    ```
+
+??? question "How do I add custom schemas to a class agent?"
+    Create a `schemas.py` file in your agent's folder. Agentomatic discovers
+    it automatically:
+
+    ```python
+    # agents/my_agent/schemas.py
+    from pydantic import BaseModel, Field
+
+    class CustomInvokeRequest(BaseModel):
+        query: str = Field(..., description="User question")
+        language: str = Field("en", description="Response language")
+        max_length: int = Field(500, description="Max response length")
+    ```
+
+    The auto-generated `/invoke` endpoint will now use your custom schema
+    for both validation and Swagger docs.
+
+??? question "What's the difference between `transform()` and `invoke()`?"
+    They are identical — `invoke()` is simply an alias for `transform()`.
+    Both execute the full pipeline:
+    `input_to_state() → graph execution → state_to_output()`.
+
+??? question "`current_query` vs `query` — which key should I use in `input_to_state`?"
+    The REST API sends `query` in the `AgentInvokeRequest` body. The router
+    maps this to `current_query` in the state dict before invoking your
+    agent. In class agents, you control `input_to_state()` directly, so use
+    whatever key your API sends:
+
+    ```python
+    def input_to_state(self, input_data):
+        # input_data comes directly from the REST request body
+        return MyState(query=input_data.get("query", ""))
+    ```
+
+---
+
+## 📚 Related Documentation
+
+| Topic | Link | When You Need It |
+|-------|------|------------------|
+| Agent folder structure & discovery | [Agent Structure](agent-structure.md) | Understanding how agents are found |
+| Custom request/response schemas | [Input & Output Schemas](schemas.md) | Domain-specific API contracts |
+| Versioned prompt templates | [Prompt Management](prompts.md) | A/B testing prompts |
+| Storage & conversation memory | [Storage Backends](storage.md) | Persistent chat threads |
+| Visual debugging | [Agentomatic Studio](studio.md) | Graph visualization & time-travel |
+| HITL, thread forking, A/B routing | [Platform Features](platform-features.md) | Advanced production features |
+| Platform configuration | [Configuration](configuration.md) | Auth, CORS, rate limiting |
+| Scaffolding templates | [Templates](templates.md) | `agentomatic init` options |
+| CLI commands | [CLI Reference](../cli/commands.md) | All available commands |
+| Full REST API reference | [API Reference](../architecture/api-reference.md) | Every endpoint documented |

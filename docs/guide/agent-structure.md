@@ -7,7 +7,53 @@
 
 ---
 
-Agentomatic follows a **convention-over-configuration** model. Each agent is a self-contained Python package (a folder containing `__init__.py`) stored under your configured agents directory. By dropping files with specific names into this folder, you override default behaviors, customize schemas, configure hyper-parameters, inject custom routers, and define tools.
+Agentomatic follows a **convention-over-configuration** model. Each agent lives in a subfolder under your configured agents directory. By dropping files with specific names into this folder, you override default behaviors, customize schemas, configure hyper-parameters, inject custom routers, and define tools.
+
+---
+
+## 🎯 Choose Your Agent Pattern
+
+Agentomatic supports **two patterns** for defining agents. Both are fully auto-discovered and get the same 26 REST endpoints.
+
+```mermaid
+flowchart TD
+    A["How do you want to define your agent?"] --> B["Class-Based Agent\n(Recommended)"]
+    A --> C["Functional Agent\n(Legacy)"]
+    B --> D["agent.py with BaseGraphAgent\nML lifecycle · typed state · graph wiring"]
+    C --> E["__init__.py with manifest + node_fn\nSimple functions · dict state"]
+
+    style B fill:#c8e6c9,stroke:#388e3c
+    style D fill:#c8e6c9,stroke:#388e3c
+```
+
+=== "Class-Based (Recommended)"
+
+    ```text
+    agents/my_agent/
+    ├── agent.py         ← REQUIRED: BaseGraphAgent subclass
+    ├── config.py        ← Optional: Pydantic config
+    ├── schemas.py       ← Optional: custom request/response
+    ├── tools.py         ← Optional: LangChain tools
+    ├── prompts.json     ← Optional: versioned prompts
+    └── README.md        ← Optional: documentation
+    ```
+
+    !!! tip "Start here"
+        Class-based agents give you typed state, ML lifecycle (`compile → fit → evaluate → transform`), and built-in graph visualization. See [Class-Based Agents](class-agents.md) for the full guide.
+
+=== "Functional (Legacy)"
+
+    ```text
+    agents/my_agent/
+    ├── __init__.py      ← REQUIRED: manifest + node_fn/graph_fn
+    ├── graph.py         ← Optional: LangGraph StateGraph
+    ├── nodes.py         ← Optional: node functions
+    ├── config.py        ← Optional: Pydantic config
+    └── prompts.json     ← Optional: versioned prompts
+    ```
+
+    !!! note "Still fully supported"
+        The functional pattern works perfectly and is ideal for simple agents or when integrating existing LangGraph code.
 
 ---
 
@@ -39,7 +85,8 @@ agents/
 
 | File | Required | Discovery Phase | Purpose |
 |------|----------|----------------|---------|
-| `__init__.py` | **Yes** | `importlib.import_module()` | Must export `manifest: AgentManifest` and either `node_fn` or `graph_fn` |
+| `agent.py` | **Yes** (class-based) | `_discover_class_agent()` | Contains a `BaseGraphAgent` subclass. Alternative to `__init__.py` + manifest. |
+| `__init__.py` | **Yes** (functional) | `importlib.import_module()` | Must export `manifest: AgentManifest` and either `node_fn` or `graph_fn` |
 | `graph.py` | No | `_discover_graph()` | Exports `get_graph()` returning a compiled `StateGraph` |
 | `nodes.py` | No | Imported by `graph.py` | Individual processing functions used as graph nodes |
 | `config.py` | No | `_discover_config()` | Exports a Pydantic `BaseModel` class named `{AgentName}Config` |
@@ -82,7 +129,7 @@ manifest = AgentManifest(
 | `intent_keywords` | `list[str]` | `[]` | Keywords used by the orchestrator for intent-based routing. When a user query matches these keywords, this agent is selected. |
 | `version` | `str` | `"1.0.0"` | Semantic version string. Shown in health checks and A2A discovery. |
 | `is_subagent` | `bool` | `True` | When `True`, the agent gets its own auto-generated REST endpoints and appears in listings. Set `False` for orchestrators or hidden utility agents. |
-| `framework` | `str` | `"langgraph"` | Agent framework type. Determines how the agent is invoked. One of: `"langgraph"`, `"langchain"`, or `"custom"`. |
+| `framework` | `str` | `"langgraph"` | Agent framework type. Determines how the agent is invoked. One of: `"langgraph"`, `"langchain"`, `"graph_agent"`, or `"custom"`. Class-based agents auto-set this to `"graph_agent"`. |
 | `metadata` | `dict[str, Any]` | `{}` | Arbitrary metadata dictionary. Passed through to A2A agent cards and available at runtime via `agent.manifest.metadata`. |
 
 !!! info "Frozen Dataclass"
@@ -193,17 +240,28 @@ sequenceDiagram
     loop For each subdirectory
         FS-->>R: entry (e.g. agents/my_agent/)
         R->>R: Skip if starts with _ or .
-        R->>FS: Check __init__.py exists
-        FS-->>R: True
-        R->>I: import_module("agents.my_agent")
-        I-->>R: module
-        R->>R: getattr(module, "manifest")
-        R->>R: getattr(module, "node_fn")
-        R->>R: _discover_graph() → get_graph
-        R->>R: _discover_router() → api.router
-        R->>R: _discover_config() → AgentConfig
-        R->>R: _discover_prompts() → PromptManager
-        R->>R: Register as RegisteredAgent
+        alt __init__.py exists (functional)
+            R->>FS: Check __init__.py exists
+            FS-->>R: True
+            R->>I: import_module("agents.my_agent")
+            I-->>R: module
+            R->>R: getattr(module, "manifest")
+            R->>R: getattr(module, "node_fn")
+            R->>R: _discover_graph() → get_graph
+            R->>R: _discover_router() → api.router
+            R->>R: _discover_config() → AgentConfig
+            R->>R: _discover_prompts() → PromptManager
+            R->>R: Register as RegisteredAgent
+        else agent.py exists (class-based)
+            R->>FS: Check agent.py exists
+            FS-->>R: True
+            R->>I: import_module("agents.my_agent.agent")
+            I-->>R: module
+            R->>R: Find BaseGraphAgent subclass
+            R->>R: Instantiate agent class
+            R->>R: Call agent.as_registered_agent()
+            R->>R: Register as RegisteredAgent
+        end
     end
     R-->>P: Discovery complete — N agent(s)
 ```
@@ -212,9 +270,14 @@ sequenceDiagram
 
 1. **Directory scanning**: Only top-level subdirectories of `agents_dir` are scanned (no recursive nesting).
 2. **Skip rules**: Directories starting with `_` or `.` are ignored.
-3. **Package requirement**: A valid `__init__.py` must exist in the directory.
-4. **Manifest requirement**: The module must export a `manifest` variable that is an `AgentManifest` instance.
-5. **Import path**: Computed as `{package_prefix}.{folder_name}` (e.g. `agents.my_agent`).
+3. **Entry requirement**: The directory must contain **either** `__init__.py` (functional) **or** `agent.py` (class-based) — or both.
+4. **Priority**: When `__init__.py` exists, functional discovery runs first. If the `__init__.py` has no valid `AgentManifest`, the registry falls back to class-agent discovery via `agent.py`.
+5. **Manifest requirement (functional)**: The module must export a `manifest` variable that is an `AgentManifest` instance.
+6. **Subclass requirement (class-based)**: The `agent.py` module must contain a concrete `BaseGraphAgent` subclass.
+7. **Import path**: Computed as `{package_prefix}.{folder_name}` (functional) or `{package_prefix}.{folder_name}.agent` (class-based).
+
+!!! info "Class-Based Agent Discovery"
+    When `agent.py` exists (even without `__init__.py`), the registry imports it, scans for `BaseGraphAgent` subclasses, instantiates them, and calls `as_registered_agent()` to register the agent. The agent's `agent_name` class attribute determines the API URL path.
 
 ### Enhancement Discovery Order
 
@@ -479,7 +542,7 @@ agent_tools = [calculate_salary, search_database]
 
 ### 6. `api.py` — Custom FastAPI Router
 
-If `api.py` exports a `router`, **Agentomatic drops all 12 auto-generated endpoints** for this agent and mounts your custom router instead.
+If `api.py` exports a `router`, **Agentomatic drops all 26 auto-generated endpoints** for this agent and mounts your custom router instead.
 
 ```python
 # agents/my_agent/api.py
@@ -627,3 +690,35 @@ health = await agent.health_check()
 #     "status": "healthy"
 # }
 ```
+
+---
+
+## ❓ Troubleshooting Discovery
+
+??? question "My agent isn't being discovered"
+    Check these common causes:
+
+    1. **Missing required file**: Class agents need `agent.py`, functional agents need `__init__.py`
+    2. **Folder starts with `_` or `.`**: These are skipped during scanning
+    3. **Import error in your code**: Check the console for `❌ Failed to discover` messages
+    4. **Wrong directory**: Make sure your agents are in the configured `agents_dir` (default: `agents/`)
+    5. **No BaseGraphAgent subclass**: For class agents, the file must contain a class that inherits from `BaseGraphAgent`
+
+??? question "My agent shows as `(minimal)` in discovery"
+    This means only the manifest was found — no `graph_fn`, `node_fn`, `config`, or prompts. Check that your entrypoint function is correctly exported.
+
+??? question "Agent name doesn't match folder name"
+    For functional agents, `manifest.name` **must** match the folder name exactly. For class agents, `agent_name` is used instead.
+
+---
+
+## Related Documentation
+
+| Topic | Link |
+|-------|------|
+| Class-based agent deep dive | [Class-Based Agents](class-agents.md) |
+| Custom request/response schemas | [Input & Output Schemas](schemas.md) |
+| Versioned prompt templates | [Prompt Management](prompts.md) |
+| Visual debugging with Studio | [Agentomatic Studio](studio.md) |
+| All CLI commands | [CLI Reference](../cli/commands.md) |
+| Platform configuration | [Configuration](configuration.md) |

@@ -65,6 +65,7 @@ If you prefer a lightweight install, you can select only the modules and depende
 | `db-postgres` | `pip install agentomatic[db-postgres]` | SQLAlchemy async PostgreSQL client driver |
 | `cli` | `pip install agentomatic[cli]` | Rich terminal formatting + interactive select prompt controls |
 | `ui` | `pip install agentomatic[ui]` | Graphical Chainlit chat debug console |
+| `studio` | `pip install agentomatic[studio]` | Agentomatic Studio visual debugger |
 | `optimize` | `pip install agentomatic[optimize]` | DSPy-style optimizer loop + DeepEval validation |
 | `telemetry` | `pip install agentomatic[telemetry]` | OpenTelemetry APM tracing exporters |
 | `all` | `pip install agentomatic[all]` | Installs all components and drivers above |
@@ -125,6 +126,18 @@ agentomatic doctor
 │ ✅ OpenTelemetry  1.20.x                                   │
 ╰────────────────────────────────────────────────────────────╯
 ```
+
+---
+
+## ❓ Troubleshooting
+
+??? question "Command `agentomatic` not found after install"
+    Make sure you installed the CLI extra: `pip install agentomatic[cli]` or `pip install agentomatic[all]`.
+    If using a virtual environment, verify it's activated.
+
+??? question "`ModuleNotFoundError: No module named 'langgraph'`"
+    LangGraph is optional. Install it with: `pip install agentomatic[langgraph]`.
+    Class-based agents using `BaseGraphAgent` do NOT require LangGraph.
 
 !!! tip "Next Step"
     Now that the installation is complete, proceed to the [Quick Start](quickstart.md) guide!
