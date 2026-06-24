@@ -219,3 +219,17 @@ module = [
     "agentomatic.optimize.*",
 ]
 disable_error_code = ["call-arg", "override", "misc", "attr-defined"]
+
+# Optional dependencies that may not be installed
+[[tool.mypy.overrides]]
+module = [
+    "chainlit",
+    "chainlit.*",
+    "litellm",
+    "opentelemetry.*",
+    "langchain_openai",
+    "langchain_google_vertexai",
+    "holysheet",
+    "yaml",
+]
+ignore_missing_imports = true
