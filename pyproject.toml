@@ -217,6 +217,7 @@ module = [
     "agentomatic.studio.run_tracker",
     "agentomatic.demo.*",
     "agentomatic.optimize.*",
+    "agentomatic.providers.*",
 ]
 disable_error_code = ["call-arg", "override", "misc", "attr-defined"]
 
