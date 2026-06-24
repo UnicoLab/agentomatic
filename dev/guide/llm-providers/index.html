@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/logo.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -50,10 +50,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -87,6 +89,25 @@
     </div>
     <div data-md-component="announce">
       
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+              <button class="md-banner__button md-icon" aria-label="Don't show this again">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            
+            
+  <a href="changelog/">
+    🚀 <strong>Agentomatic</strong> — Class-based agents, Cookbook recipes, and Studio visual debugger now available!
+  </a>
+
+          </div>
+          
+            <script>var el=document.querySelector("[data-md-component=announce]");if(el){var content=el.querySelector(".md-typeset");__md_hash(content.innerHTML)===__md_get("__announce")&&(el.hidden=!0)}</script>
+          
+        </aside>
+      
     </div>
     
       <div data-md-color-scheme="default" data-md-component="outdated" hidden>
@@ -102,8 +123,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="Agentomatic" class="md-header__button md-logo" aria-label="Agentomatic" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -176,6 +196,11 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
       </label>
       <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
         
         <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
           
@@ -264,17 +289,37 @@
   
   
   
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../class-agents/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
     
   
   
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../agent-structure/" class="md-tabs__link">
+        <a href="../platform-features/" class="md-tabs__link">
           
   
   
-  User Guide
+  Advanced
 
         </a>
       </li>
@@ -410,8 +455,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="Agentomatic" class="md-nav__button md-logo" aria-label="Agentomatic" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/logo.png" alt="logo">
 
     </a>
     Agentomatic
@@ -547,6 +591,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts & Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
@@ -607,31 +679,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -649,7 +718,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -667,14 +736,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent-structure/" class="md-nav__link">
+      <a href="../class-agents/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Agent Structure
+    Class-Based Agents
   
 
     
@@ -695,14 +764,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../class-agents/" class="md-nav__link">
+      <a href="../agent-structure/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Class-Based Agents
+    Agent Structure & Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook & Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates
   
 
     
@@ -759,62 +884,6 @@
     
   
     Prompt Management
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../templates/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Templates
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../pipelines/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pipelines
   
 
     
@@ -947,6 +1016,126 @@
   
   
     <li class="md-nav__item">
+      <a href="../ml-plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Your Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../platform-features/" class="md-nav__link">
         
   
@@ -954,7 +1143,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Platform Features
+    Platform Features
   
 
     
@@ -1031,14 +1220,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../ml-plugins/" class="md-nav__link">
+      <a href="../pipelines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ML Plugins
+    Pipelines
   
 
     
@@ -1158,10 +1347,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#initializing-an-llm" class="md-nav__link">
+  <a href="#provider-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Initializing an LLM
+        Provider Setup
       
     </span>
   </a>
@@ -1169,30 +1358,68 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#failover-chains" class="md-nav__link">
+  <a href="#environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failover Chains
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Failover Chains">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#telemetry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Telemetry
+        Environment Variables
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#failover-chain-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failover Chain Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retry-timeout-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry &amp; Timeout Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#named-llm-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Named LLM Instances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-specific-llms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent-Specific LLMs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured Output
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1201,6 +1428,50 @@
     <span class="md-ellipsis">
       
         Embedding Providers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failover-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failover Telemetry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
       
     </span>
   </a>
@@ -1301,10 +1572,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -1322,8 +1593,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1474,10 +1745,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1495,8 +1766,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1563,10 +1834,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1584,8 +1855,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1778,10 +2049,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#initializing-an-llm" class="md-nav__link">
+  <a href="#provider-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Initializing an LLM
+        Provider Setup
       
     </span>
   </a>
@@ -1789,30 +2060,68 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#failover-chains" class="md-nav__link">
+  <a href="#environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failover Chains
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Failover Chains">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#telemetry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Telemetry
+        Environment Variables
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#failover-chain-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failover Chain Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retry-timeout-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry &amp; Timeout Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#named-llm-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Named LLM Instances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-specific-llms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent-Specific LLMs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured Output
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1821,6 +2130,50 @@
     <span class="md-ellipsis">
       
         Embedding Providers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failover-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failover Telemetry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
       
     </span>
   </a>
@@ -1838,6 +2191,54 @@
           
             <div class="md-content" data-md-component="content">
               
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../platform-features/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Advanced
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
               <article class="md-content__inner md-typeset">
                 
                   
@@ -1848,59 +2249,489 @@
 
 
 <h1 id="llm-providers-failovers">LLM Providers &amp; Failovers<a class="headerlink" href="#llm-providers-failovers" title="Permanent link">&para;</a></h1>
-<p>Agentomatic abstracts away the underlying differences between LLM providers using a unified Multi-Provider LLM Factory (<code>get_llm</code>). This allows your agents to seamlessly swap out the model provider, handle failover mechanisms, and stay robust during outages.</p>
+<p>Agentomatic abstracts LLM access behind a <strong>provider layer</strong> that handles
+instantiation, caching, failover chains, retry logic, and structured output
+binding. You never construct LangChain chat-model objects directly — instead
+you call one of the <code>get_llm*</code> helpers and let the framework manage the rest.</p>
+<pre class="mermaid"><code>graph LR
+    A["Agent / Pipeline"] --&gt; B["get_llm_for_agent()"]
+    B --&gt; C{"Resolution order"}
+    C --&gt;|1| D["Agent llm_config"]
+    C --&gt;|2| E["Stack profile"]
+    C --&gt;|3| F["'default' profile"]
+    C --&gt;|4| G["Global get_llm() singleton"]
+    G --&gt; H["Primary provider"]
+    H --&gt;|failure| I["Fallback chain"]
+    I --&gt;|all fail| J["Dummy LLM"]</code></pre>
+<hr />
 <h2 id="supported-providers">Supported Providers<a class="headerlink" href="#supported-providers" title="Permanent link">&para;</a></h2>
-<p>Agentomatic supports multiple LangChain-compatible model providers out of the box:
-- <code>ollama</code>: For local models (e.g. <code>llama3</code>, <code>mistral</code>)
-- <code>openai</code>: OpenAI GPT series
-- <code>azure</code>: Azure OpenAI endpoints
-- <code>vertex</code>: Google Vertex AI models
-- <code>google_genai</code>: Google GenAI API
-- <code>dummy</code>: For testing purposes</p>
-<h2 id="initializing-an-llm">Initializing an LLM<a class="headerlink" href="#initializing-an-llm" title="Permanent link">&para;</a></h2>
-<p>You can construct a singleton LLM instance using the <code>get_llm</code> function. The returned instance is cached to avoid unnecessary re-initialization.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;your-api-key&quot;</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
-</code></pre></div>
-<h2 id="failover-chains">Failover Chains<a class="headerlink" href="#failover-chains" title="Permanent link">&para;</a></h2>
-<p>A key reliability feature of Agentomatic is the ability to automatically fallback to secondary or tertiary models if the primary provider goes down or rate-limits you. </p>
-<p>You can define a failover chain using the <code>fallbacks</code> parameter:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>              <span class="c1"># Primary provider</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;ollama&quot;</span><span class="p">],</span>  <span class="c1"># Fallback chain</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="c1"># Shared or specific kwargs:</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.1</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">)</span>
-</code></pre></div>
-<p>If OpenAI fails, the system will automatically route the request to <code>azure</code>. If <code>azure</code> fails, it will attempt <code>ollama</code>. </p>
-<h3 id="telemetry">Telemetry<a class="headerlink" href="#telemetry" title="Permanent link">&para;</a></h3>
-<p>Failovers are automatically tracked. You can inspect the total failover count programmatically:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_failover_count</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">count</span> <span class="o">=</span> <span class="n">get_failover_count</span><span class="p">()</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total failovers occurred: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Provider Key</th>
+<th>LangChain Class</th>
+<th>Package</th>
+<th>Streaming</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ollama</code></td>
+<td><code>ChatOllama</code></td>
+<td><code>langchain-ollama</code></td>
+<td>✅</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>openai</code></td>
+<td><code>ChatOpenAI</code></td>
+<td><code>langchain-openai</code></td>
+<td>✅</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>azure</code></td>
+<td><code>AzureChatOpenAI</code></td>
+<td><code>langchain-openai</code></td>
+<td>✅</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>vertex</code></td>
+<td><code>ChatVertexAI</code></td>
+<td><code>langchain-google-vertexai</code></td>
+<td>✅</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>google_genai</code></td>
+<td>—</td>
+<td><code>langchain-google-genai</code></td>
+<td>✅</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td><code>dummy</code></td>
+<td><code>FakeListChatModel</code></td>
+<td><code>langchain-core</code></td>
+<td>❌</td>
+<td>Testing</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Google GenAI</p>
+<p>The <code>google_genai</code> provider key is accepted by the stack manager
+configuration but is not yet wired into the low-level <code>_build_llm</code>
+factory.  Use <code>vertex</code> for production Google model access today.</p>
+</div>
+<hr />
+<h2 id="provider-setup">Provider Setup<a class="headerlink" href="#provider-setup" title="Permanent link">&para;</a></h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="openai" name="__tabbed_1" type="radio" /><input id="ollama" name="__tabbed_1" type="radio" /><input id="azure-openai" name="__tabbed_1" type="radio" /><input id="google-vertex-ai" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="openai">OpenAI</label><label for="ollama">Ollama</label><label for="azure-openai">Azure OpenAI</label><label for="google-vertex-ai">Google Vertex AI</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Required environment variables</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENAI_API_KEY</span><span class="o">=</span><span class="s2">&quot;sk-...&quot;</span>
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>          <span class="c1"># or &quot;gpt-4o&quot;, &quot;gpt-4o-mini&quot;, etc.</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;sk-...&quot;</span><span class="p">,</span>       <span class="c1"># falls back to OPENAI_API_KEY env var</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Model name format:</strong> OpenAI model slugs — <code>gpt-4</code>, <code>gpt-4o</code>,
+<code>gpt-4o-mini</code>, <code>gpt-3.5-turbo</code>.</p>
+</div>
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Start the Ollama server (default: http://localhost:11434)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ollama<span class="w"> </span>serve
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>ollama<span class="w"> </span>pull<span class="w"> </span>llama3
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;llama3&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span>   <span class="c1"># default</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Model name format:</strong> Ollama model tags — <code>llama3</code>, <code>mistral</code>,
+<code>codellama:13b</code>, <code>phi3:medium</code>.</p>
+</div>
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Required environment variables</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AZURE_OPENAI_API_KEY</span><span class="o">=</span><span class="s2">&quot;...&quot;</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AZURE_OPENAI_ENDPOINT</span><span class="o">=</span><span class="s2">&quot;https://&lt;resource&gt;.openai.azure.com/&quot;</span>
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">azure_endpoint</span><span class="o">=</span><span class="s2">&quot;https://&lt;resource&gt;.openai.azure.com/&quot;</span><span class="p">,</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">azure_deployment</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">,</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;2024-02-15-preview&quot;</span><span class="p">,</span>   <span class="c1"># default</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Model name format:</strong> Your Azure <em>deployment name</em>, not the
+underlying OpenAI model id.</p>
+</div>
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Authenticate with Google Cloud</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>gcloud<span class="w"> </span>auth<span class="w"> </span>application-default<span class="w"> </span>login
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;vertex&quot;</span><span class="p">,</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;gemini-1.5-pro&quot;</span><span class="p">,</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">project</span><span class="o">=</span><span class="s2">&quot;my-gcp-project&quot;</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">location</span><span class="o">=</span><span class="s2">&quot;us-central1&quot;</span><span class="p">,</span>       <span class="c1"># default</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Model name format:</strong> Vertex AI model ids — <code>gemini-1.5-pro</code>,
+<code>gemini-1.5-flash</code>, <code>gemini-2.0-flash</code>.</p>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Provider</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENAI_API_KEY</code></td>
+<td><code>openai</code></td>
+<td>OpenAI API key</td>
+</tr>
+<tr>
+<td><code>AZURE_OPENAI_API_KEY</code></td>
+<td><code>azure</code></td>
+<td>Azure OpenAI resource key</td>
+</tr>
+<tr>
+<td><code>AZURE_OPENAI_ENDPOINT</code></td>
+<td><code>azure</code></td>
+<td>Azure resource endpoint URL</td>
+</tr>
+<tr>
+<td><code>GOOGLE_CLOUD_PROJECT</code></td>
+<td><code>vertex</code></td>
+<td>GCP project id</td>
+</tr>
+<tr>
+<td><code>GOOGLE_APPLICATION_CREDENTIALS</code></td>
+<td><code>vertex</code></td>
+<td>Path to service-account JSON</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="failover-chain-configuration">Failover Chain Configuration<a class="headerlink" href="#failover-chain-configuration" title="Permanent link">&para;</a></h2>
+<p><code>get_llm</code> accepts a <code>fallbacks</code> list so you can build an automatic failover
+chain. If the primary provider fails, LangChain transparently routes to the
+next provider in the list.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">,</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ollama&quot;</span><span class="p">,</span> <span class="s2">&quot;vertex&quot;</span><span class="p">],</span>   <span class="c1"># tried in order on failure</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Under the hood Agentomatic calls LangChain's
+<code>.with_fallbacks(fallback_models, exceptions_to_handle=(Exception,))</code>,
+catching <strong>all</strong> exceptions so that transient errors, rate-limits, and
+network issues all trigger a failover.</p>
+<div class="admonition warning">
+<p class="admonition-title">Last-resort dummy</p>
+<p>If the primary provider <strong>and</strong> every fallback fail to build, the
+framework silently falls back to a <code>FakeListChatModel</code> (dummy) so that
+your process never crashes at import time. Check logs for
+<code>record_failover</code> warnings in production.</p>
+</div>
+<pre class="mermaid"><code>graph LR
+    P["Primary: openai"] --&gt;|Exception| F1["Fallback 1: ollama"]
+    F1 --&gt;|Exception| F2["Fallback 2: vertex"]
+    F2 --&gt;|Exception| D["Dummy LLM"]</code></pre>
+<hr />
+<h2 id="retry-timeout-settings">Retry &amp; Timeout Settings<a class="headerlink" href="#retry-timeout-settings" title="Permanent link">&para;</a></h2>
+<p>For transient failures <em>within</em> a single provider, use <code>invoke_with_retry</code>
+which wraps <code>llm.ainvoke</code> with <strong>exponential back-off</strong>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span><span class="p">,</span> <span class="n">invoke_with_retry</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">invoke_with_retry</span><span class="p">(</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">llm</span><span class="p">,</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">messages</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Hello!&quot;</span><span class="p">}],</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>       <span class="c1"># default</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">retry_delay</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>     <span class="c1"># base delay in seconds (default)</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The delay doubles after each attempt: <code>delay × 2^attempt</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Attempt</th>
+<th>Wait before retry</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>1.0 s</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2.0 s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>4.0 s</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Failover vs. Retry</p>
+<p><strong>Retry</strong> re-attempts the <em>same</em> provider (good for transient 429 / 503
+errors). <strong>Failover</strong> switches to a <em>different</em> provider (good for
+persistent outages). Combine both for maximum resilience.</p>
+</div>
+<hr />
+<h2 id="named-llm-instances">Named LLM Instances<a class="headerlink" href="#named-llm-instances" title="Permanent link">&para;</a></h2>
+<p><code>get_named_llm</code> lets you maintain multiple cached LLM instances under
+human-readable names — for example a <em>fast</em> model for routing and a
+<em>powerful</em> model for complex reasoning:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_named_llm</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">fast</span>  <span class="o">=</span> <span class="n">get_named_llm</span><span class="p">(</span><span class="s2">&quot;fast&quot;</span><span class="p">,</span>  <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o-mini&quot;</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">judge</span> <span class="o">=</span> <span class="n">get_named_llm</span><span class="p">(</span><span class="s2">&quot;judge&quot;</span><span class="p">,</span> <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">,</span>      <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Subsequent calls with the same <code>name</code> return the <strong>cached</strong> instance
+(thread-safe). Call <code>reset_llm()</code> to clear all named instances.</p>
+<hr />
+<h2 id="agent-specific-llms">Agent-Specific LLMs<a class="headerlink" href="#agent-specific-llms" title="Permanent link">&para;</a></h2>
+<p><code>get_llm_for_agent</code> resolves the LLM for a particular agent using a strict
+priority order:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm_for_agent</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm_for_agent</span><span class="p">(</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;planner&quot;</span><span class="p">,</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">role</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>           <span class="c1"># or &quot;judge&quot;, &quot;fast&quot;, etc.</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">stack_manager</span><span class="o">=</span><span class="n">manager</span><span class="p">,</span>    <span class="c1"># optional StackManager instance</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Resolution order:</strong></p>
+<ol>
+<li><strong>Agent's own <code>llm_config</code></strong> — defined in the agent manifest.</li>
+<li><strong>Stack profile</strong> — the named profile matching <code>role</code> in the active stack.</li>
+<li><strong><code>"default"</code> profile</strong> — the stack's default profile.</li>
+<li><strong>Global singleton</strong> — <code>get_llm()</code> with default settings.</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This layered resolution means you can override LLM settings at any
+granularity — per-agent, per-stack, or globally — without touching
+other agents' configuration.</p>
+</div>
+<hr />
+<h2 id="structured-output">Structured Output<a class="headerlink" href="#structured-output" title="Permanent link">&para;</a></h2>
+<p><code>get_structured_llm</code> binds a Pydantic model to the LLM so every response is
+automatically parsed and validated:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_structured_llm</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">SentimentResult</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">score</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_structured_llm</span><span class="p">(</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="n">response_model</span><span class="o">=</span><span class="n">SentimentResult</span><span class="p">,</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o-mini&quot;</span><span class="p">,</span>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="p">)</span>
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">llm</span><span class="o">.</span><span class="n">ainvoke</span><span class="p">(</span><span class="s2">&quot;Analyze: &#39;I love this product!&#39;&quot;</span><span class="p">)</span>
+</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="c1"># result -&gt; SentimentResult(label=&quot;positive&quot;, score=0.97)</span>
+</span></code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Fallback wrapper</p>
+<p>If the underlying provider does not support native structured output,
+Agentomatic transparently wraps it with a
+<code>StructuredOutputFallbackWrapper</code> that prompts the model for JSON and
+parses the response against your Pydantic schema.</p>
+</div>
+<hr />
 <h2 id="embedding-providers">Embedding Providers<a class="headerlink" href="#embedding-providers" title="Permanent link">&para;</a></h2>
-<p>Agentomatic also provides abstractions for embedding models:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.embeddings</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_embeddings</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">embeddings</span> <span class="o">=</span> <span class="n">get_embeddings</span><span class="p">(</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;nomic-embed-text&quot;</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
-</code></pre></div>
-<p>This keeps both generation and vector search completely agnostic to the underlying provider.</p>
+<p>Embeddings follow the same singleton pattern via <code>get_embeddings</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.embeddings</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_embeddings</span><span class="p">,</span> <span class="n">reset_embeddings</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">embeddings</span> <span class="o">=</span> <span class="n">get_embeddings</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">&quot;ollama&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;nomic-embed-text&quot;</span><span class="p">)</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">vectors</span> <span class="o">=</span> <span class="n">embeddings</span><span class="o">.</span><span class="n">embed_documents</span><span class="p">([</span><span class="s2">&quot;Hello world&quot;</span><span class="p">,</span> <span class="s2">&quot;Goodbye world&quot;</span><span class="p">])</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Provider Key</th>
+<th>Class</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ollama</code></td>
+<td><code>OllamaEmbeddings</code></td>
+<td>Requires running Ollama</td>
+</tr>
+<tr>
+<td><em>(other)</em></td>
+<td><code>DeterministicFakeEmbedding</code></td>
+<td>Deterministic dummy vectors</td>
+</tr>
+</tbody>
+</table>
+<p>Call <code>reset_embeddings()</code> to clear the cached instance.</p>
+<hr />
+<h2 id="streaming-support">Streaming Support<a class="headerlink" href="#streaming-support" title="Permanent link">&para;</a></h2>
+<p>All LangChain providers support token-level streaming via <code>astream_events</code>.
+Agentomatic exposes this through an <strong>SSE (Server-Sent Events)</strong> endpoint:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>POST /invoke/stream
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>Content-Type: application/json
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>{&quot;input&quot;: &quot;Explain quantum computing&quot;, &quot;config&quot;: {&quot;provider&quot;: &quot;openai&quot;}}
+</span></code></pre></div>
+<p>Enable streaming in your settings:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># settings.yaml</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">platform</span><span class="p">:</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>  <span class="n">enable_streaming</span><span class="p">:</span> <span class="n">true</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code>dummy</code> provider does <strong>not</strong> support streaming. Use a real
+provider when testing streaming behaviour.</p>
+</div>
+<hr />
+<h2 id="failover-telemetry">Failover Telemetry<a class="headerlink" href="#failover-telemetry" title="Permanent link">&para;</a></h2>
+<p>Agentomatic tracks every failover event so you can monitor provider
+reliability in production:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="n">get_failover_count</span><span class="p">,</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="n">record_failover</span><span class="p">,</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="n">reset_llm</span><span class="p">,</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="p">)</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Manually record a failover (usually called internally)</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="n">record_failover</span><span class="p">(</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="n">primary</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>    <span class="n">fallback</span><span class="o">=</span><span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="n">error</span><span class="o">=</span><span class="s2">&quot;RateLimitError: 429&quot;</span><span class="p">,</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="p">)</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="c1"># Query cumulative failover count</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="n">count</span> <span class="o">=</span> <span class="n">get_failover_count</span><span class="p">()</span>   <span class="c1"># -&gt; int</span>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="c1"># Reset everything (instances + telemetry)</span>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a><span class="n">reset_llm</span><span class="p">()</span>
+</span></code></pre></div>
+<p>Each <code>record_failover</code> call emits a <strong>loguru warning</strong> with the primary
+provider, the fallback that took over, and the error message — making it
+easy to set up alerts in your logging pipeline.</p>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<details class="question">
+<summary>API key not found — <code>AuthenticationError</code></summary>
+<p>Verify the environment variable is set in the shell where your process
+runs. Common mistakes:</p>
+<ul>
+<li>Setting the variable in <code>.bashrc</code> but running the process in a
+  different shell (e.g. a VS Code terminal that sources <code>.zshrc</code>).</li>
+<li>Passing <code>api_key</code> as a kwarg with a typo.</li>
+<li>Using <code>OPENAI_API_KEY</code> when the provider is <code>azure</code> (needs
+  <code>AZURE_OPENAI_API_KEY</code>).</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nb">echo</span><span class="w"> </span><span class="nv">$OPENAI_API_KEY</span><span class="w">   </span><span class="c1"># should print your key</span>
+</span></code></pre></div>
+</details>
+<details class="question">
+<summary>Model not available — <code>NotFoundError</code></summary>
+<p>Each provider uses a different model naming scheme:</p>
+<ul>
+<li><strong>OpenAI</strong>: <code>gpt-4o</code>, not <code>gpt4o</code> or <code>gpt-4-o</code>.</li>
+<li><strong>Azure</strong>: Use your <em>deployment name</em>, not the OpenAI model id.</li>
+<li><strong>Ollama</strong>: Run <code>ollama list</code> to see locally pulled models.</li>
+<li><strong>Vertex</strong>: Ensure the model is enabled in your GCP project.</li>
+</ul>
+</details>
+<details class="question">
+<summary>Timeout errors — <code>TimeoutError</code> / <code>ReadTimeout</code></summary>
+<ul>
+<li>Increase <code>max_retries</code> and <code>retry_delay</code> in <code>invoke_with_retry</code>.</li>
+<li>For Ollama, ensure the server is running (<code>ollama serve</code>) and the
+  model is fully loaded (first invocation can take 30 s+).</li>
+<li>For cloud providers, check your network / proxy configuration.</li>
+</ul>
+</details>
+<details class="question">
+<summary>Rate limited — <code>429 Too Many Requests</code></summary>
+<ul>
+<li><code>invoke_with_retry</code> handles transient 429s automatically via
+  exponential back-off.</li>
+<li>For sustained rate-limiting, add a cheaper provider as a fallback:
+  <div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">,</span> <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ollama&quot;</span><span class="p">])</span>
+</span></code></pre></div></li>
+<li>Consider using <code>get_named_llm</code> to route high-volume, low-stakes
+  calls to a faster / cheaper model.</li>
+</ul>
+</details>
+<hr />
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Page</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent Manifest &amp; Config</td>
+<td><a href="../agent-structure/">Agent Structure</a></td>
+</tr>
+<tr>
+<td>Stack Manager</td>
+<td><a href="../stacks/">Stacks &amp; Profiles</a></td>
+</tr>
+<tr>
+<td>Prompt Engineering</td>
+<td><a href="../prompts/">Prompt Management</a></td>
+</tr>
+<tr>
+<td>Platform Settings</td>
+<td><a href="../configuration/">Configuration</a></td>
+</tr>
+<tr>
+<td>API Reference — Providers</td>
+<td><a href="../../architecture/api-reference/">API Reference</a></td>
+</tr>
+</tbody>
+</table>
 
 
 
@@ -1933,6 +2764,46 @@
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../stacks/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Configuration Stacks">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Configuration Stacks
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../security/" class="md-footer__link md-footer__link--next" aria-label="Next: Security &amp; Zero Trust">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Security & Zero Trust
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
@@ -1941,11 +2812,6 @@
       Copyright &copy; 2024-2026 UnicoLab
     </div>
   
-  
-    Made with
-    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
-      Material for MkDocs
-    </a>
   
 </div>
       
@@ -1956,10 +2822,7 @@
     
     
     
-      
-      
-    
-    <a href="https://github.com/UnicoLab/agentomatic" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+    <a href="https://github.com/UnicoLab/agentomatic" target="_blank" rel="noopener" title="Agentomatic on GitHub" class="md-social__link">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
     </a>
   
@@ -1967,10 +2830,7 @@
     
     
     
-      
-      
-    
-    <a href="https://pypi.org/project/agentomatic/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+    <a href="https://pypi.org/project/agentomatic/" target="_blank" rel="noopener" title="Agentomatic on PyPI" class="md-social__link">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
     </a>
   
@@ -1985,11 +2845,13 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
     
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "navigation.path", "search.suggest", "search.highlight", "search.share", "content.tabs.link", "content.code.copy", "content.code.annotate", "content.tooltips", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
