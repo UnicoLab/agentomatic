@@ -44,6 +44,7 @@ def _get_version() -> str:
     """Get the package version."""
     try:
         from importlib.metadata import version
+
         return version("agentomatic")
     except Exception:
         return "dev"
@@ -453,21 +454,19 @@ def list_agents(agents_dir: str) -> None:
                     info["has_manifest"] = True
                     # Try to extract description
                     import re
-                    desc_match = re.search(
-                        r'description\s*=\s*["\']([^"\']+)["\']', source
-                    )
+
+                    desc_match = re.search(r'description\s*=\s*["\']([^"\']+)["\']', source)
                     if desc_match:
                         info["description"] = desc_match.group(1)[:50]
                     # Extract framework
-                    fw_match = re.search(
-                        r'framework\s*=\s*["\']([^"\']+)["\']', source
-                    )
+                    fw_match = re.search(r'framework\s*=\s*["\']([^"\']+)["\']', source)
                     if fw_match:
                         info["framework"] = fw_match.group(1)
             elif has_agent_py:
                 info["has_manifest"] = True  # class agents self-describe
                 agent_source = (entry / "agent.py").read_text(errors="ignore")
                 import re
+
                 desc_match = re.search(
                     r'agent_description\s*=\s*["\']([^"\']+)["\']', agent_source
                 )
@@ -544,18 +543,14 @@ def list_agents(agents_dir: str) -> None:
             )
 
         console.print(table)
-        console.print(
-            "[dim]  ML Lifecycle: T=train  E=eval  O=optimize  D=dataset[/dim]"
-        )
+        console.print("[dim]  ML Lifecycle: T=train  E=eval  O=optimize  D=dataset[/dim]")
     else:
         click.echo(f"📂 {agents_path} ({len(agents)} agents)")
         for a in agents:
             pattern = "⬡" if a.get("pattern") == "class" else "ƒ"
             desc = a.get("description", "")
             desc_str = f" — {desc}" if desc else ""
-            click.echo(
-                f"  {pattern} {a['name']} ({a.get('files', '?')} files){desc_str}"
-            )
+            click.echo(f"  {pattern} {a['name']} ({a.get('files', '?')} files){desc_str}")
 
     _echo(f"\n   Total: {len(agents)} agent(s)")
 
@@ -912,10 +907,11 @@ def doctor(agents_dir: str) -> None:
     agents_path = Path(agents_dir)
     if agents_path.exists():
         count = len(
-            [d for d in agents_path.iterdir()
-             if d.is_dir() and (
-                 (d / "__init__.py").exists() or (d / "agent.py").exists()
-             )]
+            [
+                d
+                for d in agents_path.iterdir()
+                if d.is_dir() and ((d / "__init__.py").exists() or (d / "agent.py").exists())
+            ]
         )
         checks.append(("Agents directory", True, f"{count} agent(s) in {agents_path}"))
     else:
