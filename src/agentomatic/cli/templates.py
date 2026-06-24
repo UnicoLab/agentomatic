@@ -273,7 +273,7 @@ def _legacy_nodes_py(name: str) -> str:
 
 TEMPLATES: dict[str, str] = {
     "basic": "Minimal class-based agent (recommended) — 1 file, quick start",
-    "full": "All overwrite files — class agent with config, schemas, api, tools, prompts",
+    "full": "All files — class agent with config, schemas, tools, dataset, train/eval scripts",
     "rag": "RAG class-based agent — retrieve → generate pipeline",
     "chatbot": "Conversational class-based agent with memory",
     "deepagent": "Deep Agent — planning, tools, subagents (requires deepagents package)",
@@ -337,6 +337,485 @@ def _plugin_readme(name: str) -> str:
     return f"""# {title} Plugin\n\nGenerated with `agentomatic init {name} --template plugin`.\n\n## Quick Start\n\nPlace this folder inside your `plugins/` directory. When you run `agentomatic run --plugins-dir plugins`, the platform will automatically discover this plugin and mount its REST endpoints.\n\n## Endpoints\n\n- `POST /api/v1/plugins/{name}/predict`\n- `GET /api/v1/plugins/{name}/health`\n- `GET /api/v1/plugins/{name}/model_card`\n"""
 
 
+def _dataset_jsonl(name: str) -> str:
+    return (
+        f'{{"id": "{name}_001", "split": "train", "input": {{"current_query": '
+        f'"Help me with task planning"}}, "expected_output": {{"response": '
+        f'"Here is a structured plan..."}}, "metadata": {{"domain": "general", '
+        f'"difficulty": "easy"}}}}\n'
+        f'{{"id": "{name}_002", "split": "train", "input": {{"current_query": '
+        f'"Summarize this document"}}, "expected_output": {{"response": '
+        f'"Summary: ..."}}, "metadata": {{"domain": "general", '
+        f'"difficulty": "medium"}}}}\n'
+        f'{{"id": "{name}_003", "split": "train", "input": {{"current_query": '
+        f'"Compare option A vs B"}}, "expected_output": {{"response": '
+        f'"Comparison: A is..."}}, "metadata": {{"domain": "general", '
+        f'"difficulty": "medium"}}}}\n'
+        f'{{"id": "{name}_004", "split": "train", "input": {{"current_query": '
+        f'"Write a brief report"}}, "expected_output": {{"response": '
+        f'"Report: ..."}}, "metadata": {{"domain": "general", '
+        f'"difficulty": "easy"}}}}\n'
+        f'{{"id": "{name}_005", "split": "test", "input": {{"current_query": '
+        f'"Analyze the risks"}}, "expected_output": {{"response": '
+        f'"Risks identified: ..."}}, "metadata": {{"domain": "general", '
+        f'"difficulty": "hard"}}}}\n'
+        f'{{"id": "{name}_006", "split": "test", "input": {{"current_query": '
+        f'"Explain in simple terms"}}, "expected_output": {{"response": '
+        f'"In simple terms: ..."}}, "metadata": {{"domain": "general", '
+        f'"difficulty": "easy"}}}}\n'
+    )
+
+
+def _train_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Train script for {name} — compile, fit, and save.
+
+Usage::
+
+    python -m agents.{name}.train
+    # or
+    python agents/{name}/train.py
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from .agent import {title}Agent
+
+from agentomatic.agents import AgentDataset
+from agentomatic.agents.metrics import (
+    ContainsTermsMetric,
+    ExactKeyMatchMetric,
+)
+from agentomatic.agents.optimizers import NoOpOptimizer
+
+DATA_DIR = Path(__file__).parent
+COMPILED_DIR = Path("compiled") / "{name}"
+
+
+def main() -> None:
+    """Compile, fit, and save the agent."""
+    # 1. Create agent
+    agent = {title}Agent(llm=None)
+    print(f"Agent: {{agent.agent_name}}")
+
+    # 2. Load dataset
+    dataset = AgentDataset.from_jsonl(str(DATA_DIR / "dataset.jsonl"))
+    print(f"Dataset: {{len(dataset)}} examples "
+          f"(train={{len(dataset.train)}}, test={{len(dataset.test)}})")
+
+    # 3. Compile — register metrics + optimizer
+    metrics = [
+        ExactKeyMatchMetric(["response"]),
+        ContainsTermsMetric(["Result"]),
+    ]
+    agent.compile(dataset, metrics, optimizer=NoOpOptimizer())
+    print("Compiled with 2 metrics + NoOpOptimizer")
+
+    # 4. Fit — run optimization loop
+    agent.fit(dataset)
+    print("Fit complete")
+
+    # 5. Quick evaluation on test set
+    report = agent.evaluate(dataset.test, metrics)
+    print(f"Test pass rate: {{report.pass_rate:.1%}}")
+
+    # 6. Save compiled agent
+    agent.save(str(COMPILED_DIR))
+    print(f"Saved to {{COMPILED_DIR}}/")
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _eval_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Evaluate script for {name} — detailed quality reporting.
+
+Usage::
+
+    python -m agents.{name}.eval
+    python -m agents.{name}.eval --compiled compiled/{name}
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from .agent import {title}Agent
+
+from agentomatic.agents import AgentDataset
+from agentomatic.agents.metrics import (
+    CallableMetric,
+    ContainsTermsMetric,
+    ExactKeyMatchMetric,
+)
+
+DATA_DIR = Path(__file__).parent
+
+
+def main() -> None:
+    """Evaluate the agent and print a detailed report."""
+    parser = argparse.ArgumentParser(description="Evaluate {name}")
+    parser.add_argument(
+        "--compiled", type=str, default=None,
+        help="Path to compiled agent directory (loads saved config)"
+    )
+    parser.add_argument(
+        "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
+        help="Path to evaluation dataset (JSONL)"
+    )
+    parser.add_argument(
+        "--split", choices=["test", "train", "all"], default="test",
+        help="Dataset split to evaluate on"
+    )
+    args = parser.parse_args()
+
+    # 1. Create agent
+    agent = {title}Agent(llm=None)
+
+    # Load compiled state if provided
+    if args.compiled:
+        agent.load_compiled(args.compiled)
+        print(f"Loaded compiled config from {{args.compiled}}")
+
+    # 2. Load dataset
+    dataset = AgentDataset.from_jsonl(args.dataset)
+    if args.split == "test":
+        examples = dataset.test
+    elif args.split == "train":
+        examples = dataset.train
+    else:
+        examples = dataset.examples
+    print(f"Evaluating on {{len(examples)}} examples (split={{args.split}})")
+
+    # 3. Define metrics
+    metrics = [
+        ExactKeyMatchMetric(["response"]),
+        ContainsTermsMetric(["Result"]),
+        CallableMetric(
+            "has_output",
+            lambda example, pred: 1.0 if pred.get("response") else 0.0,
+        ),
+    ]
+
+    # 4. Evaluate
+    report = agent.evaluate(examples, metrics)
+
+    # 5. Print report
+    print()
+    print(report.summary())
+    print()
+
+    # 6. Show per-example details
+    for result in report.example_results:
+        status = "PASS" if result.passed else "FAIL"
+        print(f"  [{{status}}] {{result.example_id}} "
+              f"({{result.duration_ms:.0f}}ms) — {{result.scores}}")
+        if result.error:
+            print(f"         ERROR: {{result.error}}")
+
+    # 7. Save report as JSON
+    report_path = DATA_DIR / "eval_report.json"
+    report_data = {{
+        "agent": report.agent_name,
+        "dataset": report.dataset_name,
+        "pass_rate": report.pass_rate,
+        "num_examples": report.num_examples,
+        "scores": report.scores,
+    }}
+    report_path.write_text(json.dumps(report_data, indent=2))
+    print(f"\\nReport saved to {{report_path}}")
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _optimize_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Prompt optimization script for {name}.
+
+Supports two optimization strategies:
+  - GridSearch: brute-force parameter sweep (temperature, prompt_version)
+  - PromptFitter: LLM-powered prompt rewriting (requires agentomatic[optimize])
+
+Usage::
+
+    python -m agents.{name}.optimize
+    python -m agents.{name}.optimize --strategy grid
+    python -m agents.{name}.optimize --strategy prompt
+"""
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from .agent import {title}Agent
+
+from agentomatic.agents import AgentDataset
+from agentomatic.agents.metrics import (
+    ContainsTermsMetric,
+    ExactKeyMatchMetric,
+)
+from agentomatic.agents.optimizers import GridSearchOptimizer, PromptFitterBridge
+
+DATA_DIR = Path(__file__).parent
+COMPILED_DIR = Path("compiled") / "{name}"
+
+
+def run_grid_search(agent: {title}Agent, dataset: AgentDataset) -> None:
+    """Run GridSearch optimization."""
+    metrics = [
+        ExactKeyMatchMetric(["response"]),
+        ContainsTermsMetric(["Result"]),
+    ]
+
+    optimizer = GridSearchOptimizer(
+        param_grid={{
+            "system_prompt": [
+                "You are a helpful assistant.",
+                "You are a precise, detail-oriented assistant.",
+                "You are a concise assistant. Be brief and accurate.",
+            ],
+            # Add more parameters to tune:
+            # "temperature": [0.0, 0.2, 0.5, 0.8],
+            # "retrieval_top_k": [3, 5, 8],
+        }},
+        max_examples=10,  # limit examples per combo for speed
+    )
+
+    print("Running GridSearch optimization...")
+    print(f"  Training examples: {{len(dataset.train)}}")
+    agent.compile(dataset, metrics, optimizer=optimizer)
+    agent.fit(dataset)
+
+    print("\\nOptimized config:")
+    for key, value in agent.compiled_config.items():
+        print(f"  {{key}}: {{value}}")
+
+    # Evaluate optimized agent
+    report = agent.evaluate(dataset.test, metrics)
+    print(f"\\nTest pass rate: {{report.pass_rate:.1%}}")
+    print(report.summary())
+
+    # Save
+    agent.save(str(COMPILED_DIR))
+    print(f"\\nSaved optimized agent to {{COMPILED_DIR}}/")
+
+
+def run_prompt_fitter(agent: {title}Agent, dataset: AgentDataset) -> None:
+    """Run PromptFitter optimization (LLM-powered prompt rewriting)."""
+    metrics = [
+        ExactKeyMatchMetric(["response"]),
+        ContainsTermsMetric(["Result"]),
+    ]
+
+    optimizer = PromptFitterBridge(
+        agent_name="{name}",
+        task_model="ollama/qwen2.5:7b",      # model that runs your agent
+        rewrite_model="openai/gpt-4.1",       # model that rewrites prompts
+    )
+
+    print("Running PromptFitter optimization...")
+    print("  This uses an LLM to rewrite your system prompt for better quality.")
+    agent.compile(dataset, metrics, optimizer=optimizer)
+    agent.fit(dataset)
+
+    print("\\nOptimized config:")
+    for key, value in agent.compiled_config.items():
+        print(f"  {{key}}: {{value}}")
+
+    agent.save(str(COMPILED_DIR))
+    print(f"\\nSaved optimized agent to {{COMPILED_DIR}}/")
+
+
+def main() -> None:
+    """Run optimization."""
+    parser = argparse.ArgumentParser(description="Optimize {name}")
+    parser.add_argument(
+        "--strategy", choices=["grid", "prompt"], default="grid",
+        help="Optimization strategy: grid (GridSearch) or prompt (PromptFitter)"
+    )
+    parser.add_argument(
+        "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
+        help="Path to training dataset (JSONL)"
+    )
+    args = parser.parse_args()
+
+    agent = {title}Agent(llm=None)
+    dataset = AgentDataset.from_jsonl(args.dataset)
+
+    if args.strategy == "grid":
+        run_grid_search(agent, dataset)
+    elif args.strategy == "prompt":
+        run_prompt_fitter(agent, dataset)
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _predict_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Batch prediction script for {name}.
+
+Runs the agent on a list of inputs and saves results.
+
+Usage::
+
+    python -m agents.{name}.predict "What is X?"
+    python -m agents.{name}.predict --input queries.jsonl --output results.jsonl
+    python -m agents.{name}.predict --compiled compiled/{name} "Hello"
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from .agent import {title}Agent
+
+DATA_DIR = Path(__file__).parent
+
+
+def main() -> None:
+    """Run batch or single prediction."""
+    parser = argparse.ArgumentParser(description="Run {name} predictions")
+    parser.add_argument(
+        "query", nargs="?", default=None,
+        help="Single query to run (interactive mode)"
+    )
+    parser.add_argument(
+        "--compiled", type=str, default=None,
+        help="Path to compiled agent directory"
+    )
+    parser.add_argument(
+        "--input", type=str, default=None,
+        help="JSONL file with queries (one per line)"
+    )
+    parser.add_argument(
+        "--output", type=str, default=None,
+        help="Output JSONL file for results"
+    )
+    args = parser.parse_args()
+
+    # Create agent
+    agent = {title}Agent(llm=None)
+    if args.compiled:
+        agent.load_compiled(args.compiled)
+        print(f"Loaded compiled config from {{args.compiled}}")
+
+    # Single query mode
+    if args.query:
+        result = agent.transform({{"current_query": args.query}})
+        print(json.dumps(result, indent=2, default=str))
+        return
+
+    # Batch mode
+    if args.input:
+        input_path = Path(args.input)
+        output_path = Path(args.output) if args.output else DATA_DIR / "predictions.jsonl"
+
+        queries = []
+        with open(input_path) as f:
+            for line in f:
+                queries.append(json.loads(line.strip()))
+
+        print(f"Processing {{len(queries)}} queries...")
+        results = []
+        for i, query_data in enumerate(queries, 1):
+            try:
+                result = agent.transform(query_data)
+                results.append({{"input": query_data, "output": result, "status": "ok"}})
+            except Exception as exc:
+                results.append({{"input": query_data, "error": str(exc), "status": "error"}})
+            print(f"  [{{i}}/{{len(queries)}}] done")
+
+        with open(output_path, "w") as f:
+            for r in results:
+                f.write(json.dumps(r, default=str) + "\\n")
+
+        ok = sum(1 for r in results if r["status"] == "ok")
+        print(f"\\nCompleted: {{ok}}/{{len(results)}} successful")
+        print(f"Results saved to {{output_path}}")
+        return
+
+    # Interactive mode (no args)
+    print(f"{{agent.agent_name}} — interactive mode (Ctrl+C to exit)")
+    print()
+    while True:
+        try:
+            query = input("Query> ").strip()
+            if not query:
+                continue
+            result = agent.transform({{"current_query": query}})
+            print(json.dumps(result, indent=2, default=str))
+            print()
+        except (KeyboardInterrupt, EOFError):
+            print("\\nBye!")
+            sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _makefile(name: str) -> str:
+    return f"""# Makefile for {name} agent — ML lifecycle commands
+#
+# Usage:
+#   make train      — Compile, fit, and save the agent
+#   make eval       — Evaluate on the test split
+#   make optimize   — Run GridSearch parameter optimization
+#   make predict    — Start interactive prediction mode
+#   make all        — Full pipeline: train → eval
+
+.PHONY: train eval optimize predict all clean
+
+AGENT = {name}
+COMPILED = compiled/$(AGENT)
+
+train:
+\t@echo "\\n🏋️  Training $(AGENT)..."
+\tpython -m agents.$(AGENT).train
+
+eval:
+\t@echo "\\n📊 Evaluating $(AGENT)..."
+\tpython -m agents.$(AGENT).eval --split test
+
+eval-all:
+\t@echo "\\n📊 Evaluating $(AGENT) on all splits..."
+\tpython -m agents.$(AGENT).eval --split all
+
+optimize:
+\t@echo "\\n🔧 Optimizing $(AGENT) with GridSearch..."
+\tpython -m agents.$(AGENT).optimize --strategy grid
+
+optimize-prompt:
+\t@echo "\\n🔧 Optimizing $(AGENT) with PromptFitter..."
+\tpython -m agents.$(AGENT).optimize --strategy prompt
+
+predict:
+\t@echo "\\n🔮 Starting interactive prediction..."
+\tpython -m agents.$(AGENT).predict
+
+all: train eval
+\t@echo "\\n✅ Pipeline complete!"
+
+clean:
+\t@echo "Cleaning compiled artifacts..."
+\trm -rf $(COMPILED)
+"""
+
+
 def get_template_files(template: str, name: str) -> dict[str, str]:
     """Get all files for a given template.
 
@@ -373,6 +852,12 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "schemas.py": _schemas_py(name),
             "tools.py": _tools_py(name),
             "api.py": _api_py(name),
+            "dataset.jsonl": _dataset_jsonl(name),
+            "train.py": _train_py(name),
+            "eval.py": _eval_py(name),
+            "optimize.py": _optimize_py(name),
+            "predict.py": _predict_py(name),
+            "Makefile": _makefile(name),
             **common,
         }
 

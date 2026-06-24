@@ -120,9 +120,7 @@ def cli():
             "chatbot",
             "deepagent",
             "custom",
-            "swarm",
-            "pipeline",
-            "class",
+            "legacy_dict",
             "plugin",
         ]
     ),
