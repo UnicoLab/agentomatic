@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.10.0 (2026-06-24)
+
+### Chores
+
+- Sync studio UI v0.2.1
+  ([`e978872`](https://github.com/UnicoLab/agentomatic/commit/e978872113f5ae9274f1b781c761855b022c07ae))
+
+### Features
+
+- **studio**: Update bundled studio UI with pipelines and plugins views
+  ([`ae23f73`](https://github.com/UnicoLab/agentomatic/commit/ae23f7318967753e3e723db5f1bc321e2cfd5f28))
+
+
 ## v0.9.0 (2026-06-24)
 
 ### Features
