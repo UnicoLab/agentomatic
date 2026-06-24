@@ -40,6 +40,15 @@ except ImportError:
 console: Console = Console() if HAS_RICH else None  # type: ignore[assignment]
 
 
+def _get_version() -> str:
+    """Get the package version."""
+    try:
+        from importlib.metadata import version
+        return version("agentomatic")
+    except Exception:
+        return "dev"
+
+
 # =====================================================================
 # Utilities
 # =====================================================================
@@ -55,15 +64,22 @@ def _echo(msg: str) -> None:
 
 def _print_banner() -> None:
     """Show the agentomatic banner."""
+    ver = _get_version()
     if HAS_RICH:
-        console.print(
-            Panel.fit(
-                "[bold magenta]⚡ agentomatic[/bold magenta]\n[dim]Drop agents, not code[/dim]",
-                border_style="magenta",
-            )
+        logo = (
+            "[bold magenta]"
+            "   _____                 __                        __  _     \n"
+            "  /  _  \\ _____ ___ ___/  |_  ____   _____ _____ /  |_|__|____ \n"
+            " /  /_\\  \\__  \\/ __ |   __\\/  _ \\ /     \\\\__  \\    _|  |  ___/\n"
+            "/    |    \\/ __ |  __|  | (  <_> |  Y Y  \\/ __ \\|  | |  |  (__ \n"
+            "\\____|__  (____/\\___|  |  \\____/|__|_|  (____/  |__| |__|\\___/\n"
+            "        \\/                           \\/\n"
+            "[/bold magenta]"
+            f"[dim]  v{ver} — Drop agents, not code[/dim]"
         )
+        console.print(Panel.fit(logo, border_style="magenta", padding=(0, 1)))
     else:
-        click.echo("⚡ agentomatic — Drop agents, not code")
+        click.echo(f"⚡ agentomatic v{ver} — Drop agents, not code")
         click.echo()
 
 
@@ -93,10 +109,57 @@ def _print_warning(msg: str) -> None:
 # =====================================================================
 
 
-@click.group()
-def cli():
+@click.group(invoke_without_command=True)
+@click.option("--version", "-V", is_flag=True, help="Show version and exit.")
+@click.pass_context
+def cli(ctx: click.Context, version: bool) -> None:
     """⚡ Agentomatic — Drop agents, not code."""
-    pass
+    if version:
+        click.echo(f"agentomatic {_get_version()}")
+        ctx.exit()
+    elif ctx.invoked_subcommand is None:
+        _print_banner()
+        if HAS_RICH:
+            # Categorized command table
+            table = Table(
+                show_header=True,
+                header_style="bold magenta",
+                show_lines=False,
+                pad_edge=True,
+                box=None,
+            )
+            table.add_column("Command", style="bold cyan", min_width=20)
+            table.add_column("Description")
+
+            table.add_row("[dim]── Agent Lifecycle ──[/dim]", "")
+            table.add_row("  init <name>", "Create a new agent from a template")
+            table.add_row("  list", "Discover and display all agents")
+            table.add_row("  inspect <name>", "Deep-dive into agent structure & ML lifecycle")
+            table.add_row("  test <name>", "Test an agent interactively")
+            table.add_row("")
+            table.add_row("[dim]── Platform ──[/dim]", "")
+            table.add_row("  run", "Start the platform server")
+            table.add_row("  demo", "Launch demo with built-in agent + Studio")
+            table.add_row("  doctor", "Diagnose environment & dependencies")
+            table.add_row("")
+            table.add_row("[dim]── ML & Optimization ──[/dim]", "")
+            table.add_row("  optimize <name>", "Run prompt optimization")
+            table.add_row("")
+            table.add_row("[dim]── Debug & UI ──[/dim]", "")
+            table.add_row("  ui", "Launch Chainlit debug interface")
+            table.add_row("")
+            table.add_row("[dim]── Advanced ──[/dim]", "")
+            table.add_row("  stack <cmd>", "Manage environment stacks")
+            table.add_row("  pipeline <cmd>", "Manage and execute pipelines")
+
+            console.print(table)
+            console.print()
+            console.print(
+                "[dim]Run [bold]agentomatic <command> --help[/bold] "
+                "for details on any command.[/dim]"
+            )
+        else:
+            click.echo(ctx.get_help())
 
 
 # =====================================================================
@@ -129,7 +192,7 @@ def cli():
 )
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
 def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
-    """Scaffold a new agent with template selection."""
+    """Create a new agent from a template (basic, full, rag, chatbot, ...)."""
     from .templates import TEMPLATES, get_template_files
 
     target = Path(agents_dir) / name
@@ -200,24 +263,43 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
     else:
         edit_file = "agent.py"
 
-    if HAS_RICH:
-        console.print(
-            Panel(
-                f"[bold]Next steps:[/bold]\n\n"
-                f"  1. [cyan]cd {agents_dir}[/cyan]\n"
-                f"  2. Edit [yellow]{name}/{edit_file}[/yellow] with your logic\n"
-                f"  3. [cyan]agentomatic run[/cyan] to start\n"
-                f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
-                f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs",
-                title="🚀 What's next?",
-                border_style="green",
-            )
+    # Build next-steps text
+    steps = (
+        f"[bold]Next steps:[/bold]\n\n"
+        f"  1. [cyan]cd {agents_dir}[/cyan]\n"
+        f"  2. Edit [yellow]{name}/{edit_file}[/yellow] with your logic\n"
+        f"  3. [cyan]agentomatic run[/cyan] to start\n"
+        f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
+        f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs"
+    )
+
+    if template == "full":
+        steps += (
+            f"\n\n"
+            f"[bold]ML Lifecycle:[/bold]\n\n"
+            f"  [cyan]python -m agents.{name}.train[/cyan]     "
+            f"[dim]— Compile, fit & save[/dim]\n"
+            f"  [cyan]python -m agents.{name}.eval[/cyan]      "
+            f"[dim]— Evaluate quality[/dim]\n"
+            f"  [cyan]python -m agents.{name}.optimize[/cyan]  "
+            f"[dim]— Prompt optimization[/dim]\n"
+            f"  [cyan]python -m agents.{name}.predict[/cyan]   "
+            f"[dim]— Batch / interactive inference[/dim]\n"
+            f"  [cyan]make all[/cyan]                          "
+            f"[dim]— Full pipeline (train → eval)[/dim]"
         )
+
+    if HAS_RICH:
+        console.print(Panel(steps, title="🚀 What's next?", border_style="green"))
     else:
         click.echo("Next steps:")
         click.echo(f"  1. Edit {name}/{edit_file} with your logic")
         click.echo("  2. agentomatic run")
         click.echo(f"  3. agentomatic test {name}")
+        if template == "full":
+            click.echo(f"  4. python -m agents.{name}.train")
+            click.echo(f"  5. python -m agents.{name}.eval")
+            click.echo(f"  6. python -m agents.{name}.optimize")
 
 
 # =====================================================================
@@ -331,7 +413,7 @@ def demo(host: str, port: int) -> None:
 @cli.command("list")
 @click.option("--agents-dir", default="agents", help="Agents directory")
 def list_agents(agents_dir: str) -> None:
-    """List agents in a directory with Rich table."""
+    """Discover and display all agents with their patterns and capabilities."""
     agents_path = Path(agents_dir)
     _print_banner()
 
@@ -341,73 +423,139 @@ def list_agents(agents_dir: str) -> None:
 
     agents = []
     for entry in sorted(agents_path.iterdir()):
-        if entry.is_dir() and (entry / "__init__.py").exists() and not entry.name.startswith("_"):
-            info: dict[str, Any] = {"name": entry.name, "path": str(entry)}
+        if not entry.is_dir() or entry.name.startswith("_"):
+            continue
 
-            # Try to read manifest
-            try:
-                spec = importlib.util.spec_from_file_location(
-                    f"_agent_{entry.name}",
-                    entry / "__init__.py",
+        has_init = (entry / "__init__.py").exists()
+        has_agent_py = (entry / "agent.py").exists()
+
+        if not has_init and not has_agent_py:
+            continue
+
+        info: dict[str, Any] = {"name": entry.name, "path": str(entry)}
+        info["files"] = len([f for f in entry.iterdir() if f.is_file()])
+
+        # Detect pattern: class-based vs functional
+        if has_agent_py:
+            agent_source = (entry / "agent.py").read_text(errors="ignore")
+            if "BaseGraphAgent" in agent_source:
+                info["pattern"] = "class"
+            else:
+                info["pattern"] = "functional"
+        else:
+            info["pattern"] = "functional"
+
+        # Read manifest / description from source
+        try:
+            if has_init:
+                source = (entry / "__init__.py").read_text(errors="ignore")
+                if "AgentManifest" in source:
+                    info["has_manifest"] = True
+                    # Try to extract description
+                    import re
+                    desc_match = re.search(
+                        r'description\s*=\s*["\']([^"\']+)["\']', source
+                    )
+                    if desc_match:
+                        info["description"] = desc_match.group(1)[:50]
+                    # Extract framework
+                    fw_match = re.search(
+                        r'framework\s*=\s*["\']([^"\']+)["\']', source
+                    )
+                    if fw_match:
+                        info["framework"] = fw_match.group(1)
+            elif has_agent_py:
+                info["has_manifest"] = True  # class agents self-describe
+                agent_source = (entry / "agent.py").read_text(errors="ignore")
+                import re
+                desc_match = re.search(
+                    r'agent_description\s*=\s*["\']([^"\']+)["\']', agent_source
                 )
-                if spec and spec.loader:
-                    _ = importlib.util.module_from_spec(spec)
-                    # Don't actually exec — just check for manifest in source
-                    source = (entry / "__init__.py").read_text()
-                    if "AgentManifest" in source:
-                        info["has_manifest"] = True
-                    if "graph.py" in [f.name for f in entry.iterdir()]:
-                        info["has_graph"] = True
-                    info["files"] = len([f for f in entry.iterdir() if f.is_file()])
-            except Exception:
-                pass
+                if desc_match:
+                    info["description"] = desc_match.group(1)[:50]
+                info["framework"] = "graph_agent"
+        except Exception:
+            pass
 
-            # v0.6: Detect enhanced features
-            info["has_llm"] = (entry / "llm.py").exists()
-            info["has_delegation"] = (entry / "delegation.py").exists()
-            info["has_security"] = (entry / "security.py").exists()
-            info["has_schemas"] = (entry / "schemas.py").exists()
+        # Detect features
+        info["has_graph"] = (entry / "graph.py").exists()
+        info["has_schemas"] = (entry / "schemas.py").exists()
+        info["has_config"] = (entry / "config.py").exists()
+        info["has_tools"] = (entry / "tools.py").exists()
 
-            agents.append(info)
+        # ML lifecycle files
+        info["has_train"] = (entry / "train.py").exists()
+        info["has_eval"] = (entry / "eval.py").exists()
+        info["has_dataset"] = (entry / "dataset.jsonl").exists()
+        info["has_optimize"] = (entry / "optimize.py").exists()
+
+        agents.append(info)
 
     if not agents:
         _print_warning(f"No agents found in {agents_path}")
+        click.echo("\n  Create one with: agentomatic init my_agent")
         return
 
     if HAS_RICH:
-        table = Table(title=f"🤖 Agents in {agents_path}", show_lines=True)
-        table.add_column("Name", style="bold cyan")
+        table = Table(
+            title=f"🤖 Agents in {agents_path} ({len(agents)} found)",
+            show_lines=True,
+        )
+        table.add_column("Name", style="bold cyan", min_width=15)
+        table.add_column("Pattern", justify="center")
+        table.add_column("Framework", justify="center")
         table.add_column("Files", justify="center")
-        table.add_column("Manifest", justify="center")
-        table.add_column("Graph", justify="center")
-        table.add_column("LLM", justify="center")
-        table.add_column("Delegation", justify="center")
-        table.add_column("Security", justify="center")
+        table.add_column("ML Lifecycle", justify="center")
+        table.add_column("Description")
 
         for a in agents:
+            pattern = a.get("pattern", "?")
+            if pattern == "class":
+                pattern_str = "[bold green]⬡ class[/bold green]"
+            else:
+                pattern_str = "[yellow]ƒ functional[/yellow]"
+
+            framework = a.get("framework", "—")
+
+            # ML lifecycle badges
+            ml_parts = []
+            if a.get("has_train"):
+                ml_parts.append("T")
+            if a.get("has_eval"):
+                ml_parts.append("E")
+            if a.get("has_optimize"):
+                ml_parts.append("O")
+            if a.get("has_dataset"):
+                ml_parts.append("D")
+            if ml_parts:
+                ml_str = "[green]" + "·".join(ml_parts) + "[/green]"
+            else:
+                ml_str = "[dim]—[/dim]"
+
+            desc = a.get("description", "[dim]—[/dim]")
+
             table.add_row(
                 a["name"],
+                pattern_str,
+                framework,
                 str(a.get("files", "?")),
-                "✅" if a.get("has_manifest") else "❌",
-                "✅" if a.get("has_graph") else "—",
-                "✅" if a.get("has_llm") else "—",
-                "✅" if a.get("has_delegation") else "—",
-                "✅" if a.get("has_security") else "—",
+                ml_str,
+                desc,
             )
 
         console.print(table)
+        console.print(
+            "[dim]  ML Lifecycle: T=train  E=eval  O=optimize  D=dataset[/dim]"
+        )
     else:
-        click.echo(f"📂 {agents_path}")
+        click.echo(f"📂 {agents_path} ({len(agents)} agents)")
         for a in agents:
-            features = []
-            if a.get("has_llm"):
-                features.append("llm")
-            if a.get("has_delegation"):
-                features.append("delegation")
-            if a.get("has_security"):
-                features.append("security")
-            feat_str = f" [{', '.join(features)}]" if features else ""
-            click.echo(f"  🤖 {a['name']} ({a.get('files', '?')} files){feat_str}")
+            pattern = "⬡" if a.get("pattern") == "class" else "ƒ"
+            desc = a.get("description", "")
+            desc_str = f" — {desc}" if desc else ""
+            click.echo(
+                f"  {pattern} {a['name']} ({a.get('files', '?')} files){desc_str}"
+            )
 
     _echo(f"\n   Total: {len(agents)} agent(s)")
 
@@ -518,7 +666,7 @@ def test(name: str, host: str, port: int, agents_dir: str) -> None:
 @click.argument("name")
 @click.option("--agents-dir", default="agents", help="Agents directory")
 def inspect(name: str, agents_dir: str) -> None:
-    """Inspect an agent's structure and configuration."""
+    """Deep-dive into an agent's structure, files, and ML lifecycle status."""
     _print_banner()
 
     target = Path(agents_dir) / name
@@ -614,28 +762,76 @@ def inspect(name: str, agents_dir: str) -> None:
                 )
             )
 
-        # Summary table
+        # Detect agent pattern
+        agent_py = target / "agent.py"
+        if agent_py.exists():
+            agent_src = agent_py.read_text(errors="ignore")
+            if "BaseGraphAgent" in agent_src:
+                pattern_str = "[bold green]⬡ Class-Based[/bold green] (BaseGraphAgent)"
+            else:
+                pattern_str = "[yellow]ƒ Functional[/yellow]"
+        else:
+            pattern_str = "[yellow]ƒ Functional[/yellow] (legacy)"
+
+        console.print(
+            Panel(
+                f"Pattern: {pattern_str}",
+                title="🏗️ Agent Pattern",
+                border_style="cyan",
+            )
+        )
+
+        # Summary table — Core
         cap_table = Table(title="Agent Capabilities", show_lines=True)
-        cap_table.add_column("Feature", style="bold")
+        cap_table.add_column("Feature", style="bold", min_width=30)
         cap_table.add_column("Status", justify="center")
-        capabilities = [
-            ("Graph (graph.py)", (target / "graph.py").exists()),
-            ("Config (config.py)", (target / "config.py").exists()),
-            ("Prompts (prompts.json)", (target / "prompts.json").exists()),
-            ("LLM Config (llm.py)", (target / "llm.py").exists()),
-            ("Schemas (schemas.py)", (target / "schemas.py").exists()),
-            ("Delegation (delegation.py)", (target / "delegation.py").exists()),
-            ("Security (security.py)", (target / "security.py").exists()),
-            ("Evals (evals.py)", (target / "evals.py").exists()),
-            ("Model Card (model_card.yaml)", (target / "model_card.yaml").exists()),
-            ("Custom API (api.py)", (target / "api.py").exists()),
-            ("Tools (tools.py)", (target / "tools.py").exists()),
+
+        core_caps = [
+            ("🏗️  Agent Class (agent.py)", (target / "agent.py").exists()),
+            ("📊 Graph (graph.py)", (target / "graph.py").exists()),
+            ("⚙️  Config (config.py)", (target / "config.py").exists()),
+            ("📝 Prompts (prompts.json)", (target / "prompts.json").exists()),
+            ("📐 Schemas (schemas.py)", (target / "schemas.py").exists()),
+            ("🔧 Tools (tools.py)", (target / "tools.py").exists()),
+            ("🌐 Custom API (api.py)", (target / "api.py").exists()),
         ]
-        for feat, exists in capabilities:
+        for feat, exists in core_caps:
             cap_table.add_row(
                 feat,
                 "[green]✅[/green]" if exists else "[dim]—[/dim]",
             )
+
+        # Separator
+        cap_table.add_row("[dim]── ML Lifecycle ──[/dim]", "")
+        ml_caps = [
+            ("📦 Dataset (dataset.jsonl)", (target / "dataset.jsonl").exists()),
+            ("🏋️  Train Script (train.py)", (target / "train.py").exists()),
+            ("📊 Eval Script (eval.py)", (target / "eval.py").exists()),
+            ("🔧 Optimize Script (optimize.py)", (target / "optimize.py").exists()),
+            ("🔮 Predict Script (predict.py)", (target / "predict.py").exists()),
+            ("📋 Makefile", (target / "Makefile").exists()),
+        ]
+        for feat, exists in ml_caps:
+            cap_table.add_row(
+                feat,
+                "[green]✅[/green]" if exists else "[dim]—[/dim]",
+            )
+
+        # Separator
+        cap_table.add_row("[dim]── Advanced ──[/dim]", "")
+        adv_caps = [
+            ("🤖 LLM Config (llm.py)", (target / "llm.py").exists()),
+            ("🔗 Delegation (delegation.py)", (target / "delegation.py").exists()),
+            ("🔒 Security (security.py)", (target / "security.py").exists()),
+            ("📊 Evals (evals.py)", (target / "evals.py").exists()),
+            ("🃏 Model Card (model_card.yaml)", (target / "model_card.yaml").exists()),
+        ]
+        for feat, exists in adv_caps:
+            cap_table.add_row(
+                feat,
+                "[green]✅[/green]" if exists else "[dim]—[/dim]",
+            )
+
         console.print(cap_table)
     else:
         click.echo(f"🔍 Agent: {name}")
@@ -645,17 +841,19 @@ def inspect(name: str, agents_dir: str) -> None:
             click.echo(f"   📄 {f.relative_to(target)}")
         click.echo("\n   Agent Capabilities:")
         capabilities = [
+            ("Agent Class (agent.py)", (target / "agent.py").exists()),
             ("Graph (graph.py)", (target / "graph.py").exists()),
             ("Config (config.py)", (target / "config.py").exists()),
             ("Prompts (prompts.json)", (target / "prompts.json").exists()),
-            ("LLM Config (llm.py)", (target / "llm.py").exists()),
             ("Schemas (schemas.py)", (target / "schemas.py").exists()),
-            ("Delegation (delegation.py)", (target / "delegation.py").exists()),
-            ("Security (security.py)", (target / "security.py").exists()),
-            ("Evals (evals.py)", (target / "evals.py").exists()),
-            ("Model Card (model_card.yaml)", (target / "model_card.yaml").exists()),
-            ("Custom API (api.py)", (target / "api.py").exists()),
             ("Tools (tools.py)", (target / "tools.py").exists()),
+            ("Custom API (api.py)", (target / "api.py").exists()),
+            ("Dataset (dataset.jsonl)", (target / "dataset.jsonl").exists()),
+            ("Train (train.py)", (target / "train.py").exists()),
+            ("Eval (eval.py)", (target / "eval.py").exists()),
+            ("Optimize (optimize.py)", (target / "optimize.py").exists()),
+            ("Predict (predict.py)", (target / "predict.py").exists()),
+            ("Makefile", (target / "Makefile").exists()),
         ]
         for feat, exists in capabilities:
             status = "✅" if exists else "—"
@@ -670,7 +868,7 @@ def inspect(name: str, agents_dir: str) -> None:
 @cli.command()
 @click.option("--agents-dir", default="agents", help="Agents directory")
 def doctor(agents_dir: str) -> None:
-    """Check environment health and dependencies."""
+    """Diagnose environment health, dependencies, and configuration."""
     _print_banner()
 
     checks: list[tuple[str, bool, str]] = []
@@ -714,7 +912,10 @@ def doctor(agents_dir: str) -> None:
     agents_path = Path(agents_dir)
     if agents_path.exists():
         count = len(
-            [d for d in agents_path.iterdir() if d.is_dir() and (d / "__init__.py").exists()]
+            [d for d in agents_path.iterdir()
+             if d.is_dir() and (
+                 (d / "__init__.py").exists() or (d / "agent.py").exists()
+             )]
         )
         checks.append(("Agents directory", True, f"{count} agent(s) in {agents_path}"))
     else:
