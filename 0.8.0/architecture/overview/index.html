@@ -1,0 +1,3426 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Drop agents, not code — Zero-code multi-agent API platform framework">
+      
+      
+        <meta name="author" content="UnicoLab">
+      
+      
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/architecture/overview/">
+      
+      
+        <link rel="prev" href="../../cli/commands/">
+      
+      
+        <link rel="next" href="../api-reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Overview - Agentomatic</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="pink">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture-overview" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+              <button class="md-banner__button md-icon" aria-label="Don't show this again">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            
+            
+  <a href="changelog/">
+    🚀 <strong>Agentomatic</strong> — Class-based agents, Cookbook recipes, and Studio visual debugger now available!
+  </a>
+
+          </div>
+          
+            <script>var el=document.querySelector("[data-md-component=announce]");if(el){var content=el.querySelector(".md-typeset");__md_hash(content.innerHTML)===__md_get("__announce")&&(el.hidden=!0)}</script>
+          
+        </aside>
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Agentomatic" class="md-header__button md-logo" aria-label="Agentomatic" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Agentomatic
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Overview
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="pink"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="pink"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/UnicoLab/agentomatic" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    UnicoLab/agentomatic
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guide/class-agents/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guide/platform-features/" class="md-tabs__link">
+          
+  
+  
+  Advanced
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guide/studio/" class="md-tabs__link">
+          
+  
+  
+  Debugging
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../cli/commands/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Agentomatic" class="md-nav__button md-logo" aria-label="Agentomatic" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    Agentomatic
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/UnicoLab/agentomatic" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    UnicoLab/agentomatic
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts & Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/class-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Class-Based Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/agent-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Structure & Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook & Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/schemas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input & Output Schemas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/prompts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage Backends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/middleware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Middleware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/langgraph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ml-plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Your Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/platform-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry & Feedback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/stacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Stacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/llm-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM Providers & Failover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security & Zero Trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/delegation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swarm Delegation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Debugging
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/studio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agentomatic Studio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/deep-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deep Agent Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/debug-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chat Interface (Chainlit)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Command
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Descriptions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Descriptions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentplatform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentPlatform
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agentregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentRegistry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#routerfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RouterFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Studio Adapters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Request Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoke-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoke Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hitl-suspendresume-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HITL Suspend/Resume Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-registration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Registration Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent Registration Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agent-folder-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Folder Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-process-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single Process (Development)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-worker-staging-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Worker (Staging / Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#containerized-kubernetes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containerized (Kubernetes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-agent-architecture-v07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class-Agent Architecture (v0.7)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class-Agent Architecture (v0.7)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-with-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with Platform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FRONTEND_API_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Descriptions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Descriptions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentplatform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentPlatform
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agentregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentRegistry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#routerfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RouterFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#studio-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Studio Adapters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Request Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoke-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoke Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hitl-suspendresume-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HITL Suspend/Resume Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-registration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Registration Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Agent Registration Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agent-folder-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Folder Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-process-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single Process (Development)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-worker-staging-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Worker (Staging / Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#containerized-kubernetes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containerized (Kubernetes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-agent-architecture-v07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class-Agent Architecture (v0.7)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class-Agent Architecture (v0.7)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-with-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with Platform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h1>
+<p>Agentomatic follows a <strong>convention-over-configuration</strong> design where agents are discovered, registered, and served with minimal boilerplate. This page describes the system architecture, component relationships, request lifecycle, and deployment patterns.</p>
+<hr />
+<h2 id="system-architecture">System Architecture<a class="headerlink" href="#system-architecture" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>graph TB
+    subgraph "Client Layer"
+        CL["REST Client\n(curl · SDK · frontend)"]
+        ST["Agentomatic Studio\n(React debug UI)"]
+        CH["Chainlit\n(Chat UI)"]
+        A2AC["A2A Client\n(Agent-to-Agent)"]
+    end
+
+    subgraph "Middleware Pipeline"
+        AUTH["Auth Middleware\nAPI key · JWT · Custom"]
+        RL["Rate Limiter\nPer-user · Per-agent"]
+        CORS["CORS\nCross-origin config"]
+        OTEL["OpenTelemetry\nTraces · Spans"]
+        PROM["Prometheus\nHistograms · Counters"]
+        LOG["Loguru\nStructured logging"]
+    end
+
+    subgraph "Agentomatic Platform Core"
+        AP["AgentPlatform\nCentral orchestrator"]
+        REG["AgentRegistry\nIn-memory agent store"]
+        RF["RouterFactory\nAuto-generated REST\n(26 endpoints per agent)"]
+        SR["StudioRouter\nDebug API (/studio/*)"]
+        MM["MemoryManager\nConversation history\nSummarization · Windowing"]
+        FB["FeedbackCollector\nRatings · Corrections"]
+    end
+
+    subgraph "Agent Layer"
+        A1["Agent A\n(LangGraph)\ngraph_fn → CompiledGraph"]
+        A2["Agent B\n(LangChain)\nnode_fn → LCEL chain"]
+        A3["Agent C\n(Raw Python)\nnode_fn → async callable"]
+        A4["Agent D\n(Deep Agent)\ngraph_fn → Subagent graph"]
+        A5["Agent E\n(Class Agent)\nBaseGraphAgent → AgentGraph"]
+    end
+
+    subgraph "Studio Adapter Layer"
+        LGA["LangGraphAdapter\n✅ Real graph topology\n✅ Checkpoints + time-travel\n✅ SSE via astream_events\n✅ HITL breakpoints"]
+        LCA["LangChainAdapter\n✅ LCEL graph extraction\n✅ SSE via astream_events\n○ Synthetic checkpoints"]
+        GA["GenericAdapter\n✅ Synthetic graph\n✅ Trace-based events\n○ Basic state tracking"]
+    end
+
+    subgraph "Storage Layer"
+        MEM["MemoryStore\nIn-process dict\n(development)"]
+        SQL["SQLAlchemyStore\nPostgreSQL · SQLite\n(production)"]
+        CP["AgentomaticCheckpointer\nLangGraph ↔ BaseStore\nbridge"]
+    end
+
+    subgraph "Observability"
+        OT["OpenTelemetry Collector"]
+        PM["Prometheus /metrics"]
+        LK["Loguru → stdout/file"]
+    end
+
+    %% Client → Middleware
+    CL --&gt; AUTH
+    ST --&gt; AUTH
+    CH --&gt; AUTH
+    A2AC --&gt; AUTH
+
+    %% Middleware chain
+    AUTH --&gt; RL --&gt; CORS --&gt; AP
+
+    %% Platform routing
+    AP --&gt; RF
+    AP --&gt; SR
+    AP --&gt; REG
+
+    %% Router → Registry → Agent
+    RF --&gt; REG
+    SR --&gt; REG
+    REG --&gt; A1
+    REG --&gt; A2
+    REG --&gt; A3
+    REG --&gt; A4
+    REG --&gt; A5
+
+    %% Agent → Adapter
+    A1 --&gt; LGA
+    A2 --&gt; LCA
+    A3 --&gt; GA
+    A4 --&gt; LGA
+    A5 --&gt; GA
+
+    %% Storage
+    RF --&gt; MM --&gt; SQL
+    RF --&gt; FB
+    LGA --&gt; CP --&gt; SQL
+    LGA --&gt; CP --&gt; MEM
+
+    %% Observability
+    AP --&gt; OTEL --&gt; OT
+    AP --&gt; PROM --&gt; PM
+    AP --&gt; LOG --&gt; LK
+
+    style AP fill:#4a9eff,color:#fff
+    style REG fill:#4a9eff,color:#fff
+    style RF fill:#4a9eff,color:#fff
+    style LGA fill:#ff6b6b,color:#fff
+    style CP fill:#ff6b6b,color:#fff
+    style SQL fill:#51cf66,color:#fff</code></pre>
+<hr />
+<h2 id="component-descriptions">Component Descriptions<a class="headerlink" href="#component-descriptions" title="Permanent link">&para;</a></h2>
+<h3 id="agentplatform">AgentPlatform<a class="headerlink" href="#agentplatform" title="Permanent link">&para;</a></h3>
+<p>The central orchestrator. Created via <code>AgentPlatform.from_folder()</code>:</p>
+<ol>
+<li><strong>Scans</strong> the agents directory for valid agent folders</li>
+<li><strong>Imports</strong> each agent's <code>__init__.py</code> to extract <code>manifest</code> and <code>node_fn</code>/<code>graph_fn</code></li>
+<li><strong>Registers</strong> agents into the <code>AgentRegistry</code></li>
+<li><strong>Generates</strong> REST endpoints per agent via <code>RouterFactory</code></li>
+<li><strong>Mounts</strong> middleware, Studio router, and Chainlit UI as requested</li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://...&quot;</span><span class="p">),</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">enable_studio</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">enable_chainlit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">app</span>  <span class="c1"># FastAPI application</span>
+</span></code></pre></div>
+<h3 id="agentregistry">AgentRegistry<a class="headerlink" href="#agentregistry" title="Permanent link">&para;</a></h3>
+<p>An in-memory registry holding <code>RegisteredAgent</code> instances. Each agent carries:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td>Machine name (folder name)</td>
+</tr>
+<tr>
+<td><code>slug</code></td>
+<td><code>str</code></td>
+<td>URL-safe identifier</td>
+</tr>
+<tr>
+<td><code>manifest</code></td>
+<td><code>AgentManifest</code></td>
+<td>Name, description, framework, version</td>
+</tr>
+<tr>
+<td><code>node_fn</code></td>
+<td><code>Callable</code></td>
+<td>Async callable that processes state</td>
+</tr>
+<tr>
+<td><code>graph_fn</code></td>
+<td><code>Callable \| None</code></td>
+<td>LangGraph <code>StateGraph</code> factory</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td><code>BaseModel \| None</code></td>
+<td>Pydantic configuration</td>
+</tr>
+<tr>
+<td><code>prompt_manager</code></td>
+<td><code>PromptManager \| None</code></td>
+<td>Template versioning from <code>prompts.json</code></td>
+</tr>
+<tr>
+<td><code>module_path</code></td>
+<td><code>str \| None</code></td>
+<td>Python module path for schema discovery</td>
+</tr>
+</tbody>
+</table>
+<h3 id="routerfactory">RouterFactory<a class="headerlink" href="#routerfactory" title="Permanent link">&para;</a></h3>
+<p>Auto-generates a full FastAPI router per agent with 26 endpoints:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Endpoints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Execution</strong></td>
+<td><code>POST /invoke</code>, <code>POST /invoke/stream</code>, <code>POST /chat</code></td>
+<td>Sync, streaming, session-aware</td>
+</tr>
+<tr>
+<td><strong>A2A Protocol</strong></td>
+<td><code>GET /card</code>, <code>POST /a2a/tasks</code>, <code>GET /a2a/tasks/{id}</code></td>
+<td>Agent-to-agent interop</td>
+</tr>
+<tr>
+<td><strong>Threads</strong></td>
+<td><code>POST /threads</code>, <code>GET /threads</code>, <code>GET /threads/{id}</code>, <code>PATCH /threads/{id}</code>, <code>DELETE /threads/{id}</code></td>
+<td>Full CRUD</td>
+</tr>
+<tr>
+<td><strong>Messages</strong></td>
+<td><code>GET /threads/{id}/messages</code>, <code>DELETE /threads/{id}/messages</code>, <code>GET /threads/{id}/summary</code></td>
+<td>History + summarization</td>
+</tr>
+<tr>
+<td><strong>HITL</strong></td>
+<td><code>GET /threads/{id}/pending</code>, <code>POST /threads/{id}/approve</code>, <code>POST /threads/{id}/reject</code></td>
+<td>Human-in-the-loop approval</td>
+</tr>
+<tr>
+<td><strong>Forking</strong></td>
+<td><code>POST /threads/{id}/fork</code>, <code>GET /threads/{id}/lineage</code></td>
+<td>Thread branching + ancestry</td>
+</tr>
+<tr>
+<td><strong>Feedback</strong></td>
+<td><code>POST /feedback</code>, <code>GET /feedback</code>, <code>GET /feedback/export</code></td>
+<td>User ratings + JSONL export</td>
+</tr>
+<tr>
+<td><strong>Inspection</strong></td>
+<td><code>GET /health</code>, <code>GET /config</code>, <code>GET /prompts</code></td>
+<td>Agent health + config</td>
+</tr>
+<tr>
+<td><strong>Optimization</strong></td>
+<td><code>POST /optimize/invoke</code></td>
+<td>Full-context pipeline for DeepEval</td>
+</tr>
+</tbody>
+</table>
+<h3 id="studio-adapters">Studio Adapters<a class="headerlink" href="#studio-adapters" title="Permanent link">&para;</a></h3>
+<p>The Studio uses an <strong>adapter pattern</strong> to provide debugging capabilities across different agent frameworks:</p>
+<pre class="mermaid"><code>graph LR
+    subgraph "Resolution Chain"
+        R["resolve_adapter()"]
+    end
+
+    subgraph "Adapters"
+        R --&gt;|"graph_fn present?"| LG["LangGraphAdapter"]
+        R --&gt;|"framework=graph_agent?"| GA["GraphAgentAdapter"]
+        R --&gt;|"framework=langchain?"| LC["LangChainAdapter"]
+        R --&gt;|"_studio_adapter set?"| CU["Custom Adapter"]
+        R --&gt;|"fallback"| GN["GenericAdapter"]
+    end
+
+    subgraph "Capabilities"
+        LG --&gt; G1["✅ Real Graph Topology"]
+        LG --&gt; G2["✅ Checkpoints + Time-travel"]
+        LG --&gt; G3["✅ HITL Breakpoints"]
+        LG --&gt; G4["✅ SSE via astream_events"]
+        GA --&gt; A1["✅ Graph Topology"]
+        GA --&gt; A2["✅ SSE Streaming"]
+        GA --&gt; A3["✅ Execution Traces"]
+        LC --&gt; L1["✅ LCEL Graph"]
+        LC --&gt; L2["✅ astream_events"]
+        GN --&gt; N1["✅ Synthetic Graph"]
+        GN --&gt; N2["✅ Trace Events"]
+    end</code></pre>
+<p>Each adapter implements the <code>StudioAdapter</code> ABC:</p>
+<ul>
+<li><strong><code>get_graph()</code></strong> — Returns <code>StudioGraphTopology</code> with nodes and edges</li>
+<li><strong><code>stream_execution()</code></strong> — Yields <code>StudioRunEvent</code> via SSE</li>
+<li><strong><code>get_state()</code></strong> — Returns <code>StudioStateSnapshot</code> for a thread</li>
+<li><strong><code>update_state()</code></strong> — Applies partial state updates</li>
+<li><strong><code>get_history()</code></strong> — Returns checkpoint history</li>
+</ul>
+<h3 id="storage-layer">Storage Layer<a class="headerlink" href="#storage-layer" title="Permanent link">&para;</a></h3>
+<p>Abstract <code>BaseStore</code> with swappable implementations:</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Backend</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MemoryStore</code></td>
+<td>In-process <code>dict</code></td>
+<td>Development, testing, CI</td>
+</tr>
+<tr>
+<td><code>SQLAlchemyStore</code></td>
+<td>PostgreSQL / SQLite</td>
+<td>Production deployment</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>AgentomaticCheckpointer</code> bridges LangGraph's <code>BaseCheckpointSaver</code> to <code>BaseStore</code>, enabling checkpoint persistence through the same storage backend used for threads and messages.</p>
+<hr />
+<h2 id="request-lifecycle">Request Lifecycle<a class="headerlink" href="#request-lifecycle" title="Permanent link">&para;</a></h2>
+<h3 id="invoke-flow">Invoke Flow<a class="headerlink" href="#invoke-flow" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Middleware
+    participant RouterFactory
+    participant Registry
+    participant MemoryManager
+    participant Agent
+    participant Storage
+
+    Client-&gt;&gt;+Middleware: POST /api/v1/{agent}/invoke
+    Middleware-&gt;&gt;Middleware: Auth · Rate Limit · Metrics
+    Middleware-&gt;&gt;+RouterFactory: Authenticated Request
+
+    RouterFactory-&gt;&gt;+Registry: get(agent_name)
+    Registry--&gt;&gt;-RouterFactory: RegisteredAgent
+
+    RouterFactory-&gt;&gt;RouterFactory: _build_initial_state(request)
+
+    alt Thread store configured
+        RouterFactory-&gt;&gt;+MemoryManager: get_or_create_thread()
+        MemoryManager-&gt;&gt;+Storage: get/create thread
+        Storage--&gt;&gt;-MemoryManager: thread_id
+        MemoryManager--&gt;&gt;-RouterFactory: thread_id
+
+        RouterFactory-&gt;&gt;+MemoryManager: load_history(thread_id, query)
+        MemoryManager-&gt;&gt;+Storage: get_messages()
+        Storage--&gt;&gt;-MemoryManager: messages
+        MemoryManager--&gt;&gt;-RouterFactory: LangChain messages
+    end
+
+    RouterFactory-&gt;&gt;RouterFactory: Execute before_node hooks
+
+    alt Has graph_fn
+        RouterFactory-&gt;&gt;+Agent: graph.ainvoke(state)
+    else Has node_fn
+        RouterFactory-&gt;&gt;+Agent: node_fn(state)
+    end
+    Agent--&gt;&gt;-RouterFactory: result dict
+
+    RouterFactory-&gt;&gt;RouterFactory: Execute after_node hooks
+
+    alt Thread store configured
+        RouterFactory-&gt;&gt;+MemoryManager: save_turn(query, response)
+        MemoryManager-&gt;&gt;+Storage: add_message(user) + add_message(assistant)
+        Storage--&gt;&gt;-MemoryManager: persisted
+        MemoryManager--&gt;&gt;-RouterFactory: done
+    end
+
+    RouterFactory-&gt;&gt;RouterFactory: _extract_response(result)
+    RouterFactory--&gt;&gt;-Middleware: AgentInvokeResponse
+    Middleware--&gt;&gt;-Client: JSON Response</code></pre>
+<h3 id="hitl-suspendresume-flow">HITL Suspend/Resume Flow<a class="headerlink" href="#hitl-suspendresume-flow" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Client
+    participant Router
+    participant Agent
+    participant Storage
+
+    Client-&gt;&gt;+Router: POST /invoke
+    Router-&gt;&gt;+Agent: graph.ainvoke(state)
+    Agent--&gt;&gt;-Router: raises AgentSuspendedException
+
+    Router-&gt;&gt;+Storage: save_suspended_state()
+    Storage--&gt;&gt;-Router: saved
+
+    Router--&gt;&gt;-Client: 202 Accepted + approval_id
+
+    Note over Client: Human reviews and approves
+
+    Client-&gt;&gt;+Router: POST /threads/{id}/approve
+    Router-&gt;&gt;+Storage: get_suspended_state(approval_id)
+    Storage--&gt;&gt;-Router: state_snapshot
+
+    Router-&gt;&gt;+Storage: delete_suspended_state()
+    Storage--&gt;&gt;-Router: deleted
+
+    Router-&gt;&gt;Router: Merge human context into state
+    Router-&gt;&gt;Router: Set metadata.hitl_approved = true
+
+    Router-&gt;&gt;+Agent: graph.ainvoke(resumed_state)
+    Agent--&gt;&gt;-Router: result
+
+    Router--&gt;&gt;-Client: AgentInvokeResponse</code></pre>
+<hr />
+<h2 id="agent-registration-flow">Agent Registration Flow<a class="headerlink" href="#agent-registration-flow" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>graph TD
+    SCAN["AgentPlatform.from_folder('agents/')"] --&gt; DISC["Discovery: scan for __init__.py"]
+    DISC --&gt; IMP["Import each agent module"]
+
+    IMP --&gt; EXTRACT["Extract:\n• manifest (required)\n• graph_fn or node_fn\n• config (optional)\n• prompts.json (optional)"]
+
+    EXTRACT --&gt; VAL["Validate manifest"]
+
+    VAL --&gt; REG["Register in AgentRegistry"]
+
+    REG --&gt; SCHEMA["Discover custom schemas\n(schemas.py module)"]
+
+    SCHEMA --&gt; ROUTER["RouterFactory creates\n26 endpoints per agent"]
+
+    ROUTER --&gt; STUDIO["Studio adapter resolved\n(LangGraph/LangChain/Generic)"]
+
+    ROUTER --&gt; MOUNT["Mount on FastAPI app\nat /api/v1/{agent_name}/"]
+
+    style SCAN fill:#4a9eff,color:#fff
+    style ROUTER fill:#ff6b6b,color:#fff
+    style MOUNT fill:#51cf66,color:#fff</code></pre>
+<h3 id="agent-folder-structure">Agent Folder Structure<a class="headerlink" href="#agent-folder-structure" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>agents/
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── my_agent/
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>│   ├── __init__.py       # Required: manifest + graph_fn/node_fn
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│   ├── prompts.json      # Optional: prompt versions
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│   ├── schemas.py        # Optional: custom request/response models
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│   ├── config.py         # Optional: Pydantic config class
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│   └── api.py            # Optional: custom router (replaces auto-generated)
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── another_agent/
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    └── __init__.py
+</span></code></pre></div>
+<hr />
+<h2 id="deployment-patterns">Deployment Patterns<a class="headerlink" href="#deployment-patterns" title="Permanent link">&para;</a></h2>
+<h3 id="single-process-development">Single Process (Development)<a class="headerlink" href="#single-process-development" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph LR
+    UV["uvicorn main:app"] --&gt; AP["AgentPlatform"]
+    AP --&gt; MEM["MemoryStore"]</code></pre>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># main.py</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">app</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># uvicorn main:app --reload --port 8000</span>
+</span></code></pre></div>
+<h3 id="multi-worker-staging-production">Multi-Worker (Staging / Production)<a class="headerlink" href="#multi-worker-staging-production" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph TB
+    LB["Load Balancer\n(nginx / ALB)"]
+    LB --&gt; W1["Gunicorn Worker 1\n(uvicorn)"]
+    LB --&gt; W2["Gunicorn Worker 2\n(uvicorn)"]
+    LB --&gt; W3["Gunicorn Worker 3\n(uvicorn)"]
+
+    W1 --&gt; DB["PostgreSQL\n(SQLAlchemyStore)"]
+    W2 --&gt; DB
+    W3 --&gt; DB
+
+    W1 --&gt; OTEL["OpenTelemetry\nCollector"]
+    W2 --&gt; OTEL
+    W3 --&gt; OTEL</code></pre>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gunicorn<span class="w"> </span>main:app<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--worker-class<span class="w"> </span>uvicorn.workers.UvicornWorker<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--bind<span class="w"> </span><span class="m">0</span>.0.0.0:8000
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">MemoryStore is Not Multi-Worker Safe</p>
+<p>Use <code>SQLAlchemyStore</code> when running with multiple workers. <code>MemoryStore</code> is per-process and does not share state.</p>
+</div>
+<h3 id="containerized-kubernetes">Containerized (Kubernetes)<a class="headerlink" href="#containerized-kubernetes" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph TB
+    ING["Ingress Controller"] --&gt; SVC["K8s Service"]
+
+    subgraph "Deployment (replicas: 3)"
+        SVC --&gt; P1["Pod 1\nAgentomatic"]
+        SVC --&gt; P2["Pod 2\nAgentomatic"]
+        SVC --&gt; P3["Pod 3\nAgentomatic"]
+    end
+
+    subgraph "Stateful Services"
+        P1 --&gt; PG["PostgreSQL\n(StatefulSet / RDS)"]
+        P2 --&gt; PG
+        P3 --&gt; PG
+
+        P1 --&gt; REDIS["Redis\n(Optional: rate limiting)"]
+        P2 --&gt; REDIS
+        P3 --&gt; REDIS
+    end
+
+    subgraph "Observability Stack"
+        P1 --&gt; PROM["Prometheus"]
+        P1 --&gt; JAEGER["Jaeger / Tempo\n(traces)"]
+    end</code></pre>
+<div class="language-dockerfile highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">FROM</span><span class="w"> </span><span class="s">python:3.12-slim</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">COPY</span><span class="w"> </span>.<span class="w"> </span>.
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">RUN</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all]&quot;</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">EXPOSE</span><span class="w"> </span><span class="s">8000</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;uvicorn&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;main:app&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--host&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--port&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;8000&quot;</span><span class="p">]</span>
+</span></code></pre></div>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># k8s deployment excerpt</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="nt">spec</span><span class="p">:</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">containers</span><span class="p">:</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agentomatic</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myregistry/agentomatic:latest</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">          </span><span class="nt">ports</span><span class="p">:</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">          </span><span class="nt">env</span><span class="p">:</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DATABASE_URL</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">              </span><span class="nt">valueFrom</span><span class="p">:</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">                </span><span class="nt">secretKeyRef</span><span class="p">:</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-credentials</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">                  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">url</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">          </span><span class="nt">livenessProbe</span><span class="p">:</span>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span>
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/readiness</span>
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+</span></code></pre></div>
+<hr />
+<h2 id="class-agent-architecture-v07">Class-Agent Architecture (v0.7)<a class="headerlink" href="#class-agent-architecture-v07" title="Permanent link">&para;</a></h2>
+<p>The <strong>Class-Owned Graph Agent</strong> system introduces an alternative agent paradigm: define agents as Python classes with an ML-inspired lifecycle, using a built-in graph runtime that requires no LangGraph dependency.</p>
+<h3 id="component-overview">Component Overview<a class="headerlink" href="#component-overview" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>graph TB
+    subgraph "Platform Integration"
+        AP["AgentPlatform"]
+        REG["AgentRegistry"]
+        RA["RegisteredAgent"]
+    end
+
+    subgraph "Class-Agent System"
+        BGA["BaseGraphAgent\n(user subclass)"]
+        BG["build_graph()\nnew_graph()"]
+        GB["GraphBuilder\nLangGraph-compatible API"]
+        AG["AgentGraph\nlightweight runtime"]
+    end
+
+    subgraph "Mixins"
+        GEM["GraphExecutionMixin\ncompile · transform"]
+        DSM["DatasetMixin\nload · split · iterate"]
+        EVM["EvaluationMixin\nevaluate · report"]
+        OPM["OptimizationMixin\nfit · optimize"]
+        SRM["SerializationMixin\nsave · load_compiled"]
+        TRM["TracingMixin\nTraceEvent logging"]
+    end
+
+    subgraph "ML Lifecycle"
+        DS["AgentDataset\nAgentExample"]
+        MET["Metrics\nExactKeyMatch\nContainsTerms\nCallable"]
+        OPT["Optimizers\nNoOp · GridSearch\nPromptFitterBridge"]
+    end
+
+    subgraph "Registration"
+        RCA["register_class_agent()"]
+        DISC["Auto-discovery\n(agent.py)"]
+    end
+
+    %% Class agent construction
+    BGA --&gt; AN
+    AN --&gt; GB
+    GB --&gt; AG
+
+    %% Mixins compose into BaseGraphAgent
+    GEM --&gt; BGA
+    DSM --&gt; BGA
+    EVM --&gt; BGA
+    OPM --&gt; BGA
+    SRM --&gt; BGA
+    TRM --&gt; BGA
+
+    %% ML lifecycle
+    DS --&gt; EVM
+    DS --&gt; OPM
+    MET --&gt; EVM
+    OPT --&gt; OPM
+
+    %% Registration into platform
+    BGA --&gt; RCA
+    DISC --&gt; RCA
+    RCA --&gt; RA
+    RA --&gt; REG
+    REG --&gt; AP
+
+    style BGA fill:#51cf66,color:#fff
+    style AG fill:#51cf66,color:#fff
+    style AP fill:#4a9eff,color:#fff
+    style REG fill:#4a9eff,color:#fff</code></pre>
+<h3 id="ml-lifecycle">ML Lifecycle<a class="headerlink" href="#ml-lifecycle" title="Permanent link">&para;</a></h3>
+<p>Class agents follow a training-inspired workflow:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Dev as Developer
+    participant Agent as BaseGraphAgent
+    participant Graph as AgentGraph
+    participant DS as AgentDataset
+    participant Opt as Optimizer
+
+    Dev-&gt;&gt;Agent: compile(dataset, metrics, optimizer)
+    Agent-&gt;&gt;Graph: Build graph from build_graph()
+    Agent-&gt;&gt;Agent: Store metrics + optimizer refs
+
+    Dev-&gt;&gt;Agent: fit(dataset)
+    Agent-&gt;&gt;Opt: optimize(agent, dataset)
+    Opt--&gt;&gt;Agent: Optimized parameters
+
+    Dev-&gt;&gt;Agent: evaluate(test_split, metrics)
+    loop Each example
+        Agent-&gt;&gt;Graph: Execute graph
+        Graph--&gt;&gt;Agent: Output
+        Agent-&gt;&gt;Agent: Score with metrics
+    end
+    Agent--&gt;&gt;Dev: EvaluationReport
+
+    Dev-&gt;&gt;Agent: transform(input_data)
+    Agent-&gt;&gt;Graph: Execute compiled graph
+    Graph--&gt;&gt;Agent: State
+    Agent--&gt;&gt;Dev: Output dict
+
+    Dev-&gt;&gt;Agent: save("path/")
+    Agent--&gt;&gt;Dev: Serialized state + config</code></pre>
+<h3 id="key-classes">Key Classes<a class="headerlink" href="#key-classes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BaseGraphAgent[S]</code></td>
+<td><code>agentomatic.agents</code></td>
+<td>Abstract base — subclass to define your agent</td>
+</tr>
+<tr>
+<td><code>build_graph()</code></td>
+<td><code>BaseGraphAgent</code></td>
+<td>Primary override — wire nodes with <code>new_graph()</code></td>
+</tr>
+<tr>
+<td><code>GraphBuilder</code></td>
+<td><code>agentomatic.agents.builder</code></td>
+<td>LangGraph-compatible API for graph construction</td>
+</tr>
+<tr>
+<td><code>AgentGraph</code></td>
+<td><code>agentomatic.agents.graph</code></td>
+<td>Lightweight graph runtime (sync + async)</td>
+</tr>
+<tr>
+<td><code>AgentDataset</code></td>
+<td><code>agentomatic.agents.types</code></td>
+<td>JSONL-backed dataset with train/test splits</td>
+</tr>
+<tr>
+<td><code>AgentExample</code></td>
+<td><code>agentomatic.agents.types</code></td>
+<td>Single input/expected-output pair</td>
+</tr>
+<tr>
+<td><code>TraceEvent</code></td>
+<td><code>agentomatic.agents.types</code></td>
+<td>Per-node execution trace event</td>
+</tr>
+<tr>
+<td><code>register_class_agent()</code></td>
+<td><code>AgentRegistry</code></td>
+<td>Register a class agent into the platform</td>
+</tr>
+</tbody>
+</table>
+<h3 id="integration-with-platform">Integration with Platform<a class="headerlink" href="#integration-with-platform" title="Permanent link">&para;</a></h3>
+<p>Class agents integrate with the platform through <code>register_class_agent()</code>, which wraps the agent's <code>transform()</code> method as a standard <code>node_fn</code> and registers it as a <code>RegisteredAgent</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseGraphAgent</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyAgent</span><span class="p">(</span><span class="n">BaseGraphAgent</span><span class="p">[</span><span class="n">MyState</span><span class="p">]):</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">agent_name</span> <span class="o">=</span> <span class="s2">&quot;my_agent&quot;</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">build_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="n">g</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_graph</span><span class="p">()</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">process</span><span class="p">)</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>        <span class="n">g</span><span class="o">.</span><span class="n">set_entry_point</span><span class="p">(</span><span class="s2">&quot;process&quot;</span><span class="p">)</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>        <span class="n">g</span><span class="o">.</span><span class="n">set_finish_point</span><span class="p">(</span><span class="s2">&quot;process&quot;</span><span class="p">)</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>        <span class="k">return</span> <span class="n">g</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="c1"># ... methods ...</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="c1"># Register into the platform</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">MyAgent</span><span class="p">(</span><span class="n">llm</span><span class="o">=</span><span class="n">my_llm</span><span class="p">)</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="n">agent</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">metrics</span><span class="p">)</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="n">registry</span><span class="o">.</span><span class="n">register_class_agent</span><span class="p">(</span><span class="n">agent</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Alternatively, the platform auto-discovers class agents via <code>agent.py</code> files using the <code>agentomatic init --template class</code> scaffold.</p>
+<hr />
+<h2 id="extension-points">Extension Points<a class="headerlink" href="#extension-points" title="Permanent link">&para;</a></h2>
+<p>Agentomatic is designed for extensibility at every layer:</p>
+<table>
+<thead>
+<tr>
+<th>Extension Point</th>
+<th>Mechanism</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Custom agents</strong></td>
+<td>Drop folder in <code>agents/</code></td>
+<td>Any Python async function</td>
+</tr>
+<tr>
+<td><strong>Custom routers</strong></td>
+<td><code>api.py</code> in agent folder</td>
+<td>Replace auto-generated endpoints</td>
+</tr>
+<tr>
+<td><strong>Custom schemas</strong></td>
+<td><code>schemas.py</code> in agent folder</td>
+<td>Domain-specific request/response models</td>
+</tr>
+<tr>
+<td><strong>Custom adapters</strong></td>
+<td><code>_studio_adapter</code> attribute</td>
+<td>Framework-specific Studio integration</td>
+</tr>
+<tr>
+<td><strong>Before/after hooks</strong></td>
+<td><code>register_before_node_hook()</code></td>
+<td>Audit logging, security scanning</td>
+</tr>
+<tr>
+<td><strong>Storage backends</strong></td>
+<td>Subclass <code>BaseStore</code></td>
+<td>Custom databases, cloud storage</td>
+</tr>
+<tr>
+<td><strong>Middleware</strong></td>
+<td>FastAPI middleware</td>
+<td>Auth, rate limiting, custom headers</td>
+</tr>
+<tr>
+<td><strong>Prompt versions</strong></td>
+<td><code>prompts.json</code></td>
+<td>A/B testing, version management</td>
+</tr>
+<tr>
+<td><strong>LLM providers</strong></td>
+<td><code>get_llm(provider=...)</code></td>
+<td>OpenAI, Azure, Ollama, Anthropic</td>
+</tr>
+<tr>
+<td><strong>Checkpointers</strong></td>
+<td><code>AgentomaticCheckpointer</code></td>
+<td>Bridge any store to LangGraph</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="key-design-decisions">Key Design Decisions<a class="headerlink" href="#key-design-decisions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Convention over configuration</strong> — Drop a folder, get a full API</li>
+<li><strong>Everything is optional</strong> — Only <code>__init__.py</code> with a manifest is required</li>
+<li><strong>Override anything</strong> — Custom <code>api.py</code> routers replace auto-generated ones</li>
+<li><strong>Async-first</strong> — All I/O uses <code>async</code>/<code>await</code></li>
+<li><strong>ABC-based storage</strong> — Swap backends without code changes</li>
+<li><strong>Universal Studio</strong> — Adapter pattern degrades gracefully across frameworks</li>
+<li><strong>Middleware pipeline</strong> — Composable, ordered middleware with per-request context</li>
+<li><strong>Schema discovery</strong> — Custom Pydantic models auto-integrate into OpenAPI docs</li>
+<li><strong>Checkpoint bridge</strong> — Single storage backend for threads, messages, and LangGraph checkpoints</li>
+<li><strong>HITL as first-class</strong> — Suspend/resume built into the router factory, not bolted on</li>
+<li><strong>Class agents</strong> — ML lifecycle (<code>compile</code>/<code>fit</code>/<code>evaluate</code>/<code>transform</code>) with zero framework deps</li>
+<li><strong>Composable pipelines</strong> — YAML, Builder, and decorator interfaces for multi-agent orchestration</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../cli/commands/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Commands">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Commands
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../api-reference/" class="md-footer__link md-footer__link--next" aria-label="Next: API Reference">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                API Reference
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 UnicoLab
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/UnicoLab/agentomatic" target="_blank" rel="noopener" title="Agentomatic on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://pypi.org/project/agentomatic/" target="_blank" rel="noopener" title="Agentomatic on PyPI" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "navigation.path", "search.suggest", "search.highlight", "search.share", "content.tabs.link", "content.code.copy", "content.code.annotate", "content.tooltips", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
