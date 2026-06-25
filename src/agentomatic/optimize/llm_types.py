@@ -175,7 +175,7 @@ async def call_llm(
         # ── Sync callable ────────────────────────────────────────
         if callable(model):
             result = await asyncio.to_thread(
-                model,
+                model,  # type: ignore[arg-type]
                 prompt,
                 system_prompt=system_prompt,
             )
@@ -289,7 +289,7 @@ async def _call_langchain_async(
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
 
-        messages = []
+        messages: list[Any] = []
         if system_prompt:
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))
@@ -313,7 +313,7 @@ def _call_langchain_sync(
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
 
-        messages = []
+        messages: list[Any] = []
         if system_prompt:
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))

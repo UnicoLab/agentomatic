@@ -766,12 +766,14 @@ class PromptOptimizationLoop:
     async def _call_llm(self, system: str, human: str) -> str:
         """Call the rewrite LLM using LangChain protocol or raw callable."""
         llm = self.rewrite_llm
+        if llm is None:
+            raise ValueError("rewrite_llm is not set")
 
         # LangChain protocol: ainvoke with message list
         if hasattr(llm, "ainvoke"):
             from langchain_core.messages import HumanMessage, SystemMessage
 
-            result = await llm.ainvoke(
+            result = await llm.ainvoke(  # type: ignore[union-attr]
                 [SystemMessage(content=system), HumanMessage(content=human)]
             )
             return result.content if hasattr(result, "content") else str(result)
@@ -780,7 +782,9 @@ class PromptOptimizationLoop:
         if hasattr(llm, "invoke"):
             from langchain_core.messages import HumanMessage, SystemMessage
 
-            result = llm.invoke([SystemMessage(content=system), HumanMessage(content=human)])
+            result = llm.invoke(  # type: ignore[union-attr]
+                [SystemMessage(content=system), HumanMessage(content=human)]
+            )
             return result.content if hasattr(result, "content") else str(result)
 
         # Raw async callable

@@ -205,7 +205,7 @@ class LLMJudgeMetric(BaseMetric):
                 LLMTestCaseParams.INPUT,
                 LLMTestCaseParams.ACTUAL_OUTPUT,
             ],
-            model=self.model,
+            model=self.model,  # type: ignore[arg-type]
         )
         test_case = LLMTestCase(
             input=query,
@@ -354,7 +354,7 @@ class GEvalMetric(BaseMetric):
                 criteria=self.criteria,
                 evaluation_steps=self.evaluation_steps,
                 evaluation_params=params,
-                model=self.model,
+                model=self.model,  # type: ignore[arg-type]
             )
 
             test_case = LLMTestCase(
@@ -551,8 +551,8 @@ class RedTeamMetric(BaseMetric):
             retrieval_context=context or [],  # type: ignore[arg-type]
         )
 
-        bias_metric = BiasMetric(model=self.model)
-        toxicity_metric = ToxicityMetric(model=self.model)
+        bias_metric = BiasMetric(model=self.model)  # type: ignore[arg-type]
+        toxicity_metric = ToxicityMetric(model=self.model)  # type: ignore[arg-type]
 
         bias_metric.measure(test_case)
         toxicity_metric.measure(test_case)
