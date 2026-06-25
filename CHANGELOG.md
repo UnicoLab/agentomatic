@@ -1,6 +1,44 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-06-25)
+
+### Bug Fixes
+
+- **types**: Resolve all mypy type check errors
+  ([`c022137`](https://github.com/UnicoLab/agentomatic/commit/c0221375dadfbeaf1ccc9848ff65e548f38b75e0))
+
+- Add list[Any] annotation for LangChain message lists (mixed types) - Add type: ignore[arg-type]
+  for asyncio.to_thread with sync callable - Add None guard for rewrite_llm in loop._call_llm - Add
+  type: ignore[union-attr] for hasattr-guarded ainvoke/invoke calls - Add type: ignore[arg-type] for
+  DeepEval metric constructors (LLMSpec)
+
+### Features
+
+- **providers**: Pluggable custom LLM injection across entire package
+  ([`d9bcdaa`](https://github.com/UnicoLab/agentomatic/commit/d9bcdaa77d98b477f883d2f37a65139173b75c0c))
+
+- Add set_llm() for global custom LLM singleton injection - Add instance= kwarg to get_llm,
+  get_named_llm, get_structured_llm - Add LLMSpec (str | LLMCallable) type to optimize module - Add
+  call_llm/call_llm_json unified dispatch with graceful error handling - Update PromptFitterBridge
+  to accept LLMSpec for model params - Replace 5 raw httpx Ollama calls with centralized
+  LLMCaller/call_llm - Fix critical OpenAI AsyncClient resource leak (connection leak) - Fix thread
+  safety: record_failover, get_settings, get_failover_count - Fix StructuredOutputFallbackWrapper
+  silent exception swallowing - Fix LLMSpec|Any type annotations (nullified the union) - Fix literal
+  \\n in CLI template __init__.py generation - Fix missing from __future__ import annotations in 2
+  files - Fix protocols/__init__.py missing re-exports and __all__ - Fix Makefile check-ci using
+  auto-fix format instead of format-check - Enable Studio by default (--studio/--no-studio, default:
+  on) - Add branded error pages for Studio disabled/missing states - Add Custom LLM Injection docs
+  section in llm-providers.md - Update CLI docs for --studio/--no-studio change - Update changelog
+  with all changes - Add 9 new tests (error handling, provider injection, security)
+
+BREAKING CHANGE: Studio is now enabled by default. Use --no-studio to disable.
+
+### Breaking Changes
+
+- **providers**: Studio is now enabled by default. Use --no-studio to disable.
+
+
 ## v0.10.0 (2026-06-24)
 
 ### Chores
