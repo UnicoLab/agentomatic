@@ -1878,6 +1878,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1907,7 +1929,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1946,7 +1968,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2046,6 +2068,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2075,7 +2119,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2114,7 +2158,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2218,7 +2262,39 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <li>YAML, Builder, and Flow (decorator) interfaces</li>
 <li>Parallel, sequential, conditional, loop, and transform steps</li>
 <li>Auto-schema detection and delegation</li>
-<li>99 tests with full platform integration</li>
+<li>
+<p>99 tests with full platform integration</p>
+</li>
+<li>
+<p><strong>Custom LLM Injection — Pluggable Models Everywhere</strong></p>
+</li>
+<li><code>set_llm()</code> — inject a custom LLM as the global singleton</li>
+<li><code>get_llm(instance=...)</code>, <code>get_named_llm(instance=...)</code>,
+    <code>get_structured_llm(instance=...)</code> — bypass factory with pre-built LLMs</li>
+<li><code>LLMSpec = str | LLMCallable</code> type in the <code>optimize</code> module —
+    all optimizers, metrics, synthesizers, and fitters accept custom callables</li>
+<li><code>call_llm()</code> / <code>call_llm_json()</code> — unified dispatch with graceful
+    error handling (string, async/sync callable, LangChain model)</li>
+<li><code>PromptFitterBridge</code> accepts <code>LLMSpec</code> for <code>task_model</code> / <code>rewrite_model</code></li>
+<li>Eliminated 5 raw <code>httpx</code> Ollama calls — all LLM traffic goes through
+    <code>LLMCaller</code> or <code>call_llm()</code></li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Studio enabled by default</strong> — <code>agentomatic run</code> now enables Studio
+  at <code>/studio/ui/</code> by default. Use <code>--no-studio</code> to disable.</li>
+<li><strong>Studio resilience</strong> — branded error pages (503) when Studio is
+  disabled or assets are missing, instead of raw 404s.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fixed literal <code>\\n</code> characters appearing in generated <code>__init__.py</code> files
+  from <code>agentomatic init</code> templates.</li>
+<li>Added <code>from __future__ import annotations</code> to <code>plugins/__init__.py</code> and
+  <code>demo/__init__.py</code> per project rules.</li>
+<li>Fixed <code>protocols/__init__.py</code> missing re-exports and <code>__all__</code>.</li>
+<li>Fixed <code>Makefile</code> <code>check-ci</code> target using auto-fix <code>format</code> instead of
+  read-only <code>format-check</code>.</li>
 </ul>
 <hr />
 <h2 id="030-2026-06-18"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.3.0">0.3.0</a> - 2026-06-18<a class="headerlink" href="#030-2026-06-18" title="Permanent link">&para;</a></h2>
@@ -2276,7 +2352,7 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <li><code>.agents/skills/agentomatic/SKILL.md</code> — comprehensive package skill</li>
 <li><code>.agents/AGENTS.md</code> — project rules and conventions</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>CI/CD pipeline now includes docs build verification and import smoke tests</li>
 <li>PR checks use <code>uv</code> consistently (replaced pip-based pre-commit install)</li>
@@ -2309,7 +2385,7 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <li><code>agentomatic doctor</code> — environment health check</li>
 <li><code>agentomatic optimize</code> — prompt optimization runner</li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Test suite expanded to 393+ tests with multi-Python matrix CI</li>
 <li>Improved error messages and validation</li>
