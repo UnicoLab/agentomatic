@@ -2706,14 +2706,15 @@ Without Rich, the CLI falls back to plain text output.</p>
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  --reload             Auto-reload on code or config file changes
 </span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  --title TEXT         Platform title
 </span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  --log-level TEXT     Log level (DEBUG, INFO, WARNING, ERROR)  [default: INFO]
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  --with-ui            Mount the Chainlit chat UI at /chat
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>  --studio             Enable Agentomatic Studio at /studio/ui/
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  --with-ui, --ui     Mount the Chainlit chat UI at /chat
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>  --studio/--no-studio Enable/disable Agentomatic Studio at /studio/ui/ (default: on)
 </span></code></pre></div>
 <h4 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h4>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:5"><input checked="checked" id="development-studio--reload" name="__tabbed_1" type="radio" /><input id="development-chat-ui--reload" name="__tabbed_1" type="radio" /><input id="full-debug-both-uis" name="__tabbed_1" type="radio" /><input id="production-like" name="__tabbed_1" type="radio" /><input id="custom-directory" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="development-studio--reload">Development (Studio + reload)</label><label for="development-chat-ui--reload">Development (Chat UI + reload)</label><label for="full-debug-both-uis">Full Debug (Both UIs)</label><label for="production-like">Production-like</label><label for="custom-directory">Custom Directory</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--studio<span class="w"> </span>--reload
+<p>Studio is <strong>on by default</strong> — no extra flag needed:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--reload
 </span></code></pre></div>
 <table>
 <thead>
