@@ -13,9 +13,12 @@ Classes
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
 # Failure Clustering
@@ -71,7 +74,7 @@ class FailureClusterer:
 
     def __init__(
         self,
-        model: str = "ollama/qwen2.5:7b",
+        model: LLMSpec = "ollama/qwen2.5:7b",
         max_clusters: int = 8,
         max_examples_per_cluster: int = 3,
     ) -> None:

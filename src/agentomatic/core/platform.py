@@ -790,29 +790,31 @@ class AgentPlatform:
                 app.include_router(studio_router)
                 logger.info("🎨 Studio API mounted at /studio/")
 
-                # Mount the built Studio UI (if available)
-                from agentomatic.studio.serve import is_studio_available, mount_studio_ui
+                # Mount the built Studio UI (always — shows helpful
+                # error page if assets are missing)
+                from agentomatic.studio.serve import mount_studio_ui
 
-                if is_studio_available():
-                    mount_studio_ui(app)
+                mount_studio_ui(app)
 
-                    # Convenience redirects: /studio → /studio/ui/
-                    from fastapi.responses import RedirectResponse
+                # Convenience redirects: /studio → /studio/ui/
+                from fastapi.responses import RedirectResponse
 
-                    @app.get("/studio", include_in_schema=False)
-                    @app.get("/studio/", include_in_schema=False)
-                    async def _studio_redirect() -> RedirectResponse:
-                        return RedirectResponse(url="/studio/ui/")
+                @app.get("/studio", include_in_schema=False)
+                @app.get("/studio/", include_in_schema=False)
+                async def _studio_redirect() -> RedirectResponse:
+                    return RedirectResponse(url="/studio/ui/")
 
-                    logger.info("🎨 Studio UI + redirects mounted")
-                else:
-                    logger.info(
-                        "🎨 Studio API is running but UI assets not bundled. "
-                        "Run the frontend separately or build with: "
-                        "./scripts/build_studio.sh"
-                    )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Studio setup failed: {exc}")
+        else:
+            # Studio disabled — mount informative error pages so users
+            # hitting /studio/ui/ get guidance instead of a bare 404.
+            try:
+                from agentomatic.studio.serve import mount_studio_disabled_page
+
+                mount_studio_disabled_page(app)
+            except Exception:  # noqa: BLE001
+                pass  # Non-critical — don't log noise
 
         self._app = app
         return app

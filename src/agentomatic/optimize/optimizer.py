@@ -20,7 +20,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -32,6 +32,9 @@ from agentomatic.optimize.strategies import (
     OptimizationStrategy,
     resolve_strategy,
 )
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
 # Experiment Tracking
@@ -389,9 +392,9 @@ class PromptOptimizer:
         self,
         agent: str,
         metrics: list[str | BaseMetric] | None = None,
-        llm: str = "ollama/mistral:7b",
-        rewrite_llm: str | None = None,
-        eval_llm: str | None = None,
+        llm: LLMSpec = "ollama/mistral:7b",
+        rewrite_llm: LLMSpec | None = None,
+        eval_llm: LLMSpec | None = None,
         strategy: str | OptimizationStrategy = "iterative_rewrite",
         api_base: str = "http://localhost:8000",
         api_prefix: str = "/api/v1",

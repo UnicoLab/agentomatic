@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from .types import AgentDataset, Metric
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # ---------------------------------------------------------------------------
 # NoOpOptimizer
@@ -175,8 +178,8 @@ class PromptFitterBridge:
     def __init__(
         self,
         agent_name: str = "",
-        task_model: str = "ollama/qwen2.5:7b",
-        rewrite_model: str = "openai/gpt-4.1",
+        task_model: LLMSpec = "ollama/qwen2.5:7b",
+        rewrite_model: LLMSpec = "openai/gpt-4.1",
         **kwargs: Any,
     ) -> None:
         self.agent_name = agent_name

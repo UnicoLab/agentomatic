@@ -7,6 +7,8 @@ calling Ollama directly, every call goes through
 :class:`LLMCaller` which handles:
 
 * **Provider routing** — ``ollama/``, ``openai/``, ``litellm/`` prefixes.
+* **Callable dispatch** — custom async/sync callables and LangChain
+  models are transparently supported via :data:`LLMSpec`.
 * **Graceful degradation** — failures are logged and an empty string
   (or empty dict for JSON calls) is returned so the caller never crashes.
 * **JSON extraction** — :meth:`LLMCaller.call_with_json` strips
@@ -16,15 +18,22 @@ Example
 -------
 >>> text = await LLMCaller.call("ollama/mistral:7b", "Say hello")
 >>> data = await LLMCaller.call_with_json("openai/gpt-4o-mini", "Return {\"ok\": true}")
+>>>
+>>> # Custom callable also works:
+>>> async def my_llm(prompt, *, system_prompt=None): return "Hello!"
+>>> text = await LLMCaller.call(my_llm, "Say hello")
 """
 
 from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
 # Constants
@@ -102,6 +111,10 @@ class LLMCaller:
 
     All methods are **static / async** so that no instance state is
     required — just call ``await LLMCaller.call(model, prompt)``.
+
+    Accepts both **string model specs** (e.g. ``"ollama/mistral:7b"``) and
+    **custom callables** (async functions, LangChain models, etc.) via the
+    :data:`~agentomatic.optimize.llm_types.LLMSpec` union type.
     """
 
     # -----------------------------------------------------------------
@@ -110,7 +123,7 @@ class LLMCaller:
 
     @staticmethod
     async def call(
-        model: str,
+        model: LLMSpec,
         prompt: str,
         *,
         system_prompt: str | None = None,
@@ -124,8 +137,8 @@ class LLMCaller:
         Parameters
         ----------
         model:
-            Model specification, optionally prefixed with the provider
-            (e.g. ``"ollama/mistral:7b"``, ``"openai/gpt-4o-mini"``).
+            Model specification — a string like ``"ollama/mistral:7b"``
+            or a callable / LangChain model matching :data:`LLMSpec`.
         prompt:
             User prompt text.
         system_prompt:
@@ -145,6 +158,21 @@ class LLMCaller:
         str
             Generated text, or ``""`` on failure.
         """
+        # ── Non-string: delegate to unified callable dispatcher ──
+        if not isinstance(model, str):
+            from agentomatic.optimize.llm_types import call_llm
+
+            return await call_llm(
+                model,
+                prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                json_mode=json_mode,
+                timeout=timeout,
+            )
+
+        # ── String: route to provider backend ────────────────────
         provider, model_name = parse_model_spec(model)
         try:
             if provider == "ollama":
@@ -196,7 +224,7 @@ class LLMCaller:
 
     @staticmethod
     async def call_with_json(
-        model: str,
+        model: LLMSpec,
         prompt: str,
         *,
         system_prompt: str | None = None,
@@ -210,10 +238,12 @@ class LLMCaller:
         If the first attempt fails to parse, the call is retried up to
         *max_retries* times.  Returns an empty ``{}`` on total failure.
 
+        Accepts both string model specs and callables via :data:`LLMSpec`.
+
         Parameters
         ----------
         model:
-            Model specification (see :meth:`call`).
+            Model specification — string or callable (see :meth:`call`).
         prompt:
             User prompt — a JSON-return instruction is appended automatically.
         system_prompt:
@@ -230,9 +260,23 @@ class LLMCaller:
         dict[str, Any]
             Parsed JSON object, or ``{}`` on failure.
         """
+        # For non-string models, delegate to call_llm_json
+        if not isinstance(model, str):
+            from agentomatic.optimize.llm_types import call_llm_json
+
+            return await call_llm_json(
+                model,
+                prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_retries=max_retries,
+                timeout=timeout,
+            )
+
         json_instruction = (
             "\n\nIMPORTANT: Reply with ONLY a valid JSON object. "
-            "Do not include any other text, explanation, or markdown formatting."
+            "Do not include any other text, explanation, or "
+            "markdown formatting."
         )
         augmented_prompt = prompt + json_instruction
 
@@ -329,9 +373,10 @@ async def _call_openai(
         kwargs["response_format"] = {"type": "json_object"}
 
     client = openai.AsyncOpenAI(timeout=timeout)
-    response = await client.chat.completions.create(**kwargs)
-    choice = response.choices[0]
-    return (choice.message.content or "").strip()
+    async with client as c:
+        response = await c.chat.completions.create(**kwargs)
+        choice = response.choices[0]
+        return (choice.message.content or "").strip()
 
 
 async def _call_litellm(

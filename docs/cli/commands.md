@@ -137,16 +137,18 @@ Options:
   --reload             Auto-reload on code or config file changes
   --title TEXT         Platform title
   --log-level TEXT     Log level (DEBUG, INFO, WARNING, ERROR)  [default: INFO]
-  --with-ui            Mount the Chainlit chat UI at /chat
-  --studio             Enable Agentomatic Studio at /studio/ui/
+  --with-ui, --ui     Mount the Chainlit chat UI at /chat
+  --studio/--no-studio Enable/disable Agentomatic Studio at /studio/ui/ (default: on)
 ```
 
 #### Examples
 
 === "Development (Studio + reload)"
 
+    Studio is **on by default** — no extra flag needed:
+
     ```bash
-    agentomatic run --studio --reload
+    agentomatic run --reload
     ```
 
     | Service | URL |

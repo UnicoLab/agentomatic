@@ -67,6 +67,14 @@ from agentomatic.optimize.judges import (
     LocalJudgeMetric,
     MultiJudgePanel,
 )
+
+# ── Pluggable LLM type system ────────────────────────────────────────
+from agentomatic.optimize.llm_types import (
+    LLMCallable,
+    LLMSpec,
+    call_llm,
+    call_llm_json,
+)
 from agentomatic.optimize.loop import (
     AVAILABLE_STRATEGIES,
     LoopResult,
@@ -112,6 +120,11 @@ from agentomatic.optimize.synthesizer import (
 )
 
 __all__ = [
+    # ── Pluggable LLM type system ─────────────────────────────────
+    "LLMSpec",
+    "LLMCallable",
+    "call_llm",
+    "call_llm_json",
     # Core — local-first optimization loop
     "PromptOptimizationLoop",
     "LoopResult",

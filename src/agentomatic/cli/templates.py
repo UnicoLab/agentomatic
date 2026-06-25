@@ -1720,14 +1720,14 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     if template == "basic":
         return {
-            "__init__.py": '"""Agent package."""\\n',
+            "__init__.py": '"""Agent package."""\n',
             "agent.py": _class_agent_py(name, "basic"),
             **common,
         }
 
     elif template == "full":
         return {
-            "__init__.py": '"""Agent package."""\\n',
+            "__init__.py": '"""Agent package."""\n',
             "agent.py": _class_agent_py(name, "full"),
             "config.py": _config_py(name),
             "schemas.py": _schemas_py(name),
@@ -1744,7 +1744,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "coordinator":
         return {
-            "__init__.py": '"""Agent package."""\\n',
+            "__init__.py": '"""Agent package."""\n',
             "agent.py": _coordinator_agent_py(name),
             "delegation.py": _coordinator_delegation_py(name),
             "security.py": _coordinator_security_py(name),
@@ -1765,7 +1765,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "rag":
         return {
-            "__init__.py": '"""Agent package."""\\n',
+            "__init__.py": '"""Agent package."""\n',
             "agent.py": _class_agent_py(name, "rag"),
             "config.py": _config_py(name),
             "tools.py": _tools_py(name),
@@ -1774,7 +1774,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "chatbot":
         return {
-            "__init__.py": '"""Agent package."""\\n',
+            "__init__.py": '"""Agent package."""\n',
             "agent.py": _class_agent_py(name, "chatbot"),
             "config.py": _config_py(name),
             **common,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -105,20 +106,25 @@ class PlatformSettings(BaseSettings):
 
 
 _settings: PlatformSettings | None = None
+_settings_lock = threading.Lock()
 
 
 def get_settings() -> PlatformSettings:
     """Get or create the singleton settings instance."""
     global _settings
-    if _settings is None:
-        _settings = PlatformSettings()  # type: ignore[call-arg]
-    return _settings
+    if _settings is not None:
+        return _settings
+    with _settings_lock:
+        if _settings is None:
+            _settings = PlatformSettings()  # type: ignore[call-arg]
+        return _settings
 
 
 def reset_settings() -> None:
     """Reset settings singleton (for testing)."""
     global _settings
-    _settings = None
+    with _settings_lock:
+        _settings = None
 
 
 def load_environment(env_file: str | Path | None = None) -> None:

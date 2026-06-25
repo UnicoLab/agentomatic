@@ -18,24 +18,67 @@ _llm_lock = threading.Lock()
 
 def get_failover_count() -> int:
     """Return the number of LLM failover events recorded."""
-    return _failover_count
+    with _llm_lock:
+        return _failover_count
 
 
-def record_failover(primary_provider: str, fallback_provider: str, error: str) -> None:
+def record_failover(
+    primary_provider: str,
+    fallback_provider: str,
+    error: str,
+) -> None:
     """Record a failover event for telemetry."""
     global _failover_count
-    _failover_count += 1
+    with _llm_lock:
+        _failover_count += 1
+        count = _failover_count
     logger.warning(
-        f"🔄 LLM failover #{_failover_count}: {primary_provider} -> {fallback_provider} | Error: {error}"
+        f"🔄 LLM failover #{count}: {primary_provider} -> {fallback_provider} | Error: {error}"
     )
 
 
-def get_llm(provider: str = "ollama", fallbacks: list[str] | None = None, **kwargs: Any) -> Any:
+def get_llm(
+    provider: str = "ollama",
+    fallbacks: list[str] | None = None,
+    *,
+    instance: Any | None = None,
+    **kwargs: Any,
+) -> Any:
     """Get or create a singleton LLM instance.
 
     Supports: ollama, azure, openai, vertex, dummy.
+
+    If *instance* is provided, it is stored as the global singleton
+    directly — bypassing the factory.  This lets users inject a custom
+    LLM (e.g. a LangChain model, a callable, or any object that
+    implements ``ainvoke`` / ``invoke``).
+
+    Example::
+
+        from langchain_openai import ChatOpenAI
+        from agentomatic.providers import get_llm
+
+        # Use a custom pre-built model
+        get_llm(instance=ChatOpenAI(model="gpt-4o"))
+
+    Args:
+        provider: Provider identifier when building from factory.
+        fallbacks: Optional fallback provider identifiers.
+        instance: Pre-built LLM instance to use directly.
+        **kwargs: Provider-specific parameters for the factory.
+
+    Returns:
+        An LLM instance.
     """
     global _llm_instance
+
+    # Inject a pre-built instance directly
+    if instance is not None:
+        with _llm_lock:
+            _llm_instance = instance
+            logger.info(f"Custom LLM instance set: {type(instance).__name__}")
+            return _llm_instance
+
     if _llm_instance is not None:
         logger.debug("Returning cached LLM instance (call reset_llm() to reconfigure)")
         return _llm_instance
@@ -66,6 +109,37 @@ def get_llm(provider: str = "ollama", fallbacks: list[str] | None = None, **kwar
             _llm_instance = _build_dummy_llm()
 
         return _llm_instance
+
+
+def set_llm(instance: Any) -> None:
+    """Set a custom LLM instance as the global singleton.
+
+    This is the recommended way to inject a custom model that
+    doesn't fit the built-in provider system.  Any object that
+    implements ``ainvoke(messages)`` or ``invoke(messages)`` will
+    work, as will plain callables.
+
+    Example::
+
+        from agentomatic.providers import set_llm
+
+        # Async callable
+        async def my_llm(messages):
+            return await my_api.chat(messages)
+
+        set_llm(my_llm)
+
+        # Or a LangChain model
+        from langchain_openai import ChatOpenAI
+        set_llm(ChatOpenAI(model="gpt-4o"))
+
+    Args:
+        instance: Pre-built LLM object to use as the global singleton.
+    """
+    global _llm_instance
+    with _llm_lock:
+        _llm_instance = instance
+        logger.info(f"Global LLM set to: {type(instance).__name__}")
 
 
 def _build_llm(provider: str, **kwargs: Any) -> Any:
@@ -136,21 +210,37 @@ def reset_llm() -> None:
         _failover_count = 0
 
 
-def get_named_llm(name: str, provider: str, **kwargs: Any) -> Any:
+def get_named_llm(
+    name: str,
+    provider: str = "ollama",
+    *,
+    instance: Any | None = None,
+    **kwargs: Any,
+) -> Any:
     """Get or create a named LLM instance.
 
     Unlike :func:`get_llm`, this function maintains a registry of named
     instances so multiple LLM configurations can coexist (e.g. ``"default"``,
     ``"fast"``, ``"judge"``).
 
+    If *instance* is provided, it is stored directly under *name*
+    without going through the factory.
+
     Args:
         name: Unique name for this LLM instance.
         provider: Provider identifier (``"ollama"``, ``"openai"``, etc.).
+        instance: Pre-built LLM instance to store directly.
         **kwargs: Provider-specific parameters.
 
     Returns:
         An LLM instance.
     """
+    if instance is not None:
+        with _llm_lock:
+            _named_instances[name] = instance
+            logger.debug(f"Custom LLM instance registered as '{name}': {type(instance).__name__}")
+            return instance
+
     if name in _named_instances:
         return _named_instances[name]
 
@@ -158,14 +248,14 @@ def get_named_llm(name: str, provider: str, **kwargs: Any) -> Any:
         if name in _named_instances:
             return _named_instances[name]
         try:
-            instance = _build_llm(provider, **kwargs)
-            _named_instances[name] = instance
+            built = _build_llm(provider, **kwargs)
+            _named_instances[name] = built
             logger.debug(f"Created named LLM instance '{name}' ({provider})")
         except Exception as exc:
             logger.warning(f"Failed to build LLM '{name}' ({provider}): {exc}. Using dummy.")
-            instance = _build_dummy_llm()
-            _named_instances[name] = instance
-        return instance
+            built = _build_dummy_llm()
+            _named_instances[name] = built
+        return built
 
 
 def get_llm_for_agent(
@@ -266,7 +356,14 @@ class StructuredOutputFallbackWrapper:
             try:
                 data = json.loads(content)
                 return self.response_model.model_validate(data)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    f"Structured output parse failed for "
+                    f"{self.response_model.__name__}: {exc}. "
+                    f"Falling back to dummy values. "
+                    f"Raw content (first 200 chars): "
+                    f"{content[:200]!r}"
+                )
                 fields = {}
                 for name, field in self.response_model.model_fields.items():
                     if field.default is not PydanticUndefined:
@@ -296,10 +393,27 @@ class StructuredOutputFallbackWrapper:
 def get_structured_llm(
     response_model: type,
     provider: str = "ollama",
+    *,
+    instance: Any | None = None,
     **kwargs: Any,
 ) -> Any:
-    """Get an LLM instance bound to return a structured output matching response_model."""
-    llm = _build_llm(provider, **kwargs)
+    """Get an LLM instance bound to return structured output.
+
+    If *instance* is provided, it is used directly instead of
+    building from the factory.  This lets users inject a custom
+    LLM (LangChain model, callable, etc.) and still get
+    structured output parsing.
+
+    Args:
+        response_model: Pydantic model class for output parsing.
+        provider: Provider identifier for the factory.
+        instance: Pre-built LLM instance to use directly.
+        **kwargs: Provider-specific parameters for the factory.
+
+    Returns:
+        An LLM instance bound to the response model.
+    """
+    llm = instance if instance is not None else _build_llm(provider, **kwargs)
     if hasattr(llm, "with_structured_output"):
         try:
             return llm.with_structured_output(response_model)

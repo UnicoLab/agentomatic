@@ -11,6 +11,7 @@ from .llm import (
     invoke_with_retry,
     record_failover,
     reset_llm,
+    set_llm,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "invoke_with_retry",
     "record_failover",
     "reset_llm",
+    "set_llm",
 ]

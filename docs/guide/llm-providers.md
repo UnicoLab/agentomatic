@@ -293,6 +293,124 @@ result = await llm.ainvoke("Analyze: 'I love this product!'")
 
 ---
 
+## Custom LLM Injection
+
+Every `get_llm*` function accepts an `instance=` keyword argument so
+you can **bypass the factory** and inject a pre-built LLM directly.
+This is the recommended approach for custom models, fine-tuned endpoints,
+or any LLM that doesn't fit the built-in provider system.
+
+### Inject a Global Custom LLM
+
+The simplest way is `set_llm()` — it stores your model as the global
+singleton used by all agents, pipelines, and the platform:
+
+```python
+from agentomatic.providers import set_llm, get_llm
+
+# Any object with ainvoke/invoke works (LangChain models, etc.)
+from langchain_openai import ChatOpenAI
+
+set_llm(ChatOpenAI(model="gpt-4o", temperature=0.2))
+
+# Now every get_llm() call returns your custom model
+llm = get_llm()  # → your ChatOpenAI instance
+```
+
+Or equivalently via `get_llm(instance=...)`:
+
+```python
+from agentomatic.providers import get_llm
+
+llm = get_llm(instance=ChatOpenAI(model="gpt-4o"))
+```
+
+### Named Custom Instances
+
+Use `get_named_llm(instance=...)` for per-role models:
+
+```python
+from agentomatic.providers import get_named_llm
+
+get_named_llm("judge", instance=my_judge_model)
+get_named_llm("fast",  instance=my_fast_model)
+
+# Later lookups return the cached instance
+judge = get_named_llm("judge")  # → my_judge_model
+```
+
+### Structured Output with Custom LLMs
+
+```python
+from agentomatic.providers import get_structured_llm
+
+structured = get_structured_llm(
+    SentimentResult,
+    instance=my_custom_llm,   # bypasses the factory
+)
+```
+
+### Async / Sync Callables
+
+Any async or sync callable matching `(prompt, *, system_prompt=None) → str`
+works everywhere:
+
+```python
+from agentomatic.providers import set_llm
+
+# Async callable
+async def my_llm(prompt: str, *, system_prompt: str | None = None) -> str:
+    return await my_inference_api(prompt, system=system_prompt)
+
+set_llm(my_llm)
+
+# Sync callable (run in executor automatically)
+def my_sync_llm(prompt: str, *, system_prompt: str | None = None) -> str:
+    return requests.post("https://my-api/v1/chat", json={"prompt": prompt}).text
+
+set_llm(my_sync_llm)
+```
+
+### LLMSpec — Custom Models in the Optimize Pipeline
+
+The `optimize` module (prompt optimizers, metrics, synthesizers) uses the
+`LLMSpec` type — a union of `str | LLMCallable` — so you can pass
+custom callables to **every** optimization component:
+
+```python
+from agentomatic.optimize import (
+    LLMSpec,
+    LLMCallable,
+    call_llm,
+    call_llm_json,
+    PromptOptimizer,
+    PromptFitter,
+)
+
+# Custom callable
+async def my_eval_llm(prompt: str, *, system_prompt: str | None = None) -> str:
+    return await my_api.complete(prompt, system=system_prompt)
+
+# Use in optimizer
+optimizer = PromptOptimizer(
+    agent="my_agent",
+    llm=my_eval_llm,         # Custom callable ✓
+    rewrite_llm="openai/gpt-4o",  # String spec ✓
+)
+
+# Use directly
+text = await call_llm(my_eval_llm, "Hello")
+data = await call_llm_json(my_eval_llm, "Return {\"ok\": true}")
+```
+
+!!! important "Graceful degradation"
+    If your callable raises an exception, `call_llm()` catches it and
+    returns an empty string `""` with a warning log — matching the
+    resilience behavior of the string-model path. Your optimisation
+    pipeline will never crash due to a transient LLM failure.
+
+---
+
 ## Embedding Providers
 
 Embeddings follow the same singleton pattern via `get_embeddings`:

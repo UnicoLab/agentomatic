@@ -51,6 +51,7 @@ from agentomatic.optimize.search_space import PromptSearchSpace
 
 if TYPE_CHECKING:
     from agentomatic.optimize.context import OptimizationContext
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
 # Perspectives used by MIPRO-like instruction generation
@@ -177,7 +178,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
     """
 
     name: str = "rewrite"
-    model: str = "ollama/qwen2.5:7b"
+    model: LLMSpec = "ollama/qwen2.5:7b"
     max_failures: int = 5
 
     async def propose(
@@ -557,7 +558,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
     """
 
     name: str = "mipro_like"
-    model: str = "ollama/qwen2.5:7b"
+    model: LLMSpec = "ollama/qwen2.5:7b"
     n_instruction_candidates: int = 5
     n_few_shot_candidates: int = 3
     fuse_top_k: int = 2
@@ -858,8 +859,8 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
     """
 
     name: str = "gepa_like"
-    judge_model: str = "ollama/qwen2.5:7b"
-    rewrite_model: str = "ollama/qwen2.5:7b"
+    judge_model: LLMSpec = "ollama/qwen2.5:7b"
+    rewrite_model: LLMSpec = "ollama/qwen2.5:7b"
     n_mutations: int = 3
 
     # Default mutation aspects when fewer categories are found in feedback
@@ -1444,8 +1445,8 @@ def _build_failure_summary(
 
 def resolve_fitter_optimizer(
     name: str | BaseFitterOptimizer,
-    model: str = "ollama/qwen2.5:7b",
-    rewrite_model: str | None = None,
+    model: LLMSpec = "ollama/qwen2.5:7b",
+    rewrite_model: LLMSpec | None = None,
     **kwargs: Any,
 ) -> BaseFitterOptimizer:
     """Resolve a fitter optimizer by name or pass through an existing instance.

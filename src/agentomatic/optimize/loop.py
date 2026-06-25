@@ -72,7 +72,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 from agentomatic.optimize.events import (
     CallbackManager,
@@ -373,7 +376,7 @@ class PromptOptimizationLoop:
         threshold: float = 0.3,
         language: str = "English",
         strategy: str = "iterative",
-        rewrite_llm: Any = None,
+        rewrite_llm: LLMSpec | None = None,
         callbacks: list[OptimizationCallback] | None = None,
         acceptance_policy: str = "best",
     ):

@@ -43,7 +43,7 @@ import json
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -76,6 +76,9 @@ from agentomatic.optimize.metrics import (
 )
 from agentomatic.optimize.runner import AgentRunner, RunResult
 from agentomatic.optimize.search_space import PromptSearchSpace
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -164,8 +167,8 @@ class PromptFitter:
         self,
         agent: str,
         base_prompt_version: str = "v1",
-        task_model: str = "ollama/qwen2.5:7b",
-        rewrite_model: str | None = None,
+        task_model: LLMSpec = "ollama/qwen2.5:7b",
+        rewrite_model: LLMSpec | None = None,
         local_judges: list[str] | None = None,
         search_space: PromptSearchSpace | None = None,
         optimizer: str | Any = "gepa_like",

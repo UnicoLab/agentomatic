@@ -21,9 +21,12 @@ import difflib
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
 # Result container
@@ -162,7 +165,7 @@ class LLMJudgeMetric(BaseMetric):
     def __init__(
         self,
         criteria: str,
-        model: str = "ollama/mistral:7b",
+        model: LLMSpec = "ollama/mistral:7b",
         name: str = "llm_judge",
     ):
         self.criteria = criteria
@@ -222,10 +225,11 @@ class LLMJudgeMetric(BaseMetric):
     ) -> EvalResult:
         """Fallback LLM-based evaluation without deepeval."""
         try:
-            import httpx
+            from agentomatic.optimize.llm_types import call_llm
 
             prompt = (
-                f"You are an evaluation judge. Score the following response on a scale of 0.0 to 1.0.\n\n"
+                "You are an evaluation judge. Score the following "
+                "response on a scale of 0.0 to 1.0.\n\n"
                 f"CRITERIA: {self.criteria}\n\n"
                 f"QUESTION: {query}\n\n"
                 f"RESPONSE: {response}\n\n"
@@ -234,31 +238,20 @@ class LLMJudgeMetric(BaseMetric):
                 prompt += f"EXPECTED ANSWER: {expected}\n\n"
             prompt += 'Reply with ONLY a JSON object: {"score": 0.X, "reason": "..."}\n'
 
-            # Try Ollama API
-            async with httpx.AsyncClient(timeout=30) as client:
-                model_name = (
-                    self.model.replace("ollama/", "")
-                    if self.model.startswith("ollama/")
-                    else self.model
-                )
-                resp = await client.post(
-                    "http://localhost:11434/api/generate",
-                    json={"model": model_name, "prompt": prompt, "stream": False},
-                )
-                if resp.status_code == 200:
-                    import json as json_mod
+            text = await call_llm(self.model, prompt)
 
-                    text = resp.json().get("response", "")
-                    # Try to parse JSON from response
-                    for line in text.split("\n"):
-                        line = line.strip()
-                        if line.startswith("{"):
-                            data = json_mod.loads(line)
-                            return EvalResult(
-                                metric_name=self.name,
-                                score=float(data.get("score", 0.0)),
-                                reason=data.get("reason", ""),
-                            )
+            import json as json_mod
+
+            # Try to parse JSON from response
+            for line in text.split("\n"):
+                line = line.strip()
+                if line.startswith("{"):
+                    data = json_mod.loads(line)
+                    return EvalResult(
+                        metric_name=self.name,
+                        score=float(data.get("score", 0.0)),
+                        reason=data.get("reason", ""),
+                    )
         except Exception as exc:
             logger.warning(f"LLM judge fallback failed: {exc}")
 
@@ -334,7 +327,7 @@ class GEvalMetric(BaseMetric):
         name: str = "geval",
         criteria: str = "Is the response correct and relevant?",
         evaluation_steps: list[str] | None = None,
-        model: str = "ollama/mistral:7b",
+        model: LLMSpec = "ollama/mistral:7b",
     ):
         self.name = name
         self.criteria = criteria
@@ -391,7 +384,7 @@ class GEvalMetric(BaseMetric):
     ) -> EvalResult:
         """Raw Ollama call when deepeval is not available."""
         try:
-            import httpx
+            from agentomatic.optimize.llm_types import call_llm
 
             steps_text = ""
             if self.evaluation_steps:
@@ -400,8 +393,10 @@ class GEvalMetric(BaseMetric):
                 )
 
             prompt = (
-                "You are an evaluation judge using chain-of-thought reasoning.\n"
-                "Score the following response on a scale of 0.0 to 1.0.\n\n"
+                "You are an evaluation judge using "
+                "chain-of-thought reasoning.\n"
+                "Score the following response on a scale of "
+                "0.0 to 1.0.\n\n"
                 f"CRITERIA: {self.criteria}\n"
                 f"{steps_text}\n\n"
                 f"QUESTION: {query}\n\n"
@@ -410,33 +405,27 @@ class GEvalMetric(BaseMetric):
             if expected:
                 prompt += f"EXPECTED ANSWER: {expected}\n\n"
             prompt += (
-                "Think step-by-step, then reply with ONLY a JSON object:\n"
+                "Think step-by-step, then reply with ONLY a "
+                "JSON object:\n"
                 '{"score": 0.X, "reason": "..."}\n'
             )
 
-            async with httpx.AsyncClient(timeout=30) as client:
-                model_name = (
-                    self.model.replace("ollama/", "")
-                    if self.model.startswith("ollama/")
-                    else self.model
-                )
-                resp = await client.post(
-                    "http://localhost:11434/api/generate",
-                    json={"model": model_name, "prompt": prompt, "stream": False},
-                )
-                if resp.status_code == 200:
-                    import json as json_mod
+            text = await call_llm(self.model, prompt)
 
-                    text = resp.json().get("response", "")
-                    for line in text.split("\n"):
-                        line = line.strip()
-                        if line.startswith("{"):
-                            data = json_mod.loads(line)
-                            return EvalResult(
-                                metric_name=self.name,
-                                score=max(0.0, min(1.0, float(data.get("score", 0.0)))),
-                                reason=data.get("reason", ""),
-                            )
+            import json as json_mod
+
+            for line in text.split("\n"):
+                line = line.strip()
+                if line.startswith("{"):
+                    data = json_mod.loads(line)
+                    return EvalResult(
+                        metric_name=self.name,
+                        score=max(
+                            0.0,
+                            min(1.0, float(data.get("score", 0.0))),
+                        ),
+                        reason=data.get("reason", ""),
+                    )
         except Exception as exc:
             logger.warning("GEvalMetric fallback failed: %s", exc)
 
@@ -518,7 +507,7 @@ class RedTeamMetric(BaseMetric):
     def __init__(
         self,
         name: str = "red_team",
-        model: str = "ollama/mistral:7b",
+        model: LLMSpec = "ollama/mistral:7b",
         harm_keywords: list[str] | None = None,
     ):
         self.name = name
@@ -626,7 +615,7 @@ _DEEPEVAL_METRICS: dict[str, str] = {
 }
 
 
-def _make_deepeval_metric(name: str, model: str, **kwargs: Any) -> BaseMetric:
+def _make_deepeval_metric(name: str, model: LLMSpec, **kwargs: Any) -> BaseMetric:
     """Create a DeepEval metric wrapped as BaseMetric.
 
     Uses ``deepeval.evaluate()`` internally for metrics that support
@@ -723,7 +712,7 @@ def _make_deepeval_metric(name: str, model: str, **kwargs: Any) -> BaseMetric:
 
 def resolve_metrics(
     metrics: list[str | BaseMetric],
-    model: str = "ollama/mistral:7b",
+    model: LLMSpec = "ollama/mistral:7b",
 ) -> list[BaseMetric]:
     """Resolve metric names/instances to BaseMetric objects.
 
@@ -752,7 +741,7 @@ def resolve_metrics(
     return resolved
 
 
-def _resolve_single(name: str, model: str) -> BaseMetric:
+def _resolve_single(name: str, model: LLMSpec) -> BaseMetric:
     """Resolve a single metric name to a BaseMetric instance."""
 
     # ── geval:criteria shorthand ─────────────────────────────────

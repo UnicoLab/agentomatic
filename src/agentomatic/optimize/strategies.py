@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from loguru import logger
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 
 @dataclass
@@ -68,7 +69,7 @@ class IterativeRewrite(OptimizationStrategy):
 
     name = "iterative_rewrite"
 
-    def __init__(self, model: str = "ollama/mistral:7b", max_failures: int = 5):
+    def __init__(self, model: LLMSpec = "ollama/mistral:7b", max_failures: int = 5):
         self.model = model
         self.max_failures = max_failures
 
@@ -119,24 +120,16 @@ class IterativeRewrite(OptimizationStrategy):
 
     async def _call_llm(self, prompt: str) -> str:
         """Call LLM for prompt rewriting."""
-        import httpx
+        from agentomatic.optimize.llm_caller import LLMCaller
 
-        model_name = (
-            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+        result = await LLMCaller.call(
+            self.model,
+            prompt,
+            temperature=0.7,
         )
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    "http://localhost:11434/api/generate",
-                    json={"model": model_name, "prompt": prompt, "stream": False},
-                )
-                if resp.status_code == 200:
-                    return str(resp.json().get("response", "")).strip()
-        except Exception as exc:
-            logger.warning(f"LLM call failed: {exc}")
-
-        # Fallback: return current prompt with a hint
-        return prompt + "\n\n(Optimization LLM unavailable — manual revision needed)"
+        if not result:
+            return prompt + "\n\n(Optimization LLM unavailable — manual revision needed)"
+        return result
 
 
 class FewShotBootstrap(OptimizationStrategy):
@@ -151,7 +144,7 @@ class FewShotBootstrap(OptimizationStrategy):
 
     name = "few_shot_bootstrap"
 
-    def __init__(self, n_examples: int = 5, model: str = "ollama/mistral:7b"):
+    def __init__(self, n_examples: int = 5, model: LLMSpec = "ollama/mistral:7b"):
         self.n_examples = n_examples
         self.model = model
 
@@ -204,7 +197,7 @@ class ChainOfThought(OptimizationStrategy):
 
     name = "chain_of_thought"
 
-    def __init__(self, model: str = "ollama/mistral:7b"):
+    def __init__(self, model: LLMSpec = "ollama/mistral:7b"):
         self.model = model
 
     async def step(
@@ -276,7 +269,7 @@ class MIPRO(OptimizationStrategy):
 
     def __init__(
         self,
-        model: str = "ollama/mistral:7b",
+        model: LLMSpec = "ollama/mistral:7b",
         n_candidates: int = 5,
         fuse_top_k: int = 2,
     ):
@@ -371,22 +364,13 @@ class MIPRO(OptimizationStrategy):
 
     async def _call_llm(self, prompt: str) -> str:
         """Call LLM."""
-        import httpx
+        from agentomatic.optimize.llm_caller import LLMCaller
 
-        model_name = (
-            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+        return await LLMCaller.call(
+            self.model,
+            prompt,
+            temperature=0.7,
         )
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    "http://localhost:11434/api/generate",
-                    json={"model": model_name, "prompt": prompt, "stream": False},
-                )
-                if resp.status_code == 200:
-                    return str(resp.json().get("response", "")).strip()
-        except Exception as exc:
-            logger.warning(f"MIPRO LLM call failed: {exc}")
-        return ""
 
 
 class BootstrapRandomSearch(OptimizationStrategy):
@@ -408,7 +392,7 @@ class BootstrapRandomSearch(OptimizationStrategy):
 
     def __init__(
         self,
-        model: str = "ollama/mistral:7b",
+        model: LLMSpec = "ollama/mistral:7b",
         n_candidates: int = 8,
         k_examples: int = 4,
     ):
@@ -493,7 +477,7 @@ class EnsembleOptimizer(OptimizationStrategy):
 
     name = "ensemble"
 
-    def __init__(self, model: str = "ollama/mistral:7b"):
+    def __init__(self, model: LLMSpec = "ollama/mistral:7b"):
         self.model = model
         self._strategies = [
             IterativeRewrite(model=model),
@@ -531,6 +515,8 @@ class EnsembleOptimizer(OptimizationStrategy):
 
     async def _fuse(self, candidates: list[str], original: str) -> str:
         """Fuse strategy outputs into one optimal prompt."""
+        from agentomatic.optimize.llm_caller import LLMCaller
+
         parts = "\n\n---\n\n".join(
             f"Strategy {i + 1}:\n```\n{c[:500]}\n```" for i, c in enumerate(candidates)
         )
@@ -543,24 +529,15 @@ class EnsembleOptimizer(OptimizationStrategy):
             f"Reply with ONLY the fused prompt text.\n"
         )
 
-        model_name = (
-            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+        result = await LLMCaller.call(
+            self.model,
+            prompt,
+            temperature=0.7,
         )
-        try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    "http://localhost:11434/api/generate",
-                    json={"model": model_name, "prompt": prompt, "stream": False},
-                )
-                if resp.status_code == 200:
-                    return str(resp.json().get("response", "")).strip()
-        except Exception:
-            pass
-
-        # Fallback: return the longest candidate (typically most detailed)
-        return max(candidates, key=len)
+        if not result:
+            # Fallback: return the longest candidate (typically most detailed)
+            return max(candidates, key=len)
+        return result
 
 
 # =====================================================================
@@ -582,7 +559,7 @@ _STRATEGIES: dict[str, type[OptimizationStrategy]] = {
 
 def resolve_strategy(
     name: str | OptimizationStrategy,
-    model: str = "ollama/mistral:7b",
+    model: LLMSpec = "ollama/mistral:7b",
 ) -> OptimizationStrategy:
     """Resolve a strategy name to an instance."""
     if isinstance(name, OptimizationStrategy):

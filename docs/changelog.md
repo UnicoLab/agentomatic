@@ -34,6 +34,35 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   - Auto-schema detection and delegation
   - 99 tests with full platform integration
 
+- **Custom LLM Injection — Pluggable Models Everywhere**
+  - `set_llm()` — inject a custom LLM as the global singleton
+  - `get_llm(instance=...)`, `get_named_llm(instance=...)`,
+    `get_structured_llm(instance=...)` — bypass factory with pre-built LLMs
+  - `LLMSpec = str | LLMCallable` type in the `optimize` module —
+    all optimizers, metrics, synthesizers, and fitters accept custom callables
+  - `call_llm()` / `call_llm_json()` — unified dispatch with graceful
+    error handling (string, async/sync callable, LangChain model)
+  - `PromptFitterBridge` accepts `LLMSpec` for `task_model` / `rewrite_model`
+  - Eliminated 5 raw `httpx` Ollama calls — all LLM traffic goes through
+    `LLMCaller` or `call_llm()`
+
+### Changed
+
+- **Studio enabled by default** — `agentomatic run` now enables Studio
+  at `/studio/ui/` by default. Use `--no-studio` to disable.
+- **Studio resilience** — branded error pages (503) when Studio is
+  disabled or assets are missing, instead of raw 404s.
+
+### Fixed
+
+- Fixed literal `\\n` characters appearing in generated `__init__.py` files
+  from `agentomatic init` templates.
+- Added `from __future__ import annotations` to `plugins/__init__.py` and
+  `demo/__init__.py` per project rules.
+- Fixed `protocols/__init__.py` missing re-exports and `__all__`.
+- Fixed `Makefile` `check-ci` target using auto-fix `format` instead of
+  read-only `format-check`.
+
 ---
 
 ## [0.3.0] - 2026-06-18

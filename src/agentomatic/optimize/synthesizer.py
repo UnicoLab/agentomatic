@@ -19,11 +19,15 @@ All generation uses LLM calls — configurable model.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from agentomatic.optimize.dataset import DataPoint, Dataset
+from agentomatic.optimize.llm_caller import LLMCaller
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 
 class DataSynthesizer:
@@ -55,7 +59,7 @@ class DataSynthesizer:
 
     def __init__(
         self,
-        model: str = "ollama/mistral:7b",
+        model: LLMSpec = "ollama/mistral:7b",
         temperature: float = 0.8,
         api_base: str = "http://localhost:11434",
     ):
@@ -409,30 +413,12 @@ class DataSynthesizer:
         return points
 
     async def _call_llm(self, prompt: str) -> str:
-        """Call LLM API."""
-        import httpx
-
-        model_name = (
-            self.model.replace("ollama/", "") if self.model.startswith("ollama/") else self.model
+        """Call LLM API via the unified LLMCaller."""
+        return await LLMCaller.call(
+            self.model,
+            prompt,
+            temperature=self.temperature,
         )
-
-        try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                resp = await client.post(
-                    f"{self.api_base}/api/generate",
-                    json={
-                        "model": model_name,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {"temperature": self.temperature},
-                    },
-                )
-                if resp.status_code == 200:
-                    return str(resp.json().get("response", ""))
-        except Exception as exc:
-            logger.warning(f"LLM call failed: {exc}")
-
-        return ""
 
     # =================================================================
     # DeepEval Integration
@@ -639,7 +625,7 @@ class DataSynthesizer:
 async def generate_dataset(
     description: str,
     n_samples: int = 30,
-    model: str = "ollama/mistral:7b",
+    model: LLMSpec = "ollama/mistral:7b",
     categories: list[str] | None = None,
     **kwargs: Any,
 ) -> Dataset:
@@ -667,7 +653,7 @@ async def augment_dataset(
     dataset: Dataset,
     strategies: list[str] | None = None,
     multiplier: int = 3,
-    model: str = "ollama/mistral:7b",
+    model: LLMSpec = "ollama/mistral:7b",
 ) -> Dataset:
     """Convenience function to augment a dataset.
 
@@ -692,7 +678,7 @@ async def augment_dataset(
 async def generate_from_docs(
     document_paths: list[str],
     n_samples: int = 30,
-    model: str = "ollama/mistral:7b",
+    model: LLMSpec = "ollama/mistral:7b",
 ) -> Dataset:
     """Convenience function to generate dataset from documents.
 
@@ -712,7 +698,7 @@ async def generate_from_docs(
 async def red_team(
     agent_description: str,
     n_samples: int = 20,
-    model: str = "ollama/mistral:7b",
+    model: LLMSpec = "ollama/mistral:7b",
     vulnerabilities: list[str] | None = None,
 ) -> Dataset:
     """Convenience function for red team adversarial testing.

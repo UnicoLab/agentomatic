@@ -15,11 +15,14 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from agentomatic.optimize.metrics import BaseMetric, EvalResult, MetricResult
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
 # Local SLM Judge
@@ -48,7 +51,7 @@ class LocalJudgeMetric(BaseMetric):
     def __init__(
         self,
         name: str = "local_judge",
-        model: str = "ollama/qwen2.5:7b",
+        model: LLMSpec = "ollama/qwen2.5:7b",
         criteria: str = "Evaluate the quality and correctness of the response.",
         dimensions: list[str] | None = None,
         weight: float = 1.0,

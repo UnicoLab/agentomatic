@@ -364,7 +364,11 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
 @click.option("--title", default=None, help="Platform title")
 @click.option("--log-level", default="INFO", help="Log level")
 @click.option("--with-ui", "--ui", is_flag=True, help="Enable Chainlit debug UI at /chat")
-@click.option("--studio", is_flag=True, help="Enable Agentomatic Studio debug UI at /studio/ui")
+@click.option(
+    "--studio/--no-studio",
+    default=True,
+    help="Enable Agentomatic Studio debug UI at /studio/ui (default: on)",
+)
 def run(
     agents_dir: str,
     plugins_dir: str,

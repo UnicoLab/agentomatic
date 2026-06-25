@@ -21,6 +21,9 @@ format: ## Auto-format code
 	uv run ruff check --fix src/agentomatic/ tests/
 	uv run ruff format src/agentomatic/ tests/
 
+format-check: ## Verify formatting (read-only, for CI)
+	uv run ruff format --check src/agentomatic/ tests/
+
 typecheck: ## Run mypy type checking
 	uv run mypy src/agentomatic/ --ignore-missing-imports
 
@@ -107,7 +110,7 @@ structure: ## Show package structure
 check-all: lint typecheck test docs-check ## Run all quality checks
 	@echo "✅ All checks passed!"
 
-check-ci: lint format typecheck test-cov docs-check ## Full CI parity check (lint + format + typecheck + coverage)
+check-ci: lint format-check typecheck test-cov docs-check ## Full CI parity check (lint + format-check + typecheck + coverage)
 	@echo "✅ CI check passed!"
 
 # === Help ===
