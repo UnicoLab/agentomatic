@@ -15,6 +15,7 @@ from loguru import logger
 from .context import PipelineContext
 from .models import (
     AgentStepConfig,
+    EndpointStepConfig,
     ErrorPolicy,
     LoopStepConfig,
     ParallelStepConfig,
@@ -28,6 +29,7 @@ from .models import (
 )
 from .steps import (
     execute_agent_step,
+    execute_endpoint_step,
     execute_loop_step,
     execute_parallel_step,
     execute_transform_step,
@@ -36,6 +38,7 @@ from .steps import (
 
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
+    from agentomatic.endpoints.registry import EndpointRegistry
 
 
 class PipelineEngine:
@@ -63,10 +66,12 @@ class PipelineEngine:
         config: PipelineConfig,
         registry: AgentRegistry,
         sub_pipelines: dict[str, PipelineConfig] | None = None,
+        endpoints: EndpointRegistry | None = None,
     ) -> None:
         self.config = config
         self.registry = registry
         self.sub_pipelines = sub_pipelines or {}
+        self.endpoints = endpoints
 
     def validate(self) -> list[str]:
         """Pre-flight validation of the pipeline.
@@ -103,6 +108,17 @@ class PipelineEngine:
             if isinstance(step, SubPipelineStepConfig):
                 if step.pipeline not in self.sub_pipelines:
                     errors.append(f"Sub-pipeline '{step.pipeline}' not found")
+
+        # Check endpoint references
+        required_endpoints = self.config.get_endpoint_names()
+        if required_endpoints:
+            available = set(self.endpoints.list_names()) if self.endpoints else set()
+            for endpoint_name in required_endpoints:
+                if endpoint_name not in available:
+                    errors.append(
+                        f"Endpoint '{endpoint_name}' not found in registry. "
+                        f"Available: {sorted(available)}"
+                    )
 
         return errors
 
@@ -255,6 +271,18 @@ class PipelineEngine:
                 )
             return await execute_agent_step(step_config, ctx, self.registry)
 
+        elif isinstance(step_config, EndpointStepConfig):
+            if step_config.retry:
+                return await execute_with_retry(
+                    execute_endpoint_step,
+                    step_config,
+                    ctx,
+                    self.endpoints,
+                    retry_config=step_config.retry,
+                    on_error=step_config.on_error,
+                )
+            return await execute_endpoint_step(step_config, ctx, self.endpoints)
+
         elif isinstance(step_config, TransformStepConfig):
             return await execute_transform_step(step_config, ctx)
 
@@ -403,6 +431,11 @@ class PipelineEngine:
                 lines.append(f'    {node_id}[["🔄 {step.name} (max {step.max_iterations})"]]')
                 lines.append(f"    {prev} --> {node_id}")
                 lines.append(f"    {node_id} -. loop .-> {node_id}")
+                prev = node_id
+
+            elif isinstance(step, EndpointStepConfig):
+                lines.append(f'    {node_id}[/"🌐 {step.name} ({step.endpoint})"/]')
+                lines.append(f"    {prev} --> {node_id}")
                 prev = node_id
 
             elif isinstance(step, TransformStepConfig):

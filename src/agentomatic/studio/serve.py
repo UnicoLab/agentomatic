@@ -176,7 +176,7 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
 
         # Still mount a helpful error page so the user doesn't get
         # an opaque 404.
-        @app.get(f"{prefix}/{{filename:path}}", response_model=None)
+        @app.get(f"{prefix}/{{filename:path}}", response_model=None, include_in_schema=False)
         async def studio_assets_missing(
             request: Request,
             filename: str,
@@ -207,7 +207,7 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
         )
 
     # Serve root-level assets (favicon, manifest, robots.txt, etc.)
-    @app.get(f"{prefix}/{{filename:path}}", response_model=None)
+    @app.get(f"{prefix}/{{filename:path}}", response_model=None, include_in_schema=False)
     async def studio_spa(
         request: Request,
         filename: str,
@@ -245,7 +245,7 @@ def mount_studio_disabled_page(
     """
     prefix = path_prefix.rstrip("/")
 
-    @app.get(f"{prefix}/{{filename:path}}", response_model=None)
+    @app.get(f"{prefix}/{{filename:path}}", response_model=None, include_in_schema=False)
     async def studio_disabled(
         request: Request,
         filename: str,

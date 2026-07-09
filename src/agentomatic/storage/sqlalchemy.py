@@ -69,21 +69,29 @@ class SQLAlchemyStore(BaseStore):
         pool_recycle: int = 3600,
         pool_pre_ping: bool = True,
         echo: bool = False,
+        engine: Any = None,
     ) -> None:
-        engine_kwargs: dict[str, Any] = {"echo": echo}
-        # SQLite doesn't support pool_size
-        if "sqlite" not in url:
-            engine_kwargs.update(
-                {
-                    "pool_size": pool_size,
-                    "max_overflow": max_overflow,
-                    "pool_recycle": pool_recycle,
-                    "pool_pre_ping": pool_pre_ping,
-                }
-            )
-
         self._url = url
-        self._engine = create_async_engine(url, **engine_kwargs)
+        # Reuse an existing engine (e.g. from a per-agent DatabaseConnection)
+        # so memory shares the agent's own database + pool.
+        if engine is not None:
+            self._owns_engine = False
+            self._engine = engine
+        else:
+            engine_kwargs: dict[str, Any] = {"echo": echo}
+            # SQLite doesn't support pool_size
+            if "sqlite" not in url:
+                engine_kwargs.update(
+                    {
+                        "pool_size": pool_size,
+                        "max_overflow": max_overflow,
+                        "pool_recycle": pool_recycle,
+                        "pool_pre_ping": pool_pre_ping,
+                    }
+                )
+            self._owns_engine = True
+            self._engine = create_async_engine(url, **engine_kwargs)
+
         self._session_factory = async_sessionmaker(
             self._engine,
             expire_on_commit=False,
@@ -103,9 +111,15 @@ class SQLAlchemyStore(BaseStore):
         logger.info("🗄️ Database tables created/verified")
 
     async def close(self) -> None:
-        """Dispose the engine and release all pooled connections."""
-        await self._engine.dispose()
-        logger.info("🗄️ Database connection pool closed")
+        """Dispose the engine and release all pooled connections.
+
+        When the store was created from a shared engine (e.g. a per-agent
+        :class:`~agentomatic.connections.database.DatabaseConnection`), the
+        engine is owned by that connection and is *not* disposed here.
+        """
+        if self._owns_engine:
+            await self._engine.dispose()
+            logger.info("🗄️ Database connection pool closed")
 
     async def health_check(self) -> dict[str, Any]:
         """Verify database connectivity."""

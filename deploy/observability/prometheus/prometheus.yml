@@ -1,0 +1,28 @@
+# Prometheus scrape configuration for Agentomatic.
+#
+# Assumes your Agentomatic app exposes /metrics (enable_metrics=True).
+# When running the app on the host (outside docker), Prometheus reaches it
+# via host.docker.internal. Adjust targets for your environment.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: agentomatic
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "host.docker.internal:8000"
+        labels:
+          service: agentomatic
+
+  - job_name: otel-collector
+    static_configs:
+      - targets:
+          - "otel-collector:8888"
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - "localhost:9090"

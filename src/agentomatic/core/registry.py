@@ -154,6 +154,11 @@ class AgentRegistry:
         if agent.delegation_config:
             enhancements.append("+delegation")
 
+        # connections.py → per-agent connection configs
+        agent.connections = self._discover_connections(module_path, agent_name)
+        if agent.connections:
+            enhancements.append("+connections")
+
         # Register
         self._agents[agent_name] = agent
         extras = " ".join(enhancements) if enhancements else "(minimal)"
@@ -243,6 +248,21 @@ class AgentRegistry:
             return getattr(sec_mod, "policy", None)
         except ImportError:
             return None
+
+    def _discover_connections(self, module_path: str, agent_name: str) -> Any:
+        """Try to import connection configs from agent's ``connections.py``.
+
+        Looks for a ``connections`` (or ``CONNECTIONS``) attribute containing
+        a list of connection configuration objects.
+        """
+        try:
+            conn_mod = importlib.import_module(f"{module_path}.connections")
+        except ImportError:
+            return None
+        configs = getattr(conn_mod, "connections", None) or getattr(conn_mod, "CONNECTIONS", None)
+        if configs:
+            return list(configs)
+        return None
 
     def _discover_delegation(self, module_path: str, agent_name: str) -> Any:
         """Try to import delegation config from agent's ``delegation.py``."""

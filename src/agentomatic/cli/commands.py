@@ -188,6 +188,8 @@ def cli(ctx: click.Context, version: bool) -> None:
             "custom",
             "legacy_dict",
             "plugin",
+            "endpoint",
+            "connection",
         ]
     ),
     default=None,
@@ -261,6 +263,10 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
 
     if template == "plugin":
         edit_file = "plugin.py"
+    elif template == "endpoint":
+        edit_file = "endpoint.py"
+    elif template == "connection":
+        edit_file = "connections.py"
     elif template in ["legacy_dict", "custom"]:
         edit_file = "nodes.py" if template == "legacy_dict" else "__init__.py"
     elif template == "pipeline":
