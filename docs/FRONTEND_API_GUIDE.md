@@ -363,6 +363,114 @@ agent prefix `/api/v1/{agent_name}`.
 
 ---
 
+## Platform Surfaces (beyond a single agent)
+
+Besides the per-agent endpoints above, the platform exposes cross-cutting
+surfaces a frontend can consume. These power the **Agentomatic Studio** views
+(Control, Endpoints, Connections, Pipelines, Plugins).
+
+### Control Plane
+
+Mounted at `{api_prefix}/control` when `enable_control_plane=True`. Mutating
+calls require the `X-Control-Token` header if a `control_token` is configured.
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/api/v1/control` | Platform overview (counts, uptime, maintenance flag) |
+| `GET` | `/api/v1/control/agents` | Agents with health, effective auth policy, connections |
+| `GET` | `/api/v1/control/agents/{name}` | Single-agent operational detail |
+| `GET` | `/api/v1/control/endpoints` | Registered custom endpoints |
+| `GET` | `/api/v1/control/connections` | Connection health by scope |
+| `GET` | `/api/v1/control/health` | Aggregate health (agents + connections) |
+| `GET` | `/api/v1/control/metrics/summary` | Coarse counters for dashboards |
+| `GET` | `/api/v1/control/config` | Sanitised feature/config snapshot |
+| `POST` | `/api/v1/control/agents/{name}/disable` | Drain an agent (503 for its routes) |
+| `POST` | `/api/v1/control/agents/{name}/enable` | Re-enable an agent |
+| `POST` | `/api/v1/control/maintenance` | Toggle maintenance mode (`{ "enabled": bool }`) |
+
+```typescript
+// Overview + agent list
+const info = await fetch("/api/v1/control").then((r) => r.json());
+const agents = await fetch("/api/v1/control/agents").then((r) => r.json());
+
+// Drain an agent (requires control token when configured)
+await fetch("/api/v1/control/agents/fraud_agent/disable", {
+  method: "POST",
+  headers: { "X-Control-Token": CONTROL_TOKEN },
+});
+```
+
+```typescript
+/** Maps to ControlAgentInfo (control/models.py) */
+interface ControlAgentInfo {
+  name: string;
+  slug: string;
+  description: string;
+  version: string;
+  framework: string;
+  enabled: boolean;
+  requires_auth: boolean;
+  allowed_roles: string[];
+  allowed_scopes: string[];
+  connections: string[];
+  health: Record<string, any>;
+}
+
+/** Maps to ControlEndpointInfo */
+interface ControlEndpointInfo {
+  name: string;
+  description: string;
+  version: string;
+  path: string;
+  methods: string[];
+  aggregation: string;
+  upstreams: string[];
+  ready: boolean;
+}
+
+/** Maps to ControlConnectionInfo */
+interface ControlConnectionInfo {
+  scope: string;
+  connections: Record<string, any>;
+}
+```
+
+### Custom Endpoints
+
+Each custom endpoint is mounted under `{api_prefix}/endpoints/{name}`. The main
+handler lives at the endpoint's configurable `path` (default `/call`), with
+`/health` and `/info` alongside it. List all endpoints via `GET
+/api/v1/endpoints` or the control plane. Use these to enrich a UI with
+model-ensemble results.
+
+```typescript
+// Default handler path is `/call` (override via the endpoint's `path` attr)
+const result = await fetch("/api/v1/endpoints/ensemble/call", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ payload: { text: "classify me" } }),
+}).then((r) => r.json());
+```
+
+### Pipelines & Plugins
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/api/v1/pipelines` | List pipelines |
+| `POST` | `/api/v1/pipelines/{name}/run` | Run a pipeline (`{ input, metadata? }`) |
+| `GET` | `/api/v1/pipelines/{name}/validate` | Validate a pipeline |
+| `GET` | `/api/v1/pipelines/{name}/visualize` | Mermaid diagram of the flow |
+| `GET` | `/api/v1/plugins` | List ML plugins |
+| `GET` | `/api/v1/plugins/{name}/model_card` | Plugin model card |
+| `POST` | `/api/v1/plugins/{name}/predict` | Run a plugin prediction |
+
+!!! tip "Auth for platform surfaces"
+    When JWT auth is enabled, send the same `Authorization: Bearer <token>`
+    header used for agent calls. The control plane's **mutating** routes
+    additionally require `X-Control-Token` when a control token is configured.
+
+---
+
 ## Framework Integration Examples
 
 ### React Hook

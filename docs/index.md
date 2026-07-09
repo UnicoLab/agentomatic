@@ -151,7 +151,31 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
 
     Production `Dockerfile` and `docker-compose.yml` included. Distroless variant available for minimal attack surface. CI/CD-ready with GitHub Actions.
 
-    [:octicons-arrow-right-24: Contributing](contributing.md)
+    [:octicons-arrow-right-24: Deployment Guide](guide/deployment.md)
+
+- :material-database-cog:{ .lg .middle } **Per-Agent Connections**
+
+    ---
+
+    Give every agent its **own** authenticated databases, vector stores (RAG), HTTP services, and any custom backend (redis, mongo, …) — declared in `connections.py` with `${ENV}` secrets and purpose tagging.
+
+    [:octicons-arrow-right-24: Connections Guide](guide/connections.md)
+
+- :material-transit-connection-variant:{ .lg .middle } **Custom Endpoints**
+
+    ---
+
+    Expose custom APIs that fan out to multiple deployed models over authenticated upstreams (OAuth2), aggregate results, and feed them into pipelines — no router code.
+
+    [:octicons-arrow-right-24: Endpoints Guide](guide/endpoints.md)
+
+- :material-view-dashboard-edit:{ .lg .middle } **Production Control Plane**
+
+    ---
+
+    Inspect agents, endpoints, and connection health at runtime; drain or re-enable individual agents; toggle maintenance mode — via REST or the Studio Control view.
+
+    [:octicons-arrow-right-24: Control Plane](guide/control-plane.md)
 
 </div>
 

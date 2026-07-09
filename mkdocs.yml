@@ -131,6 +131,7 @@ nav:
     - ML Plugins: guide/ml-plugins.md
     - Testing Your Agents: guide/testing.md
   - Advanced:
+    - Production Deployment: guide/deployment.md
     - Platform Features: guide/platform-features.md
     - Custom Endpoints: guide/endpoints.md
     - Per-Agent Connections: guide/connections.md
