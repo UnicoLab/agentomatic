@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/stacks/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/observability/">
       
       
-        <link rel="prev" href="../pipelines/">
+        <link rel="prev" href="../optimization/">
       
       
-        <link rel="next" href="../llm-providers/">
+        <link rel="next" href="../telemetry/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Configuration Stacks - Agentomatic</title>
+        <title>Observability & Monitoring - Agentomatic</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#stacks-configuration-management" class="md-skip">
+        <a href="#observability-monitoring" class="md-skip">
           Skip to content
         </a>
       
@@ -140,7 +140,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Configuration Stacks
+              Observability & Monitoring
             
           </span>
         </div>
@@ -1245,10 +1245,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../observability/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability & Monitoring
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1264,6 +1291,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-metrics-tracing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling metrics &amp; tracing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-ready-made-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ready-made stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wiring-a-trace-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wiring a trace backend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1329,37 +1431,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration Stacks
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../stacks/" class="md-nav__link">
         
   
   
@@ -1375,93 +1450,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-stackmanager" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The StackManager
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The StackManager">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#loading-a-stack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Loading a Stack
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#stack-yaml-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stack YAML Structure
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Stack YAML Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-stacksproductionyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: stacks/production.yaml
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#using-stack-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using Stack Configuration
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2074,66 +2062,54 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-stackmanager" class="md-nav__link">
+  <a href="#enabling-metrics-tracing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The StackManager
+        Enabling metrics &amp; tracing
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="The StackManager">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#loading-a-stack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Loading a Stack
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#stack-yaml-structure" class="md-nav__link">
+  <a href="#the-ready-made-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stack YAML Structure
+        The ready-made stack
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Stack YAML Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-stacksproductionyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: stacks/production.yaml
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-stack-configuration" class="md-nav__link">
+  <a href="#metrics-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using Stack Configuration
+        Metrics reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wiring-a-trace-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wiring a trace backend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
       
     </span>
   </a>
@@ -2208,80 +2184,186 @@
   
 
 
-<h1 id="stacks-configuration-management">Stacks &amp; Configuration Management<a class="headerlink" href="#stacks-configuration-management" title="Permanent link">&para;</a></h1>
-<p>Agentomatic allows you to bundle and manage multi-environment LLM configurations, databases, authentication, and feature flags into deployable units known as <strong>Stacks</strong>.</p>
-<p>Stacks are defined using YAML files and managed using the <code>StackManager</code>. This allows you to smoothly transition from local development to staging and production without changing code.</p>
-<h2 id="the-stackmanager">The StackManager<a class="headerlink" href="#the-stackmanager" title="Permanent link">&para;</a></h2>
-<p>The <code>StackManager</code> reads YAML stack files, applies environment variables, and interpolates <code>${ENV_VAR}</code> references automatically.</p>
-<h3 id="loading-a-stack">Loading a Stack<a class="headerlink" href="#loading-a-stack" title="Permanent link">&para;</a></h3>
-<p>You can initialize the <code>StackManager</code> to load configurations dynamically:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.stacks.manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">StackManager</span>
+<h1 id="observability-monitoring">Observability &amp; Monitoring<a class="headerlink" href="#observability-monitoring" title="Permanent link">&para;</a></h1>
+<p>Agentomatic ships automatic logging, Prometheus metrics, OpenTelemetry
+tracing, and a <strong>ready-to-run</strong> monitoring stack (Prometheus + OpenTelemetry
+Collector + Grafana) with a pre-provisioned dashboard.</p>
+<h2 id="enabling-metrics-tracing">Enabling metrics &amp; tracing<a class="headerlink" href="#enabling-metrics-tracing" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Load from a directory (looks for local.yaml, prod.yaml, etc.)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mgr</span> <span class="o">=</span> <span class="n">StackManager</span><span class="p">(</span><span class="s2">&quot;stacks/&quot;</span><span class="p">)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">stack</span> <span class="o">=</span> <span class="n">mgr</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;local&quot;</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Or load directly from a file</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">mgr</span> <span class="o">=</span> <span class="n">StackManager</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;stacks/prod.yaml&quot;</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="p">(</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;My Agents&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># exposes GET /metrics for Prometheus</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">enable_tracing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># emits OTLP spans</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
 </span></code></pre></div>
-<h2 id="stack-yaml-structure">Stack YAML Structure<a class="headerlink" href="#stack-yaml-structure" title="Permanent link">&para;</a></h2>
-<p>A complete stack configuration is defined under a <code>StackConfig</code> structure. This includes:</p>
-<ul>
-<li><strong>llm</strong>: Named LLM profiles (e.g. <code>default</code>, <code>fast</code>, <code>judge</code>).</li>
-<li><strong>embedding</strong>: The embedding provider settings.</li>
-<li><strong>database</strong>: Async database connection URL and pool settings.</li>
-<li><strong>features</strong>: Feature flags to toggle components like metrics, streaming, and rate limiting.</li>
-<li><strong>auth</strong>: API Key or JWT authentication settings.</li>
-<li><strong>agent_overrides</strong>: Per-agent specific overrides.</li>
-</ul>
-<h3 id="example-stacksproductionyaml">Example: <code>stacks/production.yaml</code><a class="headerlink" href="#example-stacksproductionyaml" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Production</span><span class="nv"> </span><span class="s">Stack&quot;</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;High-availability</span><span class="nv"> </span><span class="s">production</span><span class="nv"> </span><span class="s">stack</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">failover</span><span class="nv"> </span><span class="s">support&quot;</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">features</span><span class="p">:</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">enable_streaming</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">enable_metrics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">enable_rate_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">enable_db</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nt">database</span><span class="p">:</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgresql+asyncpg://${DB_USER}:${DB_PASS}@${DB_HOST}/agentomatic&quot;</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">pool_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nt">auth</span><span class="p">:</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;jwt&quot;</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="nt">jwks_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://auth.example.com/.well-known/jwks.json&quot;</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="nt">llm</span><span class="p">:</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="nt">default</span><span class="p">:</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;openai&quot;</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gpt-4o&quot;</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${OPENAI_API_KEY}&quot;</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">  </span><span class="nt">fast</span><span class="p">:</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ollama&quot;</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;llama3&quot;</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://internal-ollama:11434&quot;</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="nt">agent_overrides</span><span class="p">:</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">  </span><span class="nt">coder_agent</span><span class="p">:</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;openai&quot;</span>
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;o1-preview&quot;</span>
+<p>Point tracing at any OTLP collector via the standard environment variable:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_EXPORTER_OTLP_ENDPOINT</span><span class="o">=</span>http://localhost:4317
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uvicorn<span class="w"> </span>app:app<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
 </span></code></pre></div>
-<h2 id="using-stack-configuration">Using Stack Configuration<a class="headerlink" href="#using-stack-configuration" title="Permanent link">&para;</a></h2>
-<p>Once loaded, you can access properties and pass them to agents or LLM factories seamlessly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Access a specific LLM configuration profile</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">llm_cfg</span> <span class="o">=</span> <span class="n">mgr</span><span class="o">.</span><span class="n">get_llm_config</span><span class="p">(</span><span class="s2">&quot;fast&quot;</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Access the database URL (interpolated)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">db_url</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">database</span><span class="o">.</span><span class="n">url</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Check feature flags</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">if</span> <span class="n">stack</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">enable_metrics</span><span class="p">:</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Prometheus metrics enabled&quot;</span><span class="p">)</span>
+<h2 id="the-ready-made-stack">The ready-made stack<a class="headerlink" href="#the-ready-made-stack" title="Permanent link">&para;</a></h2>
+<p>A complete stack lives in <code>deploy/observability/</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>deploy/observability/
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── docker-compose.yml            # Prometheus + OTel Collector + Grafana
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├── prometheus/prometheus.yml     # Scrape config for your app
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├── otel-collector/config.yaml    # OTLP receiver + pipelines
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├── grafana/
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│   ├── provisioning/             # Datasource + dashboard providers
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│   └── dashboards/               # Agentomatic Overview dashboard
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>└── README.md
 </span></code></pre></div>
-<p>The stack configuration provides a single source of truth for your agent's ecosystem.</p>
+<p>Bring it up:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/observability
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>URL</th>
+<th>Credentials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Grafana</td>
+<td>http://localhost:3000</td>
+<td><code>admin</code> / <code>admin</code></td>
+</tr>
+<tr>
+<td>Prometheus</td>
+<td>http://localhost:9090</td>
+<td>–</td>
+</tr>
+<tr>
+<td>OTLP gRPC</td>
+<td><code>localhost:4317</code></td>
+<td>–</td>
+</tr>
+<tr>
+<td>OTLP HTTP</td>
+<td><code>localhost:4318</code></td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+<p>Grafana automatically loads the <strong>Agentomatic Overview</strong> dashboard (folder
+<em>Agentomatic</em>) with panels for request throughput/latency, agent invocations,
+custom endpoint and upstream calls, connection acquisitions, and error rates.</p>
+<div class="admonition tip">
+<p class="admonition-title">Scrape target</p>
+<p>Prometheus scrapes <code>host.docker.internal:8000/metrics</code> by default. Adjust
+the target in <code>prometheus/prometheus.yml</code> if your app runs elsewhere.</p>
+</div>
+<h2 id="metrics-reference">Metrics reference<a class="headerlink" href="#metrics-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Labels</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agentomatic_requests_total</code></td>
+<td>counter</td>
+<td><code>method</code>, <code>endpoint</code>, <code>status_code</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_request_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>method</code>, <code>endpoint</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_agent_invocations_total</code></td>
+<td>counter</td>
+<td><code>agent_name</code>, <code>status</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_agent_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>agent_name</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_errors_total</code></td>
+<td>counter</td>
+<td><code>error_type</code>, <code>agent_name</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_endpoint_calls_total</code></td>
+<td>counter</td>
+<td><code>endpoint</code>, <code>status</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_endpoint_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>endpoint</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_upstream_calls_total</code></td>
+<td>counter</td>
+<td><code>status</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_upstream_duration_seconds</code></td>
+<td>histogram</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>agentomatic_connection_calls_total</code></td>
+<td>counter</td>
+<td><code>connection</code>, <code>status</code></td>
+</tr>
+<tr>
+<td><code>agentomatic_active_requests</code></td>
+<td>gauge</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>agentomatic_active_agents</code></td>
+<td>gauge</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>agentomatic_registered_agents</code></td>
+<td>gauge</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>agentomatic_registered_endpoints</code></td>
+<td>gauge</td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+<p>These cover the full request path — including <a href="../endpoints/">custom endpoints</a>,
+their upstream model calls, and <a href="../connections/">per-agent connections</a> — so
+you get end-to-end visibility with zero extra code.</p>
+<h2 id="wiring-a-trace-backend">Wiring a trace backend<a class="headerlink" href="#wiring-a-trace-backend" title="Permanent link">&para;</a></h2>
+<p>The bundled collector logs spans via the <code>debug</code> exporter. To ship traces to
+Tempo, Jaeger, or Honeycomb, add an exporter in <code>otel-collector/config.yaml</code>
+and include it in the <code>traces</code> pipeline:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">exporters</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">otlp/tempo</span><span class="p">:</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tempo:4317</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">tls</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="nt">insecure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">service</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">pipelines</span><span class="p">:</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">traces</span><span class="p">:</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">      </span><span class="nt">receivers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">otlp</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">      </span><span class="nt">processors</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">batch</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">      </span><span class="nt">exporters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">debug</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">otlp/tempo</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<p>Structured logging (via <code>loguru</code>) is configured automatically. Every request,
+agent invocation, endpoint call, and connection acquisition is logged with
+contextual detail, so local development and production share the same
+observable behaviour. See <a href="../telemetry/">Telemetry &amp; Feedback</a> for
+request-level telemetry and user feedback capture.</p>
 
 
 
@@ -2319,7 +2401,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../pipelines/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Pipelines">
+          <a href="../optimization/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Prompt Optimization">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2329,20 +2411,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Pipelines
+                Prompt Optimization
               </div>
             </div>
           </a>
         
         
           
-          <a href="../llm-providers/" class="md-footer__link md-footer__link--next" aria-label="Next: LLM Providers &amp; Failover">
+          <a href="../telemetry/" class="md-footer__link md-footer__link--next" aria-label="Next: Telemetry &amp; Feedback">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                LLM Providers & Failover
+                Telemetry & Feedback
               </div>
             </div>
             <div class="md-footer__button md-icon">

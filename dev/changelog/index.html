@@ -1159,6 +1159,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../guide/endpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-Agent Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guide/optimization/" class="md-nav__link">
         
   
@@ -1167,6 +1223,34 @@
     
   
     Prompt Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability & Monitoring
   
 
     
@@ -1307,6 +1391,34 @@
     
   
     Security & Zero Trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Control Plane
   
 
     
@@ -2236,7 +2348,56 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Class-Owned Graph Agents (v0.7)</strong></li>
+<li><strong>Custom Endpoints</strong></li>
+<li><code>BaseEndpoint</code> — user-defined HTTP APIs that call deployed model services
+    via authenticated <code>httpx</code> requests and aggregate their outputs</li>
+<li>Auto-discovery from the <code>endpoints/</code> directory; routes mounted under
+    <code>/api/v1/endpoints/{name}</code> with auto-generated <code>/health</code> and <code>/info</code></li>
+<li>Upstream auth: API key, bearer, basic, and OAuth2 client-credentials
+    (with token caching); <code>${ENV}</code> interpolation keeps secrets out of code</li>
+<li><code>MultiModelClient</code> fan-out with <code>ALL</code> / <code>FIRST_SUCCESS</code> / <code>MAJORITY</code>
+    aggregation, retries, timeouts, and Prometheus metrics</li>
+<li>Usable as a pipeline step (<code>endpoint:</code>) to feed model outputs into agents</li>
+<li><code>agentomatic init &lt;name&gt; --template endpoint</code> scaffolding</li>
+<li><strong>Per-Agent Connections</strong></li>
+<li><code>DatabaseConnectionConfig</code> / <code>HttpConnectionConfig</code> for scoped, authenticated
+    databases (SQLAlchemy async) and HTTP services per agent</li>
+<li><code>get_connections(scope)</code> runtime accessor; auto-discovery from an agent's
+    <code>connections.py</code> (<code>CONNECTIONS = [...]</code>)</li>
+<li>Lifecycle-managed (initialised on startup, closed on shutdown) with health
+    checks; <code>agentomatic init &lt;name&gt; --template connection</code> scaffolding</li>
+<li><strong>Vector stores</strong> (<code>VectorConnectionConfig</code>) for RAG / vector search with
+    lazy, provider-agnostic clients (Qdrant, Chroma, Weaviate, Pinecone,
+    Milvus) and <code>register_vector_provider()</code> for custom backends</li>
+<li><strong>Purpose tagging</strong> (<code>ConnectionPurpose</code>: memory/rag/vector/cache/analytics…)
+    with <code>by_purpose()</code> / <code>for_purpose()</code> / <code>first_for_purpose()</code> lookups</li>
+<li><strong>Any backend, zero classes</strong> — <code>CustomConnectionConfig</code> wraps any factory
+    callable / dotted path (redis, mongo, elasticsearch, neo4j…) with lazy
+    build, deep <code>${ENV}</code> resolution, sync/async factories and auto-detected
+    lifecycle; fetch the native client via <code>await conns.client(name)</code></li>
+<li><strong>Pluggable type registry</strong> (<code>register_connection_type()</code>) so any backend
+    becomes a first-class connection with a full custom wrapper</li>
+<li>Conversation <strong>memory</strong> can be backed by a connection's own engine via
+    <code>DatabaseConnection.create_store()</code> (shared pool, no double-dispose)</li>
+<li><strong><code>ConnectionsMiddleware</code></strong> exposes the routed agent's manager on
+    <code>request.state.connections</code> (enabled by <code>enable_connections_context</code>)</li>
+<li><strong>Production Control Plane</strong> (<code>enable_control_plane=True</code>)</li>
+<li>Admin API under <code>/api/v1/control</code> to inspect agents/endpoints/connections,
+    read health/metrics/config, drain/re-enable agents, and toggle maintenance
+    mode; mutating ops protected by an optional <code>X-Control-Token</code></li>
+<li><strong>Observability &amp; Monitoring</strong></li>
+<li>New metrics for endpoints, upstream model calls, and connections</li>
+<li>Ready-to-run stack in <code>deploy/observability/</code> (Prometheus + OpenTelemetry
+    Collector + Grafana) with a pre-provisioned <strong>Agentomatic Overview</strong> dashboard</li>
+<li><strong>Zero-Trust enforcement</strong> activated via middleware so per-agent security
+  policies (roles/scopes/auth) are enforced on the request path</li>
+<li>
+<p><strong>Swagger/OpenAPI fixes</strong>: structured tag metadata, cleaner operation IDs,
+  de-duplicated pipeline tags, and Studio UI routes excluded from the schema</p>
+</li>
+<li>
+<p><strong>Class-Owned Graph Agents (v0.7)</strong></p>
+</li>
 <li><code>BaseGraphAgent</code> — define agents as Python classes with ML lifecycle</li>
 <li><code>build_graph()</code> + <code>new_graph()</code> — LangGraph-style graph wiring (primary API)</li>
 <li><code>GraphBuilder</code> with LangGraph-compatible aliases: <code>add_node()</code>, <code>add_edge()</code>,
