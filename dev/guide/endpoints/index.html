@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/stacks/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/endpoints/">
       
       
-        <link rel="prev" href="../pipelines/">
+        <link rel="prev" href="../platform-features/">
       
       
-        <link rel="next" href="../llm-providers/">
+        <link rel="next" href="../connections/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Configuration Stacks - Agentomatic</title>
+        <title>Custom Endpoints - Agentomatic</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#stacks-configuration-management" class="md-skip">
+        <a href="#custom-endpoints" class="md-skip">
           Skip to content
         </a>
       
@@ -140,7 +140,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Configuration Stacks
+              Custom Endpoints
             
           </span>
         </div>
@@ -1161,10 +1161,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../endpoints/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Endpoints
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1180,6 +1207,136 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaffolding-an-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaffolding an endpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimal-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-to-upstreams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication to upstreams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregation-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregation strategies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typed-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typed schemas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom logic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-endpoints-in-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using endpoints in pipelines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registering-programmatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering programmatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1329,37 +1486,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration Stacks
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../stacks/" class="md-nav__link">
         
   
   
@@ -1375,93 +1505,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-stackmanager" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The StackManager
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The StackManager">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#loading-a-stack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Loading a Stack
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#stack-yaml-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stack YAML Structure
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Stack YAML Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-stacksproductionyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: stacks/production.yaml
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#using-stack-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using Stack Configuration
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2074,66 +2117,109 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-stackmanager" class="md-nav__link">
+  <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The StackManager
+        How it works
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="The StackManager">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#loading-a-stack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Loading a Stack
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#stack-yaml-structure" class="md-nav__link">
+  <a href="#scaffolding-an-endpoint" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stack YAML Structure
+        Scaffolding an endpoint
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Stack YAML Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-stacksproductionyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: stacks/production.yaml
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-stack-configuration" class="md-nav__link">
+  <a href="#minimal-example" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using Stack Configuration
+        Minimal example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-to-upstreams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication to upstreams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregation-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregation strategies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typed-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typed schemas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom logic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-endpoints-in-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using endpoints in pipelines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registering-programmatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering programmatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
       
     </span>
   </a>
@@ -2208,80 +2294,224 @@
   
 
 
-<h1 id="stacks-configuration-management">Stacks &amp; Configuration Management<a class="headerlink" href="#stacks-configuration-management" title="Permanent link">&para;</a></h1>
-<p>Agentomatic allows you to bundle and manage multi-environment LLM configurations, databases, authentication, and feature flags into deployable units known as <strong>Stacks</strong>.</p>
-<p>Stacks are defined using YAML files and managed using the <code>StackManager</code>. This allows you to smoothly transition from local development to staging and production without changing code.</p>
-<h2 id="the-stackmanager">The StackManager<a class="headerlink" href="#the-stackmanager" title="Permanent link">&para;</a></h2>
-<p>The <code>StackManager</code> reads YAML stack files, applies environment variables, and interpolates <code>${ENV_VAR}</code> references automatically.</p>
-<h3 id="loading-a-stack">Loading a Stack<a class="headerlink" href="#loading-a-stack" title="Permanent link">&para;</a></h3>
-<p>You can initialize the <code>StackManager</code> to load configurations dynamically:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.stacks.manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">StackManager</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Load from a directory (looks for local.yaml, prod.yaml, etc.)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mgr</span> <span class="o">=</span> <span class="n">StackManager</span><span class="p">(</span><span class="s2">&quot;stacks/&quot;</span><span class="p">)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">stack</span> <span class="o">=</span> <span class="n">mgr</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;local&quot;</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Or load directly from a file</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">mgr</span> <span class="o">=</span> <span class="n">StackManager</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;stacks/prod.yaml&quot;</span><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="stack-yaml-structure">Stack YAML Structure<a class="headerlink" href="#stack-yaml-structure" title="Permanent link">&para;</a></h2>
-<p>A complete stack configuration is defined under a <code>StackConfig</code> structure. This includes:</p>
+<h1 id="custom-endpoints">Custom Endpoints<a class="headerlink" href="#custom-endpoints" title="Permanent link">&para;</a></h1>
+<p>Custom endpoints are a first-class building block in Agentomatic — right
+alongside agents, plugins, and pipelines. An <strong>endpoint</strong> is a user-defined
+HTTP API that typically calls one or more <strong>deployed model services</strong> (or any
+HTTP API) via authenticated <code>httpx</code> requests, aggregates their outputs, and
+exposes the result as a clean REST route.</p>
+<p>They are designed for the common production need: <em>"call my deployed models
+(with auth), combine the results, and feed them into an agent or pipeline"</em> —
+with minimal code.</p>
+<p>Endpoints give you:</p>
 <ul>
-<li><strong>llm</strong>: Named LLM profiles (e.g. <code>default</code>, <code>fast</code>, <code>judge</code>).</li>
-<li><strong>embedding</strong>: The embedding provider settings.</li>
-<li><strong>database</strong>: Async database connection URL and pool settings.</li>
-<li><strong>features</strong>: Feature flags to toggle components like metrics, streaming, and rate limiting.</li>
-<li><strong>auth</strong>: API Key or JWT authentication settings.</li>
-<li><strong>agent_overrides</strong>: Per-agent specific overrides.</li>
+<li>Auto-discovery from the <code>endpoints/</code> directory</li>
+<li>Auto-generated <code>/{path}</code>, <code>/health</code>, and <code>/info</code> routes</li>
+<li>Strict Pydantic request/response validation</li>
+<li>Built-in authentication to upstreams (API key, bearer, basic, OAuth2)</li>
+<li>Fan-out to multiple upstreams with aggregation strategies</li>
+<li>Retries, timeouts, and Prometheus metrics out of the box</li>
+<li>Direct use as a <a href="../pipelines/">pipeline step</a></li>
 </ul>
-<h3 id="example-stacksproductionyaml">Example: <code>stacks/production.yaml</code><a class="headerlink" href="#example-stacksproductionyaml" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Production</span><span class="nv"> </span><span class="s">Stack&quot;</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;High-availability</span><span class="nv"> </span><span class="s">production</span><span class="nv"> </span><span class="s">stack</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">failover</span><span class="nv"> </span><span class="s">support&quot;</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">features</span><span class="p">:</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">enable_streaming</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">enable_metrics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">enable_rate_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">enable_db</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nt">database</span><span class="p">:</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgresql+asyncpg://${DB_USER}:${DB_PASS}@${DB_HOST}/agentomatic&quot;</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">pool_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nt">auth</span><span class="p">:</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;jwt&quot;</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="nt">jwks_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://auth.example.com/.well-known/jwks.json&quot;</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="nt">llm</span><span class="p">:</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="nt">default</span><span class="p">:</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;openai&quot;</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gpt-4o&quot;</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${OPENAI_API_KEY}&quot;</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">  </span><span class="nt">fast</span><span class="p">:</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ollama&quot;</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;llama3&quot;</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://internal-ollama:11434&quot;</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="nt">agent_overrides</span><span class="p">:</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">  </span><span class="nt">coder_agent</span><span class="p">:</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;openai&quot;</span>
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;o1-preview&quot;</span>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart LR
+    Client([Client]) --&gt; EP[Custom Endpoint]
+    EP --&gt;|httpx + auth| M1[Model Service A]
+    EP --&gt;|httpx + auth| M2[Model Service B]
+    EP --&gt;|httpx + auth| M3[Model Service C]
+    M1 --&gt; AGG{Aggregate}
+    M2 --&gt; AGG
+    M3 --&gt; AGG
+    AGG --&gt; EP
+    EP --&gt; Client</code></pre>
+<ol>
+<li>Place each endpoint in the <code>endpoints/</code> directory (its own folder or module).</li>
+<li>Subclass <code>BaseEndpoint</code>, declare <code>upstreams</code>, and pick an <code>aggregation</code>.</li>
+<li>The platform discovers it and mounts routes under
+   <code>/api/v1/endpoints/{endpoint_name}</code>.</li>
+</ol>
+<h2 id="scaffolding-an-endpoint">Scaffolding an endpoint<a class="headerlink" href="#scaffolding-an-endpoint" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>agentomatic<span class="w"> </span>init<span class="w"> </span>ensemble<span class="w"> </span>--template<span class="w"> </span>endpoint<span class="w"> </span>--dir<span class="w"> </span>endpoints
 </span></code></pre></div>
-<h2 id="using-stack-configuration">Using Stack Configuration<a class="headerlink" href="#using-stack-configuration" title="Permanent link">&para;</a></h2>
-<p>Once loaded, you can access properties and pass them to agents or LLM factories seamlessly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Access a specific LLM configuration profile</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">llm_cfg</span> <span class="o">=</span> <span class="n">mgr</span><span class="o">.</span><span class="n">get_llm_config</span><span class="p">(</span><span class="s2">&quot;fast&quot;</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Access the database URL (interpolated)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">db_url</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">database</span><span class="o">.</span><span class="n">url</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Check feature flags</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">if</span> <span class="n">stack</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">enable_metrics</span><span class="p">:</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Prometheus metrics enabled&quot;</span><span class="p">)</span>
+<p>This creates:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>endpoints/ensemble/
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── __init__.py       # Package marker
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── endpoint.py       # BaseEndpoint subclass with upstreams
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── .env.example      # Upstream URLs + credentials
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>└── README.md         # Usage docs
 </span></code></pre></div>
-<p>The stack configuration provides a single source of truth for your agent's ecosystem.</p>
+<h2 id="minimal-example">Minimal example<a class="headerlink" href="#minimal-example" title="Permanent link">&para;</a></h2>
+<p>The default <code>handle</code> fans out to every configured upstream — so you often only
+need configuration, no imperative code:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.endpoints</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">AggregationStrategy</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">AuthType</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">BaseEndpoint</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">UpstreamAuthConfig</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">UpstreamConfig</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">EnsembleEndpoint</span><span class="p">(</span><span class="n">BaseEndpoint</span><span class="p">):</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">endpoint_name</span> <span class="o">=</span> <span class="s2">&quot;ensemble&quot;</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">endpoint_description</span> <span class="o">=</span> <span class="s2">&quot;Aggregate predictions from deployed models.&quot;</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;/predict&quot;</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">aggregation</span> <span class="o">=</span> <span class="n">AggregationStrategy</span><span class="o">.</span><span class="n">MAJORITY</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="n">upstreams</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="n">UpstreamConfig</span><span class="p">(</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;model_a&quot;</span><span class="p">,</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>            <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{MODEL_A_URL}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>            <span class="n">path</span><span class="o">=</span><span class="s2">&quot;/v1/predict&quot;</span><span class="p">,</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="n">auth</span><span class="o">=</span><span class="n">UpstreamAuthConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">AuthType</span><span class="o">.</span><span class="n">BEARER</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{MODEL_A_TOKEN}</span><span class="s2">&quot;</span><span class="p">),</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="p">),</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>        <span class="n">UpstreamConfig</span><span class="p">(</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;model_b&quot;</span><span class="p">,</span>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>            <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{MODEL_B_URL}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>            <span class="n">path</span><span class="o">=</span><span class="s2">&quot;/v1/predict&quot;</span><span class="p">,</span>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>            <span class="n">auth</span><span class="o">=</span><span class="n">UpstreamAuthConfig</span><span class="p">(</span>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>                <span class="nb">type</span><span class="o">=</span><span class="n">AuthType</span><span class="o">.</span><span class="n">OAUTH2_CLIENT_CREDENTIALS</span><span class="p">,</span>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>                <span class="n">token_url</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{MODEL_B_TOKEN_URL}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>                <span class="n">client_id</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{MODEL_B_CLIENT_ID}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>                <span class="n">client_secret</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{MODEL_B_CLIENT_SECRET}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>            <span class="p">),</span>
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>        <span class="p">),</span>
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>    <span class="p">]</span>
+</span></code></pre></div>
+<p>Mounted routes:</p>
+<ul>
+<li><code>POST /api/v1/endpoints/ensemble/predict</code> — invoke the endpoint</li>
+<li><code>GET  /api/v1/endpoints/ensemble/health</code> — readiness</li>
+<li><code>GET  /api/v1/endpoints/ensemble/info</code> — metadata</li>
+<li><code>GET  /api/v1/endpoints</code> — list all endpoints</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Secrets stay out of code</p>
+<p>Any string field supports <code>${ENV}</code> interpolation, resolved lazily at
+request time and never persisted or logged.</p>
+</div>
+<h2 id="authentication-to-upstreams">Authentication to upstreams<a class="headerlink" href="#authentication-to-upstreams" title="Permanent link">&para;</a></h2>
+<p>Each upstream configures its own <code>auth</code>, so different models can authenticate
+differently.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="api-key" name="__tabbed_1" type="radio" /><input id="bearer" name="__tabbed_1" type="radio" /><input id="basic" name="__tabbed_1" type="radio" /><input id="oauth2-client-credentials" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="api-key">API key</label><label for="bearer">Bearer</label><label for="basic">Basic</label><label for="oauth2-client-credentials">OAuth2 (client credentials)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">UpstreamAuthConfig</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="nb">type</span><span class="o">=</span><span class="n">AuthType</span><span class="o">.</span><span class="n">API_KEY</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{SERVICE_KEY}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">header_name</span><span class="o">=</span><span class="s2">&quot;X-API-Key&quot;</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">header_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>  <span class="c1"># no prefix</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">UpstreamAuthConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">AuthType</span><span class="o">.</span><span class="n">BEARER</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{SERVICE_TOKEN}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">UpstreamAuthConfig</span><span class="p">(</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="nb">type</span><span class="o">=</span><span class="n">AuthType</span><span class="o">.</span><span class="n">BASIC</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">username</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{SERVICE_USER}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">password</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{SERVICE_PASSWORD}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<p><div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">UpstreamAuthConfig</span><span class="p">(</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="nb">type</span><span class="o">=</span><span class="n">AuthType</span><span class="o">.</span><span class="n">OAUTH2_CLIENT_CREDENTIALS</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">token_url</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{TOKEN_URL}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">client_id</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{CLIENT_ID}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">client_secret</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{CLIENT_SECRET}</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">scope</span><span class="o">=</span><span class="s2">&quot;predict:read&quot;</span><span class="p">,</span>       <span class="c1"># optional</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">audience</span><span class="o">=</span><span class="s2">&quot;$</span><span class="si">{AUDIENCE}</span><span class="s2">&quot;</span><span class="p">,</span>     <span class="c1"># optional</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">)</span>
+</span></code></pre></div>
+The access token is fetched from <code>token_url</code> and cached until shortly
+before expiry (controlled by <code>token_leeway</code>).</p>
+</div>
+</div>
+</div>
+<h2 id="aggregation-strategies">Aggregation strategies<a class="headerlink" href="#aggregation-strategies" title="Permanent link">&para;</a></h2>
+<p>When an endpoint calls multiple upstreams, <code>aggregation</code> controls how their
+responses combine:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ALL</code></td>
+<td>Return a mapping of <code>{upstream_name: data}</code>; succeeds only if all succeed.</td>
+</tr>
+<tr>
+<td><code>FIRST_SUCCESS</code></td>
+<td>Return the first successful response.</td>
+</tr>
+<tr>
+<td><code>MAJORITY</code></td>
+<td>Return the most common response (weighted by <code>UpstreamConfig.weight</code>).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="typed-schemas">Typed schemas<a class="headerlink" href="#typed-schemas" title="Permanent link">&para;</a></h2>
+<p>Provide typed request/response schemas via generics for full OpenAPI docs:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.endpoints</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEndpoint</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">ScoreRequest</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">ScoreResponse</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">confidence</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="k">class</span><span class="w"> </span><span class="nc">ScorerEndpoint</span><span class="p">(</span><span class="n">BaseEndpoint</span><span class="p">[</span><span class="n">ScoreRequest</span><span class="p">,</span> <span class="n">ScoreResponse</span><span class="p">]):</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="n">endpoint_name</span> <span class="o">=</span> <span class="s2">&quot;scorer&quot;</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;/score&quot;</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">ScoreRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScoreResponse</span><span class="p">:</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>        <span class="n">ok</span><span class="p">,</span> <span class="n">aggregated</span><span class="p">,</span> <span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">fan_out</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">model_dump</span><span class="p">())</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>        <span class="k">return</span> <span class="n">ScoreResponse</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="n">aggregated</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">],</span> <span class="n">confidence</span><span class="o">=</span><span class="n">aggregated</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">])</span>
+</span></code></pre></div>
+<h2 id="custom-logic">Custom logic<a class="headerlink" href="#custom-logic" title="Permanent link">&para;</a></h2>
+<p>Override <code>handle</code> for anything beyond fan-out — call upstreams conditionally,
+post-process, merge with local computation, etc. The <code>self.models</code> client
+exposes <code>fan_out(...)</code> and per-upstream <code>get(name).request(...)</code>.</p>
+<h2 id="using-endpoints-in-pipelines">Using endpoints in pipelines<a class="headerlink" href="#using-endpoints-in-pipelines" title="Permanent link">&para;</a></h2>
+<p>Endpoints are usable as a pipeline step, so you can fetch data from your
+deployed models and pass it straight to an agent:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enrich_then_answer</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ensemble</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">predictions</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">input</span><span class="p">:</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">payload</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$.input.*</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">answerer</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">answer</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">input</span><span class="p">:</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">      </span><span class="nt">current_query</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$.input.query</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">      </span><span class="nt">predictions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$.steps.predictions.aggregated</span>
+</span></code></pre></div>
+<p>See the <a href="../pipelines/">Pipelines guide</a> for the full step reference.</p>
+<h2 id="registering-programmatically">Registering programmatically<a class="headerlink" href="#registering-programmatically" title="Permanent link">&para;</a></h2>
+<p>You can also register endpoints without discovery:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="p">(</span><span class="n">endpoints_dir</span><span class="o">=</span><span class="s2">&quot;endpoints&quot;</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">platform</span><span class="o">.</span><span class="n">register_endpoint</span><span class="p">(</span><span class="n">EnsembleEndpoint</span><span class="p">())</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</span></code></pre></div>
+<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<p>Every endpoint call emits Prometheus metrics
+(<code>agentomatic_endpoint_calls_total</code>, <code>agentomatic_endpoint_duration_seconds</code>),
+and every upstream call emits <code>agentomatic_upstream_*</code> metrics. See the
+<a href="../observability/">Observability guide</a> for the ready-to-run Grafana stack.</p>
 
 
 
@@ -2319,7 +2549,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../pipelines/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Pipelines">
+          <a href="../platform-features/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Platform Features">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2329,20 +2559,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Pipelines
+                Platform Features
               </div>
             </div>
           </a>
         
         
           
-          <a href="../llm-providers/" class="md-footer__link md-footer__link--next" aria-label="Next: LLM Providers &amp; Failover">
+          <a href="../connections/" class="md-footer__link md-footer__link--next" aria-label="Next: Per-Agent Connections">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                LLM Providers & Failover
+                Per-Agent Connections
               </div>
             </div>
             <div class="md-footer__button md-icon">
