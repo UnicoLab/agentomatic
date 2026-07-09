@@ -1,6 +1,61 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-07-09)
+
+### Bug Fixes
+
+- **types**: Ignore missing imports for optional vector-store clients
+  ([`53925f5`](https://github.com/UnicoLab/agentomatic/commit/53925f5c96dda3d94cef8aa7401d4e39d269fe4a))
+
+Add qdrant_client, chromadb, weaviate, pinecone and pymilvus to the mypy optional-dependency
+  override so the type-check gate passes when these lazily-imported vector backends are not
+  installed.
+
+### Documentation
+
+- Add production deployment guide; sync Studio UI with control-plane views
+  ([`28a809f`](https://github.com/UnicoLab/agentomatic/commit/28a809f6e41afdfcb548f89a0927a2fdbe438ba9))
+
+- Add docs/guide/deployment.md: an end-to-end production guide built around a 5-agent deployment —
+  per-agent inbound OAuth2/JWT + zero-trust, per-agent authenticated databases and vector stores
+  (RAG), caching, custom APIs that call authenticated model APIs, observability stack, control-plane
+  operations, Docker/compose, health/readiness probes, and a production checklist. - index.md: add
+  discoverable cards for Per-Agent Connections, Custom Endpoints, and the Control Plane; point the
+  container card at the deployment guide. - FRONTEND_API_GUIDE.md: document the platform surfaces
+  (control plane, custom endpoints, pipelines, plugins) with TS interfaces matching the server
+  models. - Rebuild and sync the Studio UI bundle (Control/Endpoints/Connections views).
+
+Docs build --strict and Studio/serve tests pass.
+
+### Features
+
+- Production endpoints, per-agent connections, control plane & observability
+  ([`003e239`](https://github.com/UnicoLab/agentomatic/commit/003e239aca48dfeb409f88331f486dc423bdf3b2))
+
+Make Agentomatic production-ready for deploying multiple authenticated agents that pull ML-model
+  context, connect to per-agent databases (memory, RAG / vector search, cache) and call
+  authenticated services — with minimal code.
+
+- Custom Endpoints: BaseEndpoint APIs that call deployed model services via authenticated httpx (API
+  key/bearer/basic/OAuth2 client-credentials with token caching), fan out and aggregate
+  (ALL/FIRST_SUCCESS/MAJORITY), and are usable as pipeline steps to feed context into agents;
+  auto-discovered from endpoints/ and scaffoldable via `init --template endpoint`. - Per-Agent
+  Connections: scoped, authenticated DatabaseConnection (any SQL DB via URL), VectorConnection
+  (qdrant/chroma/weaviate/pinecone/milvus, pluggable), HttpConnection, and CustomConnection (any
+  backend via a factory, zero classes). Purpose tagging (memory/rag/vector/cache/...) with
+  by_purpose lookups, register_connection_type/register_vector_provider extensibility, memory backed
+  by a connection engine, and request.state.connections middleware; scaffoldable via `init
+  --template connection`. - Production Control Plane (enable_control_plane): /api/v1/control admin
+  API to inspect/drain agents, read health/metrics, and toggle maintenance mode, protected by
+  X-Control-Token. - Security: JWT/OAuth2 auth plus per-agent zero-trust policy enforcement. -
+  Observability: endpoint/upstream/connection Prometheus metrics and a ready Grafana + Prometheus +
+  OTel Collector stack in deploy/observability/. - Swagger/OpenAPI fixes: structured tags, cleaner
+  operation IDs, de-duplicated pipeline tags, Studio UI routes excluded from the schema. - Docs,
+  changelog, agent SKILL/AGENTS updates, and full tests for all of the above (lint, format, mypy,
+  docs --strict, build all green).
+
+
 ## v1.0.0 (2026-06-25)
 
 ### Bug Fixes
