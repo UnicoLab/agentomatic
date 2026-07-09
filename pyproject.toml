@@ -236,5 +236,10 @@ module = [
     "langchain_google_vertexai",
     "holysheet",
     "yaml",
+    "qdrant_client",
+    "chromadb",
+    "weaviate",
+    "pinecone",
+    "pymilvus",
 ]
 ignore_missing_imports = true
