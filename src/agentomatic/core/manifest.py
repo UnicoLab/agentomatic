@@ -72,6 +72,9 @@ class RegisteredAgent:
     security_policy: Any = None  # AgentSecurityPolicy from agent's security.py
     delegation_config: Any = None  # Delegation config from agent's delegation.py
 
+    # v0.11 enhancements
+    connections: Any = None  # list[ConnectionConfig] from agent's connections.py
+
     # Studio hooks (set programmatically or via decorators)
     _studio_graph_fn: Callable[..., Any] | None = field(default=None, repr=False)
     _studio_state_fn: Callable[..., Any] | None = field(default=None, repr=False)

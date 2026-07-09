@@ -1027,6 +1027,8 @@ TEMPLATES: dict[str, str] = {
     "custom": "Framework-agnostic — no LangGraph dependency",
     "legacy_dict": "Legacy functional agent — 3 files (__init__, graph, nodes)",
     "plugin": "ML Model Plugin — wrap classical ML models with auto-generated REST endpoints",
+    "endpoint": "Custom Endpoint — call deployed model services (httpx + auth) and aggregate",
+    "connection": "Connections — per-agent authenticated database + HTTP service connections",
 }
 
 
@@ -1697,6 +1699,261 @@ clean:
 """
 
 
+# --- Custom Endpoint template ---
+
+
+def _endpoint_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Custom Endpoint: {name}.
+
+A custom endpoint calls one or more deployed model services via
+authenticated ``httpx`` requests and aggregates their responses. It is
+auto-discovered by the platform and also usable as a pipeline step.
+"""
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from agentomatic.endpoints import (
+    AggregationStrategy,
+    AuthType,
+    BaseEndpoint,
+    UpstreamAuthConfig,
+    UpstreamConfig,
+)
+
+
+class {title}Request(BaseModel):
+    """Input schema for {name}."""
+
+    payload: dict = Field(default_factory=dict, description="Data forwarded to upstreams.")
+
+
+class {title}Endpoint(BaseEndpoint):
+    """Fan out to deployed model services and aggregate the results."""
+
+    endpoint_name = "{name}"
+    endpoint_description = "Aggregate predictions from deployed model services."
+    endpoint_version = "1.0.0"
+
+    #: Route path (mounted under /api/v1/endpoints/{name}).
+    path = "/call"
+    methods = ["POST"]
+
+    #: How to combine responses (ALL | FIRST_SUCCESS | MAJORITY).
+    aggregation = AggregationStrategy.ALL
+
+    #: Deployed model services this endpoint calls. Secrets use ${{ENV}}.
+    upstreams = [
+        UpstreamConfig(
+            name="model_a",
+            base_url="${{MODEL_A_URL}}",
+            path="/v1/predict",
+            method="POST",
+            auth=UpstreamAuthConfig(
+                type=AuthType.BEARER,
+                api_key="${{MODEL_A_TOKEN}}",
+            ),
+        ),
+        # Add more upstreams here. For OAuth2 client-credentials:
+        # UpstreamConfig(
+        #     name="model_b",
+        #     base_url="${{MODEL_B_URL}}",
+        #     path="/v1/predict",
+        #     auth=UpstreamAuthConfig(
+        #         type=AuthType.OAUTH2_CLIENT_CREDENTIALS,
+        #         token_url="${{MODEL_B_TOKEN_URL}}",
+        #         client_id="${{MODEL_B_CLIENT_ID}}",
+        #         client_secret="${{MODEL_B_CLIENT_SECRET}}",
+        #     ),
+        # ),
+    ]
+
+    # The default ``handle`` fans out to every upstream and aggregates.
+    # Override it for fully custom behaviour:
+    #
+    # async def handle(self, request):
+    #     ok, aggregated, results = await self.models.fan_out(request.payload)
+    #     return {{"ok": ok, "aggregated": aggregated}}
+'''
+
+
+def _endpoint_readme(name: str) -> str:
+    title = name.replace("_", " ").title()
+    return (
+        f"# {title} Endpoint\n\n"
+        f"Generated with `agentomatic init {name} --template endpoint`.\n\n"
+        "## Quick Start\n\n"
+        "Place this folder inside your `endpoints/` directory and run "
+        "`agentomatic run` (or pass `endpoints_dir=` to `AgentPlatform`). The "
+        "platform auto-discovers this endpoint and mounts its routes.\n\n"
+        "## Endpoints\n\n"
+        f"- `POST /api/v1/endpoints/{name}/call` — fan out to upstreams\n"
+        f"- `GET  /api/v1/endpoints/{name}/health` — readiness\n"
+        f"- `GET  /api/v1/endpoints/{name}/info` — metadata\n\n"
+        "## Use in a pipeline\n\n"
+        "```yaml\n"
+        "steps:\n"
+        f"  - endpoint: {name}\n"
+        "    name: fetch_predictions\n"
+        "    input:\n"
+        "      payload: $input\n"
+        "```\n\n"
+        "## Configuration\n\n"
+        "Set the referenced environment variables (see `.env.example`). All "
+        "string fields support `${ENV}` interpolation so secrets never live in "
+        "code.\n"
+    )
+
+
+def _endpoint_env_example(name: str) -> str:
+    return (
+        "# Deployed model service endpoints + credentials.\n"
+        "MODEL_A_URL=https://model-a.internal.example.com\n"
+        "MODEL_A_TOKEN=replace-me\n"
+        "\n"
+        "# Example OAuth2 client-credentials upstream:\n"
+        "# MODEL_B_URL=https://model-b.internal.example.com\n"
+        "# MODEL_B_TOKEN_URL=https://auth.example.com/oauth/token\n"
+        "# MODEL_B_CLIENT_ID=replace-me\n"
+        "# MODEL_B_CLIENT_SECRET=replace-me\n"
+    )
+
+
+# --- Connections template ---
+
+
+def _connections_py(name: str) -> str:
+    upper = name.upper()
+    return f'''"""Per-agent connections for {name}.
+
+Declare authenticated databases and HTTP services this agent needs. The
+platform discovers this ``connections.py`` and registers each connection
+under the agent's scope, initialising them on startup.
+
+Access them at runtime with minimal code::
+
+    from agentomatic.connections import get_connections
+
+    conns = get_connections("{name}")
+    async with conns.database("main").session() as session:
+        ...
+    result = await conns.http("scoring_api").post("/score", payload={{"x": 1}})
+"""
+from __future__ import annotations
+
+from agentomatic.connections import (
+    ConnectionPurpose,
+    CustomConnectionConfig,
+    DatabaseConnectionConfig,
+    HttpConnectionConfig,
+    VectorConnectionConfig,
+)
+from agentomatic.endpoints import AuthType, UpstreamAuthConfig
+
+#: Discovered automatically by the platform. Any string field supports
+#: ${{ENV}} interpolation so credentials stay out of source control.
+#: Tag each connection with a ``purpose`` (memory, rag, vector, cache…) so
+#: features can look it up by intent via ``get_connections(...).by_purpose()``.
+CONNECTIONS = [
+    DatabaseConnectionConfig(
+        name="main",
+        url="${{{upper}_DB_URL}}",
+        # Optionally splice credentials into the URL at connect time:
+        username="${{{upper}_DB_USER}}",
+        password="${{{upper}_DB_PASSWORD}}",
+        pool_size=5,
+    ),
+    # Conversation memory backed by this agent's own database. Build a store
+    # with ``await conns.database("memory").create_store()``.
+    DatabaseConnectionConfig(
+        name="memory",
+        url="${{{upper}_MEMORY_DB_URL}}",
+        purpose=ConnectionPurpose.MEMORY,
+    ),
+    # Vector store for RAG / semantic search. Provider clients are lazy and
+    # optional: install the one you use (e.g. ``pip install qdrant-client``).
+    VectorConnectionConfig(
+        name="kb",
+        provider="qdrant",
+        url="${{{upper}_QDRANT_URL}}",
+        api_key="${{{upper}_QDRANT_API_KEY}}",
+        collection="knowledge_base",
+        purpose=ConnectionPurpose.RAG,
+    ),
+    HttpConnectionConfig(
+        name="scoring_api",
+        base_url="${{{upper}_SCORING_URL}}",
+        auth=UpstreamAuthConfig(
+            type=AuthType.OAUTH2_CLIENT_CREDENTIALS,
+            token_url="${{{upper}_TOKEN_URL}}",
+            client_id="${{{upper}_CLIENT_ID}}",
+            client_secret="${{{upper}_CLIENT_SECRET}}",
+        ),
+    ),
+    # Any other backend (redis, mongo, elasticsearch…) with zero new classes:
+    # point ``factory`` at a callable or dotted path; ${{ENV}} is resolved and
+    # the client lifecycle is managed for you. Fetch it with
+    # ``await get_connections("{name}").client("cache")``.
+    CustomConnectionConfig(
+        name="cache",
+        factory="redis.asyncio.from_url",
+        args=["${{{upper}_REDIS_URL}}"],
+        purpose=ConnectionPurpose.CACHE,
+    ),
+]
+'''
+
+
+def _connections_readme(name: str) -> str:
+    title = name.replace("_", " ").title()
+    return (
+        f"# {title} Connections\n\n"
+        f"Generated with `agentomatic init {name} --template connection`.\n\n"
+        "This scaffolds a `connections.py` for an agent named "
+        f"`{name}`. Drop the `connections.py` into your agent's package "
+        "(`agents/{name}/connections.py`) so it is discovered alongside the "
+        "agent, or keep it here as a reference.\n\n"
+        "## Usage\n\n"
+        "```python\n"
+        "from agentomatic.connections import get_connections\n\n"
+        f'conns = get_connections("{name}")\n'
+        'async with conns.database("main").session() as session:\n'
+        "    ...\n"
+        'result = await conns.http("scoring_api").post("/score", payload={"x": 1})\n'
+        "```\n\n"
+        "## Configuration\n\n"
+        "Set the environment variables in `.env.example`. The database URL is a "
+        "SQLAlchemy async URL (e.g. `postgresql+asyncpg://host/db`).\n"
+    )
+
+
+def _connections_env_example(name: str) -> str:
+    upper = name.upper()
+    return (
+        f"# Database (SQLAlchemy async URL, e.g. postgresql+asyncpg://host/db)\n"
+        f"{upper}_DB_URL=postgresql+asyncpg://localhost:5432/{name}\n"
+        f"{upper}_DB_USER=replace-me\n"
+        f"{upper}_DB_PASSWORD=replace-me\n"
+        "\n"
+        f"# Conversation memory database\n"
+        f"{upper}_MEMORY_DB_URL=postgresql+asyncpg://localhost:5432/{name}_memory\n"
+        "\n"
+        f"# Vector store for RAG / vector search (Qdrant by default)\n"
+        f"{upper}_QDRANT_URL=http://localhost:6333\n"
+        f"{upper}_QDRANT_API_KEY=replace-me\n"
+        "\n"
+        f"# Generic factory-based backend (redis cache by default)\n"
+        f"{upper}_REDIS_URL=redis://localhost:6379/0\n"
+        "\n"
+        f"# HTTP scoring service (OAuth2 client-credentials)\n"
+        f"{upper}_SCORING_URL=https://scoring.example.com\n"
+        f"{upper}_TOKEN_URL=https://auth.example.com/oauth/token\n"
+        f"{upper}_CLIENT_ID=replace-me\n"
+        f"{upper}_CLIENT_SECRET=replace-me\n"
+    )
+
+
 def get_template_files(template: str, name: str) -> dict[str, str]:
     """Get all files for a given template.
 
@@ -1817,6 +2074,22 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "optimize.py": _plugin_optimize_py(name),
             "predict.py": _plugin_predict_py(name),
             "Makefile": _plugin_makefile(name),
+        }
+
+    elif template == "endpoint":
+        return {
+            "__init__.py": '"""Custom Endpoint package."""\n',
+            "endpoint.py": _endpoint_py(name),
+            "README.md": _endpoint_readme(name),
+            ".env.example": _endpoint_env_example(name),
+        }
+
+    elif template == "connection":
+        return {
+            "__init__.py": '"""Connections package."""\n',
+            "connections.py": _connections_py(name),
+            "README.md": _connections_readme(name),
+            ".env.example": _connections_env_example(name),
         }
 
     else:

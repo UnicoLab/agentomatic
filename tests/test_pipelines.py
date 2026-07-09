@@ -1066,3 +1066,71 @@ class TestIntegration:
 
         assert result.succeeded
         assert node_fn.called
+
+
+# =====================================================================
+# Endpoint Steps
+# =====================================================================
+
+
+class TestEndpointStep:
+    """Test the custom-endpoint pipeline step type."""
+
+    @pytest.mark.asyncio
+    async def test_execute_endpoint_step_success(self):
+        from agentomatic.endpoints import BaseEndpoint, EndpointRegistry
+        from agentomatic.pipelines.models import EndpointStepConfig
+        from agentomatic.pipelines.steps import execute_endpoint_step
+
+        class _Ep(BaseEndpoint):
+            endpoint_name = "scorer"
+
+            async def handle(self, request):  # type: ignore[override]
+                return {"score": 0.9, "payload": request.payload}
+
+        reg = EndpointRegistry()
+        reg.register(_Ep())
+
+        ctx = PipelineContext(input_data={"text": "hello"})
+        cfg = EndpointStepConfig(
+            name="score",
+            endpoint="scorer",
+            input=InputMapping(mappings={"text": "$.input.text"}),
+        )
+        result = await execute_endpoint_step(cfg, ctx, reg)
+        assert result.status == StepStatus.SUCCESS
+        assert result.output["score"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_execute_endpoint_step_missing_endpoint(self):
+        from agentomatic.endpoints import EndpointRegistry
+        from agentomatic.pipelines.models import EndpointStepConfig
+        from agentomatic.pipelines.steps import execute_endpoint_step
+
+        ctx = PipelineContext(input_data={})
+        cfg = EndpointStepConfig(name="score", endpoint="nope")
+        result = await execute_endpoint_step(cfg, ctx, EndpointRegistry())
+        assert result.status == StepStatus.FAILED
+        assert "not found" in (result.error or "")
+
+    @pytest.mark.asyncio
+    async def test_execute_endpoint_step_no_registry(self):
+        from agentomatic.pipelines.models import EndpointStepConfig
+        from agentomatic.pipelines.steps import execute_endpoint_step
+
+        ctx = PipelineContext(input_data={})
+        cfg = EndpointStepConfig(name="score", endpoint="scorer")
+        result = await execute_endpoint_step(cfg, ctx, None)
+        assert result.status == StepStatus.FAILED
+
+    def test_pipeline_config_get_endpoint_names(self):
+        from agentomatic.pipelines.models import EndpointStepConfig
+
+        config = PipelineConfig(
+            name="with_endpoint",
+            steps=[
+                EndpointStepConfig(name="fetch", endpoint="scorer"),
+                AgentStepConfig(name="respond", agent="responder"),
+            ],
+        )
+        assert "scorer" in config.get_endpoint_names()

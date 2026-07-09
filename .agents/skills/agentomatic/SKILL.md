@@ -16,6 +16,20 @@ Use this skill when creating, modifying, debugging, or extending agents built on
 It auto-generates REST API endpoints from agent folders and provides a built-in
 Studio debug UI, prompt optimization, storage backends, and observability.
 
+For production deployments it also provides (see dedicated sections below):
+
+- **Custom Endpoints** — user-defined APIs that call deployed ML model services
+  via authenticated `httpx` requests and aggregate their outputs (usable as
+  pipeline steps to feed context into agents)
+- **Per-Agent Connections** — scoped, authenticated databases, vector stores
+  (RAG / vector search), HTTP services, and *any* backend via a factory, with
+  purpose tagging (memory / rag / vector / cache …) and caching
+- **Production Control Plane** — an admin API to inspect/drain agents and toggle
+  maintenance mode
+- **Security** — API-key auth, JWT/OAuth2, and per-agent zero-trust policies
+- **Observability** — Prometheus metrics + OpenTelemetry tracing with a
+  ready-to-run Grafana/Prometheus/OTel stack in `deploy/observability/`
+
 ```
 pip install agentomatic                    # Core
 pip install "agentomatic[langgraph]"       # + LangGraph support
@@ -49,7 +63,7 @@ src/agentomatic/
 │   └── serve.py             # Static file serving for React UI
 ├── cli/
 │   ├── commands.py          # CLI: init, run, demo, list, inspect, doctor, optimize
-│   └── templates.py         # Scaffolding: basic, full, rag, chatbot, deepagent, custom, legacy_dict, plugin
+│   └── templates.py         # Scaffolding: basic, full, rag, chatbot, deepagent, custom, legacy_dict, plugin, endpoint, connection
 ├── storage/
 │   ├── base.py              # BaseStore ABC
 │   ├── memory.py            # MemoryStore — in-memory dict
@@ -61,7 +75,29 @@ src/agentomatic/
 │   ├── rate_limit.py        # Token bucket rate limiting
 │   ├── metrics.py           # Prometheus metrics
 │   ├── feedback.py          # Feedback collection
-│   └── logging.py           # Structured logging
+│   ├── logging.py           # Structured logging
+│   ├── zero_trust.py        # Per-agent zero-trust policy enforcement
+│   └── connections.py       # Attaches request.state.connections per request
+├── endpoints/               # Custom endpoints: httpx calls to deployed ML models
+│   ├── models.py            # AuthType, UpstreamConfig/Auth, AggregationStrategy
+│   ├── auth.py              # ${ENV} + OAuth2 client-credentials (token cache)
+│   ├── client.py            # UpstreamClient + MultiModelClient (fan-out/aggregate)
+│   ├── base.py              # BaseEndpoint ABC (auto /call, /health, /info)
+│   ├── registry.py          # EndpointRegistry — auto-discovery
+│   └── router.py            # Dynamic APIRouter per endpoint
+├── connections/             # Per-agent connections (any DB, minimal code)
+│   ├── models.py            # ConnectionKind/Purpose + *ConnectionConfig models
+│   ├── database.py          # DatabaseConnection (SQLAlchemy async) + create_store()
+│   ├── vector.py            # VectorConnection + pluggable provider registry
+│   ├── http.py              # HttpConnection (authenticated, reuses UpstreamClient)
+│   ├── custom.py            # CustomConnection — any backend via a factory
+│   └── manager.py           # ConnectionManager, get_connections(scope), registries
+├── control/                 # Production control plane
+│   ├── state.py             # ControlPlaneState (maintenance, drained agents)
+│   ├── middleware.py        # MaintenanceMiddleware (503 gating)
+│   ├── models.py            # Control API response models
+│   └── router.py            # /api/v1/control admin API
+├── security/                # JWT auth + zero-trust policies (AgentSecurityPolicy)
 ├── optimize/                # DSPy-style prompt optimization (18 modules)
 ├── observability/           # OpenTelemetry tracing + Prometheus metrics
 ├── prompts/                 # PromptManager for prompt versioning
@@ -69,6 +105,9 @@ src/agentomatic/
 ├── config/                  # Settings management
 ├── ui/                      # Chainlit chat interface
 └── demo/                    # Built-in demo agent
+
+deploy/observability/        # Docker Compose: Prometheus + OTel Collector + Grafana
+                             # (pre-provisioned "Agentomatic Overview" dashboard)
 ```
 
 ## Creating Agents
@@ -218,20 +257,167 @@ from agentomatic.storage import SQLAlchemyStore
 platform = AgentPlatform.from_folder(
     "agents/",
     store=SQLAlchemyStore("postgresql+asyncpg://..."),
-    enable_metrics=True,       # Prometheus metrics
-    enable_auth=True,          # API key auth
-    auth_api_key="secret",     # Auth key
-    enable_cors=True,          # CORS headers
-    enable_rate_limit=True,    # Rate limiting
-    rate_limit=100,            # Requests per minute
+    enable_metrics=True,              # Prometheus metrics
+    enable_auth=True,                 # API key auth
+    auth_api_key="secret",            # Auth key
+    enable_rate_limit=True,           # Rate limiting
+    rate_limit_requests=100,          # Requests per window
+    # --- Security ---
+    enable_jwt_auth=True,             # JWT / OAuth2 bearer validation
+    enable_zero_trust=True,           # Per-agent role/scope/auth enforcement
+    # --- Production control plane ---
+    enable_control_plane=True,        # Mount /api/v1/control admin API
+    control_token="ops-secret",       # Protects mutating control ops
+    # --- Connections (platform-wide; agents also declare their own) ---
+    connections=[...],                # DatabaseConnectionConfig, VectorConnectionConfig, ...
+    enable_connections_context=True,  # request.state.connections per request (default)
 )
 app = platform.build()
 ```
 
+## Custom Endpoints (API calls to deployed ML models)
+
+Custom endpoints call deployed model services with authenticated `httpx`
+requests, aggregate their outputs, and can feed context into agents via
+pipelines. Auto-discovered from an `endpoints/` directory; scaffold with
+`agentomatic init NAME --template endpoint`.
+
+```python
+# endpoints/ensemble/endpoint.py
+from agentomatic.endpoints import (
+    AggregationStrategy, AuthType, BaseEndpoint, UpstreamAuthConfig, UpstreamConfig,
+)
+
+class EnsembleEndpoint(BaseEndpoint):
+    endpoint_name = "ensemble"
+    endpoint_description = "Fan out to several model services and aggregate."
+    aggregation = AggregationStrategy.MAJORITY   # ALL | FIRST_SUCCESS | MAJORITY
+
+    upstreams = [
+        UpstreamConfig(
+            name="model_a",
+            base_url="${MODEL_A_URL}",
+            auth=UpstreamAuthConfig(
+                type=AuthType.OAUTH2_CLIENT_CREDENTIALS,
+                token_url="${MODEL_A_TOKEN_URL}",
+                client_id="${MODEL_A_CLIENT_ID}",
+                client_secret="${MODEL_A_CLIENT_SECRET}",
+            ),
+        ),
+        UpstreamConfig(name="model_b", base_url="${MODEL_B_URL}",
+                       auth=UpstreamAuthConfig(type=AuthType.BEARER, api_key="${MODEL_B_KEY}")),
+    ]
+```
+
+Auto-generates `POST /api/v1/endpoints/ensemble/call`, `GET .../health`,
+`GET .../info`. Use in a pipeline step to inject model context into an agent:
+
+```yaml
+# pipeline.yaml
+steps:
+  - endpoint: ensemble        # calls the endpoint, stores result in context
+    input: {payload: {text: "$input.query"}}
+  - agent: summarizer
+    input: {current_query: "$steps.ensemble.output"}
+```
+
+Auth types: `NONE`, `API_KEY`, `BEARER`, `BASIC`, `OAUTH2_CLIENT_CREDENTIALS`
+(token cached + auto-refreshed). All string fields support `${ENV}`.
+
+## Per-Agent Connections (databases, vector search, memory, any backend)
+
+Declare a `connections.py` (`CONNECTIONS = [...]`) in an agent package; it is
+auto-discovered and registered under the agent's **scope**. Scaffold with
+`agentomatic init NAME --template connection`. Every connection has a **kind**
+(how it connects) and a **purpose** (`memory` / `rag` / `vector` / `cache` /
+`analytics` / `documents` / `general`).
+
+```python
+# agents/rag_agent/connections.py
+from agentomatic.connections import (
+    ConnectionPurpose, CustomConnectionConfig, DatabaseConnectionConfig,
+    HttpConnectionConfig, VectorConnectionConfig,
+)
+from agentomatic.endpoints import AuthType, UpstreamAuthConfig
+
+CONNECTIONS = [
+    # Any SQL database — just a URL (Postgres/MySQL/SQLite/…)
+    DatabaseConnectionConfig(name="main", url="${DB_URL}", purpose=ConnectionPurpose.GENERAL),
+    # Conversation memory backed by the agent's own database
+    DatabaseConnectionConfig(name="memory", url="${MEM_DB_URL}", purpose=ConnectionPurpose.MEMORY),
+    # Vector store for RAG / vector search (qdrant|chroma|weaviate|pinecone|milvus)
+    VectorConnectionConfig(name="kb", provider="qdrant", url="${QDRANT_URL}",
+                           api_key="${QDRANT_API_KEY}", collection="kb",
+                           purpose=ConnectionPurpose.RAG),
+    # Authenticated HTTP service
+    HttpConnectionConfig(name="scoring", base_url="${SCORING_URL}",
+                         auth=UpstreamAuthConfig(type=AuthType.OAUTH2_CLIENT_CREDENTIALS,
+                                                 token_url="${T}", client_id="${I}",
+                                                 client_secret="${S}")),
+    # ANY other backend (redis, mongo, elasticsearch…) with zero new classes
+    CustomConnectionConfig(name="cache", factory="redis.asyncio.from_url",
+                           args=["${REDIS_URL}"], purpose=ConnectionPurpose.CACHE),
+]
+```
+
+Access live, initialised connections anywhere with `get_connections(scope)`:
+
+```python
+from agentomatic.connections import ConnectionPurpose, get_connections
+
+conns = get_connections("rag_agent")
+async with conns.database("main").session() as session: ...   # SQLAlchemy
+kb = conns.vector("kb").client                                 # native vector client
+redis = await conns.client("cache")                            # any factory client (lazy)
+result = await conns.http("scoring").post("/score", payload={"x": 1})
+for name, c in conns.by_purpose(ConnectionPurpose.RAG).items(): ...   # lookup by intent
+
+memory_store = await conns.database("memory").create_store()   # back memory with a DB
+```
+
+Extensibility (minimal code):
+
+- **`VectorConnectionConfig` + `register_vector_provider(name, builder)`** — add
+  or override any vector backend.
+- **`CustomConnectionConfig`** — wrap *any* client by pointing `factory` at a
+  callable or dotted path (`"pkg.mod:func"`); `${ENV}` resolved deeply, sync/async
+  factories supported, lifecycle auto-detected (`aclose`/`close`/`disconnect`).
+- **`register_connection_type(config_cls, builder)`** — register a full custom
+  wrapper class as a first-class connection.
+
+Connections are lifecycle-managed (init on startup, closed on shutdown), emit
+`agentomatic_connection_calls_total`, appear in the control plane, and are
+exposed per request at `request.state.connections`.
+
+## Production Control Plane
+
+Enable with `enable_control_plane=True`. Admin API under `/api/v1/control`
+(mutating ops require the `X-Control-Token` header when `control_token` is set):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/control` | Platform overview snapshot |
+| `GET` | `/api/v1/control/agents` | List agents + health + policy |
+| `GET` | `/api/v1/control/endpoints` | List custom endpoints |
+| `GET` | `/api/v1/control/connections` | Connection health by scope |
+| `GET` | `/api/v1/control/health` | Aggregate health |
+| `GET` | `/api/v1/control/metrics/summary` | Coarse counters |
+| `POST` | `/api/v1/control/agents/{name}/disable` | Drain an agent (503) |
+| `POST` | `/api/v1/control/agents/{name}/enable` | Re-enable an agent |
+| `POST` | `/api/v1/control/maintenance` | Toggle maintenance mode |
+
+## Observability & Monitoring
+
+- Prometheus metrics (agent, endpoint, upstream model, and connection calls);
+  OpenTelemetry tracing auto-configured when `enable_telemetry=True`.
+- `deploy/observability/` ships a Docker Compose stack (Prometheus + OTel
+  Collector + Grafana) with a pre-provisioned **Agentomatic Overview** dashboard:
+  `cd deploy/observability && docker compose up -d`.
+
 ## CLI Commands
 
 ```bash
-agentomatic init NAME [--template basic|full|rag|chatbot|deepagent|custom|legacy_dict|plugin]
+agentomatic init NAME [--template basic|full|rag|chatbot|deepagent|custom|legacy_dict|plugin|endpoint|connection]
 agentomatic run [--studio] [--with-ui] [--port 8000] [--agents-dir agents/]
 agentomatic demo                    # Scaffold + run demo
 agentomatic list [--agents-dir]     # List registered agents

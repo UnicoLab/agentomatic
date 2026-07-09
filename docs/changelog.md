@@ -9,6 +9,52 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Custom Endpoints**
+  - `BaseEndpoint` — user-defined HTTP APIs that call deployed model services
+    via authenticated `httpx` requests and aggregate their outputs
+  - Auto-discovery from the `endpoints/` directory; routes mounted under
+    `/api/v1/endpoints/{name}` with auto-generated `/health` and `/info`
+  - Upstream auth: API key, bearer, basic, and OAuth2 client-credentials
+    (with token caching); `${ENV}` interpolation keeps secrets out of code
+  - `MultiModelClient` fan-out with `ALL` / `FIRST_SUCCESS` / `MAJORITY`
+    aggregation, retries, timeouts, and Prometheus metrics
+  - Usable as a pipeline step (`endpoint:`) to feed model outputs into agents
+  - `agentomatic init <name> --template endpoint` scaffolding
+- **Per-Agent Connections**
+  - `DatabaseConnectionConfig` / `HttpConnectionConfig` for scoped, authenticated
+    databases (SQLAlchemy async) and HTTP services per agent
+  - `get_connections(scope)` runtime accessor; auto-discovery from an agent's
+    `connections.py` (`CONNECTIONS = [...]`)
+  - Lifecycle-managed (initialised on startup, closed on shutdown) with health
+    checks; `agentomatic init <name> --template connection` scaffolding
+  - **Vector stores** (`VectorConnectionConfig`) for RAG / vector search with
+    lazy, provider-agnostic clients (Qdrant, Chroma, Weaviate, Pinecone,
+    Milvus) and `register_vector_provider()` for custom backends
+  - **Purpose tagging** (`ConnectionPurpose`: memory/rag/vector/cache/analytics…)
+    with `by_purpose()` / `for_purpose()` / `first_for_purpose()` lookups
+  - **Any backend, zero classes** — `CustomConnectionConfig` wraps any factory
+    callable / dotted path (redis, mongo, elasticsearch, neo4j…) with lazy
+    build, deep `${ENV}` resolution, sync/async factories and auto-detected
+    lifecycle; fetch the native client via `await conns.client(name)`
+  - **Pluggable type registry** (`register_connection_type()`) so any backend
+    becomes a first-class connection with a full custom wrapper
+  - Conversation **memory** can be backed by a connection's own engine via
+    `DatabaseConnection.create_store()` (shared pool, no double-dispose)
+  - **`ConnectionsMiddleware`** exposes the routed agent's manager on
+    `request.state.connections` (enabled by `enable_connections_context`)
+- **Production Control Plane** (`enable_control_plane=True`)
+  - Admin API under `/api/v1/control` to inspect agents/endpoints/connections,
+    read health/metrics/config, drain/re-enable agents, and toggle maintenance
+    mode; mutating ops protected by an optional `X-Control-Token`
+- **Observability & Monitoring**
+  - New metrics for endpoints, upstream model calls, and connections
+  - Ready-to-run stack in `deploy/observability/` (Prometheus + OpenTelemetry
+    Collector + Grafana) with a pre-provisioned **Agentomatic Overview** dashboard
+- **Zero-Trust enforcement** activated via middleware so per-agent security
+  policies (roles/scopes/auth) are enforced on the request path
+- **Swagger/OpenAPI fixes**: structured tag metadata, cleaner operation IDs,
+  de-duplicated pipeline tags, and Studio UI routes excluded from the schema
+
 - **Class-Owned Graph Agents (v0.7)**
   - `BaseGraphAgent` — define agents as Python classes with ML lifecycle
   - `build_graph()` + `new_graph()` — LangGraph-style graph wiring (primary API)

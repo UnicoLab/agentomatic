@@ -75,10 +75,30 @@ LLM_DURATION = _histogram(
     "agentomatic_llm_duration_seconds", "LLM call duration", ["provider", "model"]
 )
 
+# Custom endpoints + upstream model calls
+ENDPOINT_CALL_COUNT = _counter(
+    "agentomatic_endpoint_calls_total", "Custom endpoint invocations", ["endpoint", "status"]
+)
+ENDPOINT_DURATION = _histogram(
+    "agentomatic_endpoint_duration_seconds", "Custom endpoint duration", ["endpoint"]
+)
+UPSTREAM_CALL_COUNT = _counter(
+    "agentomatic_upstream_calls_total", "Upstream model service calls", ["status"]
+)
+UPSTREAM_DURATION = _histogram(
+    "agentomatic_upstream_duration_seconds", "Upstream model service call duration"
+)
+
+# Per-agent connections
+CONNECTION_CALL_COUNT = _counter(
+    "agentomatic_connection_calls_total", "Connection acquisitions", ["connection", "status"]
+)
+
 # Gauges
 ACTIVE_REQUESTS = _gauge("agentomatic_active_requests", "Active requests")
 ACTIVE_AGENTS = _gauge("agentomatic_active_agents", "Active agent invocations")
 REGISTERED_AGENTS = _gauge("agentomatic_registered_agents", "Registered agents")
+REGISTERED_ENDPOINTS = _gauge("agentomatic_registered_endpoints", "Registered custom endpoints")
 
 
 @asynccontextmanager

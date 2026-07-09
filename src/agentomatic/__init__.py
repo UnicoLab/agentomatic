@@ -71,6 +71,28 @@ from agentomatic.agents import (
     agent_node,
 )
 
+# Per-agent connections
+from agentomatic.connections import (
+    ConnectionPurpose,
+    CustomConnectionConfig,
+    DatabaseConnectionConfig,
+    HttpConnectionConfig,
+    VectorConnectionConfig,
+    get_connections,
+    register_connection_type,
+    register_vector_provider,
+)
+
+# Custom endpoints (httpx calls to deployed model services)
+from agentomatic.endpoints import (
+    AggregationStrategy,
+    AuthType,
+    BaseEndpoint,
+    EndpointRegistry,
+    UpstreamAuthConfig,
+    UpstreamConfig,
+)
+
 __all__ = [
     # Core
     "AgentPlatform",
@@ -93,6 +115,22 @@ __all__ = [
     "Pipeline",
     "PipelineConfig",
     "PipelineResult",
+    # Custom endpoints
+    "BaseEndpoint",
+    "EndpointRegistry",
+    "UpstreamConfig",
+    "UpstreamAuthConfig",
+    "AuthType",
+    "AggregationStrategy",
+    # Connections
+    "DatabaseConnectionConfig",
+    "HttpConnectionConfig",
+    "VectorConnectionConfig",
+    "CustomConnectionConfig",
+    "ConnectionPurpose",
+    "get_connections",
+    "register_connection_type",
+    "register_vector_provider",
     # Class-owned graph agents (v0.7)
     "BaseGraphAgent",
     "AgentGraph",

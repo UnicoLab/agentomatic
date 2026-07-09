@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
+    from agentomatic.endpoints.registry import EndpointRegistry
 
     from .engine import PipelineEngine
     from .models import PipelineConfig
@@ -75,6 +76,7 @@ def create_pipeline_router(
     pipelines: dict[str, PipelineConfig],
     registry: AgentRegistry,
     sub_pipelines: dict[str, PipelineConfig] | None = None,
+    endpoints: EndpointRegistry | None = None,
 ) -> APIRouter:
     """Create REST endpoints for all discovered pipelines.
 
@@ -93,7 +95,7 @@ def create_pipeline_router(
     Returns:
         A FastAPI ``APIRouter`` with pipeline endpoints.
     """
-    router = APIRouter(tags=["pipelines"])
+    router = APIRouter()
     all_pipelines = dict(pipelines)
     all_sub = dict(sub_pipelines or {})
 
@@ -104,7 +106,7 @@ def create_pipeline_router(
         config = all_pipelines.get(name)
         if config is None:
             raise HTTPException(404, f"Pipeline '{name}' not found")
-        return PipelineEngine(config, registry, all_sub)
+        return PipelineEngine(config, registry, all_sub, endpoints=endpoints)
 
     @router.get(
         "/pipelines",

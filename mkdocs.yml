@@ -132,12 +132,16 @@ nav:
     - Testing Your Agents: guide/testing.md
   - Advanced:
     - Platform Features: guide/platform-features.md
+    - Custom Endpoints: guide/endpoints.md
+    - Per-Agent Connections: guide/connections.md
     - Prompt Optimization: guide/optimization.md
+    - Observability & Monitoring: guide/observability.md
     - Telemetry & Feedback: guide/telemetry.md
     - Pipelines: guide/pipelines.md
     - Configuration Stacks: guide/stacks.md
     - LLM Providers & Failover: guide/llm-providers.md
     - Security & Zero Trust: guide/security.md
+    - Production Control Plane: guide/control-plane.md
     - Swarm Delegation: guide/delegation.md
   - Debugging:
     - Agentomatic Studio: guide/studio.md

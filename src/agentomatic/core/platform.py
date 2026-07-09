@@ -12,6 +12,8 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from agentomatic.endpoints.registry import EndpointRegistry
+from agentomatic.endpoints.router import create_endpoint_router
 from agentomatic.plugins.registry import PluginRegistry
 from agentomatic.plugins.router import create_plugin_router
 
@@ -21,9 +23,33 @@ from .registry import AgentRegistry
 from .router_factory import create_default_router
 
 if TYPE_CHECKING:
+    from fastapi.routing import APIRoute
+
     from agentomatic.security.jwt_auth import JWTConfig
     from agentomatic.stacks.manager import StackConfig, StackManager
     from agentomatic.storage.base import BaseStore
+
+
+def _agent_tag(name: str) -> str:
+    """Return a human-friendly OpenAPI tag for an agent name.
+
+    Avoids ``str.title`` underscore mangling (``weather_bot`` → ``Weather Bot``).
+    """
+    return name.replace("_", " ").replace("-", " ").title()
+
+
+def _generate_unique_id(route: APIRoute) -> str:
+    """Generate a clean, stable OpenAPI ``operationId`` for a route.
+
+    Combines the first tag (when present) with the route name to produce
+    readable client-codegen identifiers instead of FastAPI's verbose,
+    path-derived defaults.
+    """
+    tag = route.tags[0] if route.tags else ""
+    slug = "".join(ch if ch.isalnum() else "_" for ch in str(tag)).strip("_").lower()
+    if slug:
+        return f"{slug}_{route.name}"
+    return route.name
 
 
 class AgentPlatform:
@@ -57,6 +83,7 @@ class AgentPlatform:
         self,
         agents_dir: str | Path = "agents/",
         plugins_dir: str | Path = "plugins/",
+        endpoints_dir: str | Path = "endpoints/",
         *,
         title: str = "Agentomatic Platform",
         description: str = "Multi-agent API platform powered by Agentomatic",
@@ -91,6 +118,11 @@ class AgentPlatform:
         enable_jwt_auth: bool = False,
         jwt_config: JWTConfig | None = None,
         enable_zero_trust: bool = False,
+        # --- v0.11: Control plane & connections ---
+        enable_control_plane: bool = False,
+        control_token: str = "",
+        connections: list[Any] | None = None,
+        enable_connections_context: bool = True,
     ) -> None:
         """Initialise the platform.
 
@@ -122,9 +154,20 @@ class AgentPlatform:
             enable_jwt_auth: Add JWT/OAuth2 auth middleware.
             jwt_config: JWT configuration (required when ``enable_jwt_auth=True``).
             enable_zero_trust: Enable zero-trust policy enforcement.
+            enable_control_plane: Mount the production control plane API and
+                request-gating middleware (default ``False``).
+            control_token: Optional shared secret protecting mutating control
+                plane operations (via the ``X-Control-Token`` header).
+            connections: Optional list of platform-wide connection configs
+                (databases / vector stores / HTTP services) registered under
+                the shared scope.
+            enable_connections_context: Attach the routed agent's connection
+                manager to ``request.state.connections`` on every request
+                (default ``True``).
         """
         self.agents_dir = Path(agents_dir).resolve()
         self.plugins_dir = Path(plugins_dir).resolve()
+        self.endpoints_dir = Path(endpoints_dir).resolve()
         self.title = title
         self.description = description
         self.version = version
@@ -157,6 +200,12 @@ class AgentPlatform:
         self._enable_zero_trust = enable_zero_trust
         self._init_stack(stack, stacks_dir)
 
+        # v0.11: Control plane & connections
+        self._enable_control_plane = enable_control_plane
+        self._control_token = control_token
+        self._platform_connections = list(connections or [])
+        self._enable_connections_context = enable_connections_context
+
         # Memory config
         self._max_history_messages = max_history_messages
         self._summarize_after = summarize_after
@@ -164,12 +213,20 @@ class AgentPlatform:
         # Internal
         self._registry = AgentRegistry()
         self._plugin_registry = PluginRegistry()
+        self._endpoint_registry = EndpointRegistry()
+        self._pipelines: dict[str, Any] = {}
         self._on_startup: list[Callable[..., Any]] = []
         self._on_shutdown: list[Callable[..., Any]] = []
         self._extra_routers: list[tuple[str, Any, dict[str, Any]]] = []
         self._app: FastAPI | None = None
         self._discovered: bool = False  # guard against double discovery
         self._plugins_discovered: bool = False
+        self._endpoints_discovered: bool = False
+
+        # Control plane state (used only when enabled)
+        from agentomatic.control.state import ControlPlaneState
+
+        self._control_state = ControlPlaneState()
 
     def _init_stack(
         self,
@@ -247,6 +304,20 @@ class AgentPlatform:
     def registry(self) -> AgentRegistry:
         """Access the agent registry."""
         return self._registry
+
+    @property
+    def endpoint_registry(self) -> EndpointRegistry:
+        """Access the custom endpoint registry."""
+        return self._endpoint_registry
+
+    @property
+    def pipelines(self) -> dict[str, Any]:
+        """Access the discovered pipelines (populated during ``build``)."""
+        return self._pipelines
+
+    def register_endpoint(self, endpoint: Any) -> None:
+        """Register a custom endpoint programmatically."""
+        self._endpoint_registry.register(endpoint)
 
     @property
     def store(self) -> BaseStore | None:
@@ -334,6 +405,57 @@ class AgentPlatform:
         self._registry.discover(self.agents_dir, prefix)
         self._discovered = True
 
+    def _build_openapi_tags(self) -> list[dict[str, Any]]:
+        """Build OpenAPI tag metadata (descriptions + ordering) for Swagger."""
+        tags: list[dict[str, Any]] = [
+            {"name": "Platform", "description": "Platform health, readiness and discovery."},
+        ]
+        for name, agent in sorted(self._registry.all().items()):
+            if agent.manifest.is_subagent:
+                tags.append(
+                    {
+                        "name": _agent_tag(name),
+                        "description": agent.manifest.description or f"Agent '{name}'.",
+                    }
+                )
+        tags.append({"name": "Endpoints", "description": "Custom HTTP endpoints."})
+        tags.append({"name": "Pipelines", "description": "Multi-step agent pipelines."})
+        if self._plugin_registry.count:
+            tags.append({"name": "Plugins", "description": "Classical ML model plugins."})
+        if self._enable_control_plane:
+            tags.append(
+                {"name": "Control Plane", "description": "Runtime operations and observability."}
+            )
+        if self._enable_studio:
+            tags.append({"name": "Studio Debug API", "description": "Studio debugging surface."})
+        return tags
+
+    async def _init_connections(self) -> None:
+        """Register and initialise per-agent and platform-wide connections."""
+        from agentomatic.connections.manager import (
+            PLATFORM_SCOPE,
+            register_connections,
+        )
+
+        # Platform-wide connections
+        if self._platform_connections:
+            register_connections(PLATFORM_SCOPE, self._platform_connections)
+
+        # Per-agent connections discovered from ``connections.py``
+        for name, agent in self._registry.all().items():
+            configs = getattr(agent, "connections", None)
+            if configs:
+                register_connections(name, list(configs))
+
+        from agentomatic.connections.manager import all_managers
+
+        managers = all_managers()
+        if managers:
+            logger.info(f"🔗 Initializing {len(managers)} connection scope(s)...")
+            for scope, manager in managers.items():
+                await manager.initialize()
+                logger.info(f"  ✅ Connections ready for scope '{scope}' ({manager.count})")
+
     # ------------------------------------------------------------------
     # Custom routers
     # ------------------------------------------------------------------
@@ -382,6 +504,18 @@ class AgentPlatform:
             platform._plugin_registry.discover(platform.plugins_dir, plugin_prefix)
             platform._plugins_discovered = True
 
+        if not platform._endpoints_discovered:
+            endpoint_prefix = platform.package_prefix or platform.endpoints_dir.name
+            platform._endpoint_registry.discover(platform.endpoints_dir, endpoint_prefix)
+            platform._endpoints_discovered = True
+
+        try:
+            from agentomatic.observability.metrics import REGISTERED_ENDPOINTS
+
+            REGISTERED_ENDPOINTS.set(platform._endpoint_registry.count)
+        except Exception:  # noqa: BLE001 - metrics are optional
+            pass
+
         # Track which agents are already registered (programmatic + discovered)
         _pre_registered = set(platform._registry.list_names())
 
@@ -418,6 +552,19 @@ class AgentPlatform:
                 except Exception as e:
                     logger.error(f"  ❌ Failed to load plugin '{name}': {e}")
 
+            # --- Start custom endpoints ---
+            if platform._endpoint_registry.count:
+                logger.info("🌐 Starting custom endpoints...")
+                for name, endpoint in platform._endpoint_registry.list_endpoints().items():
+                    try:
+                        await endpoint.startup()
+                        logger.info(f"  ✅ Endpoint '{name}' ready")
+                    except Exception as e:  # noqa: BLE001
+                        logger.error(f"  ❌ Failed to start endpoint '{name}': {e}")
+
+            # --- Register + initialize connections (per-agent + platform) ---
+            await platform._init_connections()
+
             # Auto-generate + mount routers for NEWLY discovered agents
             for name, agent in platform._registry.all().items():
                 if name in _pre_registered:
@@ -435,7 +582,7 @@ class AgentPlatform:
                     app.include_router(
                         agent.router,
                         prefix=f"{platform.api_prefix}/{name}",
-                        tags=[name.title()],
+                        tags=[_agent_tag(name)],
                     )
                     logger.info(f"  🔌 Mounted: {platform.api_prefix}/{name}")
 
@@ -449,6 +596,22 @@ class AgentPlatform:
             yield
 
             # --- Shutdown ---
+            # Stop custom endpoints
+            for name, endpoint in platform._endpoint_registry.list_endpoints().items():
+                try:
+                    await endpoint.shutdown()
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"Endpoint '{name}' shutdown error: {e}")
+
+            # Close all connections
+            try:
+                from agentomatic.connections.manager import all_managers
+
+                for manager in all_managers().values():
+                    await manager.close()
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"Connection shutdown error: {e}")
+
             # Close storage
             if platform._store:
                 await platform._store.close()
@@ -466,6 +629,8 @@ class AgentPlatform:
             description=self.description,
             version=self.version,
             lifespan=lifespan,
+            openapi_tags=self._build_openapi_tags(),
+            generate_unique_id_function=_generate_unique_id,
         )
 
         # ------------------------------------------------------------------
@@ -494,6 +659,31 @@ class AgentPlatform:
 
             app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
             logger.info("🔒 Auth middleware enabled")
+
+        # Zero Trust Enforcer (v0.6) — added BEFORE JWT so that (thanks to
+        # Starlette's reverse middleware ordering) the JWT middleware runs
+        # first and populates ``request.state.jwt_claims`` before enforcement.
+        # Per-agent enforcement is opt-in via each agent's ``security.py``
+        # policy (``require_auth`` / ``allowed_roles`` / ``allowed_scopes``).
+        if self._enable_zero_trust:
+            try:
+                from agentomatic.middleware.zero_trust import ZeroTrustMiddleware
+                from agentomatic.security.zero_trust import ZeroTrustEnforcer
+
+                enforcer = ZeroTrustEnforcer(require_auth_globally=False)
+                for name, agent in self._registry.all().items():
+                    if agent.security_policy is not None:
+                        enforcer.register_policy(name, agent.security_policy)
+                app.state.zero_trust_enforcer = enforcer
+                app.add_middleware(
+                    ZeroTrustMiddleware,
+                    enforcer=enforcer,
+                    registry=self._registry,
+                    api_prefix=self.api_prefix,
+                )
+                logger.info("🛡️ Zero-trust enforcement enabled")
+            except Exception as exc:
+                logger.warning(f"Zero-trust setup failed: {exc}")
 
         # JWT Auth (v0.6)
         if self._enable_jwt_auth:
@@ -526,6 +716,26 @@ class AgentPlatform:
             app.add_middleware(MetricsMiddleware)
             logger.info("📊 Metrics middleware enabled")
 
+        # Control plane request gating (maintenance mode + agent drain)
+        if self._enable_control_plane:
+            from agentomatic.control.middleware import MaintenanceMiddleware
+
+            app.add_middleware(
+                MaintenanceMiddleware,
+                state=self._control_state,
+                api_prefix=self.api_prefix,
+            )
+
+        # Per-request connection context (request.state.connections)
+        if self._enable_connections_context:
+            from agentomatic.middleware.connections import ConnectionsMiddleware
+
+            app.add_middleware(
+                ConnectionsMiddleware,
+                registry=self._registry,
+                api_prefix=self.api_prefix,
+            )
+
         # Custom middleware
         for mw_cls, mw_kwargs in self._custom_middleware:
             app.add_middleware(mw_cls, **mw_kwargs)  # type: ignore[arg-type]
@@ -537,21 +747,6 @@ class AgentPlatform:
             collector = FeedbackCollector(store=self._store)
             set_collector(collector)
             logger.info("📝 Feedback collection enabled")
-
-        # Zero Trust Enforcer (v0.6)
-        if self._enable_zero_trust:
-            try:
-                from agentomatic.security.zero_trust import ZeroTrustEnforcer
-
-                enforcer = ZeroTrustEnforcer(require_auth_globally=self._enable_auth)
-                # Register per-agent security policies
-                for name, agent in self._registry.all().items():
-                    if agent.security_policy is not None:
-                        enforcer.register_policy(name, agent.security_policy)
-                app.state.zero_trust_enforcer = enforcer
-                logger.info("🛡️ Zero-trust enforcement enabled")
-            except Exception as exc:
-                logger.warning(f"Zero-trust setup failed: {exc}")
 
         # OpenTelemetry auto-instrumentation
         if self._enable_telemetry:
@@ -578,7 +773,7 @@ class AgentPlatform:
                 app.include_router(
                     agent.router,
                     prefix=f"{self.api_prefix}/{name}",
-                    tags=[name.title()],
+                    tags=[_agent_tag(name)],
                 )
 
         # ------------------------------------------------------------------
@@ -586,7 +781,7 @@ class AgentPlatform:
         # ------------------------------------------------------------------
         plugins_router = APIRouter(prefix=self.api_prefix + "/plugins")
 
-        @plugins_router.get("", response_model=list[dict[str, Any]])
+        @plugins_router.get("", response_model=list[dict[str, Any]], tags=["Plugins"])
         async def list_plugins() -> list[dict[str, Any]]:
             """List all registered plugins."""
             return [
@@ -609,6 +804,25 @@ class AgentPlatform:
         app.include_router(plugins_router)
 
         # ------------------------------------------------------------------
+        # Mount Custom Endpoint API Routes
+        # ------------------------------------------------------------------
+        endpoints_router = APIRouter(prefix=self.api_prefix + "/endpoints")
+
+        @endpoints_router.get("", response_model=list[dict[str, Any]], tags=["Endpoints"])
+        async def list_endpoints() -> list[dict[str, Any]]:
+            """List all registered custom endpoints."""
+            return [ep.info() for ep in self._endpoint_registry.list_endpoints().values()]
+
+        for endpoint_name, endpoint in self._endpoint_registry.list_endpoints().items():
+            endpoint_router = create_endpoint_router(endpoint)
+            endpoints_router.include_router(
+                endpoint_router,
+                prefix=f"/{endpoint_name}",
+            )
+            logger.info(f"🌐 Mounted custom endpoint: {endpoint_name}")
+        app.include_router(endpoints_router)
+
+        # ------------------------------------------------------------------
         # Pipeline auto-discovery and mounting
         # ------------------------------------------------------------------
         try:
@@ -626,8 +840,14 @@ class AgentPlatform:
             agents_pipelines = PipelineLoader.discover_pipelines(self.agents_dir)
             pipelines.update(agents_pipelines)
 
+            self._pipelines = pipelines
+
             if pipelines:
-                pipeline_router = create_pipeline_router(pipelines, self._registry)
+                pipeline_router = create_pipeline_router(
+                    pipelines,
+                    self._registry,
+                    endpoints=self._endpoint_registry,
+                )
                 app.include_router(
                     pipeline_router,
                     prefix=self.api_prefix,
@@ -645,7 +865,7 @@ class AgentPlatform:
         # Platform-level endpoints
         # ------------------------------------------------------------------
 
-        @app.get("/health")
+        @app.get("/health", tags=["Platform"])
         async def health() -> dict[str, Any]:
             """Aggregate health across all agents + storage."""
             agents: dict[str, Any] = {}
@@ -675,13 +895,13 @@ class AgentPlatform:
                 "storage": storage_health,
             }
 
-        @app.get("/readiness")
+        @app.get("/readiness", tags=["Platform"])
         async def readiness() -> dict[str, Any]:
             """Kubernetes-style readiness probe."""
             return {"status": "ready", "agents": self._registry.count}
 
         # A2A discovery
-        @app.get("/.well-known/agent.json")
+        @app.get("/.well-known/agent.json", tags=["Platform"])
         async def a2a_discovery() -> dict[str, Any]:
             """Return A2A agent cards for all registered agents."""
             cards: dict[str, Any] = {}
@@ -703,7 +923,7 @@ class AgentPlatform:
             }
 
         # Agents list
-        @app.get(f"{self.api_prefix}/agents")
+        @app.get(f"{self.api_prefix}/agents", tags=["Platform"])
         async def list_agents() -> dict[str, Any]:
             """List all registered agents."""
             return {
@@ -722,13 +942,13 @@ class AgentPlatform:
         if self._store:
             store = self._store  # local var for mypy narrowing across closures
 
-            @app.get(f"{self.api_prefix}/storage/stats")
+            @app.get(f"{self.api_prefix}/storage/stats", tags=["Platform"])
             async def storage_stats() -> dict[str, Any]:
                 """Storage backend statistics."""
                 return await store.get_stats()
 
             # Feedback endpoint
-            @app.post(f"{self.api_prefix}/feedback")
+            @app.post(f"{self.api_prefix}/feedback", tags=["Platform"])
             async def submit_feedback(
                 thread_id: str,
                 user_id: str,
@@ -745,7 +965,7 @@ class AgentPlatform:
                     comment=comment,
                 )
 
-            @app.get(f"{self.api_prefix}/feedback")
+            @app.get(f"{self.api_prefix}/feedback", tags=["Platform"])
             async def list_feedback(
                 agent_name: str | None = None,
                 limit: int = 50,
@@ -758,7 +978,7 @@ class AgentPlatform:
                 return {"feedback": items, "count": len(items)}
 
         # Root
-        @app.get("/")
+        @app.get("/", tags=["Platform"])
         async def root() -> dict[str, Any]:
             """Platform index."""
             return {
@@ -769,6 +989,23 @@ class AgentPlatform:
                 "health": "/health",
                 "a2a": "/.well-known/agent.json",
             }
+
+        # ------------------------------------------------------------------
+        # Control Plane API
+        # ------------------------------------------------------------------
+        if self._enable_control_plane:
+            try:
+                from agentomatic.control.router import create_control_router
+
+                control_router = create_control_router(
+                    self,
+                    self._control_state,
+                    control_token=self._control_token,
+                )
+                app.include_router(control_router, prefix=self.api_prefix + "/control")
+                logger.info(f"🎛️ Control plane mounted at {self.api_prefix}/control")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Control plane setup failed: {exc}")
 
         # Extra routers
         for prefix, router, kwargs in self._extra_routers:

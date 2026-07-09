@@ -15,6 +15,7 @@ from loguru import logger
 from .context import PipelineContext
 from .models import (
     AgentStepConfig,
+    EndpointStepConfig,
     ErrorPolicy,
     LoopStepConfig,
     ParallelStepConfig,
@@ -25,6 +26,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
+    from agentomatic.endpoints.registry import EndpointRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +165,90 @@ def _normalize_output(result: Any) -> dict[str, Any]:
     if hasattr(result, "model_dump"):
         return result.model_dump()
     return {"response": str(result)}
+
+
+# ---------------------------------------------------------------------------
+# Endpoint Step
+# ---------------------------------------------------------------------------
+
+
+async def execute_endpoint_step(
+    config: EndpointStepConfig,
+    ctx: PipelineContext,
+    endpoints: EndpointRegistry | None,
+) -> StepResult:
+    """Invoke a registered custom endpoint.
+
+    Resolves the input mapping into a payload, calls the endpoint (which
+    usually fetches data from deployed model services), and returns the
+    endpoint output as a ``StepResult`` for downstream steps/agents.
+
+    Args:
+        config: Endpoint step configuration.
+        ctx: Pipeline context for resolving ``$`` expressions.
+        endpoints: The endpoint registry for lookup.
+
+    Returns:
+        Step result with the endpoint's output.
+    """
+    t0 = time.perf_counter()
+    name = config.endpoint
+
+    if endpoints is None:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error="No endpoint registry available to this pipeline",
+        )
+
+    endpoint = endpoints.get(name)
+    if endpoint is None:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=f"Endpoint '{name}' not found in registry",
+        )
+
+    try:
+        if config.input and config.input.mappings:
+            payload = ctx.resolve_mapping(config.input.mappings)
+        else:
+            payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+
+        kwargs: dict[str, Any] = {}
+        if config.upstreams:
+            kwargs["upstreams"] = config.upstreams
+
+        result = await asyncio.wait_for(
+            endpoint.call(payload, **kwargs),
+            timeout=config.timeout,
+        )
+        output = _normalize_output(result)
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=StepStatus.SUCCESS,
+            output=output,
+            duration_ms=duration,
+            metadata={"endpoint": name},
+        )
+    except TimeoutError:
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=f"Endpoint '{name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+        )
+    except Exception as exc:  # noqa: BLE001
+        duration = (time.perf_counter() - t0) * 1000
+        logger.error(f"Endpoint step '{config.name}' failed: {exc}")
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=str(exc),
+            duration_ms=duration,
+        )
 
 
 # ---------------------------------------------------------------------------
