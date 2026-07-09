@@ -38,6 +38,7 @@ from .engine import PipelineEngine
 from .loader import PipelineLoader
 from .models import (
     AgentStepConfig,
+    EndpointStepConfig,
     ErrorPolicy,
     LoopStepConfig,
     OutputMapping,
@@ -54,6 +55,7 @@ from .router import create_pipeline_router
 
 __all__ = [
     "AgentStepConfig",
+    "EndpointStepConfig",
     "ErrorPolicy",
     "LoopStepConfig",
     "OutputMapping",

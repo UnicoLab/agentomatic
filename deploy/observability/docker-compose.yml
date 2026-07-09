@@ -1,0 +1,52 @@
+# Agentomatic observability stack.
+#
+# Brings up Prometheus (metrics), an OpenTelemetry Collector (traces),
+# and Grafana (dashboards) pre-provisioned with an Agentomatic overview.
+#
+# Usage:
+#   cd deploy/observability && docker compose up -d
+#   Grafana:    http://localhost:3000  (admin / admin)
+#   Prometheus: http://localhost:9090
+#
+# Point your Agentomatic app at the collector:
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# and expose /metrics (enable_metrics=True) on port 8000.
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agentomatic-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: agentomatic-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: agentomatic-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus

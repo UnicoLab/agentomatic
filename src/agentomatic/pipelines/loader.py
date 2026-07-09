@@ -14,6 +14,7 @@ from loguru import logger
 
 from agentomatic.pipelines.models import (
     AgentStepConfig,
+    EndpointStepConfig,
     ErrorPolicy,
     InputMapping,
     LoopStepConfig,
@@ -33,7 +34,7 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore[assignment]
 
 # Keys used to discriminate the step type from a raw dict.
-_STEP_TYPE_KEYS = ("agent", "parallel", "transform", "loop", "sub_pipeline")
+_STEP_TYPE_KEYS = ("agent", "endpoint", "parallel", "transform", "loop", "sub_pipeline")
 
 # Recognised YAML file suffixes.
 _YAML_SUFFIXES = {".yaml", ".yml"}
@@ -145,6 +146,35 @@ def _parse_agent_step(data: dict[str, Any]) -> AgentStepConfig:
         condition=data.get("condition"),
         on_error=ErrorPolicy(data["on_error"]) if "on_error" in data else ErrorPolicy.FAIL,
         fallback_agent=data.get("fallback_agent"),
+        retry=_parse_retry(data.get("retry")),
+        timeout=data.get("timeout", 30.0),
+        metadata=data.get("metadata", {}),
+    )
+
+
+def _parse_endpoint_step(data: dict[str, Any]) -> EndpointStepConfig:
+    """Build an ``EndpointStepConfig`` from a raw dict.
+
+    Handles the shorthand form ``{endpoint: "name"}`` where the step *name*
+    defaults to the endpoint identifier.
+
+    Args:
+        data: Raw step dictionary containing at least the ``endpoint`` key.
+
+    Returns:
+        A validated ``EndpointStepConfig``.
+    """
+    endpoint: str = data["endpoint"]
+    name: str = data.get("name", endpoint)
+
+    return EndpointStepConfig(
+        name=name,
+        endpoint=endpoint,
+        input=_coerce_input_mapping(data.get("input")),
+        output=_coerce_output_mapping(data.get("output")),
+        upstreams=data.get("upstreams"),
+        condition=data.get("condition"),
+        on_error=ErrorPolicy(data["on_error"]) if "on_error" in data else ErrorPolicy.FAIL,
         retry=_parse_retry(data.get("retry")),
         timeout=data.get("timeout", 30.0),
         metadata=data.get("metadata", {}),
@@ -287,6 +317,8 @@ def _parse_step(data: dict[str, Any]) -> StepConfigUnion:
     """
     if "agent" in data:
         return _parse_agent_step(data)
+    if "endpoint" in data:
+        return _parse_endpoint_step(data)
     if "parallel" in data:
         return _parse_parallel_step(data)
     if "transform" in data:

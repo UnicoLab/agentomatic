@@ -11,6 +11,7 @@ __all__ = [
     "MetricsMiddleware",
     "FeedbackCollector",
     "collect_feedback",
+    "ConnectionsMiddleware",
 ]
 
 # Lazy imports to avoid cascading failures when optional dependencies
@@ -22,6 +23,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "RateLimitMiddleware": (".rate_limit", "RateLimitMiddleware"),
     "FeedbackCollector": (".feedback", "FeedbackCollector"),
     "collect_feedback": (".feedback", "collect_feedback"),
+    "ConnectionsMiddleware": (".connections", "ConnectionsMiddleware"),
 }
 
 

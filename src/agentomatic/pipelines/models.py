@@ -21,6 +21,7 @@ class StepType(StrEnum):
     """Discriminator for step types."""
 
     AGENT = "agent"
+    ENDPOINT = "endpoint"
     TRANSFORM = "transform"
     CONDITION = "condition"
     PARALLEL = "parallel"
@@ -137,6 +138,27 @@ class AgentStepConfig(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class EndpointStepConfig(BaseModel):
+    """Configuration for a custom-endpoint invocation step.
+
+    Calls a registered custom endpoint (which typically fetches data from
+    one or more deployed model services) and stores its output in the
+    pipeline context so downstream agents can consume it.
+    """
+
+    step_type: Literal[StepType.ENDPOINT] = StepType.ENDPOINT
+    name: str
+    endpoint: str  # Endpoint name in the endpoint registry
+    input: InputMapping = Field(default_factory=InputMapping)
+    output: OutputMapping = Field(default_factory=OutputMapping)
+    upstreams: list[str] | None = None
+    condition: str | None = None
+    on_error: ErrorPolicy = ErrorPolicy.FAIL
+    retry: RetryConfig | None = None
+    timeout: float = Field(30.0, gt=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class TransformStepConfig(BaseModel):
     """Configuration for a data-transformation step.
 
@@ -192,6 +214,7 @@ class SubPipelineStepConfig(BaseModel):
 # Discriminated union of all step types
 StepConfigUnion = (
     AgentStepConfig
+    | EndpointStepConfig
     | TransformStepConfig
     | ParallelStepConfig
     | LoopStepConfig
@@ -246,6 +269,10 @@ class PipelineConfig(BaseModel):
             elif isinstance(step, LoopStepConfig):
                 agents.add(step.step.agent)
         return agents
+
+    def get_endpoint_names(self) -> set[str]:
+        """Return the set of all referenced custom-endpoint names."""
+        return {s.endpoint for s in self.steps if isinstance(s, EndpointStepConfig)}
 
 
 # ---------------------------------------------------------------------------

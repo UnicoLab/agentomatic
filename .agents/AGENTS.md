@@ -36,6 +36,10 @@
 ## Package Structure
 - Source code in `src/agentomatic/`.
 - Each subpackage has an `__init__.py` that re-exports the public API.
+- Production subpackages: `endpoints/` (custom APIs to deployed ML models),
+  `connections/` (per-agent databases / vector stores / HTTP / any backend),
+  `control/` (control plane), `security/` (JWT + zero-trust), plus the
+  `middleware/` stack and `observability/`.
 - New features should include: implementation, tests, documentation, and changelog entry.
 
 ## CI/CD

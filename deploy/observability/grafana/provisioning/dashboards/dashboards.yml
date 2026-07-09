@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: Agentomatic
+    orgId: 1
+    folder: Agentomatic
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
