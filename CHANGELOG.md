@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-07-14)
+
+### Features
+
+- Production execution modes, task board, status, ingestion and Keras lifecycle
+  ([`86496e9`](https://github.com/UnicoLab/agentomatic/commit/86496e984ae0d1ff9916b46de1786aa7740670f4))
+
+Add a unified task/execution subsystem so every agent, plugin, pipeline, endpoint, and ingestor is
+  callable sync, async, batch, streaming, or as a tracked background task with progress, SSE events,
+  cancellation, and webhooks.
+
+- tasks: TaskManager/TaskStore with InMemory + durable SQLAlchemyTaskStore (pooling, TTL/eviction,
+  forward-compatible JSON schema, lazy import), per-resource /async and /batch routes, and a
+  pollable /api/v1/tasks board - status: unified /status HTML dashboard + /api/v1/status JSON rollup
+  across all resources, storage, and the task engine - ingestion: first-class BaseIngestor ops layer
+  (auto-discovery, /run and /run/async, pipeline ingestion step) - packaging, not implementation -
+  pipelines: plugin step type, rollback/compensation, optional input/output schema enforcement,
+  plugin registry threaded through engine/router/dispatcher - agents: Keras-style lifecycle -
+  History, epoch-aware fit() with verbose/callbacks/validation_data, EarlyStopping, Loss
+  abstraction, and PromptFitterBridge wired to the optimize engine
+
+Docs: new tasks/status/ingestion guides; README plus index, concepts, deployment, storage,
+  observability, api-reference, and frontend guide updated. mkdocs --strict clean; full test suite
+  green.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+
 ## v1.1.0 (2026-07-09)
 
 ### Bug Fixes
