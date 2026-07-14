@@ -1220,6 +1220,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks & Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ingestion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingestion & RAG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../connections/" class="md-nav__link">
         
   
@@ -2216,6 +2300,13 @@
 <p>Agentomatic ships automatic logging, Prometheus metrics, OpenTelemetry
 tracing, and a <strong>ready-to-run</strong> monitoring stack (Prometheus + OpenTelemetry
 Collector + Grafana) with a pre-provisioned dashboard.</p>
+<div class="admonition tip">
+<p class="admonition-title">At-a-glance health</p>
+<p>For a single, human-readable roll-up of every agent, plugin, pipeline,
+endpoint, ingestor, the storage backend, and the task engine, open the
+unified <a href="../status/"><code>/status</code> dashboard</a> (or <code>GET /api/v1/status</code> for JSON).
+It complements the metrics/tracing below with an instant control-plane view.</p>
+</div>
 <h2 id="enabling-metrics-tracing">Enabling metrics &amp; tracing<a class="headerlink" href="#enabling-metrics-tracing" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>

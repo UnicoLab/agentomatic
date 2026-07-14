@@ -1217,6 +1217,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks & Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ingestion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingestion & RAG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/connections/" class="md-nav__link">
         
   
@@ -2731,6 +2815,16 @@
 </tr>
 <tr>
 <td><code>GET</code></td>
+<td><code>/status</code></td>
+<td>Unified status dashboard (HTML)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/status</code></td>
+<td>Unified platform status (JSON)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
 <td><code>/docs</code></td>
 <td>OpenAPI interactive docs</td>
 </tr>
@@ -2756,6 +2850,58 @@
 </tr>
 </tbody>
 </table>
+<p><strong>Resource surfaces</strong> (each with its own list/run endpoints + <code>/async</code> and
+<code>/batch</code> execution modes):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code>/<code>GET</code>/<code>DELETE</code></td>
+<td><code>/api/v1/tasks[/{id}][/events\|/result\|/cancel]</code></td>
+<td>Task board — submit, poll, stream, cancel, delete</td>
+</tr>
+<tr>
+<td><code>GET</code>/<code>POST</code></td>
+<td><code>/api/v1/plugins[/{name}/predict]</code></td>
+<td>ML plugins — list, model card, predict</td>
+</tr>
+<tr>
+<td><code>GET</code>/<code>POST</code></td>
+<td><code>/api/v1/pipelines[/{name}/run\|/validate\|/visualize]</code></td>
+<td>Pipelines — list, run, validate, visualize</td>
+</tr>
+<tr>
+<td><code>GET</code>/<code>POST</code></td>
+<td><code>/api/v1/ingestion[/{name}/run]</code></td>
+<td>Ingestors — list, info, health, run</td>
+</tr>
+<tr>
+<td><code>GET</code>/<code>POST</code></td>
+<td><code>/api/v1/endpoints[/{name}{path}]</code></td>
+<td>Custom endpoints — list, call</td>
+</tr>
+<tr>
+<td><code>GET</code>/<code>POST</code></td>
+<td><code>/api/v1/control[/...]</code></td>
+<td>Control plane (when enabled)</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">Dedicated guides</p>
+<p>Full details live in <a href="../../guide/tasks/">Tasks &amp; Execution Modes</a>,
+<a href="../../guide/status/">Status Dashboard</a>, <a href="../../guide/ingestion/">Ingestion &amp; RAG</a>,
+<a href="../../guide/pipelines/">Pipelines</a>, <a href="../../guide/ml-plugins/">ML Plugins</a>, and
+<a href="../../guide/endpoints/">Custom Endpoints</a>. The
+<a href="../../FRONTEND_API_GUIDE/">Frontend API Guide</a> has copy-paste TypeScript for
+async task polling and SSE.</p>
+</div>
 <hr />
 <h3 id="get"><code>GET /</code><a class="headerlink" href="#get" title="Permanent link">&para;</a></h3>
 <p>Platform information.</p>

@@ -1215,6 +1215,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guide/tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks & Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/ingestion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingestion & RAG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guide/connections/" class="md-nav__link">
         
   
@@ -2376,6 +2460,119 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Durable <code>SQLAlchemyTaskStore</code></strong></li>
+<li>Drop-in, production-ready <code>TaskStore</code> backed by any SQLAlchemy async driver
+    (SQLite/PostgreSQL/MySQL) — task status, progress, and results survive
+    process restarts and are shared across workers/replicas</li>
+<li>Wire it in one line: <code>AgentPlatform.from_folder(..., task_store=SQLAlchemyTaskStore(url))</code>;
+    the platform lifespan initialises and disposes it automatically</li>
+<li>Fully configurable and safe by default: connection pooling, <code>table_name</code>,
+    TTL/<code>max_records</code> eviction (best-effort, never blocks a <code>save</code>), reusable
+    external <code>engine</code>, and a forward-compatible indexed-JSON schema</li>
+<li>Lazy import — <code>agentomatic.tasks</code> never requires the optional <code>db</code> extra;
+    a clear install hint is raised only when the store is constructed</li>
+<li>Exposed as <code>agentomatic.tasks.SQLAlchemyTaskStore</code>; install via
+    <code>agentomatic[db]</code> (SQLite) or <code>agentomatic[db-postgres]</code> (PostgreSQL)</li>
+<li><strong>Keras-style agent training lifecycle</strong></li>
+<li><code>BaseGraphAgent.fit()</code> is now epoch-aware and returns a real <strong><code>History</code></strong>
+    object (<code>.history</code> log-key → per-epoch values, plus <code>.epoch</code>, <code>.params</code>,
+    <code>final()</code>, <code>best()</code>, <code>to_dict()</code>, <code>summary()</code>); also stored on
+    <code>agent.history</code></li>
+<li><code>fit(dataset, *, epochs, verbose, callbacks, validation_data)</code> — per-epoch
+    optimizer step + train/validation evaluation, Keras-like verbose log lines,
+    and <code>val_*</code> metrics when <code>validation_data</code> is supplied</li>
+<li><strong>Callbacks</strong>: <code>Callback</code> base class (<code>on_train_begin</code>/<code>on_epoch_begin</code>/
+    <code>on_epoch_end(epoch, logs)</code>/<code>on_train_end</code>) and a built-in <code>EarlyStopping</code>
+    that halts training via <code>agent.stop_training</code></li>
+<li><strong>Loss abstraction</strong>: <code>compile(..., loss=...)</code> accepts a <code>Loss</code>, any
+    metric-like object (converted to <code>1 - score</code> via <code>MetricLoss</code>), or a
+    callable (<code>CallableLoss</code>); <code>resolve_loss()</code> coerces any of these</li>
+<li><strong>Optimize-engine wiring</strong>: <code>PromptFitterBridge</code> now actually runs the
+    async <code>optimize.PromptFitter</code> from <code>fit()</code>, applies the best prompt config
+    back onto the agent, and stores the full <code>PromptFitResult</code> on
+    <code>agent._last_fit_result</code> (gracefully degrades to a baseline pass when the
+    <code>optimize</code> extra is missing or called inside a running event loop)</li>
+<li><code>compile()</code> arguments are now all optional (dataset/metrics can be provided
+    at <code>fit()</code> time); <code>History</code>, <code>Callback</code>, <code>EarlyStopping</code>, and <code>Loss</code> are
+    exported from <code>agentomatic</code> and <code>agentomatic.agents</code></li>
+<li><strong>Pipeline data-passing hardening</strong></li>
+<li>New <strong><code>plugin:</code> step type</strong> — call a registered ML plugin's <code>predict()</code>
+    mid-pipeline; the resolved input mapping is coerced into the plugin's
+    declared input schema before inference (with input/output mapping,
+    condition, retry, timeout, and <code>on_error</code> like every other step)</li>
+<li><strong>Rollback / compensation</strong>: under <code>on_error: rollback</code>, completed steps
+    are compensated in reverse order via an optional per-step <code>rollback</code> code
+    block (with <code>ctx</code> and <code>output</code> in scope); compensated steps are reported in
+    <code>result.metadata["rolled_back_steps"]</code></li>
+<li><strong>Optional input/output schema enforcement</strong>: <code>input_schema</code> /
+    <code>output_schema</code> are now validated (advisory by default, failing when
+    <code>strict_schema: true</code>) via a lightweight type checker</li>
+<li>Plugin registry is threaded through the pipeline engine, router, task
+    dispatcher, and sub-pipelines so plugin steps work in every run mode
+    (sync, <code>/run/async</code>, <code>/run/batch</code>, and nested pipelines)</li>
+<li><strong>Per-resource execution-mode sugar</strong></li>
+<li>Every resource now exposes consistent <code>/&lt;sync&gt;/async</code> and <code>/&lt;sync&gt;/batch</code>
+    companion routes backed by the unified task system: agents
+    (<code>/invoke/async</code>, <code>/invoke/batch</code>), plugins (<code>/predict/async</code>,
+    <code>/predict/batch</code>), pipelines (<code>/run/async</code>, <code>/run/batch</code>), ingestors, and
+    custom endpoints</li>
+<li>All return <code>202</code> with a task id and hypermedia <code>links</code> (status / events /
+    result / cancel); batch bodies wrap a list of the normal input and fan out
+    as one task with per-item progress</li>
+<li>Shared <code>attach_execution_modes</code> helper + <code>BatchSubmitRequest</code> in
+    <code>agentomatic.tasks</code> keep behaviour and links uniform across resource types</li>
+<li><strong>Unified Status Dashboard</strong></li>
+<li>Self-contained, auto-refreshing HTML dashboard at <code>/status</code> showing the
+    health of every resource — agents, plugins, custom endpoints, ingestors,
+    and pipelines — plus the task executor and storage backend, with no
+    external assets</li>
+<li>Structured <code>GET /api/v1/status</code> endpoint exposing the same snapshot as JSON
+    (platform uptime/version, per-resource healthy/total summaries, task stats
+    by status + concurrency, and storage health) for custom tooling</li>
+<li>Extended <code>GET /health</code> to aggregate plugins, endpoints, ingestors, and
+    pipelines (previously agents + storage only); root index now advertises
+    resource counts and the <code>/status</code> link</li>
+<li><code>TaskManager.stats()</code> snapshot (totals, per-status breakdown, running vs.
+    max concurrency, supported targets)</li>
+<li><strong>First-class Ingestion / RAG ops layer</strong></li>
+<li><code>BaseIngestor</code> packages <em>your</em> document-ingestion code — built with any
+    libraries you like (<code>docling</code>/<code>unstructured</code>/<code>pymupdf4llm</code> to parse,
+    <code>langchain-text-splitters</code> to chunk, your own vector DB client) — as a
+    deployable resource. Agentomatic provides the ops, not the implementation</li>
+<li>Auto-discovery from an <code>ingestion/</code> directory; routes mounted under
+    <code>/api/v1/ingestion/{name}</code> with <code>/run</code> (sync), <code>/run/async</code> (background
+    task), <code>/info</code>, and <code>/health</code></li>
+<li>Async runs use the unified task system for live progress, SSE streaming,
+    cancellation, and webhooks; the <code>ingest(request, ctx)</code> context exposes
+    <code>await ctx.report(...)</code> and <code>ctx.cancelled</code></li>
+<li>Flexible <code>IngestionResult</code> telemetry (documents/chunks/upserted/skipped +
+    free-form <code>stats</code>/<code>output</code>) and a default <code>IngestionRequest</code> input model</li>
+<li>Hardened embeddings factory: cached per <code>(provider, kwargs)</code>, new
+    dependency-free <code>HashEmbedder</code>, and <code>openai</code> provider support</li>
+<li>Fully connected to the rest of the platform: new <strong><code>ingestion:</code> pipeline
+    step type</strong> (with input/output mapping, condition, retry, timeout, and
+    sub-pipeline support), inclusion in the unified <code>/health</code> status (alongside
+    plugins, endpoints, and pipelines), and resource counts on the root index</li>
+<li><code>agentomatic init &lt;name&gt; --template ingestion</code> scaffolding</li>
+<li>Public API: <code>BaseIngestor</code>, <code>IngestionRegistry</code>, <code>IngestionRequest</code>,
+    <code>IngestionResult</code></li>
+<li><strong>Unified Task / Execution Subsystem</strong></li>
+<li>Run any resource — agent, ML plugin, pipeline, or custom endpoint — in
+    <strong>sync</strong>, <strong>async (background)</strong>, <strong>batch</strong>, or <strong>streaming</strong> modes through a
+    single, uniform <code>TaskRecord</code> contract</li>
+<li>Task board API at <code>/api/v1/tasks</code>: submit (<code>202</code>/<code>200</code>), list/filter, poll
+    status, fetch result, cancel, delete, and a live SSE progress stream
+    (<code>/tasks/{id}/events</code>)</li>
+<li><code>TaskManager</code> with a bounded in-process queue (<code>task_max_concurrency</code>),
+    cooperative cancellation, batch fan-out with per-item progress, and
+    completion webhooks (<code>callback_url</code>)</li>
+<li>Pluggable persistence via <code>TaskStore</code> (default bounded, TTL-aware
+    <code>InMemoryTaskStore</code>); enable/disable with <code>enable_tasks</code></li>
+<li><strong>A2A task lifecycle is now real and pollable</strong> — <code>POST /{agent}/a2a/tasks</code>
+    runs asynchronously and returns a trackable id; <code>GET .../a2a/tasks/{id}</code>
+    reports live status mapped to canonical A2A states, plus a new
+    <code>POST .../a2a/tasks/{id}/cancel</code> (replaces the previous synchronous stub)</li>
+<li>Public API: <code>TaskManager</code>, <code>TaskRecord</code>, <code>TaskStatus</code>, <code>TargetType</code></li>
 <li><strong>Custom Endpoints</strong></li>
 <li><code>BaseEndpoint</code> — user-defined HTTP APIs that call deployed model services
     via authenticated <code>httpx</code> requests and aggregate their outputs</li>
