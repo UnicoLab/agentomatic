@@ -363,18 +363,20 @@ flowchart LR
     F -.-> D
 ```
 
-### `compile(dataset, metrics, optimizer?)`
+### `compile(dataset?, metrics?, optimizer?, loss?)`
 
-Prepares the optimization strategy. Stores the dataset, metrics, and
-optimizer reference, then invalidates the graph.
+Prepares the optimization strategy — Keras-style. Stores the dataset,
+metrics, optimizer, and an optional `loss` objective, then invalidates the
+graph. Every argument is optional; anything omitted here can be supplied to
+`fit()`.
 
 ```python
 from agentomatic.agents import (
     AgentDataset,
     ExactKeyMatchMetric,
     ContainsTermsMetric,
+    GridSearchOptimizer,
 )
-from agentomatic.agents import GridSearchOptimizer
 
 agent = MyAgent(llm=my_llm)
 dataset = AgentDataset.from_jsonl("data.jsonl")
@@ -385,25 +387,89 @@ agent.compile(
         ExactKeyMatchMetric(["summary", "risks"]),
         ContainsTermsMetric(["risk", "mitigation"]),
     ],
-    optimizer=GridSearchOptimizer({
-        "temperature": [0.0, 0.3, 0.7],
-    }),
+    optimizer=GridSearchOptimizer({"temperature": [0.0, 0.3, 0.7]}),
+    loss=ExactKeyMatchMetric(["summary"]),  # objective to minimise (1 - score)
 )
 ```
 
-Returns `self` for chaining: `agent.compile(...).fit(dataset)`.
+The `loss` accepts a `Loss`, any metric-like object (converted to
+`1 - score`), or a `(example, prediction) -> float` callable. Returns `self`
+for chaining.
 
-### `fit(dataset)`
+Under the hood, `compile()` normalises whatever you pass via `resolve_loss()`:
 
-Runs the optimizer. If no optimizer was set, performs a baseline pass.
-After fitting, the compiled config is applied to the agent and the graph
-is rebuilt.
+| Input | Wrapped as | Meaning |
+|-------|------------|---------|
+| a `Loss` subclass | used as-is | full control over the objective |
+| a metric-like object | `MetricLoss` | `loss = 1 - metric.score(...)` |
+| a `callable(example, prediction)` | `CallableLoss` | your own scalar objective |
 
 ```python
-agent.fit(dataset)
-# INFO: Fitting summarizer with GridSearchOptimizer
-# INFO: Grid search best: {'temperature': 0.3} (score: 0.850)
-# INFO: Fit complete: 1 params updated
+from agentomatic.agents import Loss, MetricLoss, CallableLoss, resolve_loss
+
+# Any of these are valid `loss=` arguments:
+loss = MetricLoss(ExactKeyMatchMetric(["summary"]))         # 1 - score
+loss = CallableLoss(lambda ex, pred: abs(pred["n"] - ex.expected["n"]))
+loss = resolve_loss(my_metric)                              # explicit coercion
+```
+
+### `fit(dataset?, *, epochs=1, verbose=1, callbacks=None, validation_data=None)`
+
+Trains the agent and returns a Keras-style **`History`**. Each epoch runs the
+compiled optimizer (if any), applies config changes, then evaluates on the
+training data — and on `validation_data` if provided — recording per-epoch
+metric and `loss` values.
+
+```python
+history = agent.fit(dataset, epochs=5, validation_data=dataset.validation)
+# INFO: Epoch 1/5 - accuracy: 0.72 - loss: 0.28 - val_accuracy: 0.68 - val_loss: 0.32
+# ...
+
+print(history.history["loss"])       # [0.28, 0.21, 0.18, 0.17, 0.17]
+print(history.best("val_loss", "min"))  # (3, 0.19)
+print(history.summary())
+```
+
+`History` exposes `.history` (log-key → per-epoch values), `.epoch`,
+`.params`, and helpers `final(key)`, `best(key, mode)`, `to_dict()`, and
+`summary()`. It is also stored on `agent.history`.
+
+#### Callbacks & early stopping
+
+Pass `Callback` instances to hook into training. `EarlyStopping` halts when a
+monitored key stops improving (by flipping `agent.stop_training`):
+
+```python
+from agentomatic.agents import EarlyStopping
+
+history = agent.fit(
+    dataset,
+    epochs=20,
+    callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=2)],
+)
+```
+
+Write your own by subclassing `Callback` and overriding any of
+`on_train_begin`, `on_epoch_begin`, `on_epoch_end(epoch, logs)`, or
+`on_train_end`.
+
+#### Wiring into the optimization engine
+
+To run the full prompt-optimization engine as the optimizer, use
+`PromptFitterBridge` — `fit()` runs it, applies the best prompt config back
+onto the agent, and stashes the full `PromptFitResult` on
+`agent._last_fit_result`:
+
+```python
+from agentomatic.agents import PromptFitterBridge
+
+agent.compile(
+    dataset,
+    metrics=[ExactKeyMatchMetric(["summary"])],
+    optimizer=PromptFitterBridge(task_model="ollama/qwen2.5:7b"),
+)
+history = agent.fit(dataset)
+result = agent._last_fit_result  # optimize.PromptFitResult
 ```
 
 ### `evaluate(dataset, metrics)`

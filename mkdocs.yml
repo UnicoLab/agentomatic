@@ -134,6 +134,9 @@ nav:
     - Production Deployment: guide/deployment.md
     - Platform Features: guide/platform-features.md
     - Custom Endpoints: guide/endpoints.md
+    - Tasks & Execution Modes: guide/tasks.md
+    - Status Dashboard: guide/status.md
+    - Ingestion & RAG: guide/ingestion.md
     - Per-Agent Connections: guide/connections.md
     - Prompt Optimization: guide/optimization.md
     - Observability & Monitoring: guide/observability.md

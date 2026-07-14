@@ -22,6 +22,8 @@ class StepType(StrEnum):
 
     AGENT = "agent"
     ENDPOINT = "endpoint"
+    PLUGIN = "plugin"
+    INGESTION = "ingestion"
     TRANSFORM = "transform"
     CONDITION = "condition"
     PARALLEL = "parallel"
@@ -136,6 +138,31 @@ class AgentStepConfig(BaseModel):
     retry: RetryConfig | None = None
     timeout: float = Field(30.0, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    rollback: str | None = Field(
+        default=None,
+        description="Python compensation code run (reverse order) if the pipeline "
+        "rolls back. Has `ctx` and `output` (this step's output) in scope.",
+    )
+
+
+class PluginStepConfig(BaseModel):
+    """Configuration for an ML-plugin invocation step.
+
+    Calls a registered plugin's ``predict`` and stores its output in the
+    pipeline context so downstream steps can consume the prediction.
+    """
+
+    step_type: Literal[StepType.PLUGIN] = StepType.PLUGIN
+    name: str
+    plugin: str  # Plugin name in the plugin registry
+    input: InputMapping = Field(default_factory=InputMapping)
+    output: OutputMapping = Field(default_factory=OutputMapping)
+    condition: str | None = None
+    on_error: ErrorPolicy = ErrorPolicy.FAIL
+    retry: RetryConfig | None = None
+    timeout: float = Field(30.0, gt=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    rollback: str | None = None
 
 
 class EndpointStepConfig(BaseModel):
@@ -157,6 +184,29 @@ class EndpointStepConfig(BaseModel):
     retry: RetryConfig | None = None
     timeout: float = Field(30.0, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    rollback: str | None = None
+
+
+class IngestionStepConfig(BaseModel):
+    """Configuration for an ingestor invocation step.
+
+    Runs a registered ingestor (which packages the user's document-ingestion
+    code) and stores its :class:`~agentomatic.ingestion.IngestionResult` in the
+    pipeline context, so an ingest → index → answer flow can be expressed as a
+    single pipeline.
+    """
+
+    step_type: Literal[StepType.INGESTION] = StepType.INGESTION
+    name: str
+    ingestor: str  # Ingestor name in the ingestion registry
+    input: InputMapping = Field(default_factory=InputMapping)
+    output: OutputMapping = Field(default_factory=OutputMapping)
+    condition: str | None = None
+    on_error: ErrorPolicy = ErrorPolicy.FAIL
+    retry: RetryConfig | None = None
+    timeout: float = Field(300.0, gt=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    rollback: str | None = None
 
 
 class TransformStepConfig(BaseModel):
@@ -214,7 +264,9 @@ class SubPipelineStepConfig(BaseModel):
 # Discriminated union of all step types
 StepConfigUnion = (
     AgentStepConfig
+    | PluginStepConfig
     | EndpointStepConfig
+    | IngestionStepConfig
     | TransformStepConfig
     | ParallelStepConfig
     | LoopStepConfig
@@ -238,6 +290,11 @@ class PipelineConfig(BaseModel):
     output_schema: dict[str, Any] | None = None
     defaults: dict[str, Any] = Field(default_factory=dict)
     on_error: Literal["fail_fast", "continue", "rollback"] = "fail_fast"
+    strict_schema: bool = Field(
+        default=False,
+        description="When true, input/output-schema violations raise instead of "
+        "logging a warning.",
+    )
     timeout: float = Field(300.0, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -270,9 +327,17 @@ class PipelineConfig(BaseModel):
                 agents.add(step.step.agent)
         return agents
 
+    def get_plugin_names(self) -> set[str]:
+        """Return the set of all referenced ML-plugin names."""
+        return {s.plugin for s in self.steps if isinstance(s, PluginStepConfig)}
+
     def get_endpoint_names(self) -> set[str]:
         """Return the set of all referenced custom-endpoint names."""
         return {s.endpoint for s in self.steps if isinstance(s, EndpointStepConfig)}
+
+    def get_ingestor_names(self) -> set[str]:
+        """Return the set of all referenced ingestor names."""
+        return {s.ingestor for s in self.steps if isinstance(s, IngestionStepConfig)}
 
 
 # ---------------------------------------------------------------------------

@@ -13,11 +13,33 @@ These endpoints are global — not scoped to a specific agent.
 | `GET` | `/` | Platform info and version |
 | `GET` | `/health` | Aggregated health check |
 | `GET` | `/readiness` | Kubernetes readiness probe |
+| `GET` | `/status` | Unified status dashboard (HTML) |
+| `GET` | `/api/v1/status` | Unified platform status (JSON) |
 | `GET` | `/docs` | OpenAPI interactive docs |
 | `GET` | `/.well-known/agent.json` | A2A protocol discovery |
 | `GET` | `/api/v1/agents` | List all registered agents |
 | `GET` | `/api/v1/storage/stats` | Storage backend statistics |
 | `GET` | `/metrics` | Prometheus metrics endpoint |
+
+**Resource surfaces** (each with its own list/run endpoints + `/async` and
+`/batch` execution modes):
+
+| Method | Path | Description |
+|---|---|---|
+| `POST`/`GET`/`DELETE` | `/api/v1/tasks[/{id}][/events\|/result\|/cancel]` | Task board — submit, poll, stream, cancel, delete |
+| `GET`/`POST` | `/api/v1/plugins[/{name}/predict]` | ML plugins — list, model card, predict |
+| `GET`/`POST` | `/api/v1/pipelines[/{name}/run\|/validate\|/visualize]` | Pipelines — list, run, validate, visualize |
+| `GET`/`POST` | `/api/v1/ingestion[/{name}/run]` | Ingestors — list, info, health, run |
+| `GET`/`POST` | `/api/v1/endpoints[/{name}{path}]` | Custom endpoints — list, call |
+| `GET`/`POST` | `/api/v1/control[/...]` | Control plane (when enabled) |
+
+!!! info "Dedicated guides"
+    Full details live in [Tasks & Execution Modes](../guide/tasks.md),
+    [Status Dashboard](../guide/status.md), [Ingestion & RAG](../guide/ingestion.md),
+    [Pipelines](../guide/pipelines.md), [ML Plugins](../guide/ml-plugins.md), and
+    [Custom Endpoints](../guide/endpoints.md). The
+    [Frontend API Guide](../FRONTEND_API_GUIDE.md) has copy-paste TypeScript for
+    async task polling and SSE.
 
 ---
 

@@ -418,6 +418,21 @@ Run it:
     drain) is per-process — front it with a shared store or drive it via your
     orchestrator if you need cross-worker consistency.
 
+    **Background tasks** (async/batch/long-running jobs) are tracked in a
+    `TaskStore`. The default is in-memory (per worker), so for `-w > 1` — or any
+    deployment where task status must survive restarts — pass a durable
+    [`SQLAlchemyTaskStore`](tasks.md#durable-sqlalchemy-store) so every worker
+    reads/writes the same task board:
+
+    ```python
+    from agentomatic.tasks import SQLAlchemyTaskStore
+
+    platform = AgentPlatform.from_folder(
+        "agents/",
+        task_store=SQLAlchemyTaskStore("${TASKS_DB_URL}"),  # e.g. postgresql+asyncpg://…
+    )
+    ```
+
 ## 7. Observability & monitoring
 
 With `enable_metrics=True` the app exposes Prometheus metrics at `/metrics`,
@@ -536,9 +551,14 @@ volumes:
 | `GET /health` | Liveness (always fast, unauthenticated) | none (skip-path) |
 | `GET /api/v1/{agent}/health` | Per-agent liveness | per policy |
 | `GET /api/v1/control/health` | Aggregate health (agents + connections) | control token |
+| `GET /api/v1/status` | Whole-platform status JSON (all resources + task engine) | per policy |
+| `GET /status` | Human-readable HTML status dashboard | per policy |
 
 Use `/health` for Kubernetes liveness probes and
-`/api/v1/control/health` for a deeper readiness gate.
+`/api/v1/control/health` for a deeper readiness gate. The unified
+[`/status` dashboard](status.md) is the fastest way for operators to see the
+health of every agent, plugin, pipeline, endpoint, ingestor, storage, and the
+task engine at a glance.
 
 ```yaml title="Kubernetes probes (excerpt)"
 livenessProbe:
@@ -558,6 +578,8 @@ readinessProbe:
 - [ ] Rate limiting and a restrictive `cors_origins` list are set.
 - [ ] Each agent declares its own scoped `connections.py`; pools sized for load.
 - [ ] Shared state (threads/memory/cache) lives in external services, not process memory.
+- [ ] For `workers > 1` or restart-durable tasks, a durable `task_store` (e.g. `SQLAlchemyTaskStore`) is configured.
+- [ ] `/status` (and `/api/v1/status`) reviewed; all resources report healthy.
 - [ ] `enable_metrics=True`, `/metrics` scraped, dashboard imported.
 - [ ] `enable_telemetry=True` with the OTLP endpoint configured.
 - [ ] `enable_control_plane=True` with a strong `control_token`.

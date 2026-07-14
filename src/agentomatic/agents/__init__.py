@@ -45,6 +45,15 @@ from agentomatic.agents.base import BaseGraphAgent
 from agentomatic.agents.builder import GraphBuilder
 from agentomatic.agents.decorators import agent_node
 from agentomatic.agents.graph import AgentGraph, GraphNode
+from agentomatic.agents.history import (
+    CallableLoss,
+    Callback,
+    EarlyStopping,
+    History,
+    Loss,
+    MetricLoss,
+    resolve_loss,
+)
 from agentomatic.agents.metrics import (
     CallableMetric,
     ContainsTermsMetric,
@@ -81,6 +90,14 @@ __all__ = [
     "Metric",
     "Optimizer",
     "TraceEvent",
+    # Training lifecycle (Keras-style)
+    "History",
+    "Callback",
+    "EarlyStopping",
+    "Loss",
+    "MetricLoss",
+    "CallableLoss",
+    "resolve_loss",
     # Metrics
     "ExactKeyMatchMetric",
     "ContainsTermsMetric",

@@ -228,6 +228,58 @@ agent automatically receives endpoints for:
 
 ---
 
+### :material-timer-sand: Task & Execution Modes
+
+A **unit of work tracked by the platform's task engine**. The same resource can
+be invoked in several **execution modes** — *sync* (wait for the result),
+*streaming* (SSE), *async* (submit now, poll later), *batch* (many inputs), or
+A2A. Async/batch calls return a **`TaskRecord`** with a status
+(`queued → running → succeeded/failed/cancelled`) and live `progress`, pollable
+at `/api/v1/tasks/{id}`.
+
+```bash
+# Submit an async job, then poll it
+curl -X POST /api/v1/my_agent/invoke/async -d '{"query": "long job"}'
+curl /api/v1/tasks/task_abc123    # → {"status": "running", "progress": {...}}
+```
+
+!!! tip "Think of it as…"
+    A background job with a receipt. Perfect for long-running work (e.g. document
+    ingestion) where a UI submits, then shows a progress bar. See
+    [Tasks & Execution Modes](../guide/tasks.md).
+
+---
+
+### :material-cube-outline: Plugin
+
+A **classical ML model wrapped as a deployable resource** (`BaseMLPlugin`). Drop
+it in `plugins/` and it's auto-discovered with `/predict` endpoints — callable
+sync, async, or as a task, and usable as a pipeline step. Use it to serve
+scikit-learn, PyTorch, or any model alongside your LLM agents. See
+[ML Plugins](../guide/ml-plugins.md).
+
+---
+
+### :material-vector-polyline: Pipeline
+
+A **declarative graph that chains resources** — agents, plugins, endpoints,
+ingestors, transforms, loops, and sub-pipelines — with explicit data-passing
+between steps. Defined in YAML under `pipelines/`, with conditionals, retries,
+timeouts, rollback/compensation, and optional schema enforcement. See
+[Pipelines](../guide/pipelines.md).
+
+---
+
+### :material-file-import-outline: Ingestor
+
+A **user-defined ingestion/RAG job packaged as a resource** (`BaseIngestor`).
+Agentomatic handles the *ops* (discovery, endpoints, task tracking, progress);
+you bring the *implementation* by reusing any library (PDF→markdown, splitters,
+embedders, vector stores). Drop it in `ingestion/`. See
+[Ingestion & RAG](../guide/ingestion.md).
+
+---
+
 ## 🔀 How a Request Flows
 
 Every request — whether REST, streaming, or chat — follows the same path

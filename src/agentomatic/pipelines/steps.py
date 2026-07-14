@@ -17,8 +17,10 @@ from .models import (
     AgentStepConfig,
     EndpointStepConfig,
     ErrorPolicy,
+    IngestionStepConfig,
     LoopStepConfig,
     ParallelStepConfig,
+    PluginStepConfig,
     StepResult,
     StepStatus,
     TransformStepConfig,
@@ -27,6 +29,8 @@ from .models import (
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
     from agentomatic.endpoints.registry import EndpointRegistry
+    from agentomatic.ingestion.registry import IngestionRegistry
+    from agentomatic.plugins.registry import PluginRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +247,174 @@ async def execute_endpoint_step(
     except Exception as exc:  # noqa: BLE001
         duration = (time.perf_counter() - t0) * 1000
         logger.error(f"Endpoint step '{config.name}' failed: {exc}")
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=str(exc),
+            duration_ms=duration,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Plugin Step
+# ---------------------------------------------------------------------------
+
+
+async def execute_plugin_step(
+    config: PluginStepConfig,
+    ctx: PipelineContext,
+    plugins: PluginRegistry | None,
+) -> StepResult:
+    """Invoke a registered ML plugin's ``predict``.
+
+    Resolves the input mapping into a payload, coerces it into the plugin's
+    declared input schema, runs ``predict``, and stores the (normalized)
+    prediction so downstream steps/agents can consume it.
+
+    Args:
+        config: Plugin step configuration.
+        ctx: Pipeline context for resolving ``$`` expressions.
+        plugins: The plugin registry for lookup.
+
+    Returns:
+        Step result with the plugin's prediction output.
+    """
+    t0 = time.perf_counter()
+    name = config.plugin
+
+    if plugins is None:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error="No plugin registry available to this pipeline",
+        )
+
+    plugin = plugins.get_plugin(name)
+    if plugin is None:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=f"Plugin '{name}' not found in registry",
+        )
+
+    try:
+        if config.input and config.input.mappings:
+            payload = ctx.resolve_mapping(config.input.mappings)
+        else:
+            payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+
+        # Coerce the raw payload into the plugin's declared input schema.
+        input_schema = plugin.get_input_schema()
+        try:
+            model_input = input_schema.model_validate(payload)
+        except Exception:  # noqa: BLE001 - fall back to raw payload
+            model_input = payload
+
+        result = await asyncio.wait_for(
+            plugin.predict(model_input),
+            timeout=config.timeout,
+        )
+        output = _normalize_output(result)
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=StepStatus.SUCCESS,
+            output=output,
+            duration_ms=duration,
+            metadata={"plugin": name},
+        )
+    except TimeoutError:
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=f"Plugin '{name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+        )
+    except Exception as exc:  # noqa: BLE001
+        duration = (time.perf_counter() - t0) * 1000
+        logger.error(f"Plugin step '{config.name}' failed: {exc}")
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=str(exc),
+            duration_ms=duration,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Ingestion Step
+# ---------------------------------------------------------------------------
+
+
+async def execute_ingestion_step(
+    config: IngestionStepConfig,
+    ctx: PipelineContext,
+    ingestors: IngestionRegistry | None,
+) -> StepResult:
+    """Run a registered ingestor as a pipeline step.
+
+    Resolves the input mapping into a payload, runs the ingestor, and stores
+    its :class:`IngestionResult` (as a dict) so downstream steps can consume it.
+
+    Args:
+        config: Ingestion step configuration.
+        ctx: Pipeline context for resolving ``$`` expressions.
+        ingestors: The ingestion registry for lookup.
+
+    Returns:
+        Step result with the ingestor's output.
+    """
+    t0 = time.perf_counter()
+    name = config.ingestor
+
+    if ingestors is None:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error="No ingestion registry available to this pipeline",
+        )
+
+    ingestor = ingestors.get(name)
+    if ingestor is None:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=f"Ingestor '{name}' not found in registry",
+        )
+
+    try:
+        from agentomatic.ingestion.context import NullIngestionContext
+
+        if config.input and config.input.mappings:
+            payload = ctx.resolve_mapping(config.input.mappings)
+        else:
+            payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+
+        result = await asyncio.wait_for(
+            ingestor.run(payload, NullIngestionContext()),
+            timeout=config.timeout,
+        )
+        output = _normalize_output(result)
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=StepStatus.SUCCESS,
+            output=output,
+            duration_ms=duration,
+            metadata={"ingestor": name},
+        )
+    except TimeoutError:
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=f"Ingestor '{name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+        )
+    except Exception as exc:  # noqa: BLE001
+        duration = (time.perf_counter() - t0) * 1000
+        logger.error(f"Ingestion step '{config.name}' failed: {exc}")
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,

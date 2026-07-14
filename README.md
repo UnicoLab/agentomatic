@@ -31,10 +31,15 @@ Build, trace, optimize, and time-travel debug production-ready AI agent APIs in 
 | ⚡ **Prompt Optimizer** | Enterprise-grade prompt and configuration fitting utilizing 5 distinct optimizers with deployment recommendations. |
 | 🔍 **Zero-Code Auto-Discovery** | Drop an agent folder → 26 fully-documented REST endpoints appear automatically. |
 | 🚀 **Rich API Surface** | Natively handles `invoke`, `stream`, `chat`, `A2A`, `health`, `config`, `threads`, `memory`, and `feedback`. |
+| 🧵 **Universal Execution Modes** | Every agent, plugin, pipeline, and endpoint can run **sync**, **async**, **batch**, **streaming**, or as a **background task** — automatically, no extra code. |
+| 📮 **Task Board** | Unified `/api/v1/tasks` API: submit, poll status/progress, stream SSE events, cancel, and receive completion webhooks — with a pluggable, durable `TaskStore`. |
+| 🩺 **Unified Status Dashboard** | One `/status` HTML page + `/api/v1/status` JSON covering every agent, plugin, pipeline, endpoint, ingestor, storage, and the task engine. |
+| 📥 **Ingestion / RAG Packaging** | Bring any library (PDF→markdown, loaders, embedders); Agentomatic packages it as a discoverable ingestor callable sync/async/as-a-task. |
+| 🧱 **Composable Pipelines** | Chain agents, plugins, endpoints, ingestors, transforms, loops, and sub-pipelines with typed data-passing, conditionals, retries, rollback/compensation, and schema enforcement. |
 | 🗄️ **Pluggable Storage** | Use `MemoryStore`, `SQLAlchemy`, or plug in your own custom persistence layer. |
 | 🔐 **Enterprise Middleware** | High-performance pipeline with JWT Auth, dynamic rate limiting, and Prometheus telemetry — all toggleable. |
 | 📦 **Scaffolding Templates** | Jumpstart development with 8 templates: `basic`, `full`, `rag`, `chatbot`, `deepagent`, `custom`, `legacy_dict`, `plugin`. |
-| 🧬 **Class-Based Agents** | Define agents as Python classes with ML lifecycle: `compile()` → `fit()` → `evaluate()` → `transform()`. |
+| 🧬 **Class-Based Agents** | Define agents as Python classes with a **Keras-style ML lifecycle**: `compile()` → `fit()` (epochs, `verbose`, callbacks, `validation_data`) → `evaluate()` → `transform()`, returning a real `History` object. |
 | 🤖 **A2A Protocol** | True Agent-to-Agent communication flows integrated out of the box. |
 | 🔌 **Framework Agnostic** | Fully supports LangGraph, LangChain, or raw Python execution logic. |
 | 🩺 **Beautiful CLI** | A rich terminal experience with commands like `doctor`, `inspect`, and `test`. |
@@ -170,7 +175,7 @@ Define agents as Python classes with built-in graph wiring and ML lifecycle:
 
 ```python
 from dataclasses import dataclass, field
-from agentomatic import BaseGraphAgent
+from agentomatic import BaseGraphAgent, EarlyStopping
 
 @dataclass
 class MyState:
@@ -202,14 +207,28 @@ class MyAgent(BaseGraphAgent[MyState]):
     def state_to_output(self, state):
         return state.output
 
-# ML-like workflow
+# Keras-style ML workflow
 agent = MyAgent()
 result = agent.transform({"query": "Hello!"})
-agent.compile(dataset, metrics)
-agent.fit(dataset)
+
+agent.compile(dataset=dataset, metrics=[accuracy], loss=my_loss)
+history = agent.fit(
+    dataset,
+    epochs=5,
+    verbose=1,                       # Keras-like per-epoch log lines
+    validation_data=valset,          # adds val_* metrics
+    callbacks=[EarlyStopping(monitor="val_loss", patience=2)],
+)
+print(history.best("val_loss", mode="min"))
 report = agent.evaluate(dataset.test, metrics)
 agent.save("compiled/v1")
 ```
+
+`fit()` runs the prompt optimizer under the hood (via `PromptFitterBridge`),
+records per-epoch metrics/loss into a `History` object (also on `agent.history`),
+fires `Callback` hooks, and supports `EarlyStopping` — treating a GenAI agent
+like a classical trainable model. See the
+[class-based agents guide](https://unicolab.github.io/agentomatic/guide/class-agents/).
 
 ## 🎨 Agentomatic Studio
 
@@ -260,6 +279,124 @@ class IrisPlugin(BaseMLPlugin[IrisInput, dict]):
 
 Place it in `plugins/` and Agentomatic auto-discovers it alongside your AI agents!
 
+## 🧵 Execution Modes & Task Board
+
+Every resource — **agents, plugins, pipelines, endpoints, and ingestors** — is
+automatically callable in **every** execution mode. No extra code:
+
+| Mode | How | Use case |
+|------|-----|----------|
+| **Sync** | `POST /api/v1/{agent}/invoke` | Immediate request/response |
+| **Streaming** | `POST /api/v1/{agent}/invoke/stream` (SSE) | Token/node streaming |
+| **Async task** | `POST /api/v1/{agent}/invoke/async` | Fire-and-forget, poll later |
+| **Batch** | `POST /api/v1/{agent}/invoke/batch` | Many inputs, bounded concurrency |
+| **A2A** | `POST /api/v1/{agent}/a2a/tasks` | Agent-to-agent task protocol |
+
+Async work is tracked by a unified **task board** — ideal for long-running jobs
+like document ingestion where the frontend polls for progress:
+
+```bash
+# Submit an async task (returns immediately with a task id)
+curl -X POST http://localhost:8000/api/v1/my_agent/invoke/async \
+  -H "Content-Type: application/json" -d '{"query": "long job"}'
+# → {"id": "task_ab12...", "status": "queued", ...}
+
+# Poll status + progress
+curl http://localhost:8000/api/v1/tasks/task_ab12...
+# → {"status": "running", "progress": {"percent": 42, "message": "chunking"}}
+
+# Stream live progress events (SSE)
+curl -N http://localhost:8000/api/v1/tasks/task_ab12.../events
+
+# Cancel
+curl -X POST http://localhost:8000/api/v1/tasks/task_ab12.../cancel
+```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/tasks` | Submit a task for any target |
+| `GET` | `/api/v1/tasks` | List/filter tasks (status, target, …) |
+| `GET` | `/api/v1/tasks/{id}` | Task status, progress, result |
+| `GET` | `/api/v1/tasks/{id}/result` | Terminal result payload |
+| `GET` | `/api/v1/tasks/{id}/events` | SSE progress events |
+| `POST` | `/api/v1/tasks/{id}/cancel` | Request cancellation |
+| `DELETE` | `/api/v1/tasks/{id}` | Delete a task record |
+
+Tasks report `progress` (`percent`, `message`, `stage`), support **completion
+webhooks** (`callback_url`), and persist through a pluggable `TaskStore`
+(in-memory by default, or the durable `SQLAlchemyTaskStore`). See the
+[Tasks guide](https://unicolab.github.io/agentomatic/guide/tasks/).
+
+## 🩺 Unified Status Dashboard
+
+A single control-plane view of the whole platform's health:
+
+```bash
+open http://localhost:8000/status          # HTML dashboard
+curl http://localhost:8000/api/v1/status   # JSON API
+```
+
+Aggregates the health of every **agent, plugin, pipeline, endpoint, ingestor**,
+the **storage backend**, and the **task engine** (queue depth, running/terminal
+counts) into one page — with per-resource drill-down and an overall
+`healthy` / `degraded` / `unhealthy` roll-up.
+
+## 📥 Ingestion & RAG
+
+Agentomatic is about **ops, not implementation**: bring your favourite libraries
+(PDF→markdown, loaders, splitters, embedders, vector stores) and Agentomatic
+*packages* them as a discoverable **ingestor** that is callable sync, async, or
+as a tracked task — and usable as a pipeline step.
+
+```python
+from agentomatic.ingestion import BaseIngestor, IngestionRequest, IngestionResult
+
+class DocsIngestor(BaseIngestor):
+    ingestor_name = "docs"
+
+    async def ingest(self, request: IngestionRequest, ctx) -> IngestionResult:
+        # Reuse ANY library you like:
+        text = my_pdf_lib.to_markdown(request.source)     # extract
+        chunks = my_splitter.split(text)                  # chunk
+        vectors = my_embedder.embed(chunks)               # embed
+        await my_store.upsert(vectors)                    # persist
+        await ctx.report(percent=100, message="done")     # progress → task board
+        return IngestionResult(documents=1, chunks=len(chunks), upserted=len(vectors))
+```
+
+Drop it in `ingestion/`, and it's auto-discovered with its own endpoints,
+task support, and pipeline step. See the
+[Ingestion guide](https://unicolab.github.io/agentomatic/guide/ingestion/).
+
+## 🧱 Pipelines
+
+Compose agents, plugins, endpoints, ingestors, transforms, loops, and
+sub-pipelines into a single graph with **full control over data-passing**:
+
+```yaml
+# pipelines/rag_ingest.yaml
+name: rag_ingest
+strict_schema: true
+on_error: rollback
+steps:
+  - ingestion: docs            # reuse your ingestor
+    input: { source: "{{ input.path }}" }
+    output: ingested
+  - agent: summarizer
+    input: { text: "{{ ingested.summary }}" }
+    output: summary
+    retry: { max_attempts: 3 }
+    rollback: "await store.delete(ingested.id)"   # compensation
+  - plugin: classifier         # call an ML plugin mid-pipeline
+    input: { features: "{{ summary }}" }
+```
+
+Supports input/output mapping, shared context, conditionals, retries, timeouts,
+`on_error` policies (**including rollback/compensation**), optional input/output
+**schema enforcement**, and per-step async execution — all runnable via the same
+sync/async/streaming/task modes. See the
+[Pipelines guide](https://unicolab.github.io/agentomatic/guide/pipelines/).
+
 ## ⚙️ Configuration
 
 ```python
@@ -302,6 +439,22 @@ class RedisStore(BaseStore):
     async def create_thread(self, ...): ...
     async def get_thread(self, ...): ...
 ```
+
+**Durable task storage** (for background tasks that must survive restarts or be
+shared across workers) uses a separate, pluggable `TaskStore`:
+
+```python
+from agentomatic.tasks import SQLAlchemyTaskStore
+
+platform = AgentPlatform.from_folder(
+    "agents/",
+    task_store=SQLAlchemyTaskStore("postgresql+asyncpg://user:pass@localhost/db"),
+)
+```
+
+Defaults to an in-memory store; install with `agentomatic[db]` (SQLite) or
+`agentomatic[db-postgres]` (PostgreSQL). See
+[Tasks → Persistence](https://unicolab.github.io/agentomatic/guide/tasks/#persistence-durability).
 
 ## 🎨 Debug UI
 

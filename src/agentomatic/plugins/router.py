@@ -11,7 +11,12 @@ from loguru import logger
 from .ml import BaseMLPlugin
 
 
-def create_plugin_router(plugin: BaseMLPlugin) -> APIRouter:
+def create_plugin_router(
+    plugin: BaseMLPlugin,
+    *,
+    task_manager: Any | None = None,
+    api_prefix: str = "/api/v1",
+) -> APIRouter:
     """Create a FastAPI router for a specific ML plugin."""
     router = APIRouter(tags=[f"Plugin: {plugin.plugin_name}"])
 
@@ -76,5 +81,21 @@ def create_plugin_router(plugin: BaseMLPlugin) -> APIRouter:
         summary=f"Run inference using {plugin.plugin_name}",
         description=plugin.plugin_description,
     )
+
+    # Async + batch execution modes via the task system.
+    if task_manager is not None:
+        from agentomatic.tasks.models import TargetType
+        from agentomatic.tasks.sugar import attach_execution_modes
+
+        attach_execution_modes(
+            router,
+            task_manager=task_manager,
+            target_type=TargetType.PLUGIN,
+            target=plugin.plugin_name,
+            base_path="/predict",
+            input_schema=input_schema,
+            api_prefix=api_prefix,
+            summary_label=f"Run inference using {plugin.plugin_name}",
+        )
 
     return router

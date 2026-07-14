@@ -276,6 +276,18 @@ class TestAgentMetadata:
 
 
 class TestA2ATasks:
+    def _poll(self, client, task_id, target="completed", tries=50):
+        import time
+
+        for _ in range(tries):
+            resp = client.get(f"/api/v1/echo/a2a/tasks/{task_id}")
+            assert resp.status_code == 200
+            data = resp.json()
+            if data["status"] in {target, "failed", "canceled"}:
+                return data
+            time.sleep(0.02)
+        return data
+
     def test_submit_task(self, client):
         resp = client.post(
             "/api/v1/echo/a2a/tasks",
@@ -284,15 +296,28 @@ class TestA2ATasks:
                 "metadata": {"from": "agent-x"},
             },
         )
+        # Async A2A: submission is accepted with a real, pollable task id.
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "completed"
-        assert "A2A query" in data["result"]
+        assert data["status"] in {"submitted", "working", "completed"}
         assert data["task_id"].startswith("task_")
 
+        final = self._poll(client, data["task_id"])
+        assert final["status"] == "completed"
+        assert "A2A query" in final["result"]
+
     def test_get_task_status(self, client):
-        resp = client.get("/api/v1/echo/a2a/tasks/task_abc123")
+        submit = client.post(
+            "/api/v1/echo/a2a/tasks",
+            json={"message": {"content": "hello"}},
+        )
+        task_id = submit.json()["task_id"]
+        resp = client.get(f"/api/v1/echo/a2a/tasks/{task_id}")
         assert resp.status_code == 200
+
+    def test_get_unknown_task_404(self, client):
+        resp = client.get("/api/v1/echo/a2a/tasks/task_does_not_exist")
+        assert resp.status_code == 404
 
 
 # =========================================================================

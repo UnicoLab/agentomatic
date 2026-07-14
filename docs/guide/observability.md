@@ -4,6 +4,12 @@ Agentomatic ships automatic logging, Prometheus metrics, OpenTelemetry
 tracing, and a **ready-to-run** monitoring stack (Prometheus + OpenTelemetry
 Collector + Grafana) with a pre-provisioned dashboard.
 
+!!! tip "At-a-glance health"
+    For a single, human-readable roll-up of every agent, plugin, pipeline,
+    endpoint, ingestor, the storage backend, and the task engine, open the
+    unified [`/status` dashboard](status.md) (or `GET /api/v1/status` for JSON).
+    It complements the metrics/tracing below with an instant control-plane view.
+
 ## Enabling metrics & tracing
 
 ```python

@@ -16,12 +16,14 @@ from agentomatic.pipelines.models import (
     AgentStepConfig,
     EndpointStepConfig,
     ErrorPolicy,
+    IngestionStepConfig,
     InputMapping,
     LoopStepConfig,
     OutputMapping,
     ParallelStepConfig,
     ParallelStrategy,
     PipelineConfig,
+    PluginStepConfig,
     RetryConfig,
     StepConfigUnion,
     SubPipelineStepConfig,
@@ -34,7 +36,16 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore[assignment]
 
 # Keys used to discriminate the step type from a raw dict.
-_STEP_TYPE_KEYS = ("agent", "endpoint", "parallel", "transform", "loop", "sub_pipeline")
+_STEP_TYPE_KEYS = (
+    "agent",
+    "plugin",
+    "endpoint",
+    "ingestion",
+    "parallel",
+    "transform",
+    "loop",
+    "sub_pipeline",
+)
 
 # Recognised YAML file suffixes.
 _YAML_SUFFIXES = {".yaml", ".yml"}
@@ -149,6 +160,36 @@ def _parse_agent_step(data: dict[str, Any]) -> AgentStepConfig:
         retry=_parse_retry(data.get("retry")),
         timeout=data.get("timeout", 30.0),
         metadata=data.get("metadata", {}),
+        rollback=data.get("rollback"),
+    )
+
+
+def _parse_plugin_step(data: dict[str, Any]) -> PluginStepConfig:
+    """Build a ``PluginStepConfig`` from a raw dict.
+
+    Handles the shorthand form ``{plugin: "name"}`` where the step *name*
+    defaults to the plugin identifier.
+
+    Args:
+        data: Raw step dictionary containing at least the ``plugin`` key.
+
+    Returns:
+        A validated ``PluginStepConfig``.
+    """
+    plugin: str = data["plugin"]
+    name: str = data.get("name", plugin)
+
+    return PluginStepConfig(
+        name=name,
+        plugin=plugin,
+        input=_coerce_input_mapping(data.get("input")),
+        output=_coerce_output_mapping(data.get("output")),
+        condition=data.get("condition"),
+        on_error=ErrorPolicy(data["on_error"]) if "on_error" in data else ErrorPolicy.FAIL,
+        retry=_parse_retry(data.get("retry")),
+        timeout=data.get("timeout", 30.0),
+        metadata=data.get("metadata", {}),
+        rollback=data.get("rollback"),
     )
 
 
@@ -178,6 +219,36 @@ def _parse_endpoint_step(data: dict[str, Any]) -> EndpointStepConfig:
         retry=_parse_retry(data.get("retry")),
         timeout=data.get("timeout", 30.0),
         metadata=data.get("metadata", {}),
+        rollback=data.get("rollback"),
+    )
+
+
+def _parse_ingestion_step(data: dict[str, Any]) -> IngestionStepConfig:
+    """Build an ``IngestionStepConfig`` from a raw dict.
+
+    Handles the shorthand form ``{ingestion: "name"}`` where the step *name*
+    defaults to the ingestor identifier.
+
+    Args:
+        data: Raw step dictionary containing at least the ``ingestion`` key.
+
+    Returns:
+        A validated ``IngestionStepConfig``.
+    """
+    ingestor: str = data["ingestion"]
+    name: str = data.get("name", ingestor)
+
+    return IngestionStepConfig(
+        name=name,
+        ingestor=ingestor,
+        input=_coerce_input_mapping(data.get("input")),
+        output=_coerce_output_mapping(data.get("output")),
+        condition=data.get("condition"),
+        on_error=ErrorPolicy(data["on_error"]) if "on_error" in data else ErrorPolicy.FAIL,
+        retry=_parse_retry(data.get("retry")),
+        timeout=data.get("timeout", 300.0),
+        metadata=data.get("metadata", {}),
+        rollback=data.get("rollback"),
     )
 
 
@@ -317,8 +388,12 @@ def _parse_step(data: dict[str, Any]) -> StepConfigUnion:
     """
     if "agent" in data:
         return _parse_agent_step(data)
+    if "plugin" in data:
+        return _parse_plugin_step(data)
     if "endpoint" in data:
         return _parse_endpoint_step(data)
+    if "ingestion" in data:
+        return _parse_ingestion_step(data)
     if "parallel" in data:
         return _parse_parallel_step(data)
     if "transform" in data:
@@ -419,6 +494,7 @@ class PipelineLoader:
             output_schema=data.get("output_schema"),
             defaults=data.get("defaults", {}),
             on_error=data.get("on_error", "fail_fast"),
+            strict_schema=data.get("strict_schema", False),
             timeout=data.get("timeout", 300.0),
             metadata=data.get("metadata", {}),
         )

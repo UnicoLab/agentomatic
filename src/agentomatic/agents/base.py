@@ -63,6 +63,7 @@ from loguru import logger
 from .builder import GraphBuilder
 from .decorators import get_node_meta
 from .graph import AgentGraph
+from .history import Callback, History, Loss, resolve_loss
 from .types import (
     AgentDataset,
     AgentExample,
@@ -117,6 +118,12 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         self.compiled_metadata: dict[str, Any] = {}
         self._optimizer: Optimizer | None = None
         self._compile_metrics: Sequence[Metric] = []
+        self._compile_dataset: AgentDataset | None = None
+        self._loss: Loss | None = None
+
+        # Training lifecycle (Keras-style)
+        self.history: History | None = None
+        self.stop_training: bool = False
 
         # Evaluation
         self.evaluation_history: list[EvaluationReport] = []
@@ -489,68 +496,209 @@ class BaseGraphAgent(ABC, Generic[StateT]):
 
     def compile(
         self,
-        dataset: AgentDataset,
-        metrics: Sequence[Metric],
+        dataset: AgentDataset | None = None,
+        metrics: Sequence[Metric] | None = None,
         optimizer: Optimizer | None = None,
+        loss: Loss | Metric | Any | None = None,
     ) -> BaseGraphAgent[StateT]:
-        """Prepare the agent for optimization.
+        """Prepare the agent for optimization (Keras-style ``compile``).
 
-        Stores the optimization strategy (dataset, metrics, optimizer)
-        and invalidates the graph so it's rebuilt with any new config.
+        Stores the optimization strategy (dataset, metrics, optimizer, and an
+        optional ``loss`` objective) and invalidates the graph so it is rebuilt
+        with any new config.
 
         Args:
-            dataset: Training dataset.
-            metrics: Metrics for evaluation.
+            dataset: Training dataset (optional; can be supplied to ``fit``).
+            metrics: Metrics tracked during ``fit``/``evaluate``.
             optimizer: Optional optimizer instance.
+            loss: Optional objective to minimise. Accepts a :class:`Loss`, a
+                metric-like object (turned into ``1 - score``), or a
+                ``(example, prediction) -> float`` callable.
 
         Returns:
             Self for chaining.
         """
+        metrics = list(metrics or [])
         self._optimizer = optimizer
         self._compile_metrics = metrics
-        self.compiled_metadata["dataset_name"] = dataset.name
-        self.compiled_metadata["dataset_size"] = len(dataset)
+        self._compile_dataset = dataset
+        self._loss = resolve_loss(loss)
+        if dataset is not None:
+            self.compiled_metadata["dataset_name"] = dataset.name
+            self.compiled_metadata["dataset_size"] = len(dataset)
         self.compiled_metadata["metrics"] = [m.name for m in metrics]
         self.compiled_metadata["optimizer"] = type(optimizer).__name__ if optimizer else "none"
+        self.compiled_metadata["loss"] = self._loss.name if self._loss else "none"
 
         self.invalidate_graph()
-        logger.info(f"Compiled {self.agent_name}: {len(dataset)} examples, {len(metrics)} metrics")
+        size = len(dataset) if dataset is not None else 0
+        logger.info(f"Compiled {self.agent_name}: {size} examples, {len(metrics)} metrics")
         return self
 
     def fit(
         self,
-        dataset: AgentDataset,
-    ) -> BaseGraphAgent[StateT]:
-        """Run the optimization loop.
+        dataset: AgentDataset | list[AgentExample] | None = None,
+        *,
+        epochs: int = 1,
+        verbose: int = 1,
+        callbacks: Sequence[Callback] | None = None,
+        validation_data: AgentDataset | list[AgentExample] | None = None,
+    ) -> History:
+        """Train the agent and return a Keras-style :class:`History`.
 
-        If an optimizer was set via ``compile()``, runs it.
-        Otherwise, performs a baseline evaluation.
+        Each epoch (optionally) runs the compiled optimizer, applies any config
+        changes, then evaluates the agent on the training data (and
+        ``validation_data`` if given), recording per-epoch metric and ``loss``
+        values. Callbacks receive ``on_epoch_end(epoch, logs)`` and may set
+        ``agent.stop_training`` to halt early (see :class:`EarlyStopping`).
 
         Args:
-            dataset: Training dataset.
+            dataset: Training data. Defaults to the dataset passed to
+                ``compile``. An ``AgentDataset`` uses its ``train`` split when
+                present, otherwise all examples.
+            epochs: Number of optimization/evaluation rounds.
+            verbose: ``0`` = silent, ``1`` = per-epoch log line.
+            callbacks: Optional list of :class:`Callback` instances.
+            validation_data: Optional held-out data scored as ``val_*`` keys.
 
         Returns:
-            Self for chaining.
+            A :class:`History` (also stored on ``self.history``).
         """
-        if self._optimizer:
-            logger.info(f"Fitting {self.agent_name} with {type(self._optimizer).__name__}")
-            config = self._optimizer.optimize(
-                self,
-                dataset,
-                self._compile_metrics,
-            )
-            self.compiled_config.update(config)
-            logger.info(f"Fit complete: {len(config)} params updated")
-        else:
-            logger.info("No optimizer set — running baseline")
+        dataset = dataset if dataset is not None else self._compile_dataset
+        train_examples = self._resolve_examples(dataset, split="train")
+        val_examples = self._resolve_examples(validation_data, split="validation")
+        if not val_examples and isinstance(dataset, AgentDataset):
+            val_examples = dataset.validation
 
-        # Apply any config changes
-        for key, value in self.compiled_config.items():
-            if hasattr(self, key) and not key.startswith("_"):
-                setattr(self, key, value)
+        metrics = list(self._compile_metrics)
+        loss = self._loss
+        history = History(
+            params={
+                "epochs": epochs,
+                "optimizer": type(self._optimizer).__name__ if self._optimizer else "none",
+                "metrics": [m.name for m in metrics],
+                "loss": loss.name if loss else "none",
+                "train_size": len(train_examples),
+                "val_size": len(val_examples),
+            }
+        )
+        self.history = history
+        self.stop_training = False
 
-        self.invalidate_graph()
-        return self
+        callbacks = list(callbacks or [])
+        for cb in callbacks:
+            cb.set_agent(self)
+            cb.set_params(history.params)
+            cb.on_train_begin()
+
+        logger.info(
+            f"Fitting {self.agent_name}: {epochs} epoch(s), {len(train_examples)} train example(s)"
+        )
+
+        for epoch in range(epochs):
+            for cb in callbacks:
+                cb.on_epoch_begin(epoch)
+
+            # Optimization step (if an optimizer was compiled in).
+            if self._optimizer is not None and dataset is not None:
+                opt_dataset = dataset if isinstance(dataset, AgentDataset) else None
+                if opt_dataset is None:
+                    opt_dataset = AgentDataset(name="inline", examples=list(train_examples))
+                config = self._optimizer.optimize(self, opt_dataset, metrics)
+                if config:
+                    self.compiled_config.update(config)
+                    for key, value in config.items():
+                        if hasattr(self, key) and not key.startswith("_"):
+                            setattr(self, key, value)
+                    self.invalidate_graph()
+
+            logs = self._epoch_logs(train_examples, metrics, loss)
+            if val_examples:
+                val_logs = self._epoch_logs(val_examples, metrics, loss)
+                logs.update({f"val_{k}": v for k, v in val_logs.items()})
+
+            history.record(epoch, logs)
+
+            if verbose:
+                metric_str = " - ".join(f"{k}: {v:.4f}" for k, v in logs.items())
+                logger.info(f"Epoch {epoch + 1}/{epochs} - {metric_str}")
+
+            for cb in callbacks:
+                cb.on_epoch_end(epoch, logs)
+
+            if self.stop_training:
+                break
+
+        for cb in callbacks:
+            cb.on_train_end()
+
+        return history
+
+    def _epoch_logs(
+        self,
+        examples: Sequence[AgentExample],
+        metrics: Sequence[Metric],
+        loss: Loss | None,
+    ) -> dict[str, float]:
+        """Run one evaluation pass, returning averaged metric + loss logs.
+
+        A single ``transform()`` per example feeds both metrics and the loss.
+        Prediction failures score ``0.0`` for metrics and the maximum loss
+        (``1.0``) so a broken agent surfaces as a poor epoch rather than an
+        exception.
+        """
+        if not examples:
+            return {}
+
+        totals = {m.name: 0.0 for m in metrics}
+        loss_total = 0.0
+        n = len(examples)
+
+        for example in examples:
+            try:
+                prediction = self.transform(example.input)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"fit: transform failed for '{example.id}': {exc}")
+                if loss is not None:
+                    loss_total += 1.0
+                continue
+
+            for metric in metrics:
+                try:
+                    totals[metric.name] += float(metric.score(example, prediction))
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"fit: metric '{metric.name}' failed: {exc}")
+            if loss is not None:
+                try:
+                    loss_total += loss.compute(example, prediction)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"fit: loss '{loss.name}' failed: {exc}")
+                    loss_total += 1.0
+
+        logs = {name: total / n for name, total in totals.items()}
+        if loss is not None:
+            logs["loss"] = loss_total / n
+        return logs
+
+    @staticmethod
+    def _resolve_examples(
+        data: AgentDataset | list[AgentExample] | None,
+        split: str,
+    ) -> list[AgentExample]:
+        """Normalise a dataset / example list into a list of examples.
+
+        For an ``AgentDataset`` the requested ``split`` is preferred, falling
+        back to all examples when that split is empty.
+        """
+        if data is None:
+            return []
+        if isinstance(data, AgentDataset):
+            if split == "train":
+                return data.train or list(data.examples)
+            if split == "validation":
+                return data.validation
+            return list(data.examples)
+        return list(data)
 
     # ==================================================================
     # Observability

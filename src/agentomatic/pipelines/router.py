@@ -12,9 +12,13 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from agentomatic.tasks.sugar import BatchSubmitRequest
+
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
     from agentomatic.endpoints.registry import EndpointRegistry
+    from agentomatic.ingestion.registry import IngestionRegistry
+    from agentomatic.plugins.registry import PluginRegistry
 
     from .engine import PipelineEngine
     from .models import PipelineConfig
@@ -77,6 +81,10 @@ def create_pipeline_router(
     registry: AgentRegistry,
     sub_pipelines: dict[str, PipelineConfig] | None = None,
     endpoints: EndpointRegistry | None = None,
+    ingestors: IngestionRegistry | None = None,
+    plugins: PluginRegistry | None = None,
+    task_manager: Any | None = None,
+    api_prefix: str = "/api/v1",
 ) -> APIRouter:
     """Create REST endpoints for all discovered pipelines.
 
@@ -106,7 +114,14 @@ def create_pipeline_router(
         config = all_pipelines.get(name)
         if config is None:
             raise HTTPException(404, f"Pipeline '{name}' not found")
-        return PipelineEngine(config, registry, all_sub, endpoints=endpoints)
+        return PipelineEngine(
+            config,
+            registry,
+            all_sub,
+            endpoints=endpoints,
+            ingestors=ingestors,
+            plugins=plugins,
+        )
 
     @router.get(
         "/pipelines",
@@ -159,6 +174,52 @@ def create_pipeline_router(
             duration_ms=result.duration_ms,
             error=result.error,
         )
+
+    if task_manager is not None:
+        from agentomatic.tasks.models import TargetType
+        from agentomatic.tasks.sugar import task_links
+
+        @router.post(
+            "/pipelines/{name}/run/async",
+            status_code=202,
+            summary="Execute a pipeline as a background task",
+        )
+        async def run_pipeline_async(name: str, request: PipelineRunRequest) -> dict[str, Any]:
+            """Submit a pipeline run as a background task and return a task id."""
+            if name not in all_pipelines:
+                raise HTTPException(404, f"Pipeline '{name}' not found")
+            record = await task_manager.submit(
+                TargetType.PIPELINE,
+                name,
+                input=request.input,
+                mode="async",
+                metadata=request.metadata,
+            )
+            data = record.public_dict()
+            data["links"] = task_links(record.id, api_prefix)
+            return data
+
+        @router.post(
+            "/pipelines/{name}/run/batch",
+            status_code=202,
+            summary="Execute a pipeline over a batch of inputs",
+        )
+        async def run_pipeline_batch(name: str, request: BatchSubmitRequest) -> dict[str, Any]:
+            """Submit many pipeline runs as one batch task."""
+            if name not in all_pipelines:
+                raise HTTPException(404, f"Pipeline '{name}' not found")
+            record = await task_manager.submit(
+                TargetType.PIPELINE,
+                name,
+                batch=request.inputs,
+                mode="batch",
+                metadata=request.metadata,
+                callback_url=request.callback_url,
+                batch_concurrency=request.batch_concurrency,
+            )
+            data = record.public_dict()
+            data["links"] = task_links(record.id, api_prefix)
+            return data
 
     @router.get(
         "/pipelines/{name}/config",

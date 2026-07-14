@@ -382,6 +382,34 @@ The code block executes with `ctx` in scope and must `return` a `dict`.
     )
     ```
 
+### Plugin
+
+Call a registered ML plugin's `predict()` mid-pipeline. The resolved input
+mapping is coerced into the plugin's declared input schema before inference,
+and the prediction is stored in the context for downstream steps.
+
+```yaml
+steps:
+  - name: score
+    plugin: churn_model          # references a plugin by name
+    input:
+      tenure: "$.input.tenure"
+      monthly_charges: "$.input.monthly_charges"
+    output:
+      risk: "$.churn_probability"
+  - name: explain
+    agent: explainer
+    input:
+      score: "$.context.risk"
+```
+
+!!! tip "Ingestion and endpoint steps work the same way"
+    Use `ingestion: my_ingestor` to run a registered ingestor (see
+    [Ingestion & RAG](ingestion.md)) or `endpoint: my_endpoint` to call a
+    custom endpoint. All of `agent`, `plugin`, `endpoint`, and `ingestion`
+    steps support `input`/`output` mapping, `condition`, `retry`, `timeout`,
+    and `on_error`.
+
 ### Sub-pipeline
 
 Embed one pipeline inside another for reusable composition.
@@ -452,7 +480,53 @@ timeout: 300.0        # seconds — overall pipeline timeout
 |-------------|------------------------------------------------------------|
 | `fail_fast` | Stop immediately when any step fails (default).            |
 | `continue`  | Run remaining steps; final status is `partial` or `failed`.|
-| `rollback`  | Stop and mark the pipeline as failed.                      |
+| `rollback`  | Stop, run each completed step's `rollback` compensation in reverse order, then mark the pipeline failed. |
+
+### Rollback / Compensation
+
+When `on_error: rollback` is set and a step fails, the engine walks the
+already-completed steps **in reverse** and runs each step's optional
+`rollback` block — a small Python snippet executed with `ctx` and `output`
+(that step's output) in scope. Use it to undo side effects (delete a written
+record, release a lock, refund a charge). Steps without a `rollback` block are
+skipped; rollback failures are logged but never mask the original error.
+
+```yaml
+on_error: rollback
+steps:
+  - name: reserve
+    plugin: inventory
+    rollback: |
+      # runs if a later step fails
+      ctx.shared["released"] = True
+  - name: charge
+    endpoint: payments        # if this fails, `reserve` is compensated
+```
+
+The set of compensated step names is reported in
+`result.metadata["rolled_back_steps"]`, and each rolled-back step's
+`metadata["rolled_back"]` is set to `true`.
+
+### Schema Enforcement
+
+Declare `input_schema` / `output_schema` to enforce the contract between the
+caller and the pipeline (and, implicitly, between chained steps). Each field
+maps to a type name (`str`, `int`, `float`, `number`, `bool`, `list`, `dict`,
+`any`) or a verbose `{type, required}` spec. Validation is **advisory** by
+default (logs a warning); set `strict_schema: true` to fail the run instead.
+
+```yaml
+name: qa
+strict_schema: true
+input_schema:
+  query: str
+  top_k: {type: int, required: false}
+output_schema:
+  answer: str
+steps:
+  - agent: researcher
+  - agent: writer
+```
 
 ### Step-Level Policy
 

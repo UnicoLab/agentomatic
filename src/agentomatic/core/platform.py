@@ -14,6 +14,8 @@ from loguru import logger
 
 from agentomatic.endpoints.registry import EndpointRegistry
 from agentomatic.endpoints.router import create_endpoint_router
+from agentomatic.ingestion.registry import IngestionRegistry
+from agentomatic.ingestion.router import create_ingestion_router
 from agentomatic.plugins.registry import PluginRegistry
 from agentomatic.plugins.router import create_plugin_router
 
@@ -28,6 +30,8 @@ if TYPE_CHECKING:
     from agentomatic.security.jwt_auth import JWTConfig
     from agentomatic.stacks.manager import StackConfig, StackManager
     from agentomatic.storage.base import BaseStore
+    from agentomatic.tasks.manager import TaskManager
+    from agentomatic.tasks.store import TaskStore
 
 
 def _agent_tag(name: str) -> str:
@@ -84,6 +88,7 @@ class AgentPlatform:
         agents_dir: str | Path = "agents/",
         plugins_dir: str | Path = "plugins/",
         endpoints_dir: str | Path = "endpoints/",
+        ingestion_dir: str | Path = "ingestion/",
         *,
         title: str = "Agentomatic Platform",
         description: str = "Multi-agent API platform powered by Agentomatic",
@@ -123,6 +128,10 @@ class AgentPlatform:
         control_token: str = "",
         connections: list[Any] | None = None,
         enable_connections_context: bool = True,
+        # --- v0.12: Unified task/execution subsystem ---
+        enable_tasks: bool = True,
+        task_store: TaskStore | None = None,
+        task_max_concurrency: int = 8,
     ) -> None:
         """Initialise the platform.
 
@@ -168,6 +177,7 @@ class AgentPlatform:
         self.agents_dir = Path(agents_dir).resolve()
         self.plugins_dir = Path(plugins_dir).resolve()
         self.endpoints_dir = Path(endpoints_dir).resolve()
+        self.ingestion_dir = Path(ingestion_dir).resolve()
         self.title = title
         self.description = description
         self.version = version
@@ -206,6 +216,12 @@ class AgentPlatform:
         self._platform_connections = list(connections or [])
         self._enable_connections_context = enable_connections_context
 
+        # v0.12: Unified task/execution subsystem
+        self._enable_tasks = enable_tasks
+        self._task_store = task_store
+        self._task_max_concurrency = task_max_concurrency
+        self._task_manager: TaskManager | None = None
+
         # Memory config
         self._max_history_messages = max_history_messages
         self._summarize_after = summarize_after
@@ -214,6 +230,7 @@ class AgentPlatform:
         self._registry = AgentRegistry()
         self._plugin_registry = PluginRegistry()
         self._endpoint_registry = EndpointRegistry()
+        self._ingestion_registry = IngestionRegistry()
         self._pipelines: dict[str, Any] = {}
         self._on_startup: list[Callable[..., Any]] = []
         self._on_shutdown: list[Callable[..., Any]] = []
@@ -222,6 +239,7 @@ class AgentPlatform:
         self._discovered: bool = False  # guard against double discovery
         self._plugins_discovered: bool = False
         self._endpoints_discovered: bool = False
+        self._ingestion_discovered: bool = False
 
         # Control plane state (used only when enabled)
         from agentomatic.control.state import ControlPlaneState
@@ -318,6 +336,20 @@ class AgentPlatform:
     def register_endpoint(self, endpoint: Any) -> None:
         """Register a custom endpoint programmatically."""
         self._endpoint_registry.register(endpoint)
+
+    @property
+    def ingestion_registry(self) -> IngestionRegistry:
+        """Access the ingestion registry."""
+        return self._ingestion_registry
+
+    def register_ingestor(self, ingestor: Any) -> None:
+        """Register an ingestor programmatically (no folder needed)."""
+        self._ingestion_registry.register(ingestor)
+
+    @property
+    def task_manager(self) -> TaskManager | None:
+        """Access the unified task manager (available after ``build``)."""
+        return self._task_manager
 
     @property
     def store(self) -> BaseStore | None:
@@ -420,8 +452,29 @@ class AgentPlatform:
                 )
         tags.append({"name": "Endpoints", "description": "Custom HTTP endpoints."})
         tags.append({"name": "Pipelines", "description": "Multi-step agent pipelines."})
+        if self._enable_tasks:
+            tags.append(
+                {
+                    "name": "Tasks",
+                    "description": (
+                        "Unified sync/async/batch/streaming execution for agents, "
+                        "plugins, pipelines, and endpoints with status, progress, "
+                        "cancellation, and webhooks."
+                    ),
+                }
+            )
         if self._plugin_registry.count:
             tags.append({"name": "Plugins", "description": "Classical ML model plugins."})
+        if self._ingestion_registry.count:
+            tags.append(
+                {
+                    "name": "Ingestion",
+                    "description": "Document ingestion jobs (run sync or as tasks).",
+                }
+            )
+        tags.append(
+            {"name": "Status", "description": "Unified platform status + health dashboard."}
+        )
         if self._enable_control_plane:
             tags.append(
                 {"name": "Control Plane", "description": "Runtime operations and observability."}
@@ -455,6 +508,47 @@ class AgentPlatform:
             for scope, manager in managers.items():
                 await manager.initialize()
                 logger.info(f"  ✅ Connections ready for scope '{scope}' ({manager.count})")
+
+    def _build_task_manager(self) -> TaskManager:
+        """Create the task manager and register a dispatcher per resource type."""
+        from agentomatic.tasks.dispatchers import (
+            make_agent_dispatcher,
+            make_endpoint_dispatcher,
+            make_ingestion_dispatcher,
+            make_pipeline_dispatcher,
+            make_plugin_dispatcher,
+        )
+        from agentomatic.tasks.manager import TaskManager
+        from agentomatic.tasks.models import TargetType
+
+        manager = TaskManager(
+            store=self._task_store,
+            max_concurrency=self._task_max_concurrency,
+        )
+        manager.register_dispatcher(TargetType.AGENT, make_agent_dispatcher(self._registry))
+        manager.register_dispatcher(
+            TargetType.PLUGIN, make_plugin_dispatcher(self._plugin_registry)
+        )
+        manager.register_dispatcher(
+            TargetType.ENDPOINT, make_endpoint_dispatcher(self._endpoint_registry)
+        )
+        manager.register_dispatcher(
+            TargetType.INGESTION, make_ingestion_dispatcher(self._ingestion_registry)
+        )
+        # ``self._pipelines`` is populated in-place during build(); the pipeline
+        # dispatcher reads it lazily at call time so late-discovered pipelines
+        # are always visible.
+        manager.register_dispatcher(
+            TargetType.PIPELINE,
+            make_pipeline_dispatcher(
+                self._pipelines,
+                self._registry,
+                endpoints=self._endpoint_registry,
+                ingestors=self._ingestion_registry,
+                plugins=self._plugin_registry,
+            ),
+        )
+        return manager
 
     # ------------------------------------------------------------------
     # Custom routers
@@ -509,12 +603,23 @@ class AgentPlatform:
             platform._endpoint_registry.discover(platform.endpoints_dir, endpoint_prefix)
             platform._endpoints_discovered = True
 
+        if not platform._ingestion_discovered:
+            ingestion_prefix = platform.package_prefix or platform.ingestion_dir.name
+            platform._ingestion_registry.discover(platform.ingestion_dir, ingestion_prefix)
+            platform._ingestion_discovered = True
+
         try:
             from agentomatic.observability.metrics import REGISTERED_ENDPOINTS
 
             REGISTERED_ENDPOINTS.set(platform._endpoint_registry.count)
         except Exception:  # noqa: BLE001 - metrics are optional
             pass
+
+        # Build the unified task manager (dispatchers reference the registries
+        # and the in-place ``self._pipelines`` dict).
+        if platform._enable_tasks and platform._task_manager is None:
+            platform._task_manager = platform._build_task_manager()
+        task_manager = platform._task_manager
 
         # Track which agents are already registered (programmatic + discovered)
         _pre_registered = set(platform._registry.list_names())
@@ -531,6 +636,11 @@ class AgentPlatform:
             if platform._store:
                 await platform._store.initialize()
                 logger.info("🗄️ Storage backend initialized")
+
+            # Initialize the task manager
+            if task_manager is not None:
+                await task_manager.initialize()
+                logger.info("🧵 Task manager initialized")
 
             # Re-discover in lifespan only if not already done (hot-reload)
             if not platform._discovered:
@@ -562,6 +672,16 @@ class AgentPlatform:
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"  ❌ Failed to start endpoint '{name}': {e}")
 
+            # --- Start ingestors ---
+            if platform._ingestion_registry.count:
+                logger.info("📥 Starting ingestors...")
+                for name, ingestor in platform._ingestion_registry.list_ingestors().items():
+                    try:
+                        await ingestor.startup()
+                        logger.info(f"  ✅ Ingestor '{name}' ready")
+                    except Exception as e:  # noqa: BLE001
+                        logger.error(f"  ❌ Failed to start ingestor '{name}': {e}")
+
             # --- Register + initialize connections (per-agent + platform) ---
             await platform._init_connections()
 
@@ -576,6 +696,7 @@ class AgentPlatform:
                         thread_store=platform._store,
                         max_history_messages=platform._max_history_messages,
                         summarize_after=platform._summarize_after,
+                        task_manager=task_manager,
                     )
                     logger.debug(f"  📌 Auto-generated router for {name}")
                 if agent.router and agent.manifest.is_subagent:
@@ -603,6 +724,13 @@ class AgentPlatform:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Endpoint '{name}' shutdown error: {e}")
 
+            # Stop ingestors
+            for name, ingestor in platform._ingestion_registry.list_ingestors().items():
+                try:
+                    await ingestor.shutdown()
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"Ingestor '{name}' shutdown error: {e}")
+
             # Close all connections
             try:
                 from agentomatic.connections.manager import all_managers
@@ -611,6 +739,13 @@ class AgentPlatform:
                     await manager.close()
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"Connection shutdown error: {e}")
+
+            # Shut down the task manager (cancels in-flight tasks)
+            if task_manager is not None:
+                try:
+                    await task_manager.shutdown()
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug(f"Task manager shutdown error: {exc}")
 
             # Close storage
             if platform._store:
@@ -768,6 +903,7 @@ class AgentPlatform:
                     thread_store=self._store,
                     max_history_messages=self._max_history_messages,
                     summarize_after=self._summarize_after,
+                    task_manager=task_manager,
                 )
             if agent.router and agent.manifest.is_subagent:
                 app.include_router(
@@ -795,7 +931,11 @@ class AgentPlatform:
             ]
 
         for plugin_name, plugin in self._plugin_registry.list_plugins().items():
-            plugin_router = create_plugin_router(plugin)
+            plugin_router = create_plugin_router(
+                plugin,
+                task_manager=self._task_manager,
+                api_prefix=self.api_prefix,
+            )
             plugins_router.include_router(
                 plugin_router,
                 prefix=f"/{plugin_name}",
@@ -814,13 +954,35 @@ class AgentPlatform:
             return [ep.info() for ep in self._endpoint_registry.list_endpoints().values()]
 
         for endpoint_name, endpoint in self._endpoint_registry.list_endpoints().items():
-            endpoint_router = create_endpoint_router(endpoint)
+            endpoint_router = create_endpoint_router(
+                endpoint,
+                task_manager=self._task_manager,
+                api_prefix=self.api_prefix,
+            )
             endpoints_router.include_router(
                 endpoint_router,
                 prefix=f"/{endpoint_name}",
             )
             logger.info(f"🌐 Mounted custom endpoint: {endpoint_name}")
         app.include_router(endpoints_router)
+
+        # ------------------------------------------------------------------
+        # Mount Ingestion API Routes
+        # ------------------------------------------------------------------
+        if self._ingestion_registry.count:
+            ingestion_router = create_ingestion_router(
+                self._ingestion_registry,
+                task_manager=self._task_manager,
+                api_prefix=self.api_prefix,
+            )
+            app.include_router(
+                ingestion_router,
+                prefix=self.api_prefix + "/ingestion",
+            )
+            logger.info(
+                f"📥 Mounted {self._ingestion_registry.count} ingestor(s): "
+                f"{', '.join(self._ingestion_registry.list_names())}"
+            )
 
         # ------------------------------------------------------------------
         # Pipeline auto-discovery and mounting
@@ -840,13 +1002,18 @@ class AgentPlatform:
             agents_pipelines = PipelineLoader.discover_pipelines(self.agents_dir)
             pipelines.update(agents_pipelines)
 
-            self._pipelines = pipelines
+            # Update in place so the task dispatcher's reference stays valid.
+            self._pipelines.update(pipelines)
 
             if pipelines:
                 pipeline_router = create_pipeline_router(
                     pipelines,
                     self._registry,
                     endpoints=self._endpoint_registry,
+                    ingestors=self._ingestion_registry,
+                    plugins=self._plugin_registry,
+                    task_manager=self._task_manager,
+                    api_prefix=self.api_prefix,
                 )
                 app.include_router(
                     pipeline_router,
@@ -862,18 +1029,55 @@ class AgentPlatform:
             logger.warning(f"Pipeline discovery failed: {exc}")
 
         # ------------------------------------------------------------------
+        # Unified task/execution API (sync/async/batch/stream for everything)
+        # ------------------------------------------------------------------
+        if task_manager is not None:
+            from agentomatic.tasks.routes import create_task_router
+
+            app.state.task_manager = task_manager
+            app.include_router(
+                create_task_router(task_manager),
+                prefix=self.api_prefix + "/tasks",
+            )
+            logger.info(f"🧵 Task API mounted at {self.api_prefix}/tasks")
+
+        # ------------------------------------------------------------------
         # Platform-level endpoints
         # ------------------------------------------------------------------
 
         @app.get("/health", tags=["Platform"])
         async def health() -> dict[str, Any]:
-            """Aggregate health across all agents + storage."""
+            """Aggregate health across all resources + storage."""
             agents: dict[str, Any] = {}
             for name, agent in self._registry.all().items():
                 try:
                     agents[name] = await agent.health_check()
                 except Exception as exc:  # noqa: BLE001
                     agents[name] = {"status": "error", "error": str(exc)}
+
+            # Plugin health
+            plugins: dict[str, Any] = {}
+            for name, plugin in self._plugin_registry.list_plugins().items():
+                plugins[name] = {
+                    "status": "healthy" if getattr(plugin, "is_loaded", True) else "unloaded",
+                    "version": getattr(plugin, "plugin_version", "?"),
+                }
+
+            # Custom endpoint health
+            endpoints: dict[str, Any] = {}
+            for name, endpoint in self._endpoint_registry.list_endpoints().items():
+                try:
+                    endpoints[name] = await endpoint.health_check()
+                except Exception as exc:  # noqa: BLE001
+                    endpoints[name] = {"status": "error", "error": str(exc)}
+
+            # Ingestor health
+            ingestors: dict[str, Any] = {}
+            for name, ingestor in self._ingestion_registry.list_ingestors().items():
+                try:
+                    ingestors[name] = await ingestor.health_check()
+                except Exception as exc:  # noqa: BLE001
+                    ingestors[name] = {"status": "error", "error": str(exc)}
 
             # Storage health
             storage_health: dict[str, Any] = {"status": "not_configured"}
@@ -883,15 +1087,28 @@ class AgentPlatform:
                 except Exception as exc:  # noqa: BLE001
                     storage_health = {"status": "unhealthy", "error": str(exc)}
 
-            overall = (
-                "healthy"
-                if all(a.get("status") == "healthy" for a in agents.values())
-                else "degraded"
+            def _all_ok(section: dict[str, Any], *, ok: tuple[str, ...]) -> bool:
+                return all(v.get("status") in ok for v in section.values())
+
+            healthy = (
+                _all_ok(agents, ok=("healthy",))
+                and _all_ok(endpoints, ok=("healthy", "ok"))
+                and _all_ok(ingestors, ok=("healthy", "not_ready"))
+                and _all_ok(plugins, ok=("healthy",))
             )
             return {
-                "status": overall,
+                "status": "healthy" if healthy else "degraded",
                 "agents": agents,
                 "agent_count": len(agents),
+                "plugins": plugins,
+                "plugin_count": len(plugins),
+                "endpoints": endpoints,
+                "endpoint_count": len(endpoints),
+                "ingestors": ingestors,
+                "ingestor_count": len(ingestors),
+                "pipelines": list(self._pipelines.keys()),
+                "pipeline_count": len(self._pipelines),
+                "tasks_enabled": self._task_manager is not None,
                 "storage": storage_health,
             }
 
@@ -899,6 +1116,12 @@ class AgentPlatform:
         async def readiness() -> dict[str, Any]:
             """Kubernetes-style readiness probe."""
             return {"status": "ready", "agents": self._registry.count}
+
+        # Unified status endpoint (JSON) + HTML dashboard at /status
+        from agentomatic.core.status import create_status_router
+
+        app.include_router(create_status_router(self))
+        logger.info(f"📊 Status dashboard at /status ({self.api_prefix}/status for JSON)")
 
         # A2A discovery
         @app.get("/.well-known/agent.json", tags=["Platform"])
@@ -985,8 +1208,13 @@ class AgentPlatform:
                 "name": self.title,
                 "version": self.version,
                 "agents": self._registry.count,
+                "plugins": self._plugin_registry.count,
+                "endpoints": self._endpoint_registry.count,
+                "ingestors": self._ingestion_registry.count,
+                "pipelines": len(self._pipelines),
                 "docs": "/docs",
                 "health": "/health",
+                "status": "/status",
                 "a2a": "/.well-known/agent.json",
             }
 

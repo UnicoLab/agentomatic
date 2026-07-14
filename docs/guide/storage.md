@@ -267,6 +267,36 @@ app = platform.build()
 
 ---
 
+## 🧵 Task Persistence (a separate store)
+
+The `BaseStore` on this page persists **conversations** (threads, messages,
+feedback, checkpoints, HITL state). **Background tasks** — async/batch jobs
+submitted to the [task board](tasks.md) — are persisted by a *separate*,
+pluggable `TaskStore`, configured via the `task_store=` parameter.
+
+The default is an in-memory task store. For multi-worker or restart-durable
+deployments, use the durable `SQLAlchemyTaskStore`:
+
+```python
+from agentomatic import AgentPlatform
+from agentomatic.storage import SQLAlchemyStore
+from agentomatic.tasks import SQLAlchemyTaskStore
+
+platform = AgentPlatform.from_folder(
+    "agents/",
+    store=SQLAlchemyStore("postgresql+asyncpg://user:pass@localhost/agent_db"),        # conversations
+    task_store=SQLAlchemyTaskStore("postgresql+asyncpg://user:pass@localhost/tasks"),  # tasks
+)
+```
+
+The two stores are independent — they can point at the same database (different
+tables) or entirely separate databases. Like `BaseStore`, the task store's
+`initialize()`/`close()` are called automatically by the platform lifespan.
+See [Tasks → Persistence & durability](tasks.md#persistence-durability) for the
+full configuration surface (pooling, TTL/eviction, table name, shared engine).
+
+---
+
 ## 🗂️ Thread & Conversation Management
 
 ### Creating and Managing Threads

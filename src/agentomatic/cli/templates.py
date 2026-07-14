@@ -1029,6 +1029,7 @@ TEMPLATES: dict[str, str] = {
     "plugin": "ML Model Plugin — wrap classical ML models with auto-generated REST endpoints",
     "endpoint": "Custom Endpoint — call deployed model services (httpx + auth) and aggregate",
     "connection": "Connections — per-agent authenticated database + HTTP service connections",
+    "ingestion": "Ingestor — package your own doc-ingestion code (any library) as a task-run job",
 }
 
 
@@ -1954,6 +1955,146 @@ def _connections_env_example(name: str) -> str:
     )
 
 
+def _ingestor_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""Ingestor: {name}.
+
+Agentomatic packages your ingestion code as a first-class, deployable resource.
+You bring the implementation using *any* libraries you like (docling,
+unstructured, pymupdf4llm, langchain-text-splitters, your vector DB client, …);
+Agentomatic provides discovery, REST endpoints, task/queue execution with live
+progress + cancellation, and status reporting.
+
+Place this folder inside your ``ingestion/`` directory. On ``agentomatic run``
+it is auto-discovered and mounted at:
+
+- ``POST /api/v1/ingestion/{name}/run``        (synchronous)
+- ``POST /api/v1/ingestion/{name}/run/async``  (background task -> task id)
+- ``GET  /api/v1/ingestion/{name}/info``
+- ``GET  /api/v1/ingestion/{name}/health``
+"""
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from agentomatic.ingestion import BaseIngestor, IngestionResult
+
+
+class {title}Request(BaseModel):
+    """Input schema for the {name} ingestor (customise freely)."""
+
+    source: str = Field(..., description="Path / glob / URL / bucket URI to ingest")
+    collection: str = Field("default", description="Target collection / index name")
+
+
+class {title}Ingestor(BaseIngestor[{title}Request]):
+    """Ingest documents into a vector store.
+
+    Replace the body of :meth:`ingest` with your real implementation. The
+    example below shows the shape — swap in your preferred libraries.
+    """
+
+    ingestor_name = "{name}"
+    ingestor_description = "Parse documents and upsert them into a vector store."
+    ingestor_version = "1.0.0"
+
+    async def setup(self) -> None:
+        """Initialise clients/models once at startup (override as needed)."""
+        # e.g. self.client = AsyncQdrantClient(url=os.environ["QDRANT_URL"])
+        # e.g. self.embedder = get_embeddings("openai")
+        self.client = None
+
+    async def ingest(self, request: {title}Request, ctx) -> IngestionResult:
+        """Run the ingestion. Bring your own libraries here.
+
+        Example flow (pseudo-code)::
+
+            import pymupdf4llm                       # your PDF -> markdown lib
+            from langchain_text_splitters import MarkdownTextSplitter
+
+            markdown = pymupdf4llm.to_markdown(request.source)
+            chunks = MarkdownTextSplitter().split_text(markdown)
+
+            upserted = 0
+            for i, chunk in enumerate(chunks):
+                if ctx.cancelled:                    # cooperative cancellation
+                    break
+                # vector = self.embedder.embed_query(chunk)
+                # await self.client.upsert(request.collection, ...)
+                upserted += 1
+                await ctx.report(              # live progress for the frontend
+                    current=i + 1,
+                    total=len(chunks),
+                    message=f"upserting chunk {{i + 1}}/{{len(chunks)}}",
+                )
+            return IngestionResult(
+                documents=1,
+                chunks=len(chunks),
+                upserted=upserted,
+                collection=request.collection,
+            )
+        """
+        # --- Placeholder implementation (replace with your own) ---
+        await ctx.report(message=f"Ingesting {{request.source}}", current=1, total=1)
+        return IngestionResult(
+            documents=1,
+            chunks=0,
+            upserted=0,
+            collection=request.collection,
+            output={{"note": "Replace ingest() with your real implementation."}},
+        )
+'''
+
+
+def _ingestor_readme(name: str) -> str:
+    return f"""# {name.replace("_", " ").title()} Ingestor
+
+Generated with `agentomatic init {name} --template ingestion`.
+
+Agentomatic provides the **ops** (discovery, REST, task/queue execution,
+progress, status); you provide the **implementation** using any libraries you
+like.
+
+## Install this ingestor
+
+Place this folder inside your project's `ingestion/` directory:
+
+```
+ingestion/
+└── {name}/
+    ├── __init__.py
+    └── ingestor.py
+```
+
+## Run it
+
+```bash
+agentomatic run
+
+# Synchronous
+curl -X POST http://localhost:8000/api/v1/ingestion/{name}/run \\
+  -H 'content-type: application/json' \\
+  -d '{{"source": "./docs", "collection": "kb"}}'
+
+# As a background task (returns a pollable task id)
+curl -X POST http://localhost:8000/api/v1/ingestion/{name}/run/async \\
+  -H 'content-type: application/json' \\
+  -d '{{"source": "./docs", "collection": "kb"}}'
+
+# Then poll / stream progress via the unified task API
+curl http://localhost:8000/api/v1/tasks/<task_id>
+curl -N http://localhost:8000/api/v1/tasks/<task_id>/events
+```
+
+## Bring your own libraries
+
+Edit `ingestor.py` and use whatever you prefer — e.g. `pymupdf4llm` / `docling`
+/ `unstructured` for parsing, `langchain-text-splitters` for chunking, and your
+vector DB client (Qdrant, Chroma, pgvector, …) for upserts. Report progress
+with `await ctx.report(...)` and honour `ctx.cancelled` in long loops.
+"""
+
+
 def get_template_files(template: str, name: str) -> dict[str, str]:
     """Get all files for a given template.
 
@@ -2090,6 +2231,13 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "connections.py": _connections_py(name),
             "README.md": _connections_readme(name),
             ".env.example": _connections_env_example(name),
+        }
+
+    elif template == "ingestion":
+        return {
+            "__init__.py": '"""Ingestor package."""\n',
+            "ingestor.py": _ingestor_py(name),
+            "README.md": _ingestor_readme(name),
         }
 
     else:

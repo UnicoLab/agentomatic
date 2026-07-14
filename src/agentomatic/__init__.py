@@ -67,7 +67,11 @@ from agentomatic.agents import (
     AgentExample,
     AgentGraph,
     BaseGraphAgent,
+    Callback,
+    EarlyStopping,
     GraphBuilder,
+    History,
+    Loss,
     agent_node,
 )
 
@@ -91,6 +95,22 @@ from agentomatic.endpoints import (
     EndpointRegistry,
     UpstreamAuthConfig,
     UpstreamConfig,
+)
+
+# First-class ingestion / RAG ops layer (v0.12)
+from agentomatic.ingestion import (
+    BaseIngestor,
+    IngestionRegistry,
+    IngestionRequest,
+    IngestionResult,
+)
+
+# Unified task/execution subsystem (v0.12)
+from agentomatic.tasks import (
+    TargetType,
+    TaskManager,
+    TaskRecord,
+    TaskStatus,
 )
 
 __all__ = [
@@ -122,6 +142,16 @@ __all__ = [
     "UpstreamAuthConfig",
     "AuthType",
     "AggregationStrategy",
+    # Ingestion (v0.12)
+    "BaseIngestor",
+    "IngestionRegistry",
+    "IngestionRequest",
+    "IngestionResult",
+    # Tasks (v0.12)
+    "TaskManager",
+    "TaskRecord",
+    "TaskStatus",
+    "TargetType",
     # Connections
     "DatabaseConnectionConfig",
     "HttpConnectionConfig",
@@ -138,6 +168,11 @@ __all__ = [
     "agent_node",
     "AgentDataset",
     "AgentExample",
+    # Training lifecycle (Keras-style)
+    "History",
+    "Callback",
+    "EarlyStopping",
+    "Loss",
     # Version
     "__version__",
 ]

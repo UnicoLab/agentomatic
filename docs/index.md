@@ -12,13 +12,13 @@ hide:
 
   <h3>Drop agents, not code. :octicons-zap-24:</h3>
   <p><b>The zero-code multi-agent API platform framework.</b><br>
-  Turn any Python function, LangGraph workflow, LangChain pipeline, or Deep Agent into a production-ready microservice — with auto-discovery, SSE streaming, thread persistence, visual debugging, and prompt optimization.</p>
+  Turn any Python function, LangGraph workflow, LangChain pipeline, or Deep Agent into a production-ready microservice — with auto-discovery, SSE streaming, thread persistence, visual debugging, and prompt optimization. Every agent, plugin, pipeline, endpoint, and ingestor is automatically callable <b>sync, async, batch, streaming, or as a tracked background task</b>, with a unified task board and a whole-platform status dashboard.</p>
 
   <p>
     <a href="https://pypi.org/project/agentomatic/"><img src="https://img.shields.io/pypi/v/agentomatic.svg" alt="PyPI version"></a>
     <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
     <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
-    <img src="https://img.shields.io/badge/tests-846%20passing-brightgreen.svg" alt="Tests passing">
+    <img src="https://img.shields.io/badge/tests-1049%20passing-brightgreen.svg" alt="Tests passing">
     <img src="https://img.shields.io/badge/framework-LangGraph%20%7C%20LangChain%20%7C%20Deep%20Agent%20%7C%20Python-purple.svg" alt="Frameworks">
   </p>
 </div>
@@ -76,6 +76,38 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
     First-class support for **LangGraph**, **LangChain**, **Deep Agent**, and raw Python. The adapter pattern ensures every framework gets the best debugging experience possible.
 
     [:octicons-arrow-right-24: Deep Agent Integration](guide/deep-agents.md)
+
+- :material-timer-sand:{ .lg .middle } **Universal Execution Modes**
+
+    ---
+
+    Every agent, plugin, pipeline, endpoint, and ingestor runs **sync**, **async**, **batch**, **streaming**, or as a **background task** — automatically. Poll status/progress, stream events, cancel, and get completion webhooks from a unified `/api/v1/tasks` board.
+
+    [:octicons-arrow-right-24: Tasks & Execution Modes](guide/tasks.md)
+
+- :material-heart-pulse:{ .lg .middle } **Unified Status Dashboard**
+
+    ---
+
+    One `/status` HTML page (and `/api/v1/status` JSON) rolls up the health of every agent, plugin, pipeline, endpoint, ingestor, the storage backend, and the task engine into a single control-plane view.
+
+    [:octicons-arrow-right-24: Status Dashboard](guide/status.md)
+
+- :material-file-import:{ .lg .middle } **Ingestion & RAG Packaging**
+
+    ---
+
+    Bring any library (PDF→markdown, loaders, splitters, embedders, vector stores); Agentomatic *packages* it as a discoverable ingestor callable sync/async/as-a-task and usable as a pipeline step. Ops, not implementation.
+
+    [:octicons-arrow-right-24: Ingestion & RAG](guide/ingestion.md)
+
+- :material-vector-polyline:{ .lg .middle } **Composable Pipelines**
+
+    ---
+
+    Chain agents, plugins, endpoints, ingestors, transforms, loops, and sub-pipelines with typed data-passing, conditionals, retries, timeouts, rollback/compensation, and optional schema enforcement.
+
+    [:octicons-arrow-right-24: Pipelines](guide/pipelines.md)
 
 </div>
 
@@ -218,6 +250,8 @@ graph TB
         PM["Prompt Manager<br/>(hot-reload · versioning · optimization)"]
         STORE["Storage Backend<br/>(Memory · SQLite · PostgreSQL)"]
         TEL["Telemetry & Feedback<br/>(OpenTelemetry · Prometheus)"]
+        TASK["Task Engine<br/>(async · batch · progress · webhooks)"]
+        RES["Resources<br/>(Plugins · Pipelines · Endpoints · Ingestors)"]
     end
 
     subgraph Agents["Agent Layer"]
@@ -244,6 +278,9 @@ graph TB
     REG --> A4
     RF --> STORE
     RF --> TEL
+    RF --> TASK
+    RF --> RES
+    TASK --> RES
     REG --> PM
     STUDIO --> StudioBackend
     StudioBackend --> REG
@@ -399,6 +436,9 @@ The main exports you'll use when building with Agentomatic:
 | `MemoryStore` | `agentomatic.storage` | In-memory thread storage (development) |
 | `SQLAlchemyStore` | `agentomatic.storage` | SQL-based thread storage (production) |
 | `BaseGraphAgent` | `agentomatic.agents` | Base class for class-based agents with graph wiring |
+| `History` / `EarlyStopping` / `Loss` | `agentomatic` | Keras-style training lifecycle primitives for `fit()` |
+| `SQLAlchemyTaskStore` | `agentomatic.tasks` | Durable, multi-worker task persistence backend |
+| `BaseIngestor` | `agentomatic.ingestion` | Base class to package any ingestion/RAG job as a resource |
 
 ```python title="main.py"
 from agentomatic import AgentPlatform, AgentManifest, BaseAgentState

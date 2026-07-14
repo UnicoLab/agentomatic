@@ -9,6 +9,119 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Durable `SQLAlchemyTaskStore`**
+  - Drop-in, production-ready `TaskStore` backed by any SQLAlchemy async driver
+    (SQLite/PostgreSQL/MySQL) — task status, progress, and results survive
+    process restarts and are shared across workers/replicas
+  - Wire it in one line: `AgentPlatform.from_folder(..., task_store=SQLAlchemyTaskStore(url))`;
+    the platform lifespan initialises and disposes it automatically
+  - Fully configurable and safe by default: connection pooling, `table_name`,
+    TTL/`max_records` eviction (best-effort, never blocks a `save`), reusable
+    external `engine`, and a forward-compatible indexed-JSON schema
+  - Lazy import — `agentomatic.tasks` never requires the optional `db` extra;
+    a clear install hint is raised only when the store is constructed
+  - Exposed as `agentomatic.tasks.SQLAlchemyTaskStore`; install via
+    `agentomatic[db]` (SQLite) or `agentomatic[db-postgres]` (PostgreSQL)
+- **Keras-style agent training lifecycle**
+  - `BaseGraphAgent.fit()` is now epoch-aware and returns a real **`History`**
+    object (`.history` log-key → per-epoch values, plus `.epoch`, `.params`,
+    `final()`, `best()`, `to_dict()`, `summary()`); also stored on
+    `agent.history`
+  - `fit(dataset, *, epochs, verbose, callbacks, validation_data)` — per-epoch
+    optimizer step + train/validation evaluation, Keras-like verbose log lines,
+    and `val_*` metrics when `validation_data` is supplied
+  - **Callbacks**: `Callback` base class (`on_train_begin`/`on_epoch_begin`/
+    `on_epoch_end(epoch, logs)`/`on_train_end`) and a built-in `EarlyStopping`
+    that halts training via `agent.stop_training`
+  - **Loss abstraction**: `compile(..., loss=...)` accepts a `Loss`, any
+    metric-like object (converted to `1 - score` via `MetricLoss`), or a
+    callable (`CallableLoss`); `resolve_loss()` coerces any of these
+  - **Optimize-engine wiring**: `PromptFitterBridge` now actually runs the
+    async `optimize.PromptFitter` from `fit()`, applies the best prompt config
+    back onto the agent, and stores the full `PromptFitResult` on
+    `agent._last_fit_result` (gracefully degrades to a baseline pass when the
+    `optimize` extra is missing or called inside a running event loop)
+  - `compile()` arguments are now all optional (dataset/metrics can be provided
+    at `fit()` time); `History`, `Callback`, `EarlyStopping`, and `Loss` are
+    exported from `agentomatic` and `agentomatic.agents`
+- **Pipeline data-passing hardening**
+  - New **`plugin:` step type** — call a registered ML plugin's `predict()`
+    mid-pipeline; the resolved input mapping is coerced into the plugin's
+    declared input schema before inference (with input/output mapping,
+    condition, retry, timeout, and `on_error` like every other step)
+  - **Rollback / compensation**: under `on_error: rollback`, completed steps
+    are compensated in reverse order via an optional per-step `rollback` code
+    block (with `ctx` and `output` in scope); compensated steps are reported in
+    `result.metadata["rolled_back_steps"]`
+  - **Optional input/output schema enforcement**: `input_schema` /
+    `output_schema` are now validated (advisory by default, failing when
+    `strict_schema: true`) via a lightweight type checker
+  - Plugin registry is threaded through the pipeline engine, router, task
+    dispatcher, and sub-pipelines so plugin steps work in every run mode
+    (sync, `/run/async`, `/run/batch`, and nested pipelines)
+- **Per-resource execution-mode sugar**
+  - Every resource now exposes consistent `/<sync>/async` and `/<sync>/batch`
+    companion routes backed by the unified task system: agents
+    (`/invoke/async`, `/invoke/batch`), plugins (`/predict/async`,
+    `/predict/batch`), pipelines (`/run/async`, `/run/batch`), ingestors, and
+    custom endpoints
+  - All return `202` with a task id and hypermedia `links` (status / events /
+    result / cancel); batch bodies wrap a list of the normal input and fan out
+    as one task with per-item progress
+  - Shared `attach_execution_modes` helper + `BatchSubmitRequest` in
+    `agentomatic.tasks` keep behaviour and links uniform across resource types
+- **Unified Status Dashboard**
+  - Self-contained, auto-refreshing HTML dashboard at `/status` showing the
+    health of every resource — agents, plugins, custom endpoints, ingestors,
+    and pipelines — plus the task executor and storage backend, with no
+    external assets
+  - Structured `GET /api/v1/status` endpoint exposing the same snapshot as JSON
+    (platform uptime/version, per-resource healthy/total summaries, task stats
+    by status + concurrency, and storage health) for custom tooling
+  - Extended `GET /health` to aggregate plugins, endpoints, ingestors, and
+    pipelines (previously agents + storage only); root index now advertises
+    resource counts and the `/status` link
+  - `TaskManager.stats()` snapshot (totals, per-status breakdown, running vs.
+    max concurrency, supported targets)
+- **First-class Ingestion / RAG ops layer**
+  - `BaseIngestor` packages *your* document-ingestion code — built with any
+    libraries you like (`docling`/`unstructured`/`pymupdf4llm` to parse,
+    `langchain-text-splitters` to chunk, your own vector DB client) — as a
+    deployable resource. Agentomatic provides the ops, not the implementation
+  - Auto-discovery from an `ingestion/` directory; routes mounted under
+    `/api/v1/ingestion/{name}` with `/run` (sync), `/run/async` (background
+    task), `/info`, and `/health`
+  - Async runs use the unified task system for live progress, SSE streaming,
+    cancellation, and webhooks; the `ingest(request, ctx)` context exposes
+    `await ctx.report(...)` and `ctx.cancelled`
+  - Flexible `IngestionResult` telemetry (documents/chunks/upserted/skipped +
+    free-form `stats`/`output`) and a default `IngestionRequest` input model
+  - Hardened embeddings factory: cached per `(provider, kwargs)`, new
+    dependency-free `HashEmbedder`, and `openai` provider support
+  - Fully connected to the rest of the platform: new **`ingestion:` pipeline
+    step type** (with input/output mapping, condition, retry, timeout, and
+    sub-pipeline support), inclusion in the unified `/health` status (alongside
+    plugins, endpoints, and pipelines), and resource counts on the root index
+  - `agentomatic init <name> --template ingestion` scaffolding
+  - Public API: `BaseIngestor`, `IngestionRegistry`, `IngestionRequest`,
+    `IngestionResult`
+- **Unified Task / Execution Subsystem**
+  - Run any resource — agent, ML plugin, pipeline, or custom endpoint — in
+    **sync**, **async (background)**, **batch**, or **streaming** modes through a
+    single, uniform `TaskRecord` contract
+  - Task board API at `/api/v1/tasks`: submit (`202`/`200`), list/filter, poll
+    status, fetch result, cancel, delete, and a live SSE progress stream
+    (`/tasks/{id}/events`)
+  - `TaskManager` with a bounded in-process queue (`task_max_concurrency`),
+    cooperative cancellation, batch fan-out with per-item progress, and
+    completion webhooks (`callback_url`)
+  - Pluggable persistence via `TaskStore` (default bounded, TTL-aware
+    `InMemoryTaskStore`); enable/disable with `enable_tasks`
+  - **A2A task lifecycle is now real and pollable** — `POST /{agent}/a2a/tasks`
+    runs asynchronously and returns a trackable id; `GET .../a2a/tasks/{id}`
+    reports live status mapped to canonical A2A states, plus a new
+    `POST .../a2a/tasks/{id}/cancel` (replaces the previous synchronous stub)
+  - Public API: `TaskManager`, `TaskRecord`, `TaskStatus`, `TargetType`
 - **Custom Endpoints**
   - `BaseEndpoint` — user-defined HTTP APIs that call deployed model services
     via authenticated `httpx` requests and aggregate their outputs

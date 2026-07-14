@@ -81,6 +81,34 @@ interface FeedbackPayload {
   comment?: string;
   metadata?: Record<string, any>;
 }
+
+// ── Tasks (async / batch execution) ─────────────────────────────
+
+/** Maps to TaskProgress (tasks/models.py) */
+interface TaskProgress {
+  percent: number;                      // 0–100
+  message: string;
+  current?: number | null;
+  total?: number | null;
+  stage?: string | null;
+}
+
+/** Maps to TaskRecord.public_dict() (tasks/models.py) */
+interface TaskRecord {
+  id: string;                           // "task_..."
+  target_type: "agent" | "plugin" | "pipeline" | "endpoint" | "ingestion";
+  target: string;                       // resource name
+  mode: "sync" | "async" | "batch" | "stream";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  progress: TaskProgress;
+  result?: any;                         // populated once succeeded
+  error?: string | null;                // populated once failed
+  created_at: number;
+  started_at?: number | null;
+  finished_at?: number | null;
+  duration_ms?: number | null;
+  links?: { status: string; events: string; result: string; cancel: string };
+}
 ```
 
 ---
@@ -174,6 +202,113 @@ const res = await fetch("/api/v1/alpha/chat", {
 const data = await res.json();
 console.log(data.response);
 console.log(data.thread_id);         // "thread-abc"
+```
+
+### 4. Async Tasks — long-running jobs with progress ⏳ { #async-tasks }
+
+Any resource (agent, plugin, pipeline, endpoint, ingestor) can run as a tracked
+background task. This is ideal for long jobs — e.g. document ingestion — where
+the frontend submits work, then **polls** or **streams** progress.
+
+**Submit** (returns immediately with `202` and a task record):
+
+- Agent: `POST /api/v1/{agent}/invoke/async` (single) · `/invoke/batch` (many)
+- Plugin: `POST /api/v1/{plugin}/predict/async` · `/predict/batch`
+- Pipeline: `POST /api/v1/pipelines/{name}/run/async` · `/run/batch`
+- Endpoint: `POST /api/v1/endpoints/{name}{path}/async` · `.../batch`
+- Ingestor: `POST /api/v1/ingestion/{name}/run/async` · `/run/batch`
+
+```typescript
+// 1. Submit an async task
+const submit = await fetch("/api/v1/alpha/invoke/async", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ query: "Summarise this 400-page report" }),
+});
+const task: TaskRecord = await submit.json();
+// task.status === "queued"; task.links.status === "/api/v1/tasks/task_ab12..."
+
+// 2a. Poll the task board until terminal
+async function pollTask(taskId: string): Promise<TaskRecord> {
+  while (true) {
+    const res = await fetch(`/api/v1/tasks/${taskId}`);
+    const rec: TaskRecord = await res.json();
+    updateProgressBar(rec.progress.percent, rec.progress.message);
+    if (["succeeded", "failed", "cancelled"].includes(rec.status)) return rec;
+    await new Promise((r) => setTimeout(r, 750));
+  }
+}
+const final = await pollTask(task.id);
+console.log(final.result);            // once succeeded
+```
+
+**Or stream progress live via SSE** instead of polling:
+
+```typescript
+// 2b. Stream progress events
+const es = new EventSource(`/api/v1/tasks/${task.id}/events`);
+es.onmessage = (e) => {
+  const evt = JSON.parse(e.data);      // { status, progress, ... }
+  updateProgressBar(evt.progress.percent, evt.progress.message);
+  if (["succeeded", "failed", "cancelled"].includes(evt.status)) es.close();
+};
+```
+
+**Cancel** an in-flight task:
+
+```typescript
+await fetch(`/api/v1/tasks/${task.id}/cancel`, { method: "POST" });
+```
+
+The **task board** endpoints (not agent-scoped):
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `POST` | `/api/v1/tasks` | Submit a task for any target (`{ target_type, target, input }`) |
+| `GET` | `/api/v1/tasks` | List/filter tasks (`status`, `target_type`, `target`, `limit`, `offset`) |
+| `GET` | `/api/v1/tasks/{id}` | Task status, progress, result |
+| `GET` | `/api/v1/tasks/{id}/result` | Terminal result payload |
+| `GET` | `/api/v1/tasks/{id}/events` | SSE progress stream |
+| `POST` | `/api/v1/tasks/{id}/cancel` | Request cancellation |
+| `DELETE` | `/api/v1/tasks/{id}` | Delete a task record |
+
+!!! tip "Batch jobs"
+    `POST .../batch` accepts `{ "inputs": [...], "batch_concurrency"?, "callback_url"? }`
+    and returns one task whose `progress` tracks per-item completion.
+
+### React task-polling hook
+
+```tsx
+import { useCallback, useState } from "react";
+
+export function useAsyncTask(agentName: string) {
+  const [task, setTask] = useState<TaskRecord | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const run = useCallback(
+    async (request: AgentInvokeRequest) => {
+      setRunning(true);
+      const submit = await fetch(`/api/v1/${agentName}/invoke/async`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+      let rec: TaskRecord = await submit.json();
+      setTask(rec);
+
+      while (!["succeeded", "failed", "cancelled"].includes(rec.status)) {
+        await new Promise((r) => setTimeout(r, 750));
+        rec = await fetch(`/api/v1/tasks/${rec.id}`).then((r) => r.json());
+        setTask(rec);
+      }
+      setRunning(false);
+      return rec;
+    },
+    [agentName],
+  );
+
+  return { run, task, running };
+}
 ```
 
 ---
@@ -361,6 +496,13 @@ agent prefix `/api/v1/{agent_name}`.
 | 25 | `POST`  | `/threads/{tid}/fork`            | —                       | Fork thread                       |
 | 26 | `GET`   | `/threads/{tid}/lineage`         | —                       | Thread lineage                    |
 
+!!! info "Plus execution-mode routes"
+    When the task engine is enabled (default), each agent also exposes
+    `POST /invoke/async` and `POST /invoke/batch` that submit work to the
+    [task board](#async-tasks). Plugins, pipelines,
+    endpoints, and ingestors get the equivalent `/async` and `/batch` variants
+    of their primary route.
+
 ---
 
 ## Platform Surfaces (beyond a single agent)
@@ -463,6 +605,40 @@ const result = await fetch("/api/v1/endpoints/ensemble/call", {
 | `GET` | `/api/v1/plugins` | List ML plugins |
 | `GET` | `/api/v1/plugins/{name}/model_card` | Plugin model card |
 | `POST` | `/api/v1/plugins/{name}/predict` | Run a plugin prediction |
+
+### Ingestion / RAG
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/api/v1/ingestion` | List registered ingestors |
+| `POST` | `/api/v1/ingestion/{name}/run` | Run an ingestion job (sync) |
+| `POST` | `/api/v1/ingestion/{name}/run/async` | Run as a tracked task |
+| `GET` | `/api/v1/ingestion/{name}/info` | Ingestor metadata / readiness |
+
+### Status Dashboard
+
+A single roll-up of the whole platform's health — ideal for an ops/admin view.
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/status` | HTML dashboard (all resources + task engine) |
+| `GET` | `/api/v1/status` | JSON: overall + per-resource health |
+
+```typescript
+const status = await fetch("/api/v1/status").then((r) => r.json());
+// {
+//   status: "healthy",                        // overall rollup
+//   platform: { name, version, uptime_seconds, maintenance_mode },
+//   summary: { agents: { total, healthy }, plugins: {...}, ... },
+//   resources: {
+//     agents:    { total, healthy, degraded, items: { ...per-agent health } },
+//     plugins:   { ... }, endpoints: { ... },
+//     ingestors: { ... }, pipelines: { ... },
+//   },
+//   tasks:   { enabled, running, queued, ... },   // task-engine stats
+//   storage: { status, backend, ... },
+// }
+```
 
 !!! tip "Auth for platform surfaces"
     When JWT auth is enabled, send the same `Authorization: Bearer <token>`

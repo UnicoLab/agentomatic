@@ -10,6 +10,7 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
@@ -155,16 +156,26 @@ class GridSearchOptimizer:
 
 
 class PromptFitterBridge:
-    """Bridge to the existing ``optimize.PromptFitter`` for class-agents.
+    """Bridge that runs the ``optimize.PromptFitter`` engine from ``fit()``.
 
-    Wraps the powerful PromptFitter API so it can be used as an
-    Optimizer for BaseGraphAgent.
+    Wraps the powerful async PromptFitter so it can be used as a synchronous
+    :class:`~agentomatic.agents.types.Optimizer` for ``BaseGraphAgent``. When
+    ``fit()`` calls :meth:`optimize`, this bridge builds (or reuses) a
+    ``PromptFitter``, converts the ``AgentDataset`` to the optimize format,
+    runs the async optimization to completion, stashes the full
+    :class:`~agentomatic.optimize.PromptFitResult` on ``agent._last_fit_result``,
+    and returns the best prompt config as applicable agent attributes.
 
     Args:
         agent_name: Name for the fitter to use.
         task_model: Model for running tasks.
         rewrite_model: Model for prompt rewriting.
-        kwargs: Extra keyword arguments for PromptFitter.
+        metric: An ``optimize.BaseMetric`` used as the fit objective. Defaults
+            to ``ExactMatchMetric`` when omitted.
+        max_trials: Maximum optimization trials.
+        fitter: Pre-built fitter instance (mainly for testing / advanced use);
+            when given, construction kwargs are ignored.
+        kwargs: Extra keyword arguments forwarded to ``PromptFitter``.
 
     Example::
 
@@ -173,18 +184,30 @@ class PromptFitterBridge:
             task_model="ollama/qwen2.5:7b",
             rewrite_model="openai/gpt-4.1",
         )
+        agent.compile(dataset, metrics, optimizer=optimizer)
+        history = agent.fit(dataset)
+        result = agent._last_fit_result  # full PromptFitResult
     """
+
+    # Best-config keys we know how to apply back onto an agent.
+    _APPLICABLE_KEYS = ("system_prompt", "user_template", "model_choice")
 
     def __init__(
         self,
         agent_name: str = "",
         task_model: LLMSpec = "ollama/qwen2.5:7b",
         rewrite_model: LLMSpec = "openai/gpt-4.1",
+        metric: Any | None = None,
+        max_trials: int = 8,
+        fitter: Any | None = None,
         **kwargs: Any,
     ) -> None:
         self.agent_name = agent_name
         self.task_model = task_model
         self.rewrite_model = rewrite_model
+        self.metric = metric
+        self.max_trials = max_trials
+        self.fitter = fitter
         self.kwargs = kwargs
 
     def optimize(
@@ -193,34 +216,108 @@ class PromptFitterBridge:
         dataset: AgentDataset,
         metrics: Sequence[Metric],
     ) -> dict[str, Any]:
-        """Run PromptFitter optimization.
-
-        Note: This is a sync wrapper. The actual PromptFitter
-        is async and should be invoked with ``asyncio.run()``
-        in production.
+        """Run PromptFitter optimization and return applicable config.
 
         Returns:
-            Optimized configuration dict.
+            A dict of best-config values that map to agent attributes. The full
+            ``PromptFitResult`` is stored on ``agent._last_fit_result``. On any
+            failure (missing extra, no data, running event loop) an empty dict
+            is returned so ``fit()`` degrades to a baseline pass.
         """
+        name = self.agent_name or getattr(agent, "agent_name", "agent")
+
         try:
-            import importlib.util
-
-            if importlib.util.find_spec("agentomatic.optimize.fitter") is None:
-                raise ImportError("PromptFitter not available")
-
-            name = self.agent_name or getattr(agent, "agent_name", "agent")
-            logger.info(f"PromptFitterBridge: preparing fitter for '{name}'")
-
-            # Convert dataset to optimize.Dataset format
-            opt_dataset = dataset.to_optimize_dataset()
-
-            return {
-                "_fitter_agent": name,
-                "_fitter_task_model": self.task_model,
-                "_fitter_rewrite_model": self.rewrite_model,
-                "_fitter_dataset_size": len(opt_dataset),
-                "_fitter_ready": True,
-            }
-        except ImportError:
-            logger.warning("PromptFitter not available. Install agentomatic[optimize].")
+            fitter = self._build_fitter(agent, name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"PromptFitterBridge: fitter unavailable ({exc}) — skipping")
             return {}
+
+        opt_dataset = dataset.to_optimize_dataset()
+        if not len(opt_dataset):
+            logger.warning("PromptFitterBridge: empty dataset — skipping")
+            return {}
+
+        trainset, valset = self._split(opt_dataset)
+        metric = self._resolve_metric()
+        if metric is None:
+            logger.warning("PromptFitterBridge: no usable metric — skipping")
+            return {}
+
+        try:
+            result = self._run_async(fitter.fit(trainset, valset, metric))
+        except RuntimeError as exc:
+            logger.warning(f"PromptFitterBridge: cannot run fitter here ({exc})")
+            return {}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"PromptFitterBridge: fit failed ({exc})")
+            return {}
+
+        agent._last_fit_result = result  # noqa: SLF001 - intentional handoff
+        logger.info(f"PromptFitterBridge: fit complete for '{name}'")
+        return self._extract_config(agent, result)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _build_fitter(self, agent: Any, name: str) -> Any:
+        """Return the injected fitter or construct a new ``PromptFitter``."""
+        if self.fitter is not None:
+            return self.fitter
+        from agentomatic.optimize.fitter import PromptFitter
+
+        return PromptFitter(
+            agent=name,
+            task_model=self.task_model,
+            rewrite_model=self.rewrite_model,
+            max_trials=self.max_trials,
+            **self.kwargs,
+        )
+
+    def _resolve_metric(self) -> Any | None:
+        """Return the fit objective metric (default: ExactMatch)."""
+        if self.metric is not None:
+            return self.metric
+        try:
+            from agentomatic.optimize.metrics import ExactMatchMetric
+
+            return ExactMatchMetric()
+        except Exception:  # noqa: BLE001
+            return None
+
+    @staticmethod
+    def _split(opt_dataset: Any) -> tuple[Any, Any]:
+        """Split into (train, val); fall back to using the same set for both."""
+        try:
+            train, val = opt_dataset.split(0.8)
+            if len(train) and len(val):
+                return train, val
+        except Exception:  # noqa: BLE001
+            pass
+        return opt_dataset, opt_dataset
+
+    @classmethod
+    def _extract_config(cls, agent: Any, result: Any) -> dict[str, Any]:
+        """Map the fit result's best config onto applicable agent attributes."""
+        best = getattr(result, "best_config", None)
+        if best is None:
+            return {}
+        raw = best.to_dict() if hasattr(best, "to_dict") else dict(getattr(best, "__dict__", {}))
+        return {
+            key: raw[key] for key in cls._APPLICABLE_KEYS if key in raw and hasattr(agent, key)
+        }
+
+    @staticmethod
+    def _run_async(coro: Any) -> Any:
+        """Run ``coro`` to completion, erroring clearly inside a live loop."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+        # A loop is already running — we cannot block it synchronously.
+        coro.close()
+        raise RuntimeError(
+            "PromptFitterBridge.optimize() called from within a running event "
+            "loop; run agent.fit() from synchronous code or await the fitter "
+            "directly."
+        )

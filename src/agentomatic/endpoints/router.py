@@ -26,16 +26,25 @@ def _observe_endpoint(name: str, status: str, elapsed: float) -> None:
         pass
 
 
-def create_endpoint_router(endpoint: BaseEndpoint) -> APIRouter:
+def create_endpoint_router(
+    endpoint: BaseEndpoint,
+    *,
+    task_manager: Any | None = None,
+    api_prefix: str = "/api/v1",
+) -> APIRouter:
     """Create a FastAPI router for a specific custom endpoint.
 
     Generates:
         GET  {mount}/health   — readiness of the endpoint and upstreams
         GET  {mount}/info     — endpoint metadata
         *    {mount}{path}    — the main handler (typed by the endpoint schemas)
+        POST {mount}{path}/async — submit as a background task (if tasks enabled)
+        POST {mount}{path}/batch — batch submission (if tasks enabled)
 
     Args:
         endpoint: The endpoint instance to expose.
+        task_manager: Optional task manager enabling async/batch modes.
+        api_prefix: API prefix used to build task links.
 
     Returns:
         A configured :class:`~fastapi.APIRouter`.
@@ -98,5 +107,21 @@ def create_endpoint_router(endpoint: BaseEndpoint) -> APIRouter:
         summary=f"Invoke the '{endpoint.endpoint_name}' endpoint",
         description=endpoint.endpoint_description,
     )
+
+    # Async + batch execution modes via the task system.
+    if task_manager is not None:
+        from agentomatic.tasks.models import TargetType
+        from agentomatic.tasks.sugar import attach_execution_modes
+
+        attach_execution_modes(
+            router,
+            task_manager=task_manager,
+            target_type=TargetType.ENDPOINT,
+            target=endpoint.endpoint_name,
+            base_path=endpoint.path.rstrip("/"),
+            input_schema=input_schema,
+            api_prefix=api_prefix,
+            summary_label=f"Invoke the '{endpoint.endpoint_name}' endpoint",
+        )
 
     return router

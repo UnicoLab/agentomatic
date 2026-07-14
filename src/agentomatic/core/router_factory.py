@@ -203,6 +203,7 @@ def create_default_router(
     api_prefix: str = "/api/v1",
     max_history_messages: int = 50,
     summarize_after: int = 30,
+    task_manager: Any | None = None,
 ) -> APIRouter:
     """Create a full set of auto-generated endpoints for an agent.
 
@@ -599,6 +600,22 @@ def create_default_router(
         summary="Invoke agent with SSE streaming",
     )
 
+    # ── POST /invoke/async + /invoke/batch (via the task system) ──
+    if task_manager is not None:
+        from agentomatic.tasks.models import TargetType
+        from agentomatic.tasks.sugar import attach_execution_modes
+
+        attach_execution_modes(
+            router,
+            task_manager=task_manager,
+            target_type=TargetType.AGENT,
+            target=agent_name,
+            base_path="/invoke",
+            input_schema=input_model,
+            api_prefix=api_prefix,
+            summary_label=f"Invoke agent '{agent_name}'",
+        )
+
     # ── POST /chat ────────────────────────────────────────────────
     @router.post("/chat")
     async def chat(request: AgentChatRequest) -> dict[str, Any]:
@@ -831,14 +848,69 @@ def create_default_router(
             "metadata": m.metadata,
         }
 
-    # ── POST /a2a/tasks ───────────────────────────────────────────
+    # ── A2A task lifecycle ────────────────────────────────────────
+    # Maps the unified TaskStatus to canonical A2A task states.
+    _A2A_STATE = {
+        "queued": "submitted",
+        "running": "working",
+        "succeeded": "completed",
+        "failed": "failed",
+        "cancelled": "canceled",
+    }
+
+    def _a2a_view(record: Any) -> dict[str, Any]:
+        """Render a task record as an A2A-shaped task object."""
+        status = record.status.value if hasattr(record.status, "value") else str(record.status)
+        view: dict[str, Any] = {
+            "task_id": record.id,
+            "status": _A2A_STATE.get(status, status),
+            "progress": record.progress.model_dump() if record.progress else None,
+        }
+        if record.status.is_terminal and record.result is not None:
+            result = record.result
+            answer = result.get("response") if isinstance(result, dict) else str(result)
+            view["result"] = answer
+            view["artifacts"] = [{"type": "text", "content": answer}]
+            view["raw"] = result
+        if record.error:
+            view["error"] = record.error
+        return view
+
     @router.post("/a2a/tasks")
     async def submit_a2a_task(request: A2ATaskRequest) -> dict[str, Any]:
-        """Submit an A2A task."""
-        agent = _get_agent()
-        task_id = f"task_{uuid.uuid4().hex[:12]}"
-        query = request.message.get("content", "")
+        """Submit an A2A task.
 
+        When a task manager is configured the work runs asynchronously and a
+        real, pollable task id is returned. Otherwise it falls back to a
+        synchronous (blocking) execution for backward compatibility.
+        """
+        agent = _get_agent()
+        query = request.message.get("content", "")
+        payload = {
+            "query": query,
+            "user_id": "a2a",
+            "metadata": {"a2a": True, **request.metadata},
+        }
+
+        if task_manager is not None:
+            from agentomatic.tasks.models import TargetType
+
+            record = await task_manager.submit(
+                TargetType.AGENT,
+                agent_name,
+                input=payload,
+                mode="async",
+                metadata={"a2a": True},
+            )
+            view = _a2a_view(record)
+            view["links"] = {
+                "status": f"{api_prefix}/{agent_name}/a2a/tasks/{record.id}",
+                "cancel": f"{api_prefix}/{agent_name}/a2a/tasks/{record.id}/cancel",
+            }
+            return view
+
+        # Fallback: synchronous execution (no task manager configured).
+        task_id = f"task_{uuid.uuid4().hex[:12]}"
         state: dict[str, Any] = {
             "current_query": query,
             "user_id": "a2a",
@@ -846,7 +918,6 @@ def create_default_router(
             "messages": [],
             "metadata": {"a2a": True, **request.metadata},
         }
-
         try:
             if agent.graph_fn:
                 result = await agent.graph_fn().ainvoke(state)
@@ -854,7 +925,6 @@ def create_default_router(
                 result = await agent.node_fn(state)
             else:
                 raise HTTPException(500, "No callable")
-
             return {
                 "task_id": task_id,
                 "status": "completed",
@@ -863,15 +933,29 @@ def create_default_router(
         except Exception as exc:
             return {"task_id": task_id, "status": "failed", "error": str(exc)}
 
-    # ── GET /a2a/tasks/{task_id} ──────────────────────────────────
     @router.get("/a2a/tasks/{task_id}")
     async def get_a2a_task(task_id: str) -> dict[str, Any]:
         """Get A2A task status."""
+        if task_manager is not None:
+            record = await task_manager.get(task_id)
+            if record is None:
+                raise HTTPException(404, f"Task '{task_id}' not found")
+            return _a2a_view(record)
         return {
             "task_id": task_id,
             "status": "completed",
-            "message": "Task tracking requires storage backend",
+            "message": "Task tracking requires a task manager",
         }
+
+    @router.post("/a2a/tasks/{task_id}/cancel")
+    async def cancel_a2a_task(task_id: str) -> dict[str, Any]:
+        """Cancel an in-flight A2A task."""
+        if task_manager is None:
+            raise HTTPException(501, "Task cancellation requires a task manager")
+        cancelled = await task_manager.cancel(task_id)
+        if not cancelled:
+            raise HTTPException(409, f"Task '{task_id}' not found or already terminal")
+        return {"task_id": task_id, "status": "canceling"}
 
     # ── POST /threads ─────────────────────────────────────────────
     @router.post("/threads")
