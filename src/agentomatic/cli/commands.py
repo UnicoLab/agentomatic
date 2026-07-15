@@ -26,6 +26,8 @@ from typing import Any
 import click
 from loguru import logger
 
+from agentomatic.cli.agent_guide import WRITE_TARGETS as _AGENT_GUIDE_TARGETS
+
 # Graceful Rich fallback
 try:
     from rich.console import Console
@@ -724,6 +726,47 @@ def deploy(
         click.echo(f"\nStack: {plan.stack_name}")
         click.echo(f"Profile: {plan.profile}")
         click.echo(f"Distroless: {plan.distroless}")
+
+
+# =====================================================================
+# AGENTS-GUIDE — Emit an agent/Claude primer for a target project
+# =====================================================================
+
+
+@cli.command("agents-guide")
+@click.option(
+    "--write",
+    "write_target",
+    type=click.Choice(list(_AGENT_GUIDE_TARGETS)),
+    default=None,
+    help="Write the primer into the current project at the given path.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Overwrite the target file if it already exists.",
+)
+def agents_guide(write_target: str | None, force: bool) -> None:
+    """Print (or write) an Agentomatic primer to bootstrap a coding agent.
+
+    Without ``--write`` the primer is printed to stdout. With
+    ``--write AGENTS.md`` (or ``CLAUDE.md`` /
+    ``.cursor/skills/agentomatic/SKILL.md``) it is written into the current
+    project; existing files are preserved unless ``--force`` is given.
+    """
+    from .agent_guide import render_primer, write_primer
+
+    if write_target is None:
+        click.echo(render_primer())
+        return
+
+    try:
+        dest = write_primer(write_target, root=".", force=force)
+    except FileExistsError as exc:
+        _print_error(str(exc))
+        sys.exit(1)
+    logger.success(f"Wrote Agentomatic primer to {dest}")
 
 
 # =====================================================================

@@ -5,6 +5,39 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-07-16
+
+Minor release: deployment ergonomics and coding-agent enablement. Builds on the
+1.2.x production-readiness fixes (which ship together in this release). No
+breaking API changes.
+
+### Added
+
+- **Fully-featured, env-driven scaffolded `main.py`**: the project `main.py`
+  builds a module-level `app` that is feature-identical to `agentomatic run`
+  (Studio, docs, health, metrics on by default; all component dirs discovered),
+  so a deployed container running `uvicorn main:app` drops no functionality.
+  Behaviour is driven by `AGENTOMATIC_*` env vars (`ENABLE_STUDIO`,
+  `ENABLE_METRICS`, `ENABLE_AUTH`, `ENABLE_JWT`, `REQUIRE_AUTH`,
+  `ENABLE_CONTROL_PLANE`, `ENABLE_RATE_LIMIT`, `TITLE`, `LOG_LEVEL`) so the same
+  file works in dev and in the container
+- **Deploy profiles**: `agentomatic deploy --profile full|minimal` (and the
+  `--minimal` shorthand). `full` (default) runs everything; `minimal` is a
+  production-lean image that disables the Studio debug UI and quiets logging
+  via baked-in `AGENTOMATIC_*` env vars while keeping the core REST API,
+  health/readiness, metrics, and auth. **Swagger/OpenAPI (`/docs`, `/redoc`,
+  `/openapi.json`) is always available in both profiles.** Both profiles share
+  one env-driven `main.py` code path (no separate image), and `minimal` still
+  installs `agentomatic[all]` so no required functionality is dropped
+- **`agentomatic agents-guide` command**: prints an Agentomatic primer for
+  bootstrapping any coding agent, or writes it into a project with
+  `--write AGENTS.md|CLAUDE.md|.cursor/skills/agentomatic/SKILL.md` (refuses to
+  overwrite without `--force`). Content comes from a single source of truth
+  (`agentomatic.cli.agent_guide`) so the CLI, docs, and in-repo agent knowledge
+  files stay in sync
+
+---
+
 ## [1.2.1] — 2026-07-16
 
 Patch release: production/wiring fixes that landed after the 1.2.0 cut. No
@@ -58,24 +91,6 @@ breaking API changes.
 - **CORS hardening (P2)**: wildcard origins (`cors_origins=["*"]`) no longer
   send `Access-Control-Allow-Credentials: true` — credentials are auto-disabled
   (with a one-time warning) unless explicit origins are configured
-- **Deploy parity (`uvicorn main:app` == `agentomatic run`)**: the scaffolded
-  `main.py` now builds a fully-featured, env-driven `app` (Studio, docs, health,
-  metrics on by default; all component dirs discovered) so a deployed container
-  serves the exact same surface as `agentomatic run`. Feature flags read from
-  `AGENTOMATIC_*` env vars (`ENABLE_STUDIO`, `ENABLE_METRICS`, `ENABLE_AUTH`,
-  `ENABLE_JWT`, `REQUIRE_AUTH`, `ENABLE_CONTROL_PLANE`, `ENABLE_RATE_LIMIT`,
-  `TITLE`, `LOG_LEVEL`) so the same file works in dev and in the container
-
-### Added
-
-- **Deploy profiles**: `agentomatic deploy --profile full|minimal` (and the
-  `--minimal` shorthand). `full` (default) runs everything; `minimal` is a
-  production-lean image that disables the Studio debug UI and quiets logging
-  via baked-in `AGENTOMATIC_*` env vars while keeping the core REST API,
-  health/readiness, metrics, and auth. **Swagger/OpenAPI (`/docs`, `/redoc`,
-  `/openapi.json`) is always available in both profiles.** Both profiles share
-  one env-driven `main.py` code path (no separate image), and `minimal` still
-  installs `agentomatic[all]` so no required functionality is dropped
 
 ---
 
