@@ -2113,6 +2113,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2181,7 +2192,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2220,7 +2231,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2259,7 +2270,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2342,6 +2353,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2410,7 +2432,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2449,7 +2471,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2488,7 +2510,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2593,6 +2615,17 @@ breaking API changes.</p>
   <code>AGENTOMATIC_*</code> env vars (<code>ENABLE_STUDIO</code>, <code>ENABLE_METRICS</code>, <code>ENABLE_AUTH</code>,
   <code>ENABLE_JWT</code>, <code>REQUIRE_AUTH</code>, <code>ENABLE_CONTROL_PLANE</code>, <code>ENABLE_RATE_LIMIT</code>,
   <code>TITLE</code>, <code>LOG_LEVEL</code>) so the same file works in dev and in the container</li>
+</ul>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Deploy profiles</strong>: <code>agentomatic deploy --profile full|minimal</code> (and the
+  <code>--minimal</code> shorthand). <code>full</code> (default) runs everything; <code>minimal</code> is a
+  production-lean image that disables the Studio debug UI and quiets logging
+  via baked-in <code>AGENTOMATIC_*</code> env vars while keeping the core REST API,
+  health/readiness, metrics, and auth. <strong>Swagger/OpenAPI (<code>/docs</code>, <code>/redoc</code>,
+  <code>/openapi.json</code>) is always available in both profiles.</strong> Both profiles share
+  one env-driven <code>main.py</code> code path (no separate image), and <code>minimal</code> still
+  installs <code>agentomatic[all]</code> so no required functionality is dropped</li>
 </ul>
 <hr />
 <h2 id="120-2026-07-15">[1.2.0] — 2026-07-15<a class="headerlink" href="#120-2026-07-15" title="Permanent link">&para;</a></h2>
@@ -2890,7 +2923,7 @@ and the wiring fixes below.</p>
 </ul>
 <hr />
 <h2 id="030-2026-06-18"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.3.0">0.3.0</a> - 2026-06-18<a class="headerlink" href="#030-2026-06-18" title="Permanent link">&para;</a></h2>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Agentomatic Studio</strong> — Built-in visual debugging environment</li>
 <li>Real-time graph visualization for any agent framework</li>
@@ -2954,7 +2987,7 @@ and the wiring fixes below.</p>
 </ul>
 <hr />
 <h2 id="020-2026-06-14"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.2.0">0.2.0</a> - 2026-06-14<a class="headerlink" href="#020-2026-06-14" title="Permanent link">&para;</a></h2>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Universal Studio Adapter Architecture</strong></li>
 <li>Pluggable adapter system for any agent framework</li>
@@ -2984,7 +3017,7 @@ and the wiring fixes below.</p>
 </ul>
 <hr />
 <h2 id="010-2026-06-12"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.1.0">0.1.0</a> - 2026-06-12<a class="headerlink" href="#010-2026-06-12" title="Permanent link">&para;</a></h2>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Core Framework</strong></li>
 <li><code>AgentPlatform</code> class for zero-code multi-agent API creation</li>
