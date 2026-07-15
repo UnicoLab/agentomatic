@@ -685,3 +685,33 @@ async def node_fn(state):
 
         assert "start" in called
         assert "stop" in called
+
+
+class TestCorsCredentials:
+    """CORS credentials must be disabled under wildcard origins (P2-1)."""
+
+    @staticmethod
+    def _cors_options(app):
+        """Return the CORSMiddleware options mapping from a built app."""
+        from starlette.middleware.cors import CORSMiddleware
+
+        for mw in app.user_middleware:
+            if mw.cls is CORSMiddleware:
+                # Starlette stores constructor kwargs on ``.kwargs``.
+                return mw.kwargs
+        raise AssertionError("CORSMiddleware not installed")
+
+    def test_wildcard_origins_disable_credentials(self):
+        p = AgentPlatform(agents_dir="/tmp/empty")  # default cors_origins=["*"]
+        opts = self._cors_options(p.build())
+        assert opts["allow_origins"] == ["*"]
+        assert opts["allow_credentials"] is False
+
+    def test_explicit_origins_enable_credentials(self):
+        p = AgentPlatform(
+            agents_dir="/tmp/empty",
+            cors_origins=["https://app.example.com"],
+        )
+        opts = self._cors_options(p.build())
+        assert opts["allow_origins"] == ["https://app.example.com"]
+        assert opts["allow_credentials"] is True

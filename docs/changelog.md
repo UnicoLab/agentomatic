@@ -55,6 +55,9 @@ breaking API changes.
 - **`PromptFitterBridge.optimize()` (P2)**: records a structured
   `agent._last_optimize_status` (`"ok"` / `"skipped: <reason>"`) so callers can
   tell whether optimization ran instead of silently no-op'ing
+- **CORS hardening (P2)**: wildcard origins (`cors_origins=["*"]`) no longer
+  send `Access-Control-Allow-Credentials: true` — credentials are auto-disabled
+  (with a one-time warning) unless explicit origins are configured
 
 ---
 
