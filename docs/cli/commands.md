@@ -16,16 +16,20 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  init      Scaffold a new agent from a template.
-  run       Start the platform server.
-  list      List discovered agents.
-  test      Interactive agent testing in the console.
-  inspect   Show agent folder structure and configs.
-  doctor    Verify environment health and packages.
-  demo      Launch a quick demo with Studio.
-  ui        Launch the Chainlit debug UI.
-  optimize  Run automatic prompt tuning loops.
-  stack     Manage environment stacks.
+  init          Scaffold a new agent from a template.
+  new           Scaffold a full project (alias for init --project).
+  run           Start the platform server.
+  deploy        Generate Dockerfile/compose/.env (full|minimal profiles).
+  list          List discovered agents.
+  test          Interactive agent testing in the console.
+  inspect       Show agent folder structure and configs.
+  doctor        Verify environment health and packages.
+  demo          Launch a quick demo with Studio.
+  ui            Launch the Chainlit debug UI.
+  optimize      Run automatic prompt tuning loops.
+  agents-guide  Emit an agent primer for a target project.
+  stack         Manage environment stacks.
+  pipeline      Manage and execute pipelines.
 ```
 
 !!! tip "Rich terminal output"
@@ -46,6 +50,8 @@ Commands:
 | **Debug** | [`test`](#agentomatic-test), [`ui`](#agentomatic-ui) | Interactive testing and chat UI |
 | **Inspect** | [`list`](#agentomatic-list), [`inspect`](#agentomatic-inspect), [`doctor`](#agentomatic-doctor) | Discover, validate, and diagnose |
 | **Optimize** | [`optimize`](#agentomatic-optimize) | Automatic prompt tuning |
+| **Deploy** | [`deploy`](#agentomatic-deploy) | Generate container artefacts (full/minimal profiles) |
+| **Agents** | [`agents-guide`](#agentomatic-agents-guide) | Bootstrap a coding agent with an Agentomatic primer |
 | **Stacks** | [`stack init`](#agentomatic-stack-init), [`stack list`](#agentomatic-stack-list) | Multi-environment stack management |
 
 ---
@@ -582,6 +588,80 @@ agentomatic stack list
 │ remote  │        │
 ╰─────────┴────────╯
 ```
+
+---
+
+## Deploy Commands
+
+### `agentomatic deploy`
+
+Generate production container artefacts (Dockerfile, `docker-compose.yml`,
+`.env.example`, optional `nginx.conf`) that run the project via `uvicorn main:app`.
+
+```text
+Usage: agentomatic deploy [OPTIONS]
+
+Options:
+  --stack TEXT              Stack name to derive env from.
+  --distroless              Emit Dockerfile.distroless (minimal attack surface).
+  --profile [full|minimal]  Deploy profile  [default: full]
+  --minimal                 Shorthand for --profile minimal.
+  --out TEXT                Output directory  [default: deploy/generated]
+  --with-nginx/--no-nginx   Emit an nginx.conf reverse proxy template.
+  --with-agent-stubs        Emit one compose service per discovered agent.
+```
+
+**Profiles**
+
+| | `full` (default) | `minimal` |
+| --- | :---: | :---: |
+| REST API, health, metrics, auth | ✅ | ✅ |
+| **Swagger** (`/docs`, `/redoc`, `/openapi.json`) | ✅ | ✅ *(always on)* |
+| Studio UI (`/studio/ui`) | ✅ | ❌ |
+| Verbose logging | `INFO` | `WARNING` |
+
+Both profiles drive the **same** env-driven `main.py`; `minimal` just bakes
+`AGENTOMATIC_ENABLE_STUDIO=0` + `AGENTOMATIC_LOG_LEVEL=WARNING` into the image and
+compose. See the [deployment guide](../guide/deployment.md) for details.
+
+```bash
+agentomatic deploy --stack remote --distroless          # full
+agentomatic deploy --profile minimal --stack remote     # production-lean
+agentomatic deploy --minimal --stack remote             # shorthand
+```
+
+---
+
+## Agent Bootstrap Commands
+
+### `agentomatic agents-guide`
+
+Emit an Agentomatic primer so any coding agent (Cursor, Claude, etc.) can be
+bootstrapped in a target project. The content comes from a single source of truth
+(`agentomatic.cli.agent_guide`) so it stays in sync with the platform.
+
+```text
+Usage: agentomatic agents-guide [OPTIONS]
+
+Options:
+  --write [AGENTS.md|CLAUDE.md|.cursor/skills/agentomatic/SKILL.md]
+                Write the primer into the current project at the given path.
+  -f, --force   Overwrite the target file if it already exists.
+```
+
+```bash
+# Print the primer to stdout
+agentomatic agents-guide
+
+# Write it into a project (refuses to overwrite without --force)
+agentomatic agents-guide --write AGENTS.md
+agentomatic agents-guide --write CLAUDE.md --force
+agentomatic agents-guide --write .cursor/skills/agentomatic/SKILL.md
+```
+
+The primer covers what Agentomatic is, the install, the develop → optimize →
+deploy loop, key CLI commands, deploy profiles, the `AGENTOMATIC_*` env vars, the
+class-agent flow, and the provider-agnostic principles.
 
 ---
 
