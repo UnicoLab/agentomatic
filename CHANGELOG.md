@@ -38,6 +38,8 @@ Full detail lives in [`docs/changelog.md`](docs/changelog.md); highlights:
   a single agent per replica)
 - `PromptFitterBridge.optimize()` records `agent._last_optimize_status` so a
   skipped run is observable
+- CORS: wildcard origins auto-disable `allow_credentials` (safer default);
+  configure explicit `cors_origins=[...]` to enable credentialed CORS
 
 
 ## v1.2.0 (2026-07-14)

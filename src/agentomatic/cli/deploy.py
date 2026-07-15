@@ -6,13 +6,13 @@ stack.  Files are written to a target directory (default
 ``deploy/generated/``) so operators can inspect, tweak, and commit them
 before shipping.
 
-The generated Dockerfile mirrors the reference multi-stage image at the
-repository root (rootless ``USER appuser`` with ``uv``-managed venv) and
-uses the ``agentomatic run`` entrypoint so the CLI and container behave
-identically.  A ``--distroless`` variant is produced from
-``gcr.io/distroless/python3-debian12`` which runs under the built-in
-``nonroot`` user (numeric UID 65532) — verified to have execute
-permissions on ``/app/.venv/bin/python``.
+The generated Dockerfile is a rootless multi-stage image (``USER appuser``)
+that installs ``agentomatic[all]`` from PyPI (pinned to the current version)
+and launches the project's ``main.py`` via ``uvicorn main:app`` so the
+platform's ``AgentPlatform`` configuration is honoured.  A ``--distroless``
+variant is produced from ``gcr.io/distroless/python3-debian12`` which runs
+under the built-in ``nonroot`` user (numeric UID 65532) — verified to have
+execute permissions on ``/app/.venv/bin/python``.
 
 Example::
 

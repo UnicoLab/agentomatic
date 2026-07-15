@@ -910,11 +910,23 @@ class AgentPlatform:
         # Middleware pipeline (added in reverse order — last added = first run)
         # ------------------------------------------------------------------
 
-        # CORS (always)
+        # CORS (always). Wildcard origins + credentials is unsafe: Starlette
+        # would reflect the Origin and send Access-Control-Allow-Credentials,
+        # letting any site make credentialed cross-origin requests. Disable
+        # credentials whenever origins are the wildcard default; configure
+        # explicit ``cors_origins=[...]`` to opt back into credentialed CORS.
+        allow_credentials = self.cors_origins != ["*"]
+        if not allow_credentials:
+            logger.warning(
+                "CORS: allow_origins=['*'] — disabling allow_credentials to "
+                "avoid reflecting credentialed requests from any origin. Set "
+                "cors_origins=[...] with explicit origins to enable "
+                "credentialed CORS."
+            )
         app.add_middleware(
             CORSMiddleware,
             allow_origins=self.cors_origins,
-            allow_credentials=True,
+            allow_credentials=allow_credentials,
             allow_methods=["*"],
             allow_headers=["*"],
             expose_headers=["X-Studio-Run-Id"],
