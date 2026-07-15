@@ -42,6 +42,13 @@ class TaskSubmitRequest(BaseModel):
     callback_url: str | None = Field(default=None, description="Webhook for completion.")
     wait: bool = Field(default=False, description="Block until the task is terminal.")
     timeout: float | None = Field(default=None, description="Max seconds to wait when wait=True.")
+    retry: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Optional task-level retry config, e.g. "
+            "``{'max_attempts': 3, 'backoff': 'exponential', 'base_delay': 1.0}``."
+        ),
+    )
 
 
 def create_task_router(manager: TaskManager) -> APIRouter:
@@ -61,6 +68,7 @@ def create_task_router(manager: TaskManager) -> APIRouter:
                     metadata=request.metadata,
                     callback_url=request.callback_url,
                     timeout=request.timeout,
+                    retry=request.retry,
                 )
                 response.status_code = 200
             else:
@@ -72,6 +80,7 @@ def create_task_router(manager: TaskManager) -> APIRouter:
                     mode=request.mode,
                     metadata=request.metadata,
                     callback_url=request.callback_url,
+                    retry=request.retry,
                 )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -284,6 +284,7 @@ def _make_registry_with_agent(
     agent = MagicMock()
     agent.node_fn = node_fn
     agent.graph_fn = graph_fn
+    agent.class_instance = None
     agent.schema_validator = None
     registry.get.return_value = agent
     return registry
@@ -323,6 +324,49 @@ class TestSteps:
 
         assert result.status == StepStatus.SUCCESS
         assert result.output["response"] == "graph result"
+
+    @pytest.mark.asyncio
+    async def test_agent_step_prefers_class_instance_atransform(self):
+        """Class agents must use atransform (input_to_state), not raw graph.ainvoke."""
+        from dataclasses import dataclass
+
+        from agentomatic.agents.base import BaseGraphAgent
+        from agentomatic.core.registry import AgentRegistry
+        from agentomatic.pipelines.steps import execute_agent_step
+
+        @dataclass
+        class _State:
+            query: str = ""
+            response: str = ""
+
+        class _Echo(BaseGraphAgent[_State]):
+            agent_name = "echo_cls"
+
+            def build_graph(self):
+                g = self.new_graph()
+
+                def run(state: _State) -> _State:
+                    state.response = f"echo:{state.query}"
+                    return state
+
+                g.add_node("run", run)
+                g.set_entry_point("run")
+                g.set_finish_point("run")
+                return g.compile()
+
+            def input_to_state(self, data):
+                return _State(query=data.get("query", ""))
+
+            def state_to_output(self, state):
+                return {"response": state.response}
+
+        registry = AgentRegistry()
+        registry.register_class_agent(_Echo())
+        ctx = PipelineContext(input_data={"query": "hi"})
+        config = AgentStepConfig(name="echo", agent="echo_cls")
+        result = await execute_agent_step(config, ctx, registry)
+        assert result.status == StepStatus.SUCCESS
+        assert result.output["response"] == "echo:hi"
 
     @pytest.mark.asyncio
     async def test_agent_step_not_found(self):

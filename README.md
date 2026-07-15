@@ -38,7 +38,7 @@ Build, trace, optimize, and time-travel debug production-ready AI agent APIs in 
 | 🧱 **Composable Pipelines** | Chain agents, plugins, endpoints, ingestors, transforms, loops, and sub-pipelines with typed data-passing, conditionals, retries, rollback/compensation, and schema enforcement. |
 | 🗄️ **Pluggable Storage** | Use `MemoryStore`, `SQLAlchemy`, or plug in your own custom persistence layer. |
 | 🔐 **Enterprise Middleware** | High-performance pipeline with JWT Auth, dynamic rate limiting, and Prometheus telemetry — all toggleable. |
-| 📦 **Scaffolding Templates** | Jumpstart development with 8 templates: `basic`, `full`, `rag`, `chatbot`, `deepagent`, `custom`, `legacy_dict`, `plugin`. |
+| 📦 **Scaffolding Templates** | Jumpstart with 14 templates: `basic`/`class`, `full`, `coordinator`, `pipeline`, `rag`, `chatbot`, `deepagent`, `custom`, `legacy_dict`, `plugin`, `endpoint`, `connection`, `ingestion`, `extraction`. |
 | 🧬 **Class-Based Agents** | Define agents as Python classes with a **Keras-style ML lifecycle**: `compile()` → `fit()` (epochs, `verbose`, callbacks, `validation_data`) → `evaluate()` → `transform()`, returning a real `History` object. |
 | 🤖 **A2A Protocol** | True Agent-to-Agent communication flows integrated out of the box. |
 | 🔌 **Framework Agnostic** | Fully supports LangGraph, LangChain, or raw Python execution logic. |

@@ -222,37 +222,42 @@ class PromptFitterBridge:
             A dict of best-config values that map to agent attributes. The full
             ``PromptFitResult`` is stored on ``agent._last_fit_result``. On any
             failure (missing extra, no data, running event loop) an empty dict
-            is returned so ``fit()`` degrades to a baseline pass.
+            is returned so ``fit()`` degrades to a baseline pass. A structured
+            reason is always recorded on ``agent._last_optimize_status`` (e.g.
+            ``"skipped: empty dataset"`` / ``"ok"``) so callers can tell whether
+            optimization actually ran instead of silently no-op'ing.
         """
         name = self.agent_name or getattr(agent, "agent_name", "agent")
+
+        def _skip(reason: str) -> dict[str, Any]:
+            """Record a structured skip reason and return the no-op config."""
+            logger.warning(f"PromptFitterBridge: {reason} — skipping")
+            agent._last_optimize_status = f"skipped: {reason}"  # noqa: SLF001
+            return {}
 
         try:
             fitter = self._build_fitter(agent, name)
         except Exception as exc:  # noqa: BLE001
-            logger.warning(f"PromptFitterBridge: fitter unavailable ({exc}) — skipping")
-            return {}
+            return _skip(f"fitter unavailable ({exc})")
 
         opt_dataset = dataset.to_optimize_dataset()
         if not len(opt_dataset):
-            logger.warning("PromptFitterBridge: empty dataset — skipping")
-            return {}
+            return _skip("empty dataset")
 
         trainset, valset = self._split(opt_dataset)
         metric = self._resolve_metric()
         if metric is None:
-            logger.warning("PromptFitterBridge: no usable metric — skipping")
-            return {}
+            return _skip("no usable metric")
 
         try:
             result = self._run_async(fitter.fit(trainset, valset, metric))
         except RuntimeError as exc:
-            logger.warning(f"PromptFitterBridge: cannot run fitter here ({exc})")
-            return {}
+            return _skip(f"cannot run fitter here ({exc})")
         except Exception as exc:  # noqa: BLE001
-            logger.warning(f"PromptFitterBridge: fit failed ({exc})")
-            return {}
+            return _skip(f"fit failed ({exc})")
 
         agent._last_fit_result = result  # noqa: SLF001 - intentional handoff
+        agent._last_optimize_status = "ok"  # noqa: SLF001
         logger.info(f"PromptFitterBridge: fit complete for '{name}'")
         return self._extract_config(agent, result)
 
@@ -261,17 +266,37 @@ class PromptFitterBridge:
     # ------------------------------------------------------------------
 
     def _build_fitter(self, agent: Any, name: str) -> Any:
-        """Return the injected fitter or construct a new ``PromptFitter``."""
+        """Return the injected fitter or construct a new ``PromptFitter``.
+
+        Honours per-call overrides set by ``BaseGraphAgent.fit(...)`` via
+        ``agent._fit_optimize_options`` (search_space, optimizer mode,
+        max_trials, and other PromptFitter kwargs).
+        """
         if self.fitter is not None:
             return self.fitter
         from agentomatic.optimize.fitter import PromptFitter
 
+        overrides = dict(getattr(agent, "_fit_optimize_options", None) or {})
+        # Bridge-level defaults, then per-fit() overrides win.
+        kwargs = dict(self.kwargs)
+        kwargs.update(overrides)
+        max_trials = kwargs.pop("max_trials", self.max_trials)
+        # Drop agent-facing / bridge-only keys that are not PromptFitter args
+        for key in (
+            "optimize_prompt",
+            "optimize_params",
+            "optimize_few_shot",
+            "metric",
+            "fitter",
+            "agent_name",
+        ):
+            kwargs.pop(key, None)
         return PromptFitter(
             agent=name,
-            task_model=self.task_model,
-            rewrite_model=self.rewrite_model,
-            max_trials=self.max_trials,
-            **self.kwargs,
+            task_model=kwargs.pop("task_model", self.task_model),
+            rewrite_model=kwargs.pop("rewrite_model", self.rewrite_model),
+            max_trials=max_trials,
+            **kwargs,
         )
 
     def _resolve_metric(self) -> Any | None:
@@ -309,15 +334,19 @@ class PromptFitterBridge:
 
     @staticmethod
     def _run_async(coro: Any) -> Any:
-        """Run ``coro`` to completion, erroring clearly inside a live loop."""
+        """Run ``coro`` to completion (works inside a live event loop too).
+
+        When called from synchronous code with no running loop, uses
+        :func:`asyncio.run`. When already inside an event loop (FastAPI
+        handlers, notebooks), schedules ``asyncio.run`` on a worker thread
+        so ``agent.fit()`` still succeeds without requiring ``afit()``.
+        """
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             return asyncio.run(coro)
-        # A loop is already running — we cannot block it synchronously.
-        coro.close()
-        raise RuntimeError(
-            "PromptFitterBridge.optimize() called from within a running event "
-            "loop; run agent.fit() from synchronous code or await the fitter "
-            "directly."
-        )
+
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()

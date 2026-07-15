@@ -5,10 +5,129 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.2.1] — 2026-07-16
 
-### Added
+Patch release: production/wiring fixes that landed after the 1.2.0 cut. No
+breaking API changes.
 
+### Fixed
+
+- **Class-agent `langgraph.json`**: points at `./agent.py:get_graph` (with a
+  module-level `get_graph()` export) instead of broken `./graph.py:get_graph`
+- **Plugin train/optimize stubs**: exit with `SystemExit(1)` instead of
+  logging fake success, so `python -m` lifecycle commands fail loudly
+- **Plugin `eval`**: computes real accuracy from labelled examples (and fails
+  with a clear message when metrics cannot be derived) instead of reporting a
+  fabricated score
+- **`agentomatic optimize --llm`**: defaults from `AGENTOMATIC_TASK_MODEL` /
+  `LLM__MODEL` (then `ollama/mistral:7b`) instead of a hardwired default
+- **OpenAPI fallback**: minimal path list from `app.routes` when schema
+  generation fails (no empty `"paths": {}`, keeps `/docs` usable)
+- **CLI list/inspect**: `has_graph` is true when `agent.py` or `graph.py`
+  exists
+- **Studio auth**: client sends both `X-Api-Key` and `Authorization: Bearer`
+  on REST + SSE requests so either credential scheme authenticates
+- **Type-check hardening**: resolved mypy errors in the task store / manager,
+  registry LLM injection, pipeline steps, and status/health probes
+
+### Fixed (production-readiness audit)
+
+- **Class agents on every server path (P0)**: REST `invoke` / `chat` /
+  `invoke/stream` / `optimize/invoke` / A2A / approve and the Studio streaming
+  adapter now route class agents through `invoke_registered_agent` /
+  `input_to_state` instead of `graph.ainvoke(dict)`, so dataclass-state agents
+  no longer raise `AttributeError` → HTTP 500 / Studio `run_error`
+- **`agentomatic deploy` Dockerfile (P0)**: generates a project-appropriate
+  image that installs `agentomatic[all]==<version>` from PyPI, copies only the
+  project dirs that exist (`main.py`, `agents/`, …), and launches
+  `uvicorn main:app`; compose build context/volumes point back to the project
+  root. `init --project` now emits a pinned `requirements.txt`
+- **`agentomatic run --reload` / `workers>1` (P1)**: run via a module-level
+  factory import string (`agentomatic._runtime:create_app`) instead of passing
+  an app instance (which made uvicorn `exit(1)`); programmatic platforms
+  degrade to a single instance with a clear message instead of crashing
+- **`--require-auth-globally` JWT bypass (P1)**: refuses to start when no JWKS
+  (or API-key auth) is configured instead of silently accepting forged/unsigned
+  tokens; expiry (`exp`) is now always verified, even in dev mode
+- **`AGENTOMATIC_AGENTS` allow-list (P1)**: agent discovery now honours the env
+  var (comma-separated names) so `deploy --with-agent-stubs` actually scopes
+  each replica to a single agent
+- **`PromptFitterBridge.optimize()` (P2)**: records a structured
+  `agent._last_optimize_status` (`"ok"` / `"skipped: <reason>"`) so callers can
+  tell whether optimization ran instead of silently no-op'ing
+
+---
+
+## [1.2.0] — 2026-07-15
+
+Release notes for the develop / optimize / deploy platform wave:
+scaffolding, stacks, connections, deploy, Keras-style training polish,
+and the wiring fixes below.
+
+### Fixed
+
+- **Scaffolded `main.py`**: removed invalid `pipelines_dir=` kwarg that caused
+  `TypeError` on boot (pipelines auto-discovered from sibling `pipelines/`)
+- **Store auto-derive timing**: routers now use a lazy store proxy so MEMORY
+  connections derived in lifespan wire conversation threads correctly
+- **Class-agent LLM / stack**: `apply_stack_defaults` runs before discovery;
+  registry passes `stack_manager` into `get_llm_for_agent` for role-aware LLMs
+- **Pipelines + class agents**: invoke via `atransform` / `input_to_state`
+  instead of raw `graph.ainvoke(dict)` (dataclass states no longer break)
+- **`--require-auth-globally`**: auto-enables JWT so the flag cannot lock out
+  all traffic without a credential path
+- **PromptFitterBridge**: strips bridge-only kwargs (`metric`, optimize
+  toggles) before constructing `PromptFitter` (no more silent TypeError skip);
+  runs fitter on a worker thread when called inside an existing event loop
+- **`evaluate()`**: defaults to metrics from `compile()`; clear error when none
+- **`save()` / `load()`**: persists and restores Keras-style `History` and
+  `evaluation_history`; `load()` is an alias of `load_compiled()`
+- **Docker / compose healthcheck**: probes `/health` (not non-existent
+  `/api/v1/health`); compose mounts plugins/endpoints/ingestion/pipelines
+- **Studio class agents**: `resolve_adapter` prefers `GraphAgentAdapter` for
+  `framework=graph_agent` / `class_instance` *before* treating `graph_fn` as
+  LangGraph (unblocks Studio for scaffolded class agents)
+- **Studio auth / SSE**: `/studio` and `/status` skipped by JWT/API-key
+  middleware (prefix match); SSE calls `onDone` when the stream ends without
+  `[DONE]` (clears stuck “thinking…”)
+- **Plugin templates**: relative imports (`from .plugin import …`); project
+  scaffold includes `agents/__init__.py` + `plugins/__init__.py` for
+  `python -m` train/eval
+- **CLI**: `--template class` alias; `agentomatic run` accepts
+  `--endpoints-dir` / `--ingestion-dir` / `--stacks-dir`
+
+- Top-level exports: `WeightedMetric`, `PromptFitterBridge`, optimizers,
+  `VectorStore`, `register_store_provider`, `register_embedding_provider`
+- Warn when `fit(..., search_space=...)` knobs are ignored by a non-bridge
+  optimizer; warn on `compile()` without metrics
+- Scaffold `main.py` reuses one platform instance for `app` + `run()`
+- **Platform hardening (Swagger, Studio, scaffolding, generic RAG ops, deploy)**
+  - Resilient OpenAPI: plugin/`response_model` BaseModel guards +
+    `custom_openapi()` fallback so one bad schema no longer blanks `/docs`
+  - Studio: resolve agents by **name or slug**; SSE errors surface in chat/
+    debug (no more stuck "thinking…"); stream chunk accumulation + node-prefix
+    stripping for correct answers/graph highlight
+  - Project scaffold: `agentomatic init --project` / `agentomatic new` writes
+    `main.py`, stacks, `.env.example`, and component dirs
+  - Agent templates emit `AgentManifest` cards + stack-driven `llm.py`;
+    registry injects LLM + PromptManager into class agents
+  - Safe merge init (no overwrite without `--force`); `agentomatic add
+    connection|ingestion`; ingestion/plugin/endpoint templates land in the
+    correct top-level discovery dirs
+  - Provider-agnostic `VectorStore` Protocol + `register_vector_provider` /
+    `register_embedding_provider` / `register_store_provider` (users own
+    vendor SDKs such as Cosmos — no first-party vendor connectors in-core)
+  - Any-DB memory via connection→store factory + `MinimalDocumentStore`;
+    auto-derive platform store from `MEMORY` connections
+  - Stack-aware `get_llm`/`set_llm` with custom `base_url` /
+    `openai_compatible`; apply stack defaults at startup
+  - Pipeline `map` step (parallel scope fan-out), markdown ingestor,
+    task retry/checkpoints, `extraction` template
+  - `agentomatic deploy` (distroless/rootless), `stack export --env`,
+    HTTPS cert flags, `require_auth_globally`
+  - Optimize CLI + `BaseGraphAgent.fit(..., search_space=...,
+    optimize_mode=..., optimize_prompt/params=...)` for per-call control
+    over what to tune; weighted multi-criteria train/eval templates
 - **Durable `SQLAlchemyTaskStore`**
   - Drop-in, production-ready `TaskStore` backed by any SQLAlchemy async driver
     (SQLite/PostgreSQL/MySQL) — task status, progress, and results survive

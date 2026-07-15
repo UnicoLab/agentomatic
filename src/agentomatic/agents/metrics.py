@@ -156,6 +156,112 @@ class CallableMetric:
 
 
 # ---------------------------------------------------------------------------
+# WeightedMetric — composite of multiple metrics with per-metric weights
+# ---------------------------------------------------------------------------
+
+
+class WeightedMetric:
+    """Weighted average of multiple ``Metric``-protocol scorers.
+
+    Accepts metrics as either ``(name, metric, weight)`` triples or
+    ``(metric, weight)`` pairs (the metric's ``name`` attribute is used
+    if the leading name is omitted).  Sub-scores are averaged using
+    weight normalisation so weights do not have to sum to ``1.0``.
+
+    Example::
+
+        metric = WeightedMetric(
+            [
+                ("exact_response", ExactKeyMatchMetric(["response"]), 0.5),
+                ("contains_terms", ContainsTermsMetric(["Result"]), 0.3),
+                ("has_output", CallableMetric(
+                    "has_output",
+                    lambda ex, pred: 1.0 if pred.get("response") else 0.0,
+                ), 0.2),
+            ],
+            name="quality",
+        )
+        score = metric.score(example, prediction)
+
+    Args:
+        metrics: Iterable of ``(name, metric, weight)`` triples or
+            ``(metric, weight)`` pairs.
+        name: Optional composite metric name (default ``"weighted"``).
+        last_component_scores: Populated by :meth:`score` with the last
+            evaluation's per-component sub-scores for debugging.
+
+    Raises:
+        ValueError: If *metrics* is empty or total weight is not positive.
+    """
+
+    def __init__(
+        self,
+        metrics: Sequence[Any],
+        *,
+        name: str = "weighted",
+    ) -> None:
+        if not metrics:
+            raise ValueError("WeightedMetric requires at least one component metric")
+
+        components: list[tuple[str, Any, float]] = []
+        for entry in metrics:
+            if isinstance(entry, (list, tuple)):
+                if len(entry) == 3:
+                    comp_name, comp_metric, comp_weight = entry
+                elif len(entry) == 2:
+                    comp_metric, comp_weight = entry
+                    comp_name = getattr(comp_metric, "name", None) or "component"
+                else:
+                    raise ValueError(
+                        "WeightedMetric entries must be (name, metric, weight) "
+                        "or (metric, weight) tuples"
+                    )
+            else:
+                comp_metric = entry
+                comp_name = getattr(comp_metric, "name", None) or "component"
+                comp_weight = 1.0
+
+            if not hasattr(comp_metric, "score"):
+                raise TypeError(
+                    f"Component '{comp_name}' does not implement the Metric.score protocol"
+                )
+            components.append((str(comp_name), comp_metric, float(comp_weight)))
+
+        total_weight = sum(w for _, _, w in components)
+        if total_weight <= 0:
+            raise ValueError("WeightedMetric total weight must be positive")
+
+        self.name = name
+        self._components = components
+        self._total_weight = total_weight
+        self.last_component_scores: dict[str, float] = {}
+
+    def score(
+        self,
+        example: AgentExample,
+        prediction: dict[str, Any],
+    ) -> float:
+        """Return the weight-normalised average across all components.
+
+        Component failures (exceptions) are recorded as ``0.0`` sub-scores
+        so a single misbehaving metric never blocks evaluation.
+        """
+        weighted_sum = 0.0
+        component_scores: dict[str, float] = {}
+
+        for comp_name, comp_metric, comp_weight in self._components:
+            try:
+                raw = comp_metric.score(example, prediction)
+            except Exception:
+                raw = 0.0
+            component_scores[comp_name] = float(raw)
+            weighted_sum += float(raw) * comp_weight
+
+        self.last_component_scores = component_scores
+        return weighted_sum / self._total_weight
+
+
+# ---------------------------------------------------------------------------
 # OptimizeMetricAdapter
 # ---------------------------------------------------------------------------
 

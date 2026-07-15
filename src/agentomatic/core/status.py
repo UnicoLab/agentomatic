@@ -94,12 +94,45 @@ async def build_status_payload(platform: AgentPlatform) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             tasks = {"enabled": True, "error": str(exc)}
 
+    # Connections (platform + per-agent scopes)
+    connections: dict[str, Any] = {}
+    try:
+        from agentomatic.connections.manager import all_managers
+
+        for scope, mgr in all_managers().items():
+            try:
+                names = mgr.list_names() if hasattr(mgr, "list_names") else list(mgr._connections)
+            except Exception:  # noqa: BLE001
+                names = list(getattr(mgr, "_connections", {}).keys())
+            for conn_name in names:
+                key = f"{scope}/{conn_name}"
+                try:
+                    conn = mgr.get(conn_name)
+                    cfg = getattr(conn, "config", None)
+                    kind = getattr(cfg, "kind", None)
+                    purpose = getattr(cfg, "purpose", None)
+                    connections[key] = {
+                        "status": "configured",
+                        "scope": scope,
+                        "kind": str(getattr(kind, "value", kind) or "?"),
+                        "purpose": str(getattr(purpose, "value", purpose) or "?"),
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    connections[key] = {
+                        "status": "error",
+                        "error": str(exc),
+                        "scope": scope,
+                    }
+    except Exception as exc:  # noqa: BLE001
+        connections["_error"] = {"status": "error", "error": str(exc)}
+
     sections = {
         "agents": _classify(agents, ok=("healthy",)),
         "plugins": _classify(plugins, ok=("healthy",)),
         "endpoints": _classify(endpoints, ok=("healthy", "ok")),
         "ingestors": _classify(ingestors, ok=("healthy", "not_ready")),
         "pipelines": _classify(pipelines, ok=("available",)),
+        "connections": _classify(connections, ok=("configured", "healthy", "ok")),
     }
 
     degraded = any(s["degraded"] for s in sections.values())

@@ -41,7 +41,14 @@ class TestStatusJson:
             assert d["platform"]["uptime_seconds"] >= 0
 
             # All resource sections present
-            for key in ("agents", "plugins", "endpoints", "ingestors", "pipelines"):
+            for key in (
+                "agents",
+                "plugins",
+                "endpoints",
+                "ingestors",
+                "pipelines",
+                "connections",
+            ):
                 assert key in d["resources"]
                 assert key in d["summary"]
 

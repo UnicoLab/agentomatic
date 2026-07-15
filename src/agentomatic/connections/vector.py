@@ -1,13 +1,22 @@
 """Vector-store connections for RAG and semantic / vector search.
 
 A :class:`VectorConnection` wraps a provider client (Qdrant, Chroma,
-Weaviate, Pinecone, Milvus, …) behind one small, lazily-initialised object
-so an agent can obtain an authenticated vector client with a single call::
+Weaviate, Pinecone, Milvus, or any custom backend…) behind one small,
+lazily-initialised object so an agent can obtain an authenticated vector
+client with a single call::
 
     from agentomatic.connections import get_connections
 
     store = get_connections("rag_agent").vector("kb")
     client = store.client  # native provider client, ready to query
+
+For a provider-agnostic surface — ``upsert`` / ``query`` / ``delete`` —
+use :meth:`VectorConnection.store` (or :meth:`VectorConnection.as_store`)
+to obtain a :class:`VectorStore`::
+
+    store = get_connections("rag_agent").vector("kb").store()
+    await store.upsert(texts=[...], metadatas=[...], ids=[...])
+    hits = await store.query(text="what is agentomatic?", k=3)
 
 Providers are pluggable.  The built-ins are registered on import; register
 your own (or override a built-in) with :func:`register_vector_provider`::
@@ -18,11 +27,23 @@ your own (or override a built-in) with :func:`register_vector_provider`::
         return MyVectorClient(cfg.url, api_key=cfg.api_key, **cfg.options)
 
     register_vector_provider("my_store", build_my_store)
+
+To plug in a proprietary / vendor-specific backend (e.g. Azure Cosmos DB),
+implement a thin builder and register it — Agentomatic never ships
+vendor-specific connectors in-core::
+
+    def build_cosmos(cfg):
+        from azure.cosmos import CosmosClient
+        return CosmosClient(url=cfg.url, credential=cfg.api_key)
+
+    register_vector_provider("cosmos", build_cosmos)
+    # Optional: also register_vector_store_adapter("cosmos", MyCosmosStore)
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import inspect
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from urllib.parse import urlsplit
 
 from loguru import logger
@@ -31,10 +52,86 @@ from agentomatic.connections.models import VectorConnectionConfig
 from agentomatic.endpoints.auth import resolve_env
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 #: Provider builders keyed by lowercase provider name.
 _VECTOR_PROVIDERS: dict[str, Any] = {}
+
+#: Optional provider-specific :class:`VectorStore` adapter factories.
+#: Registered separately so custom clients can plug in an adapter that
+#: implements the ``upsert``/``query``/``delete`` surface.
+_VECTOR_STORE_ADAPTERS: dict[str, Any] = {}
+
+
+# ---------------------------------------------------------------------------
+# Provider-agnostic VectorStore API
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class VectorStore(Protocol):
+    """Provider-agnostic vector store surface.
+
+    Every backend adapter implements the same three async operations so
+    application code can swap providers without changes:
+
+    * :meth:`upsert` writes documents (with metadata) at the given IDs.
+    * :meth:`query` retrieves the top-``k`` documents by semantic similarity.
+    * :meth:`delete` removes documents by ID.
+
+    Adapters may accept a raw ``text`` query, a pre-computed ``embedding``,
+    or both.  Concrete adapters typically wrap the underlying native
+    client (see :func:`register_vector_store_adapter`).
+    """
+
+    async def upsert(
+        self,
+        texts: Sequence[str],
+        metadatas: Sequence[dict[str, Any]] | None = None,
+        ids: Sequence[str] | None = None,
+        *,
+        embeddings: Sequence[Sequence[float]] | None = None,
+    ) -> list[str]:
+        """Insert or update documents.
+
+        Args:
+            texts: Raw document texts.
+            metadatas: Optional per-document metadata dicts (same length as
+                ``texts``).
+            ids: Optional stable IDs (auto-generated when omitted).
+            embeddings: Optional pre-computed embeddings; if omitted, the
+                adapter is expected to embed ``texts`` itself.
+
+        Returns:
+            The list of IDs that were written.
+        """
+        ...
+
+    async def query(
+        self,
+        text: str | None = None,
+        *,
+        embedding: Sequence[float] | None = None,
+        k: int = 5,
+        filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return the top-``k`` most similar documents.
+
+        Args:
+            text: Query text (adapter must embed if ``embedding`` is None).
+            embedding: Pre-computed query embedding.
+            k: Number of results to return.
+            filter: Optional provider-specific metadata filter.
+
+        Returns:
+            Ordered list of hit dicts with at least ``id``, ``score``,
+            ``text`` and ``metadata`` keys.
+        """
+        ...
+
+    async def delete(self, ids: Sequence[str]) -> None:
+        """Delete documents by ID."""
+        ...
 
 
 def register_vector_provider(name: str, builder: Callable[[VectorConnectionConfig], Any]) -> None:
@@ -49,6 +146,21 @@ def register_vector_provider(name: str, builder: Callable[[VectorConnectionConfi
     _VECTOR_PROVIDERS[name.lower()] = builder
 
 
+def register_vector_store_adapter(
+    name: str,
+    adapter: Callable[[VectorConnectionConfig, Any], VectorStore],
+) -> None:
+    """Register a :class:`VectorStore` adapter factory for a provider.
+
+    Args:
+        name: Provider identifier (case-insensitive).
+        adapter: Callable ``(config, native_client) -> VectorStore`` that
+            wraps the provider's native client into the provider-agnostic
+            :class:`VectorStore` surface.
+    """
+    _VECTOR_STORE_ADAPTERS[name.lower()] = adapter
+
+
 def registered_vector_providers() -> list[str]:
     """Return the names of all registered vector providers."""
     return sorted(_VECTOR_PROVIDERS)
@@ -60,6 +172,7 @@ class VectorConnection:
     def __init__(self, config: VectorConnectionConfig) -> None:
         self.config = config
         self._client: Any = None
+        self._store: VectorStore | None = None
 
     @property
     def name(self) -> str:
@@ -100,6 +213,30 @@ class VectorConnection:
         logger.info(f"🧭 Vector connection '{self.name}' ready (provider={self.config.provider})")
         return client
 
+    def store(self) -> VectorStore:
+        """Return a provider-agnostic :class:`VectorStore` adapter.
+
+        Adapters are cached per connection.  If the provider registered a
+        custom adapter via :func:`register_vector_store_adapter`, it is
+        used; otherwise a :class:`_GenericVectorStoreAdapter` wraps the
+        native client with best-effort duck-typed dispatch.
+        """
+        if self._store is not None:
+            return self._store
+        if self._client is None:
+            self._client = self._build_client()
+        adapter = _VECTOR_STORE_ADAPTERS.get(self.config.provider.lower())
+        if adapter is not None:
+            self._store = adapter(self.config, self._client)
+        else:
+            self._store = _GenericVectorStoreAdapter(self.config, self._client)
+        return self._store
+
+    async def as_store(self) -> VectorStore:
+        """Async variant of :meth:`store` that also awaits initialisation."""
+        await self.initialize()
+        return self.store()
+
     async def health_check(self) -> dict[str, Any]:
         """Report provider-level health (best effort, no network guarantee)."""
         base = {
@@ -136,6 +273,113 @@ class VectorConnection:
                 logger.debug(f"Vector connection '{self.name}' close error: {exc}")
             break
         self._client = None
+        self._store = None
+
+
+# ---------------------------------------------------------------------------
+# Generic duck-typed VectorStore adapter
+# ---------------------------------------------------------------------------
+
+
+class _GenericVectorStoreAdapter:
+    """Best-effort :class:`VectorStore` wrapper over an arbitrary client.
+
+    The adapter attempts to dispatch to well-known methods on the native
+    client (``upsert`` / ``add`` / ``query`` / ``search`` / ``delete``).
+    When the underlying client does not expose any of them, calls raise
+    :class:`NotImplementedError` — register a provider-specific adapter
+    via :func:`register_vector_store_adapter` for full support.
+    """
+
+    def __init__(self, config: VectorConnectionConfig, client: Any) -> None:
+        self._config = config
+        self._client = client
+
+    @staticmethod
+    async def _maybe_await(value: Any) -> Any:
+        if inspect.isawaitable(value):
+            return await value
+        return value
+
+    def _pick(self, *candidates: str) -> Any:
+        for name in candidates:
+            fn = getattr(self._client, name, None)
+            if callable(fn):
+                return fn
+        return None
+
+    async def upsert(
+        self,
+        texts: Sequence[str],
+        metadatas: Sequence[dict[str, Any]] | None = None,
+        ids: Sequence[str] | None = None,
+        *,
+        embeddings: Sequence[Sequence[float]] | None = None,
+    ) -> list[str]:
+        """Route to the client's native upsert/add method when available."""
+        fn = self._pick("upsert", "add", "add_texts", "add_documents")
+        if fn is None:
+            raise NotImplementedError(
+                f"Provider '{self._config.provider}' has no generic upsert; register "
+                "an adapter with `register_vector_store_adapter`."
+            )
+        kwargs: dict[str, Any] = {"texts": list(texts)}
+        if metadatas is not None:
+            kwargs["metadatas"] = list(metadatas)
+        if ids is not None:
+            kwargs["ids"] = list(ids)
+        if embeddings is not None:
+            kwargs["embeddings"] = [list(e) for e in embeddings]
+        try:
+            result = await self._maybe_await(fn(**kwargs))
+        except TypeError:
+            result = await self._maybe_await(fn(list(texts)))
+        if isinstance(result, list):
+            return [str(x) for x in result]
+        return list(ids) if ids is not None else []
+
+    async def query(
+        self,
+        text: str | None = None,
+        *,
+        embedding: Sequence[float] | None = None,
+        k: int = 5,
+        filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Route to the client's native query/search method when available."""
+        fn = self._pick("query", "search", "similarity_search")
+        if fn is None:
+            raise NotImplementedError(
+                f"Provider '{self._config.provider}' has no generic query; register "
+                "an adapter with `register_vector_store_adapter`."
+            )
+        kwargs: dict[str, Any] = {"k": k}
+        if text is not None:
+            kwargs["text"] = text
+        if embedding is not None:
+            kwargs["embedding"] = list(embedding)
+        if filter is not None:
+            kwargs["filter"] = filter
+        try:
+            result = await self._maybe_await(fn(**kwargs))
+        except TypeError:
+            result = await self._maybe_await(fn(text or embedding, k))
+        if isinstance(result, list):
+            return [x if isinstance(x, dict) else {"item": x} for x in result]
+        return []
+
+    async def delete(self, ids: Sequence[str]) -> None:
+        """Route to the client's native delete method when available."""
+        fn = self._pick("delete", "delete_many", "remove")
+        if fn is None:
+            raise NotImplementedError(
+                f"Provider '{self._config.provider}' has no generic delete; register "
+                "an adapter with `register_vector_store_adapter`."
+            )
+        try:
+            await self._maybe_await(fn(ids=list(ids)))
+        except TypeError:
+            await self._maybe_await(fn(list(ids)))
 
 
 # ---------------------------------------------------------------------------

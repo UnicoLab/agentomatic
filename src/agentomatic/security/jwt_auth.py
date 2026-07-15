@@ -18,6 +18,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from agentomatic.middleware.pathutils import path_is_skipped
+
 # ---------------------------------------------------------------------------
 # Optional PyJWT import — the middleware must work even when jwt is absent.
 # ---------------------------------------------------------------------------
@@ -43,6 +45,8 @@ _DEFAULT_SKIP_PATHS: set[str] = {
     "/openapi.json",
     "/redoc",
     "/",
+    "/studio",
+    "/status",
 }
 
 
@@ -58,6 +62,11 @@ class JWTConfig(BaseModel):
         header_name: HTTP header that carries the token.
         header_prefix: Token prefix inside the header value (e.g. ``Bearer``).
         skip_paths: Request paths that bypass authentication.
+        require_signature: When ``True`` the middleware refuses to run in
+            signature-disabled dev mode — a ``jwks_url`` (real verification)
+            must be configured. Set automatically by the platform under
+            ``require_auth_globally`` so forged/unsigned tokens cannot slip
+            through the global auth lock.
     """
 
     enabled: bool = False
@@ -68,6 +77,7 @@ class JWTConfig(BaseModel):
     header_name: str = "Authorization"
     header_prefix: str = "Bearer"
     skip_paths: set[str] = Field(default_factory=lambda: set(_DEFAULT_SKIP_PATHS))
+    require_signature: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -89,9 +99,20 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: Any, *, config: JWTConfig) -> None:
         super().__init__(app)
+        # Refuse to run signature-disabled when signature verification is
+        # required (e.g. under require_auth_globally): unsigned/forged tokens
+        # would authenticate every request otherwise.
+        if config.enabled and config.require_signature and not config.jwks_url:
+            raise ValueError(
+                "JWTAuthMiddleware requires signature verification "
+                "(require_signature=True) but no jwks_url is configured. "
+                "Set JWTConfig.jwks_url to a JWKS endpoint, or disable the "
+                "auth-required flag for local dev."
+            )
         self._config = config
         self._jwks_client: Any | None = None
         self._warned_no_pyjwt = False
+        self._warned_dev_mode = False
 
     # -- helpers -------------------------------------------------------------
 
@@ -113,8 +134,8 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         if not self._config.enabled:
             return await call_next(request)
 
-        # 1. Skip configured paths.
-        if request.url.path in self._config.skip_paths:
+        # 1. Skip configured paths (exact or prefix).
+        if path_is_skipped(request.url.path, self._config.skip_paths):
             return await call_next(request)
 
         # 2. Graceful degradation when PyJWT is missing.
@@ -148,8 +169,19 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 signing_key = client.get_signing_key_from_jwt(token)
                 decode_kwargs["key"] = signing_key.key
             else:
-                # Dev mode — decode without verification.
-                decode_kwargs["options"] = {"verify_signature": False}
+                # Dev mode — decode without signature verification, but ALWAYS
+                # keep expiry checking on so stale tokens are still rejected.
+                if not self._warned_dev_mode:
+                    logger.warning(
+                        "JWT dev mode: signatures are NOT verified (no jwks_url). "
+                        "Do not use in production; forged tokens are accepted. "
+                        "Expiry (exp) is still enforced."
+                    )
+                    self._warned_dev_mode = True
+                decode_kwargs["options"] = {
+                    "verify_signature": False,
+                    "verify_exp": True,
+                }
 
             if self._config.issuer:
                 decode_kwargs["issuer"] = self._config.issuer

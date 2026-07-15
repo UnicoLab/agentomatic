@@ -109,6 +109,23 @@ class BaseEndpoint(Generic[InputT, OutputT]):
             self._models = None
         self._ready = False
 
+    async def health_check(self) -> dict[str, Any]:
+        """Report endpoint health for the platform status / control plane.
+
+        The default implementation reports readiness and the number of
+        configured upstreams. Override for deeper checks (e.g. pinging each
+        upstream).
+
+        Returns:
+            A status mapping consumed by ``/status`` and the control plane.
+        """
+        return {
+            "status": "healthy" if self._ready else "unloaded",
+            "endpoint": self.endpoint_name,
+            "version": self.endpoint_version,
+            "upstreams": len(self.get_upstreams()),
+        }
+
     # ------------------------------------------------------------------
     # Schema extraction (mirrors plugins.BaseMLPlugin)
     # ------------------------------------------------------------------

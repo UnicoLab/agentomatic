@@ -27,6 +27,7 @@ class StepType(StrEnum):
     TRANSFORM = "transform"
     CONDITION = "condition"
     PARALLEL = "parallel"
+    MAP = "map"
     LOOP = "loop"
     SUB_PIPELINE = "sub_pipeline"
 
@@ -236,6 +237,60 @@ class ParallelStepConfig(BaseModel):
     timeout: float = Field(60.0, gt=0)
 
 
+class MapStepConfig(BaseModel):
+    """Configuration for dynamic map/fan-out over a runtime list of items.
+
+    Unlike :class:`ParallelStepConfig`, which fans out a fixed set of
+    heterogeneous sub-steps, ``MapStepConfig`` runs *one* agent (``agent``)
+    against every element of a list resolved from the pipeline context
+    (``items``, e.g. ``$.input.scopes``). Each element is exposed to the
+    agent under ``item_key`` (default ``"item"``) and its index under
+    ``index_key`` (default ``"index"``).
+
+    Results are collected into a keyed fan-in structure so no keys are
+    silently overwritten::
+
+        {
+            "items": [<result_0>, <result_1>, ...],
+            "by_key": {"0": <result_0>, "1": <result_1>, ...},
+        }
+    """
+
+    step_type: Literal[StepType.MAP] = StepType.MAP
+    name: str
+    agent: str = Field(..., description="Agent name to invoke per item.")
+    items: str = Field(
+        ...,
+        description="Expression resolving to a list (e.g. ``$.input.scopes``).",
+    )
+    item_key: str = Field(
+        default="item",
+        description="Key under which each item is exposed to the agent.",
+    )
+    index_key: str = Field(
+        default="index",
+        description="Key under which each item index is exposed to the agent.",
+    )
+    input: InputMapping = Field(
+        default_factory=InputMapping,
+        description="Additional mappings merged into each per-item agent state.",
+    )
+    output: OutputMapping = Field(default_factory=OutputMapping)
+    max_concurrency: int = Field(4, ge=1, le=64)
+    strategy: ParallelStrategy = ParallelStrategy.ALL
+    on_error: ErrorPolicy = ErrorPolicy.FAIL
+    retry: RetryConfig | None = Field(
+        default=None,
+        description="Optional per-item retry configuration.",
+    )
+    timeout: float = Field(120.0, gt=0)
+    item_timeout: float = Field(60.0, gt=0)
+    fallback_agent: str | None = None
+    condition: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    rollback: str | None = None
+
+
 class LoopStepConfig(BaseModel):
     """Configuration for iterative (loop) execution."""
 
@@ -269,6 +324,7 @@ StepConfigUnion = (
     | IngestionStepConfig
     | TransformStepConfig
     | ParallelStepConfig
+    | MapStepConfig
     | LoopStepConfig
     | SubPipelineStepConfig
 )
@@ -323,6 +379,10 @@ class PipelineConfig(BaseModel):
                     agents.add(sub.agent)
                     if sub.fallback_agent:
                         agents.add(sub.fallback_agent)
+            elif isinstance(step, MapStepConfig):
+                agents.add(step.agent)
+                if step.fallback_agent:
+                    agents.add(step.fallback_agent)
             elif isinstance(step, LoopStepConfig):
                 agents.add(step.step.agent)
         return agents

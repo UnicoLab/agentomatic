@@ -624,3 +624,68 @@ class TestLangGraphCompatibleAliases:
         assert len(g1.nodes) == len(result.nodes) == 2
         assert g1.entrypoint == result.entrypoint == "a"
         assert g1.finish == result.finish == "b"
+
+
+# ===========================================================================
+# Keras-style training polish (v1.2)
+# ===========================================================================
+
+
+class TestKerasTrainingPolish:
+    """Regression coverage for evaluate defaults, History save/load, registration."""
+
+    def test_evaluate_defaults_to_compile_metrics(self) -> None:
+        agent = ScopingAgent()
+        dataset = _make_dataset()
+        metric = ExactKeyMatchMetric(["summary"])
+        agent.compile(dataset=dataset, metrics=[metric])
+        report = agent.evaluate(dataset)
+        assert "exact_key_match" in report.scores
+
+    def test_evaluate_without_metrics_raises(self) -> None:
+        agent = ScopingAgent()
+        with pytest.raises(ValueError, match="No metrics"):
+            agent.evaluate(_make_dataset())
+
+    def test_save_and_load_fit_history(self, tmp_path) -> None:
+        from agentomatic.agents.history import History
+
+        agent = ScopingAgent()
+        history = History(params={"epochs": 2})
+        history.record(0, {"loss": 0.5})
+        history.record(1, {"loss": 0.3})
+        agent.history = history
+        agent.compiled_config = {"temperature": 0.2}
+
+        save_dir = tmp_path / "with_history"
+        agent.save(save_dir)
+        assert (save_dir / "fit_history.json").exists()
+
+        restored = ScopingAgent()
+        restored.load(save_dir)
+        assert restored.history is not None
+        assert restored.history.final("loss") == 0.3
+        assert restored.compiled_config["temperature"] == 0.2
+
+    def test_save_and_load_evaluation_history(self, tmp_path) -> None:
+        agent = ScopingAgent()
+        dataset = _make_dataset()
+        metric = ExactKeyMatchMetric(["summary"])
+        report = agent.evaluate(dataset, metrics=[metric])
+        assert len(agent.evaluation_history) == 1
+
+        save_dir = tmp_path / "with_eval"
+        agent.save(save_dir)
+
+        restored = ScopingAgent()
+        restored.load(save_dir)
+        assert len(restored.evaluation_history) == 1
+        loaded = restored.evaluation_history[0]
+        assert loaded.scores == report.scores
+        assert loaded.num_examples == report.num_examples
+        assert loaded.example_results[0].example_id == report.example_results[0].example_id
+
+    def test_as_registered_agent_keeps_class_instance(self) -> None:
+        agent = ScopingAgent()
+        reg = agent.as_registered_agent()
+        assert reg.class_instance is agent

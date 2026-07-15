@@ -148,7 +148,19 @@ class GraphAgentAdapter(StudioAdapter):
 
         graph = self._agent.graph_fn()
 
-        async for evt_dict in graph.astream_studio_events(state, run_id):
+        # Class agents use a dataclass state: convert the incoming raw dict via
+        # ``input_to_state`` before streaming, otherwise the graph nodes receive
+        # a dict and raise AttributeError (HTTP 500 / run_error in Studio).
+        stream_state: Any = state
+        instance = getattr(self._agent, "class_instance", None)
+        if instance is not None:
+            from agentomatic.agents.base import BaseGraphAgent
+            from agentomatic.core.agent_invoke import _input_from_state
+
+            if isinstance(instance, BaseGraphAgent):
+                stream_state = instance.input_to_state(_input_from_state(state))
+
+        async for evt_dict in graph.astream_studio_events(stream_state, run_id):
             yield StudioRunEvent(**evt_dict)
 
     async def get_state(self, thread_id: str) -> StudioStateSnapshot | None:

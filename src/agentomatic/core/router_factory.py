@@ -13,9 +13,34 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from agentomatic.core.agent_invoke import invoke_registered_agent
+
 # ---------------------------------------------------------------------------
 # Request / Response Models
 # ---------------------------------------------------------------------------
+
+
+def _is_openapi_model(candidate: Any) -> bool:
+    """Return True if *candidate* is a Pydantic BaseModel usable in OpenAPI.
+
+    Rejects TypeVars, bare BaseModel, and non-model types that would make
+    ``app.openapi()`` raise Internal Server Error on ``/openapi.json``.
+    """
+    if not isinstance(candidate, type):
+        return False
+    try:
+        if not issubclass(candidate, BaseModel):
+            return False
+    except TypeError:
+        return False
+    # Bare BaseModel itself is not a usable response_model
+    if candidate is BaseModel:
+        return False
+    try:
+        candidate.model_json_schema()
+    except Exception:  # noqa: BLE001
+        return False
+    return True
 
 
 class AgentInvokeRequest(BaseModel):
@@ -254,8 +279,10 @@ def create_default_router(
                 "AgentInvokeRequest",
             ]:
                 if hasattr(schemas_mod, name_candidate):
-                    input_model = getattr(schemas_mod, name_candidate)
-                    break
+                    candidate = getattr(schemas_mod, name_candidate)
+                    if _is_openapi_model(candidate):
+                        input_model = candidate
+                        break
 
             # Look for CustomInvokeResponse or {AgentName}Response
             for name_candidate in [
@@ -264,10 +291,18 @@ def create_default_router(
                 "AgentInvokeResponse",
             ]:
                 if hasattr(schemas_mod, name_candidate):
-                    output_model = getattr(schemas_mod, name_candidate)
-                    break
+                    candidate = getattr(schemas_mod, name_candidate)
+                    if _is_openapi_model(candidate):
+                        output_model = candidate
+                        break
         except ImportError:
             pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Skipping custom schemas for agent '{}': {}",
+                agent_name,
+                exc,
+            )
 
     router = APIRouter()
 
@@ -277,8 +312,10 @@ def create_default_router(
         _schema_validator = agent.schema_validator
 
     # ── Memory Manager ────────────────────────────────────────────
+    # Use ``is not None`` so a lazy store proxy (truthy only after
+    # lifespan auto-derives MEMORY) still wires conversation memory.
     memory_mgr = None
-    if thread_store:
+    if thread_store is not None:
         from agentomatic.core.memory_manager import ConversationMemoryManager
 
         memory_mgr = ConversationMemoryManager(
@@ -449,13 +486,10 @@ def create_default_router(
                 logger.warning(f"Error executing before_node hook: {hook_exc}")
 
         try:
-            if agent.graph_fn:
-                graph = agent.graph_fn()
-                result = await graph.ainvoke(state)
-            elif agent.node_fn:
-                result = await agent.node_fn(state)
-            else:
-                raise HTTPException(500, f"Agent '{agent_name}' has no callable")
+            # Route through the shared helper so class agents (dataclass
+            # states) get ``input_to_state`` via ``atransform`` instead of a
+            # raw ``graph.ainvoke(dict)`` (which would raise AttributeError).
+            result = await invoke_registered_agent(agent, state)
 
             duration_ms = (time.perf_counter() - t0) * 1000
 
@@ -537,11 +571,25 @@ def create_default_router(
             except Exception as hook_exc:
                 logger.warning(f"Error executing before_node hook: {hook_exc}")
 
+        from agentomatic.agents.base import BaseGraphAgent
+
+        instance = getattr(agent, "class_instance", None)
+        is_class_agent = isinstance(instance, BaseGraphAgent)
+
         async def event_stream():
             """Yield SSE frames from graph or node execution."""
             collected_response = ""
             try:
-                if agent.graph_fn:
+                if is_class_agent:
+                    # Class agents use a dataclass state: convert dict → state
+                    # via input_to_state (atransform) and emit the final result
+                    # as a single frame instead of streaming a raw dict into the
+                    # graph (which would raise AttributeError).
+                    result = await invoke_registered_agent(agent, state)
+                    yield f"data: {json.dumps(result, default=str)}\n\n"
+                    if isinstance(result, dict):
+                        collected_response = result.get("response", "")
+                elif agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
                         yield f"data: {json.dumps(event, default=str)}\n\n"
@@ -718,12 +766,7 @@ def create_default_router(
 
         t0 = time.perf_counter()
         try:
-            if agent.graph_fn:
-                result = await agent.graph_fn().ainvoke(state)
-            elif agent.node_fn:
-                result = await agent.node_fn(state)
-            else:
-                raise HTTPException(500, f"Agent '{agent_name}' has no callable")
+            result = await invoke_registered_agent(agent, state)
 
             duration_ms = (time.perf_counter() - t0) * 1000
 
@@ -919,12 +962,7 @@ def create_default_router(
             "metadata": {"a2a": True, **request.metadata},
         }
         try:
-            if agent.graph_fn:
-                result = await agent.graph_fn().ainvoke(state)
-            elif agent.node_fn:
-                result = await agent.node_fn(state)
-            else:
-                raise HTTPException(500, "No callable")
+            result = await invoke_registered_agent(agent, state)
             return {
                 "task_id": task_id,
                 "status": "completed",
@@ -1119,12 +1157,7 @@ def create_default_router(
 
         t0 = time.perf_counter()
         try:
-            if agent.graph_fn:
-                result = await agent.graph_fn().ainvoke(state)
-            elif agent.node_fn:
-                result = await agent.node_fn(state)
-            else:
-                raise HTTPException(500, f"Agent '{agent_name}' has no callable")
+            result = await invoke_registered_agent(agent, state)
 
             duration_ms = (time.perf_counter() - t0) * 1000
 
@@ -1244,12 +1277,7 @@ def create_default_router(
         agent = _get_agent()
         t0 = time.perf_counter()
         try:
-            if agent.graph_fn:
-                result = await agent.graph_fn().ainvoke(state)
-            elif agent.node_fn:
-                result = await agent.node_fn(state)
-            else:
-                raise HTTPException(500, f"Agent '{agent_name}' has no callable")
+            result = await invoke_registered_agent(agent, state)
 
             duration_ms = (time.perf_counter() - t0) * 1000
             return _extract_response(

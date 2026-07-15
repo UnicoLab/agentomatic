@@ -174,7 +174,7 @@ class TestAgentHandle:
         registry = MagicMock()
         registry.get.return_value = agent
         handle = AgentHandle("planner", registry)
-        with pytest.raises(RuntimeError, match="neither graph_fn nor node_fn"):
+        with pytest.raises(RuntimeError, match="neither class_instance, graph_fn"):
             await handle.run({"query": "test"})
 
     def test_build_state_with_dict(self) -> None:

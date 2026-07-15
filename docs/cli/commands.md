@@ -103,8 +103,8 @@ agentomatic init helper_bot --template full --force
 ```text
 📁 agents/helper_bot
 ├── 📄 __init__.py
-├── 📄 graph.py
-├── 📄 nodes.py
+├── 📄 agent.py
+├── 📄 llm.py
 ├── 📄 config.py
 ├── 📄 prompts.json
 ├── 📄 langgraph.json
@@ -112,7 +112,7 @@ agentomatic init helper_bot --template full --force
 └── 📄 README.md
 
 🚀 What's next?
-  1. Edit helper_bot/nodes.py with your logic
+  1. Edit helper_bot/agent.py with your logic
   2. agentomatic run to start
   3. agentomatic test helper_bot to test
   4. Open http://localhost:8000/docs for API docs
@@ -353,8 +353,8 @@ Options:
 
 📁 my_chatbot/
 ├── 📄 __init__.py (1,245 bytes)
-├── 📄 graph.py (2,891 bytes)
-├── 📄 nodes.py (3,456 bytes)
+├── 📄 agent.py (2,891 bytes)
+├── 📄 llm.py (890 bytes)
 ├── 📄 config.py (512 bytes)
 ├── 📄 prompts.json (678 bytes)
 ├── 📄 tools.py (1,024 bytes)
@@ -363,7 +363,7 @@ Options:
 
 ╭── __init__.py ──────────────────────────────────╮
 │ from agentomatic import AgentManifest           │
-│ from .graph import get_graph                    │
+│ from .agent import MyChatbotAgent               │
 │                                                 │
 │ manifest = AgentManifest(                       │
 │     name="my_chatbot",                          │
@@ -445,7 +445,8 @@ Options:
   --target-score FLOAT     Stop when this avg score is reached  [default: 0.9]
   --rewrite-llm TEXT       LLM for prompt rewriting
   --eval-llm TEXT          LLM for evaluation grading
-  --llm TEXT               Default fallback LLM  [default: ollama/mistral:7b]
+  --llm TEXT               Default fallback LLM (env: AGENTOMATIC_TASK_MODEL /
+                           LLM__MODEL; else ollama/mistral:7b)
   --patience INT           Early stopping patience  [default: 3]
   --prompt TEXT            Initial system prompt (overrides prompts.json)
   --no-report              Skip generating HTML report

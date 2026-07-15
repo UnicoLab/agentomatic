@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -30,6 +31,7 @@ from .models import (
     TaskEvent,
     TaskProgress,
     TaskRecord,
+    TaskRetryConfig,
     TaskStatus,
 )
 from .store import InMemoryTaskStore, TaskStore
@@ -103,8 +105,16 @@ class TaskManager:
         callback_url: str | None = None,
         parent_id: str | None = None,
         batch_concurrency: int | None = None,
+        retry: TaskRetryConfig | dict[str, Any] | None = None,
     ) -> TaskRecord:
         """Submit work and return immediately with a ``QUEUED`` task record.
+
+        Args:
+            retry: Optional task-level retry configuration.  When the
+                dispatcher raises, the manager re-invokes it up to
+                ``retry.max_attempts`` times.  Any map-step checkpoints
+                already persisted on the task record are threaded back into
+                the pipeline input so completed items are not re-run.
 
         Raises:
             ValueError: If ``target_type`` has no registered dispatcher.
@@ -116,6 +126,14 @@ class TaskManager:
                 f"Supported: {self.supported_targets}"
             )
 
+        retry_config: TaskRetryConfig | None
+        if retry is None:
+            retry_config = None
+        elif isinstance(retry, TaskRetryConfig):
+            retry_config = retry
+        else:
+            retry_config = TaskRetryConfig(**retry)
+
         record = TaskRecord(
             target_type=ttype,
             target=target,
@@ -125,13 +143,18 @@ class TaskManager:
             metadata=metadata or {},
             callback_url=callback_url,
             parent_id=parent_id,
+            retry=retry_config,
         )
         await self.store.save(record)
         await self._emit(record, "queued")
 
         aio_task = asyncio.create_task(self._run(record, batch_concurrency))
         self._running[record.id] = aio_task
-        aio_task.add_done_callback(lambda _t, tid=record.id: self._running.pop(tid, None))
+
+        def _discard_running(_task: asyncio.Task[Any], tid: str = record.id) -> None:
+            self._running.pop(tid, None)
+
+        aio_task.add_done_callback(_discard_running)
         return record
 
     async def submit_and_wait(
@@ -176,9 +199,7 @@ class TaskManager:
         Useful for status dashboards: total tasks, a per-status breakdown,
         the number currently executing, and the configured concurrency.
         """
-        by_status = {
-            status.value: await self.store.count(status=status) for status in TaskStatus
-        }
+        by_status = {status.value: await self.store.count(status=status) for status in TaskStatus}
         return {
             "total": await self.store.count(),
             "by_status": by_status,
@@ -229,7 +250,7 @@ class TaskManager:
     # ------------------------------------------------------------------
 
     async def _run(self, record: TaskRecord, batch_concurrency: int | None) -> None:
-        """Execute a task record, honouring concurrency and cancellation."""
+        """Execute a task record, honouring concurrency, cancellation, and retry."""
         if record.id in self._cancel_requested:
             await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled before start")
             return
@@ -251,17 +272,66 @@ class TaskManager:
                 lambda: record.id in self._cancel_requested,
             )
 
-            try:
-                if record.batch is not None:
-                    result = await self._run_batch(record, dispatcher, ctx, batch_concurrency)
-                else:
-                    result = await dispatcher(record.target, record.input, ctx)
-                await self._finalize(record, TaskStatus.SUCCEEDED, result=result)
-            except asyncio.CancelledError:
-                await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled")
-            except Exception as exc:  # noqa: BLE001 - surfaced to the caller as task error
-                logger.exception(f"Task {record.id} failed: {exc}")
-                await self._finalize(record, TaskStatus.FAILED, error=str(exc))
+            max_attempts = record.retry.max_attempts if record.retry else 1
+            base_delay = record.retry.base_delay if record.retry else 1.0
+            backoff = record.retry.backoff if record.retry else "exponential"
+
+            last_error: Exception | None = None
+            for attempt in range(max_attempts):
+                record.attempts = attempt + 1
+                await self.store.save(record)
+                try:
+                    if record.batch is not None:
+                        result = await self._run_batch(record, dispatcher, ctx, batch_concurrency)
+                    else:
+                        result = await dispatcher(
+                            record.target,
+                            self._prepare_input(record),
+                            ctx,
+                        )
+                    await self._finalize(record, TaskStatus.SUCCEEDED, result=result)
+                    return
+                except asyncio.CancelledError:
+                    await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled")
+                    return
+                except Exception as exc:  # noqa: BLE001 - retry logic below
+                    last_error = exc
+                    logger.warning(
+                        f"Task {record.id} attempt {attempt + 1}/{max_attempts} failed: {exc}"
+                    )
+                    if attempt + 1 >= max_attempts:
+                        break
+                    if backoff == "exponential":
+                        delay = base_delay * (2**attempt)
+                    elif backoff == "linear":
+                        delay = base_delay * (attempt + 1)
+                    else:
+                        delay = base_delay
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+
+            logger.exception(f"Task {record.id} failed after {record.attempts} attempts")
+            await self._finalize(record, TaskStatus.FAILED, error=str(last_error))
+
+    def _prepare_input(self, record: TaskRecord) -> Any:
+        """Build the payload for a dispatcher invocation, injecting checkpoints.
+
+        When the task has persisted map-step checkpoints (e.g. from a previous
+        attempt), we surface the completed indices to the dispatcher via a
+        ``__completed_indices`` hint so the pipeline engine can skip finished
+        items on retry.
+        """
+        payload = record.input
+        if not record.checkpoints:
+            return payload
+        completed: dict[str, list[int]] = {}
+        for step_name, items in record.checkpoints.items():
+            completed[step_name] = sorted(int(idx) for idx in items)
+        if isinstance(payload, dict):
+            hinted = dict(payload)
+            hinted["__completed_indices"] = completed
+            return hinted
+        return payload
 
     async def _run_batch(
         self,
@@ -269,7 +339,7 @@ class TaskManager:
         dispatcher: Dispatcher,
         ctx: TaskContext,
         batch_concurrency: int | None,
-    ) -> list[Any]:
+    ) -> Sequence[Any]:
         """Run every item in a batch with bounded concurrency and progress."""
         items = record.batch or []
         total = len(items)
@@ -299,7 +369,14 @@ class TaskManager:
         return results
 
     def _make_reporter(self, record: TaskRecord) -> Any:
-        """Build the progress-report callback bound to ``record``."""
+        """Build the progress-report callback bound to ``record``.
+
+        When a report carries ``event="checkpoint"`` plus ``partial_step`` and
+        ``partial_index`` fields (emitted by the pipeline dispatcher for
+        completed map items), the corresponding sub-result payload is
+        persisted onto :attr:`TaskRecord.checkpoints` so it survives a
+        restart and can be replayed via ``__completed_indices``.
+        """
 
         async def report(
             *,
@@ -317,6 +394,16 @@ class TaskManager:
                 total=total if total is not None else record.progress.total,
                 stage=stage or record.progress.stage,
             )
+            step_name = data.get("partial_step")
+            index = data.get("partial_index")
+            if data.get("event") == "checkpoint" and step_name and index is not None:
+                step_bucket = record.checkpoints.setdefault(str(step_name), {})
+                sub_result = data.get("sub_result")
+                step_bucket[str(index)] = (
+                    sub_result
+                    if isinstance(sub_result, dict)
+                    else {"message": message, "current": current, "total": total}
+                )
             await self.store.save(record)
             await self._emit(record, "progress", data=data)
 

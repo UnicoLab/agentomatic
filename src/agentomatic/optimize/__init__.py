@@ -98,10 +98,11 @@ from agentomatic.optimize.metrics import (
     MetricResult,
     RedTeamMetric,
     WeightedMetric,
+    resolve_metrics,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
 from agentomatic.optimize.report import generate_fit_report, generate_html_report
-from agentomatic.optimize.search_space import PromptSearchSpace
+from agentomatic.optimize.search_space import PromptSearchSpace, load_search_space
 from agentomatic.optimize.strategies import (
     MIPRO,
     BootstrapRandomSearch,
@@ -170,11 +171,13 @@ __all__ = [
     "PromptFitResult",
     "ParamDelta",
     "PromptSearchSpace",
+    "load_search_space",
     # PromptFitter metrics
     "MetricResult",
     "CompositeMetric",
     "DeterministicMetric",
     "WeightedMetric",
+    "resolve_metrics",
     # Judges
     "LocalJudgeMetric",
     "MultiJudgePanel",

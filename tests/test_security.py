@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from agentomatic.security.jwt_auth import JWTConfig
 from agentomatic.security.policy import AgentSecurityPolicy
 from agentomatic.security.zero_trust import ZeroTrustEnforcer
@@ -441,6 +443,57 @@ class TestJWTConfigDefaults:
         assert config.header_name == "X-Auth"
         assert config.header_prefix == "Token"
         assert config.skip_paths == {"/ping"}
+
+    def test_require_signature_defaults_false(self) -> None:
+        assert JWTConfig().require_signature is False
+
+
+# =========================================================================
+# 10b. JWTAuthMiddleware — signature-required refusal + dev-mode exp (P1-2)
+# =========================================================================
+
+
+class TestJWTMiddlewareSafety:
+    """The auth-required flag must not accept forged/unsigned/expired tokens."""
+
+    def test_require_signature_without_jwks_raises(self) -> None:
+        from agentomatic.security.jwt_auth import JWTAuthMiddleware
+
+        cfg = JWTConfig(enabled=True, require_signature=True)  # no jwks_url
+        with pytest.raises(ValueError, match="jwks_url"):
+            JWTAuthMiddleware(MagicMock(), config=cfg)
+
+    def test_dev_mode_still_rejects_expired_token(self) -> None:
+        import datetime
+
+        pytest.importorskip("jwt")
+        import jwt
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from agentomatic.security.jwt_auth import JWTAuthMiddleware
+
+        app = FastAPI()
+
+        @app.get("/api/v1/echo/invoke")
+        async def _protected() -> dict[str, str]:
+            return {"ok": "yes"}
+
+        # Dev mode: no jwks_url (signatures not verified) but exp MUST be.
+        app.add_middleware(JWTAuthMiddleware, config=JWTConfig(enabled=True))
+        client = TestClient(app)
+
+        expired = jwt.encode(
+            {
+                "sub": "user-1",
+                "exp": datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1),
+            },
+            "irrelevant-secret",
+            algorithm="HS256",
+        )
+        resp = client.get("/api/v1/echo/invoke", headers={"Authorization": f"Bearer {expired}"})
+        assert resp.status_code == 401
+        assert "expired" in resp.json()["detail"].lower()
 
 
 # =========================================================================

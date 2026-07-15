@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from agentomatic._runtime import FACTORY_CONFIG_ENV
 from agentomatic.endpoints.registry import EndpointRegistry
 from agentomatic.endpoints.router import create_endpoint_router
 from agentomatic.ingestion.registry import IngestionRegistry
@@ -54,6 +56,57 @@ def _generate_unique_id(route: APIRoute) -> str:
     if slug:
         return f"{slug}_{route.name}"
     return route.name
+
+
+def _minimal_openapi_paths(routes: Any) -> dict[str, Any]:
+    """Build stub OpenAPI paths from FastAPI routes when full schema fails.
+
+    Ensures ``/docs`` still lists endpoints instead of an empty Swagger UI.
+    """
+    paths: dict[str, Any] = {}
+    for route in routes:
+        path = getattr(route, "path", None)
+        methods = getattr(route, "methods", None)
+        if not path or not methods:
+            continue
+        item = paths.setdefault(path, {})
+        for method in methods:
+            method_l = str(method).lower()
+            if method_l in ("head", "options"):
+                continue
+            item[method_l] = {
+                "summary": getattr(route, "name", None) or path,
+                "responses": {"200": {"description": "OK"}},
+            }
+    return paths
+
+
+class _LazyStoreProxy:
+    """Proxy that resolves ``platform._store`` at call time.
+
+    Routers are mounted during ``build()`` before the lifespan may
+    auto-derive a MEMORY store from connections. This proxy stays
+    truthy so thread routes / memory managers are wired, then
+    delegates to the real store once it exists.
+    """
+
+    __slots__ = ("_platform",)
+
+    def __init__(self, platform: AgentPlatform) -> None:
+        object.__setattr__(self, "_platform", platform)
+
+    def __bool__(self) -> bool:
+        """Truthy only once the underlying store exists (post-lifespan)."""
+        return object.__getattribute__(self, "_platform")._store is not None
+
+    def __getattr__(self, name: str) -> Any:
+        store = object.__getattribute__(self, "_platform")._store
+        if store is None:
+            raise RuntimeError(
+                "Thread store is not configured. Pass store=... to "
+                "AgentPlatform or declare a MEMORY connection."
+            )
+        return getattr(store, name)
 
 
 class AgentPlatform:
@@ -123,6 +176,7 @@ class AgentPlatform:
         enable_jwt_auth: bool = False,
         jwt_config: JWTConfig | None = None,
         enable_zero_trust: bool = False,
+        require_auth_globally: bool = False,
         # --- v0.11: Control plane & connections ---
         enable_control_plane: bool = False,
         control_token: str = "",
@@ -163,6 +217,10 @@ class AgentPlatform:
             enable_jwt_auth: Add JWT/OAuth2 auth middleware.
             jwt_config: JWT configuration (required when ``enable_jwt_auth=True``).
             enable_zero_trust: Enable zero-trust policy enforcement.
+            require_auth_globally: When ``True`` (and ``enable_zero_trust`` is
+                also ``True``), the zero-trust enforcer requires authenticated
+                JWT claims for **every** agent request regardless of the
+                per-agent policy.  Ignored when zero-trust is disabled.
             enable_control_plane: Mount the production control plane API and
                 request-gating middleware (default ``False``).
             control_token: Optional shared secret protecting mutating control
@@ -208,7 +266,24 @@ class AgentPlatform:
         self._enable_jwt_auth = enable_jwt_auth
         self._jwt_config = jwt_config
         self._enable_zero_trust = enable_zero_trust
+        self._require_auth_globally = require_auth_globally
+        # Remember the requested stack + dir so ``run(reload=...)`` can rebuild
+        # the platform in a worker subprocess via the module-level factory.
+        self._stacks_dir = str(stacks_dir)
+        self._stack_arg = stack if isinstance(stack, str) else None
         self._init_stack(stack, stacks_dir)
+
+        # Global auth lock requires a credential path — auto-enable JWT so
+        # ``--require-auth-globally`` does not silently reject every request.
+        if self._require_auth_globally and not self._enable_jwt_auth and not self._enable_auth:
+            self._enable_jwt_auth = True
+            logger.warning(
+                "require_auth_globally=True without JWT/API-key auth — "
+                "auto-enabling enable_jwt_auth=True. Configure JWTConfig "
+                "(jwks_url / issuer) via stack or kwargs; requests need "
+                "Authorization: Bearer <token> (dev mode accepts unsigned JWTs "
+                "when jwks_url is empty)."
+            )
 
         # v0.11: Control plane & connections
         self._enable_control_plane = enable_control_plane
@@ -484,7 +559,16 @@ class AgentPlatform:
         return tags
 
     async def _init_connections(self) -> None:
-        """Register and initialise per-agent and platform-wide connections."""
+        """Register and initialise per-agent and platform-wide connections.
+
+        If no explicit ``store`` was passed at construction, this method
+        also auto-derives one from the first connection tagged with
+        :class:`~agentomatic.connections.models.ConnectionPurpose.MEMORY`
+        (platform scope first, then any agent scope), using the
+        connection→store factory registry.  This lets an agent declare
+        a Cosmos DB (or Postgres) once and get conversation memory for
+        free — no explicit ``store=`` wiring required.
+        """
         from agentomatic.connections.manager import (
             PLATFORM_SCOPE,
             register_connections,
@@ -508,6 +592,37 @@ class AgentPlatform:
             for scope, manager in managers.items():
                 await manager.initialize()
                 logger.info(f"  ✅ Connections ready for scope '{scope}' ({manager.count})")
+
+        if self._store is None:
+            await self._auto_derive_store_from_connections()
+
+    async def _auto_derive_store_from_connections(self) -> None:
+        """Populate ``self._store`` from the first MEMORY connection, if any."""
+        from agentomatic.connections.manager import PLATFORM_SCOPE, all_managers
+        from agentomatic.connections.models import ConnectionPurpose
+        from agentomatic.connections.stores import create_store_from_connection
+
+        managers = all_managers()
+        scopes = [PLATFORM_SCOPE, *(s for s in managers if s != PLATFORM_SCOPE)]
+        for scope in scopes:
+            manager = managers.get(scope)
+            if manager is None:
+                continue
+            candidate = manager.first_for_purpose(ConnectionPurpose.MEMORY)
+            if candidate is None:
+                continue
+            try:
+                self._store = await create_store_from_connection(candidate)
+                logger.info(
+                    f"🗄️ Auto-derived store from connection "
+                    f"'{getattr(candidate, 'name', '?')}' in scope '{scope}'"
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"Failed to auto-derive store from connection "
+                    f"'{getattr(candidate, 'name', '?')}' in scope '{scope}': {exc}"
+                )
 
     def _build_task_manager(self) -> TaskManager:
         """Create the task manager and register a dispatcher per resource type."""
@@ -584,6 +699,18 @@ class AgentPlatform:
         if parent not in sys.path:
             sys.path.insert(0, parent)
 
+        # Apply stack LLM defaults BEFORE discovery so class agents receive
+        # a stack-aware ``get_llm()`` when their constructors resolve LLMs.
+        try:
+            from agentomatic.providers.llm import apply_stack_defaults
+
+            apply_stack_defaults(platform._stack_manager)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"apply_stack_defaults (pre-discover) skipped: {exc}")
+
+        # Wire stack manager into registry for role-aware per-agent LLMs.
+        platform._registry.stack_manager = platform._stack_manager
+
         # Eagerly discover agents so they are available immediately
         # after build() returns — no need to wait for lifespan startup.
         # This also fixes TestClient scenarios where lifespan may not
@@ -631,6 +758,17 @@ class AgentPlatform:
             configure_logging(platform.log_level)
             logger.info(f"🚀 {platform.title} starting...")
             logger.info(f"📂 Agents directory: {platform.agents_dir}")
+
+            # Apply the active stack's default LLM profile so global
+            # ``get_llm()`` becomes stack-aware.  Safe when no stack is
+            # loaded — the helper no-ops.  (Also applied pre-discovery
+            # in build(); re-apply here in case env changed at startup.)
+            try:
+                from agentomatic.providers.llm import apply_stack_defaults
+
+                apply_stack_defaults(platform._stack_manager)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"apply_stack_defaults skipped: {exc}")
 
             # Initialize storage if configured
             if platform._store:
@@ -693,7 +831,7 @@ class AgentPlatform:
                     agent.router = create_default_router(
                         agent_name=name,
                         registry=platform._registry,
-                        thread_store=platform._store,
+                        thread_store=_LazyStoreProxy(platform),
                         max_history_messages=platform._max_history_messages,
                         summarize_after=platform._summarize_after,
                         task_manager=task_manager,
@@ -805,7 +943,9 @@ class AgentPlatform:
                 from agentomatic.middleware.zero_trust import ZeroTrustMiddleware
                 from agentomatic.security.zero_trust import ZeroTrustEnforcer
 
-                enforcer = ZeroTrustEnforcer(require_auth_globally=False)
+                enforcer = ZeroTrustEnforcer(
+                    require_auth_globally=self._require_auth_globally,
+                )
                 for name, agent in self._registry.all().items():
                     if agent.security_policy is not None:
                         enforcer.register_policy(name, agent.security_policy)
@@ -822,10 +962,30 @@ class AgentPlatform:
 
         # JWT Auth (v0.6)
         if self._enable_jwt_auth:
-            try:
-                from agentomatic.security.jwt_auth import JWTAuthMiddleware, JWTConfig
+            from agentomatic.security.jwt_auth import JWTAuthMiddleware, JWTConfig
 
-                jwt_cfg = self._jwt_config or JWTConfig(enabled=True)
+            jwt_cfg = self._jwt_config or JWTConfig(enabled=True)
+
+            # Under the global auth lock, signature-disabled (dev) JWT is a
+            # bypass: forged/unsigned tokens would authenticate EVERY request.
+            # Refuse to start unless real verification (jwks_url) is configured
+            # — or API-key auth guards the platform instead. Raised outside the
+            # try below so the misconfiguration is not silently swallowed.
+            if self._require_auth_globally and not jwt_cfg.jwks_url and not self._enable_auth:
+                raise RuntimeError(
+                    "require_auth_globally=True but JWT signature verification "
+                    "is not configured (no jwks_url) and API-key auth is "
+                    "disabled — this would accept forged/unsigned JWTs. Fix by "
+                    "one of: (a) set JWTConfig.jwks_url (with issuer/audience) "
+                    "and pass it via jwt_config=/stack; (b) enable_auth=True "
+                    "with auth_api_key; or (c) drop require_auth_globally for "
+                    "local dev."
+                )
+            if self._require_auth_globally:
+                # Enforce signature verification for the global auth lock.
+                jwt_cfg = jwt_cfg.model_copy(update={"require_signature": True})
+
+            try:
                 app.add_middleware(JWTAuthMiddleware, config=jwt_cfg)
                 logger.info("🔐 JWT auth middleware enabled")
             except Exception as exc:
@@ -879,7 +1039,7 @@ class AgentPlatform:
         if self._enable_feedback:
             from agentomatic.middleware.feedback import FeedbackCollector, set_collector
 
-            collector = FeedbackCollector(store=self._store)
+            collector = FeedbackCollector(store=_LazyStoreProxy(self))
             set_collector(collector)
             logger.info("📝 Feedback collection enabled")
 
@@ -900,7 +1060,7 @@ class AgentPlatform:
                 agent.router = create_default_router(
                     agent_name=name,
                     registry=self._registry,
-                    thread_store=self._store,
+                    thread_store=_LazyStoreProxy(self),
                     max_history_messages=self._max_history_messages,
                     summarize_after=self._summarize_after,
                     task_manager=task_manager,
@@ -1282,6 +1442,45 @@ class AgentPlatform:
                 pass  # Non-critical — don't log noise
 
         self._app = app
+
+        # Resilient OpenAPI schema: never let one bad response_model blank
+        # the entire /docs UI.  Log the failure and return a minimal schema.
+        def custom_openapi() -> dict[str, Any]:
+            if app.openapi_schema:
+                return app.openapi_schema
+            try:
+                from fastapi.openapi.utils import get_openapi
+
+                app.openapi_schema = get_openapi(
+                    title=app.title,
+                    version=app.version,
+                    description=app.description,
+                    routes=app.routes,
+                    tags=app.openapi_tags,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "OpenAPI schema generation failed ({}). "
+                    "Returning a minimal schema so /docs still loads. "
+                    "Check agent/plugin response_model types.",
+                    exc,
+                )
+                app.openapi_schema = {
+                    "openapi": "3.1.0",
+                    "info": {
+                        "title": app.title,
+                        "version": app.version,
+                        "description": (
+                            f"{app.description}\n\n"
+                            f"**Warning:** full schema generation failed: {exc}. "
+                            "Showing route stubs so /docs still works."
+                        ),
+                    },
+                    "paths": _minimal_openapi_paths(app.routes),
+                }
+            return app.openapi_schema
+
+        app.openapi = custom_openapi  # type: ignore[method-assign]
         return app
 
     # ------------------------------------------------------------------
@@ -1294,6 +1493,8 @@ class AgentPlatform:
         port: int = 8000,
         reload: bool = False,
         workers: int = 1,
+        ssl_certfile: str | None = None,
+        ssl_keyfile: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Build and run the platform with uvicorn.
@@ -1303,16 +1504,113 @@ class AgentPlatform:
             port: Bind port.
             reload: Enable auto-reload (development).
             workers: Number of worker processes.
+            ssl_certfile: Optional path to a PEM-encoded TLS certificate;
+                supplying it (together with ``ssl_keyfile``) enables
+                HTTPS termination directly in uvicorn.
+            ssl_keyfile: Optional path to the private key that matches
+                ``ssl_certfile``.
             **kwargs: Extra arguments forwarded to :func:`uvicorn.run`.
         """
         import uvicorn
 
-        app = self.build()
-        uvicorn.run(
-            app,
-            host=host,
-            port=port,
-            reload=reload,
-            workers=workers,
+        run_kwargs: dict[str, Any] = {
+            "host": host,
+            "port": port,
             **kwargs,
-        )
+        }
+        if ssl_certfile:
+            run_kwargs["ssl_certfile"] = ssl_certfile
+        if ssl_keyfile:
+            run_kwargs["ssl_keyfile"] = ssl_keyfile
+        if ssl_certfile or ssl_keyfile:
+            logger.info(f"🔐 HTTPS enabled (certfile={ssl_certfile}, keyfile={ssl_keyfile})")
+
+        # uvicorn requires an import string (re-imported per worker subprocess)
+        # for reload / multi-worker mode. Passing an app *instance* makes modern
+        # uvicorn exit(1). Reconstruct via a module-level factory when possible.
+        if reload or workers > 1:
+            config = self._factory_config()
+            if config is not None:
+                import json
+
+                os.environ[FACTORY_CONFIG_ENV] = json.dumps(config)
+                uvicorn.run(
+                    "agentomatic._runtime:create_app",
+                    factory=True,
+                    reload=reload,
+                    workers=workers,
+                    **run_kwargs,
+                )
+                return
+            logger.warning(
+                "reload / workers>1 need an import-string app, but this "
+                "platform was configured programmatically (custom store, "
+                "middleware, lifecycle hooks, or code-registered agents) and "
+                "cannot be rebuilt in a worker subprocess. Falling back to a "
+                "single in-process instance WITHOUT reload/workers."
+            )
+
+        app = self.build()
+        uvicorn.run(app, **run_kwargs)
+
+    def _factory_config(self) -> dict[str, Any] | None:
+        """Return JSON-serialisable ``__init__`` kwargs for the run factory.
+
+        Returns ``None`` when the platform holds non-serialisable or
+        programmatic state (custom store / task store / JWT config / connections
+        / middleware / lifecycle hooks / code-registered agents, endpoints, or
+        ingestors) that a worker subprocess could not faithfully rebuild from a
+        folder. In that case the caller degrades to a single in-process run.
+        """
+        if (
+            self._store is not None
+            or self._task_store is not None
+            or self._jwt_config is not None
+            or self._platform_connections
+            or self._custom_middleware
+            or self._on_startup
+            or self._on_shutdown
+            or self._extra_routers
+            or self._registry._agents  # noqa: SLF001 — programmatic agents
+            or self._endpoint_registry.count
+            or self._ingestion_registry.count
+        ):
+            return None
+
+        config: dict[str, Any] = {
+            "agents_dir": str(self.agents_dir),
+            "plugins_dir": str(self.plugins_dir),
+            "endpoints_dir": str(self.endpoints_dir),
+            "ingestion_dir": str(self.ingestion_dir),
+            "stacks_dir": self._stacks_dir,
+            "title": self.title,
+            "description": self.description,
+            "version": self.version,
+            "api_prefix": self.api_prefix,
+            "package_prefix": self.package_prefix,
+            "cors_origins": list(self.cors_origins),
+            "log_level": self.log_level,
+            "enable_logging": self._enable_logging,
+            "enable_auth": self._enable_auth,
+            "auth_api_key": self._auth_api_key,
+            "enable_rate_limit": self._enable_rate_limit,
+            "rate_limit_requests": self._rate_limit_requests,
+            "rate_limit_window": self._rate_limit_window,
+            "enable_metrics": self._enable_metrics,
+            "enable_feedback": self._enable_feedback,
+            "enable_telemetry": self._enable_telemetry,
+            "enable_studio": self._enable_studio,
+            "max_history_messages": self._max_history_messages,
+            "summarize_after": self._summarize_after,
+            "enable_jwt_auth": self._enable_jwt_auth,
+            "enable_zero_trust": self._enable_zero_trust,
+            "require_auth_globally": self._require_auth_globally,
+            "enable_control_plane": self._enable_control_plane,
+            "control_token": self._control_token,
+            "enable_connections_context": self._enable_connections_context,
+            "enable_tasks": self._enable_tasks,
+            "task_max_concurrency": self._task_max_concurrency,
+        }
+        if self._stack_arg:
+            config["stack"] = self._stack_arg
+        return config

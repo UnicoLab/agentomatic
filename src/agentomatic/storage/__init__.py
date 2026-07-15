@@ -28,7 +28,13 @@ from __future__ import annotations
 from .base import BaseStore
 from .memory import MemoryStore
 
-__all__ = ["BaseStore", "MemoryStore", "SQLAlchemyStore", "AgentomaticCheckpointer"]
+__all__ = [
+    "AgentomaticCheckpointer",
+    "BaseStore",
+    "MemoryStore",
+    "MinimalDocumentStore",
+    "SQLAlchemyStore",
+]
 
 
 # Lazy import for optional dependencies
@@ -41,4 +47,8 @@ def __getattr__(name: str):
         from .checkpointer import AgentomaticCheckpointer
 
         return AgentomaticCheckpointer
+    if name == "MinimalDocumentStore":
+        from .document import MinimalDocumentStore
+
+        return MinimalDocumentStore
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

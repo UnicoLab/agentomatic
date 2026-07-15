@@ -438,8 +438,8 @@ graph TB
 
 - **Studio Router**: Framework-agnostic FastAPI endpoints that delegate to adapters.
 - **Adapter Factory**: Automatically selects the best adapter based on the agent's `framework` field and available decorators.
-- **LangGraphAdapter**: Full-featured — uses `CompiledGraph` APIs natively for graph extraction, checkpoint state, breakpoints, and HITL. Triggered by `framework="langgraph"`.
-- **GraphAgentAdapter**: For class-based agents (`BaseGraphAgent`). Provides graph topology extraction, streaming, and trace support. Triggered by `framework="graph_agent"`.
+- **LangGraphAdapter**: Full-featured — uses `CompiledGraph` APIs natively for graph extraction, checkpoint state, breakpoints, and HITL. Triggered by `framework="langgraph"` / `"deepagent"` (or a non-class agent with `graph_fn`).
+- **GraphAgentAdapter**: For class-based agents (`BaseGraphAgent`). Provides graph topology extraction, streaming, and trace support. Triggered by `framework="graph_agent"` or a registered `class_instance` — resolved **before** the generic `graph_fn` → LangGraph branch, because class agents also expose `graph_fn`.
 - **LangChainAdapter**: Extracts LCEL graphs via `.get_graph()`, streams via `astream_events`, and tracks messages per thread. Triggered by `framework="langchain"`.
 - **GenericAdapter**: Trace-based — wraps `node_fn()` with timing and I/O capture for any Python agent. Fallback for `framework="custom"` or unknown frameworks.
 - **Custom Adapter**: User-registered via `@studio_graph`, `@studio_state`, and `@studio_stream` decorators.

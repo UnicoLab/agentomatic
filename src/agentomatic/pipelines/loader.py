@@ -19,6 +19,7 @@ from agentomatic.pipelines.models import (
     IngestionStepConfig,
     InputMapping,
     LoopStepConfig,
+    MapStepConfig,
     OutputMapping,
     ParallelStepConfig,
     ParallelStrategy,
@@ -42,6 +43,7 @@ _STEP_TYPE_KEYS = (
     "endpoint",
     "ingestion",
     "parallel",
+    "map",
     "transform",
     "loop",
     "sub_pipeline",
@@ -314,6 +316,59 @@ def _parse_parallel_step(data: dict[str, Any]) -> ParallelStepConfig:
     )
 
 
+def _parse_map_step(data: dict[str, Any]) -> MapStepConfig:
+    """Build a ``MapStepConfig`` from a raw dict.
+
+    The ``map`` key must be a dict containing at least ``agent`` (the agent
+    to run per item) and ``items`` (an expression resolving to a list). All
+    other fields (``item_key``, ``max_concurrency``, ``retry``, …) are
+    optional.
+
+    Args:
+        data: Raw step dictionary containing the ``map`` key.
+
+    Returns:
+        A validated ``MapStepConfig``.
+
+    Raises:
+        ValueError: If no ``name`` is provided or the map body is invalid.
+        TypeError: If ``map`` is not a dict.
+    """
+    if "name" not in data:
+        raise ValueError("Map steps require an explicit 'name'.")
+
+    body = data["map"]
+    if not isinstance(body, dict):
+        raise TypeError("The 'map' key must be a dict with at least 'agent' and 'items'.")
+    if "agent" not in body:
+        raise ValueError("Map step body must contain an 'agent' key.")
+    if "items" not in body:
+        raise ValueError("Map step body must contain an 'items' expression.")
+
+    strategy_raw = body.get("strategy", "all")
+    strategy = ParallelStrategy(strategy_raw)
+
+    return MapStepConfig(
+        name=data["name"],
+        agent=body["agent"],
+        items=body["items"],
+        item_key=body.get("item_key", "item"),
+        index_key=body.get("index_key", "index"),
+        input=_coerce_input_mapping(body.get("input")),
+        output=_coerce_output_mapping(body.get("output")),
+        max_concurrency=body.get("max_concurrency", 4),
+        strategy=strategy,
+        on_error=(ErrorPolicy(data["on_error"]) if "on_error" in data else ErrorPolicy.FAIL),
+        retry=_parse_retry(body.get("retry")),
+        timeout=data.get("timeout", 120.0),
+        item_timeout=body.get("item_timeout", 60.0),
+        fallback_agent=body.get("fallback_agent"),
+        condition=data.get("condition"),
+        metadata=data.get("metadata", {}),
+        rollback=data.get("rollback"),
+    )
+
+
 def _parse_loop_step(data: dict[str, Any]) -> LoopStepConfig:
     """Build a ``LoopStepConfig`` from a raw dict.
 
@@ -396,6 +451,8 @@ def _parse_step(data: dict[str, Any]) -> StepConfigUnion:
         return _parse_ingestion_step(data)
     if "parallel" in data:
         return _parse_parallel_step(data)
+    if "map" in data:
+        return _parse_map_step(data)
     if "transform" in data:
         return _parse_transform_step(data)
     if "loop" in data:

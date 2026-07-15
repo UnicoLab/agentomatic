@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,24 @@ from typing import Any
 from loguru import logger
 
 from .manifest import AgentManifest, RegisteredAgent
+
+#: Environment variable used to scope which agents are discovered. When set to a
+#: comma-separated list of agent names/slugs, only those agents load — used by
+#: ``agentomatic deploy --with-agent-stubs`` to give each replica a single agent.
+AGENT_ALLOWLIST_ENV = "AGENTOMATIC_AGENTS"
+
+
+def _agent_allowlist() -> set[str] | None:
+    """Return the normalised ``AGENTOMATIC_AGENTS`` allow-list, or ``None``.
+
+    Returns:
+        A set of lower-cased agent names/slugs to load, or ``None`` when the
+        environment variable is unset/empty (meaning "load everything").
+    """
+    raw = os.environ.get(AGENT_ALLOWLIST_ENV, "").strip()
+    if not raw:
+        return None
+    return {token.strip().lower() for token in raw.split(",") if token.strip()}
 
 
 class AgentRegistry:
@@ -26,8 +45,10 @@ class AgentRegistry:
 
     def __init__(self) -> None:
         self._agents: dict[str, RegisteredAgent] = {}
+        self._slug_index: dict[str, str] = {}
         self.before_node_hooks: list[Callable[[str, dict[str, Any]], None]] = []
         self.after_node_hooks: list[Callable[[str, dict[str, Any]], None]] = []
+        self.stack_manager: Any = None
 
     @property
     def count(self) -> int:
@@ -52,10 +73,20 @@ class AgentRegistry:
 
         logger.info(f"🔍 Discovering agents in {agents_dir}")
 
+        allowlist = _agent_allowlist()
+        if allowlist is not None:
+            logger.info(f"🔒 {AGENT_ALLOWLIST_ENV} allow-list active: {sorted(allowlist)}")
+
         for entry in sorted(agents_dir.iterdir()):
             if not entry.is_dir():
                 continue
             if entry.name.startswith("_") or entry.name.startswith("."):
+                continue
+
+            # Scope discovery to the allow-list (folder name == agent name).
+            # Skipping here also avoids importing non-selected agents' code.
+            if allowlist is not None and entry.name.lower() not in allowlist:
+                logger.debug(f"  ⏭️ Skipping {entry.name} — not in {AGENT_ALLOWLIST_ENV}")
                 continue
 
             has_init = (entry / "__init__.py").exists()
@@ -77,9 +108,32 @@ class AgentRegistry:
         logger.info(f"📦 Discovery complete — {self.count} agents registered")
 
     def _discover_single(self, agent_dir: Path, package_prefix: str) -> None:
-        """Discover a single agent from its directory."""
+        """Discover a single agent from its directory.
+
+        Prefer class-based ``agent.py`` (executable graph) when present; the
+        ``AgentManifest`` in ``__init__.py`` still provides the agent card
+        when no class agent is found (legacy / deepagent / custom templates).
+        """
         agent_name = agent_dir.name
         module_path = f"{package_prefix}.{agent_name}" if package_prefix else agent_name
+
+        # Class agents take precedence — they own the graph + studio adapter
+        if (agent_dir / "agent.py").exists():
+            if self._discover_class_agent(agent_dir, package_prefix):
+                # Overlay manifesto card + enhancements from the package
+                registered = self._agents.get(agent_name)
+                if registered is not None:
+                    self._enrich_registered_agent(registered, agent_dir, module_path, agent_name)
+                    # Prefer explicit AgentManifest from __init__.py when present
+                    try:
+                        mod = importlib.import_module(module_path)
+                        manifest = getattr(mod, "manifest", None)
+                        if isinstance(manifest, AgentManifest):
+                            registered.manifest = manifest
+                            self._index_slug(agent_name, registered)
+                    except ImportError:
+                        pass
+                return
 
         # Import the agent's __init__.py
         try:
@@ -91,9 +145,6 @@ class AgentRegistry:
         # Look for manifest
         manifest = getattr(mod, "manifest", None)
         if not isinstance(manifest, AgentManifest):
-            # Fallback: try class-agent discovery from agent.py
-            if self._discover_class_agent(agent_dir, package_prefix):
-                return
             logger.debug(f"  ⏭️ Skipping {agent_name} — no AgentManifest")
             return
 
@@ -111,58 +162,63 @@ class AgentRegistry:
             _studio_stream_fn=getattr(mod, "studio_stream_provider", None),
         )
 
-        # Discover optional enhancements
-        enhancements: list[str] = []
-
-        # graph.py → get_graph()
-        agent.graph_fn = self._discover_graph(module_path)
-        if agent.graph_fn:
-            enhancements.append("+graph")
-
-        # api.py → router (custom or auto-generated)
-        agent.router = self._discover_router(module_path, agent_name)
-        if agent.router:
-            enhancements.append("+router")
-
-        # config.py → agent config
-        agent.config = self._discover_config(module_path, agent_name)
-        if agent.config:
-            enhancements.append("+config")
-
-        # prompts.json → PromptManager
-        agent.prompt_manager = self._discover_prompts(agent_dir, agent_name)
-        if agent.prompt_manager:
-            enhancements.append("+prompts")
-
-        # llm.py → AgentLLMConfig
-        agent.llm_config = self._discover_llm_config(module_path, agent_name)
-        if agent.llm_config:
-            enhancements.append("+llm")
-
-        # schemas.py → SchemaValidator
-        agent.schema_validator = self._discover_schemas(module_path, agent_name)
-        if agent.schema_validator:
-            enhancements.append("+schemas")
-
-        # security.py → AgentSecurityPolicy
-        agent.security_policy = self._discover_security(module_path, agent_name)
-        if agent.security_policy:
-            enhancements.append("+security")
-
-        # delegation.py → delegation config
-        agent.delegation_config = self._discover_delegation(module_path, agent_name)
-        if agent.delegation_config:
-            enhancements.append("+delegation")
-
-        # connections.py → per-agent connection configs
-        agent.connections = self._discover_connections(module_path, agent_name)
-        if agent.connections:
-            enhancements.append("+connections")
+        self._enrich_registered_agent(agent, agent_dir, module_path, agent_name)
 
         # Register
         self._agents[agent_name] = agent
-        extras = " ".join(enhancements) if enhancements else "(minimal)"
+        self._index_slug(agent_name, agent)
+        extras = self._enhancement_summary(agent)
         logger.info(f"  ✅ Registered: {agent_name} ({manifest.slug}) {extras}")
+
+    def _enhancement_summary(self, agent: RegisteredAgent) -> str:
+        """Return a short log string of discovered enhancements."""
+        flags: list[str] = []
+        if agent.graph_fn:
+            flags.append("+graph")
+        if agent.router:
+            flags.append("+router")
+        if agent.config:
+            flags.append("+config")
+        if agent.prompt_manager:
+            flags.append("+prompts")
+        if agent.llm_config:
+            flags.append("+llm")
+        if agent.schema_validator:
+            flags.append("+schemas")
+        if agent.security_policy:
+            flags.append("+security")
+        if agent.delegation_config:
+            flags.append("+delegation")
+        if agent.connections:
+            flags.append("+connections")
+        return " ".join(flags) if flags else "(minimal)"
+
+    def _enrich_registered_agent(
+        self,
+        agent: RegisteredAgent,
+        agent_dir: Path,
+        module_path: str,
+        agent_name: str,
+    ) -> None:
+        """Attach optional package enhancements onto a RegisteredAgent."""
+        if not agent.graph_fn:
+            agent.graph_fn = self._discover_graph(module_path)
+        if not agent.router:
+            agent.router = self._discover_router(module_path, agent_name)
+        if not agent.config:
+            agent.config = self._discover_config(module_path, agent_name)
+        if not agent.prompt_manager:
+            agent.prompt_manager = self._discover_prompts(agent_dir, agent_name)
+        if not agent.llm_config:
+            agent.llm_config = self._discover_llm_config(module_path, agent_name)
+        if not agent.schema_validator:
+            agent.schema_validator = self._discover_schemas(module_path, agent_name)
+        if not agent.security_policy:
+            agent.security_policy = self._discover_security(module_path, agent_name)
+        if not agent.delegation_config:
+            agent.delegation_config = self._discover_delegation(module_path, agent_name)
+        if not agent.connections:
+            agent.connections = self._discover_connections(module_path, agent_name)
 
     def _discover_graph(self, module_path: str) -> Any:
         """Try to import ``get_graph()`` from agent's ``graph.py``."""
@@ -282,9 +338,30 @@ class AgentRegistry:
 
     # --- Accessors ---
 
+    def _index_slug(self, name: str, agent: RegisteredAgent) -> None:
+        """Index an agent by its slug for name-or-slug lookups."""
+        slug = getattr(agent.manifest, "slug", None) if agent.manifest else None
+        if slug and slug != name:
+            self._slug_index[slug] = name
+
     def get(self, name: str) -> RegisteredAgent | None:
-        """Get an agent by name."""
-        return self._agents.get(name)
+        """Get an agent by folder name or slug.
+
+        Studio and other clients often address agents by ``manifest.slug``,
+        while registration keys them by folder ``name``.  This lookup accepts
+        either so the Studio UI does not 404 when slug != name.
+        """
+        agent = self._agents.get(name)
+        if agent is not None:
+            return agent
+        mapped = self._slug_index.get(name)
+        if mapped is not None:
+            return self._agents.get(mapped)
+        # Last resort: scan by slug (covers agents registered before index)
+        for agent in self._agents.values():
+            if agent.manifest and agent.manifest.slug == name:
+                return agent
+        return None
 
     def all(self) -> dict[str, RegisteredAgent]:
         """Get all registered agents."""
@@ -336,6 +413,7 @@ class AgentRegistry:
             registered = agent.as_registered_agent()
             name = registered.name
             self._agents[name] = registered
+            self._index_slug(name, registered)
             logger.info(f"  ✅ Class-agent registered: {name}")
         except Exception as exc:
             logger.error(f"  ❌ Failed to register class-agent: {exc}")
@@ -374,9 +452,73 @@ class AgentRegistry:
                 and obj is not BaseGraphAgent
             ):
                 try:
-                    instance = obj()
+                    llm = self._resolve_agent_llm(agent_name, agent_dir, package_prefix)
+                    prompt_manager = self._discover_prompts(agent_dir, agent_name)
+                    instance = self._instantiate_class_agent(
+                        obj, llm=llm, prompt_manager=prompt_manager
+                    )
                     self.register_class_agent(instance)
                     return True
                 except Exception as exc:
                     logger.warning(f"  ⚠️ Could not instantiate {attr_name}: {exc}")
         return False
+
+    def _resolve_agent_llm(
+        self,
+        agent_name: str,
+        agent_dir: Path,
+        package_prefix: str,
+    ) -> Any:
+        """Resolve an LLM for *agent_name* from llm.py + stack / global get_llm."""
+        module_path = f"{package_prefix}.{agent_name}" if package_prefix else agent_name
+        llm_config = self._discover_llm_config(module_path, agent_name)
+        role = "default"
+        if llm_config is not None:
+            roles = getattr(llm_config, "roles", None)
+            if isinstance(roles, dict) and roles:
+                role = roles.get("default", next(iter(roles.values())))
+        try:
+            from agentomatic.providers.llm import get_llm_for_agent
+
+            return get_llm_for_agent(
+                agent_name,
+                role=role,
+                stack_manager=self.stack_manager,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Could not resolve LLM for {}: {}", agent_name, exc)
+            return None
+
+    @staticmethod
+    def _instantiate_class_agent(
+        cls: type,
+        *,
+        llm: Any = None,
+        prompt_manager: Any = None,
+    ) -> Any:
+        """Instantiate a BaseGraphAgent, injecting llm/prompt_manager when accepted."""
+        import inspect
+
+        try:
+            sig = inspect.signature(cls)
+            params = dict(sig.parameters)
+        except (TypeError, ValueError):
+            params = {}
+
+        kwargs: dict[str, Any] = {}
+        accepts_kwargs = any(p.kind == p.VAR_KEYWORD for p in params.values())
+        if llm is not None and ("llm" in params or accepts_kwargs):
+            kwargs["llm"] = llm
+        if prompt_manager is not None and ("prompt_manager" in params or accepts_kwargs):
+            kwargs["prompt_manager"] = prompt_manager
+
+        try:
+            return cls(**kwargs)
+        except TypeError:
+            # Older agents that only take llm=
+            if "llm" in kwargs and "prompt_manager" in kwargs:
+                try:
+                    return cls(llm=kwargs["llm"])
+                except TypeError:
+                    pass
+            return cls()

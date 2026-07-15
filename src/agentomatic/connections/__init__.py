@@ -28,9 +28,16 @@ from agentomatic.connections.models import (
     HttpConnectionConfig,
     VectorConnectionConfig,
 )
+from agentomatic.connections.stores import (
+    create_store_from_connection,
+    register_store_provider,
+    registered_store_providers,
+)
 from agentomatic.connections.vector import (
     VectorConnection,
+    VectorStore,
     register_vector_provider,
+    register_vector_store_adapter,
     registered_vector_providers,
 )
 
@@ -48,11 +55,16 @@ __all__ = [
     "HttpConnectionConfig",
     "VectorConnection",
     "VectorConnectionConfig",
+    "VectorStore",
     "all_managers",
+    "create_store_from_connection",
     "get_connections",
     "register_connection_type",
     "register_connections",
+    "register_store_provider",
     "register_vector_provider",
+    "register_vector_store_adapter",
+    "registered_store_providers",
     "registered_vector_providers",
     "reset_connections",
 ]

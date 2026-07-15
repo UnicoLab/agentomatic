@@ -620,6 +620,7 @@ class TestAdapterResolution:
         agent.name = "test_agent"
         agent.graph_fn = graph_fn
         agent.node_fn = node_fn
+        agent.class_instance = None
         agent.manifest = MagicMock()
         agent.manifest.name = "Test Agent"
         agent.manifest.description = "A test agent"
@@ -666,6 +667,28 @@ class TestAdapterResolution:
         agent = self._make_agent(node_fn=AsyncMock(), framework="langchain")
         adapter = resolve_adapter(agent)
         assert isinstance(adapter, LangChainAdapter)
+
+    def test_resolve_graph_agent_before_langgraph_graph_fn(self):
+        """Class agents expose graph_fn but must use GraphAgentAdapter."""
+        from agentomatic.studio.adapters import resolve_adapter
+        from agentomatic.studio.adapters.graph_agent import GraphAgentAdapter
+
+        mock_graph = MagicMock()
+        agent = self._make_agent(
+            graph_fn=MagicMock(return_value=mock_graph),
+            framework="graph_agent",
+        )
+        adapter = resolve_adapter(agent)
+        assert isinstance(adapter, GraphAgentAdapter)
+
+    def test_resolve_graph_agent_framework_without_instance(self):
+        from agentomatic.studio.adapters import resolve_adapter
+        from agentomatic.studio.adapters.graph_agent import GraphAgentAdapter
+
+        agent = self._make_agent(framework="graph_agent")
+        agent.class_instance = None
+        adapter = resolve_adapter(agent)
+        assert isinstance(adapter, GraphAgentAdapter)
 
 
 class TestGenericAdapter:

@@ -36,6 +36,7 @@ from .models import (
     TaskEvent,
     TaskProgress,
     TaskRecord,
+    TaskRetryConfig,
     TaskStatus,
 )
 from .routes import TaskSubmitRequest, create_task_router
@@ -56,6 +57,7 @@ __all__ = [
     "TaskManager",
     "TaskProgress",
     "TaskRecord",
+    "TaskRetryConfig",
     "TaskStatus",
     "TaskStore",
     "TaskSubmitRequest",

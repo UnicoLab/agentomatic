@@ -10,7 +10,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-_SKIP_PATHS = {"/health", "/healthz", "/readiness", "/docs", "/openapi.json", "/redoc", "/"}
+from agentomatic.middleware.pathutils import path_is_skipped
+
+_SKIP_PATHS = {
+    "/health",
+    "/healthz",
+    "/readiness",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/",
+    "/studio",
+    "/status",
+}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -39,7 +51,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self._skip_paths = skip_paths if skip_paths is not None else _SKIP_PATHS
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path in self._skip_paths:
+        if path_is_skipped(request.url.path, self._skip_paths):
             response: Response = await call_next(request)
             return response
 

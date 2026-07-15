@@ -34,6 +34,7 @@ from __future__ import annotations
 import itertools
 import random
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -214,7 +215,13 @@ class PromptSearchSpace:
     # -- serialisation ---------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialise the search space to a plain dictionary."""
+        """Serialise the search space to a plain dictionary.
+
+        The output is a full round-trip snapshot: it includes routing /
+        model-choice fields (``optimize_model_choice``, ``model_choices``,
+        ``fallback_models`` and ``routing_weight_space``) so
+        :meth:`from_dict` can reconstruct an identical search space.
+        """
         return {
             "optimize_system_prompt": self.optimize_system_prompt,
             "optimize_user_template": self.optimize_user_template,
@@ -222,9 +229,13 @@ class PromptSearchSpace:
             "optimize_model_params": self.optimize_model_params,
             "optimize_rag_params": self.optimize_rag_params,
             "optimize_tool_params": self.optimize_tool_params,
+            "optimize_model_choice": self.optimize_model_choice,
             "model_param_space": self.model_param_space,
             "rag_param_space": self.rag_param_space,
             "tool_param_space": self.tool_param_space,
+            "model_choices": self.model_choices,
+            "fallback_models": self.fallback_models,
+            "routing_weight_space": self.routing_weight_space,
             "max_few_shot_examples": self.max_few_shot_examples,
             "few_shot_selection_strategy": self.few_shot_selection_strategy,
         }
@@ -244,3 +255,127 @@ class PromptSearchSpace:
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
         filtered = {k: v for k, v in data.items() if k in known_fields}
         return cls(**filtered)
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> PromptSearchSpace:
+        """Load a search space from a YAML file.
+
+        The YAML file should mirror the structure produced by
+        :meth:`to_dict`. Unknown keys are silently ignored so a file can
+        forward-declare new options.
+
+        Parameters
+        ----------
+        path : str | Path
+            Filesystem path to a YAML file.
+
+        Returns
+        -------
+        PromptSearchSpace
+            The reconstructed search space.
+
+        Raises
+        ------
+        FileNotFoundError
+            If *path* does not exist.
+        ValueError
+            If the YAML document is not a mapping at the top level.
+        ImportError
+            If ``pyyaml`` is not installed.
+
+        Examples
+        --------
+        >>> # Given ``search_space.yaml``::
+        >>> #     optimize_model_params: true
+        >>> #     model_param_space:
+        >>> #       temperature: [0.0, 0.2, 0.7]
+        >>> #       top_p: [0.9, 1.0]
+        >>> space = PromptSearchSpace.from_yaml("search_space.yaml")  # doctest: +SKIP
+        >>> space.n_combinations("model")                             # doctest: +SKIP
+        6
+        """
+        try:
+            import yaml
+        except ImportError as exc:
+            msg = (
+                "PyYAML is required for PromptSearchSpace.from_yaml — "
+                "install with 'pip install pyyaml'."
+            )
+            raise ImportError(msg) from exc
+
+        file_path = Path(path)
+        if not file_path.exists():
+            msg = f"Search-space YAML file not found: {file_path}"
+            raise FileNotFoundError(msg)
+
+        raw = file_path.read_text(encoding="utf-8")
+        data = yaml.safe_load(raw) or {}
+        if not isinstance(data, dict):
+            msg = (
+                f"Search-space YAML must be a mapping at the top level, "
+                f"got {type(data).__name__} in {file_path}"
+            )
+            raise ValueError(msg)
+
+        logger.info("Loaded search space from {}", file_path)
+        return cls.from_dict(data)
+
+    def to_yaml(self, path: str | Path) -> Path:
+        """Write the search space to a YAML file.
+
+        Parameters
+        ----------
+        path : str | Path
+            Destination filesystem path.
+
+        Returns
+        -------
+        Path
+            The path the search space was written to.
+
+        Raises
+        ------
+        ImportError
+            If ``pyyaml`` is not installed.
+        """
+        try:
+            import yaml
+        except ImportError as exc:
+            msg = (
+                "PyYAML is required for PromptSearchSpace.to_yaml — "
+                "install with 'pip install pyyaml'."
+            )
+            raise ImportError(msg) from exc
+
+        file_path = Path(path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(
+            yaml.safe_dump(self.to_dict(), sort_keys=False),
+            encoding="utf-8",
+        )
+        logger.info("Wrote search space to {}", file_path)
+        return file_path
+
+
+def load_search_space(path: str | Path) -> PromptSearchSpace:
+    """Load a :class:`PromptSearchSpace` from a YAML file.
+
+    Convenience wrapper around :meth:`PromptSearchSpace.from_yaml` for use
+    from CLI entrypoints and notebooks::
+
+        from agentomatic.optimize.search_space import load_search_space
+
+        space = load_search_space("search_space.yaml")
+        print(space.total_search_size())
+
+    Parameters
+    ----------
+    path : str | Path
+        Filesystem path to a YAML file.
+
+    Returns
+    -------
+    PromptSearchSpace
+        The reconstructed search space.
+    """
+    return PromptSearchSpace.from_yaml(path)

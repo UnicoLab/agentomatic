@@ -282,6 +282,7 @@ class TestDeepAgentAdapterResolution:
         agent.name = "deep_test"
         agent.graph_fn = graph_fn
         agent.node_fn = node_fn
+        agent.class_instance = None
         agent.manifest = MagicMock()
         agent.manifest.name = "Deep Test"
         agent.manifest.description = "A deep agent test"

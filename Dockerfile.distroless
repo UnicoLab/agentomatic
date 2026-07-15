@@ -1,5 +1,7 @@
 # Distroless Docker build for Agentomatic
-# Minimal attack surface using Google's distroless base
+# Minimal attack surface using Google's distroless base — runs as the
+# built-in ``nonroot`` account (numeric UID 65532) so images honour
+# Kubernetes ``runAsNonRoot`` admission policies out of the box.
 
 # Build stage
 FROM python:3.12-slim AS builder
@@ -34,8 +36,11 @@ COPY src/ ./src/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-# Production stage — distroless
-FROM gcr.io/distroless/python3-debian12
+# Ensure the runtime user (uid 65532 / nonroot) can read the venv and sources
+RUN chown -R 65532:65532 /app
+
+# Production stage — distroless, non-root by default
+FROM gcr.io/distroless/python3-debian12:nonroot
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -46,13 +51,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Copy virtual environment and application from builder
-COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/src /app/src
-COPY --from=builder /app/pyproject.toml /app/
+COPY --from=builder --chown=65532:65532 /app/.venv /app/.venv
+COPY --from=builder --chown=65532:65532 /app/src /app/src
+COPY --from=builder --chown=65532:65532 /app/pyproject.toml /app/
+
+# Explicit numeric UID so Kubernetes ``runAsNonRoot`` admission does not
+# have to introspect the base image at admit-time.
+USER 65532:65532
 
 # Expose port
 EXPOSE 8000
 
-# Run via the venv python — distroless has no shell
-ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
-CMD ["agentomatic.core.platform:app", "--host", "0.0.0.0", "--port", "8000"]
+# Distroless has no shell, but it can execute binaries directly.  We
+# invoke the ``agentomatic`` console script (installed by uv into
+# ``/app/.venv/bin``) via the venv Python so both the plain and
+# distroless images boot through the same ``agentomatic run`` entrypoint.
+ENTRYPOINT ["/app/.venv/bin/python", "/app/.venv/bin/agentomatic"]
+CMD ["run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]

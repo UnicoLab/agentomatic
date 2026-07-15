@@ -1,6 +1,45 @@
 # CHANGELOG
 
 
+## v1.2.1 (2026-07-16)
+
+Patch release with production/wiring fixes that landed after the 1.2.0 cut.
+Full detail lives in [`docs/changelog.md`](docs/changelog.md); highlights:
+
+### Bug Fixes
+
+- Class-agent `langgraph.json` targets `./agent.py:get_graph` (module-level
+  `get_graph()` export) instead of a broken `./graph.py` reference
+- Plugin train/optimize stubs exit with `SystemExit(1)` and plugin `eval`
+  computes a real metric (or fails clearly) instead of faking success
+- `agentomatic optimize --llm` resolves its default from
+  `AGENTOMATIC_TASK_MODEL` / `LLM__MODEL` before falling back to a local model
+- OpenAPI fallback lists paths from `app.routes` when schema generation fails,
+  keeping `/docs` usable; `has_graph` is true when `agent.py` or `graph.py`
+  exists
+- Studio client sends both `X-Api-Key` and `Authorization: Bearer` headers on
+  REST + SSE requests; type-check errors in tasks/registry/pipelines/status
+  resolved
+
+### Bug Fixes (production-readiness audit)
+
+- Class agents work on every server path (REST `invoke`/`chat`/`invoke/stream`/
+  `optimize`/A2A/approve + Studio streaming): route through
+  `invoke_registered_agent` / `input_to_state` instead of `graph.ainvoke(dict)`,
+  so dataclass-state agents no longer 500
+- `agentomatic deploy` builds in real projects: Dockerfile installs
+  `agentomatic[all]==<version>` from PyPI, copies existing project dirs, and runs
+  `uvicorn main:app`; `init --project` emits a pinned `requirements.txt`
+- `agentomatic run --reload` / `workers>1` uses a factory import string instead
+  of exiting with code 1 (programmatic platforms degrade gracefully)
+- `--require-auth-globally` refuses to start without JWKS/API-key auth instead
+  of accepting forged/unsigned JWTs; expiry is always verified
+- `AGENTOMATIC_AGENTS` env var now scopes agent discovery (deploy stubs isolate
+  a single agent per replica)
+- `PromptFitterBridge.optimize()` records `agent._last_optimize_status` so a
+  skipped run is observable
+
+
 ## v1.2.0 (2026-07-14)
 
 ### Features

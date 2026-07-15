@@ -1,8 +1,10 @@
-"""Optimization mixin — compile strategy and fit with an optimizer.
+"""Optimization mixin — legacy thin compile/fit helpers.
 
-``compile()`` stores the optimization strategy (dataset, metrics,
-optimizer). ``fit()`` executes the optimizer and stores results
-in ``compiled_config``.
+Prefer :class:`~agentomatic.agents.base.BaseGraphAgent` which owns
+the full Keras-style lifecycle (``History``, epochs, callbacks,
+``PromptFitterBridge``, per-call ``search_space`` / ``optimize_mode``).
+
+This mixin remains for optional composition outside ``BaseGraphAgent``.
 """
 
 from __future__ import annotations
@@ -19,11 +21,13 @@ if TYPE_CHECKING:
 
 
 class OptimizationMixin:
-    """Mixin for agent optimization workflows.
+    """Legacy mixin for a simple compile → fit optimization loop.
 
-    Provides a two-phase API:
-    1. ``compile()`` — register the optimization strategy.
-    2. ``fit()`` — execute the optimizer and apply results.
+    .. note::
+        New code should use :class:`~agentomatic.agents.base.BaseGraphAgent`,
+        whose ``fit()`` returns a :class:`~agentomatic.agents.history.History`
+        and supports epochs, callbacks, validation data, and PromptFitter
+        knobs. This mixin does **not** implement that surface.
 
     Attributes:
         compiled_config: Configuration produced by the optimizer.
@@ -85,11 +89,14 @@ class OptimizationMixin:
         self,
         dataset: AgentDataset | None = None,
     ) -> Self:
-        """Run the optimizer and apply results.
+        """Run the optimizer and apply results (legacy, non-History API).
 
         Uses the dataset from ``compile()`` if none is provided.
         Stores optimizer output in ``compiled_config`` and
         invalidates the cached graph.
+
+        For Keras-style training with ``History`` / epochs / callbacks,
+        use :meth:`BaseGraphAgent.fit` instead.
 
         Args:
             dataset: Optional override dataset. Falls back to the

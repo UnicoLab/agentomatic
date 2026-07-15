@@ -7,7 +7,7 @@
 
 ---
 
-Agentomatic ships with **8 templates** for rapid agent creation. Each template generates a complete, runnable agent package with the right files, structure, and boilerplate for your use case.
+Agentomatic ships with **14 templates** for rapid agent creation. Each template generates a complete, runnable agent package with the right files, structure, and boilerplate for your use case.
 
 ---
 
@@ -58,64 +58,28 @@ Both commands create the agent folder at `agents/my_agent/` with all necessary f
 
 ### `basic` — Minimal Agent
 
-The simplest starting point. Three core files plus common scaffolding.
+The simplest starting point — a class-owned ``BaseGraphAgent`` (also
+available as ``--template class``).
 
 ```bash
 agentomatic init my_agent --template basic
+# or: agentomatic init my_agent --template class
 ```
 
 ```text
 agents/my_agent/
-├── __init__.py          # Manifest + node_fn (delegates to graph)
-├── graph.py             # Single-node StateGraph: process → END
-├── nodes.py             # process() node function
+├── __init__.py          # AgentManifest card
+├── agent.py             # BaseGraphAgent subclass
+├── llm.py               # Stack-aware LLM helpers
 ├── prompts.json         # v1/v2 prompt templates
 ├── langgraph.json       # LangGraph Studio config
 ├── .env.example         # Environment variable template
 └── README.md            # Agent documentation
 ```
 
-??? example "Generated `__init__.py`"
-
-    ```python
-    """Agent: my_agent."""
-    from __future__ import annotations
-    from typing import Any
-    from agentomatic import AgentManifest
-
-    manifest = AgentManifest(
-        name="my_agent",
-        slug="agent-my_agent",
-        description="My Agent agent",
-        intent_keywords=["my_agent"],
-        framework="langgraph",
-    )
-
-    async def node_fn(state: dict[str, Any]) -> dict[str, Any]:
-        from .graph import get_graph
-        return await get_graph().ainvoke(state)
-    ```
-
-??? example "Generated `graph.py`"
-
-    ```python
-    """LangGraph graph for my_agent."""
-    from functools import lru_cache
-    from langgraph.graph import END, StateGraph
-    from agentomatic import BaseAgentState
-    from . import nodes
-
-    def build_graph() -> StateGraph:
-        g = StateGraph(BaseAgentState)
-        g.add_node("process", nodes.process)
-        g.set_entry_point("process")
-        g.add_edge("process", END)
-        return g
-
-    @lru_cache(maxsize=1)
-    def get_graph():
-        return build_graph().compile()
-    ```
+!!! tip "Class-agent layout"
+    `basic` / `class` emit `agent.py` + `llm.py` — not the legacy
+    `graph.py` / `nodes.py` layout (use `--template legacy_dict` for that).
 
 ---
 
@@ -129,17 +93,21 @@ agentomatic init my_agent --template full
 
 ```text
 agents/my_agent/
-├── __init__.py          # Manifest + node_fn
-├── graph.py             # Single-node StateGraph
-├── nodes.py             # process() node function
+├── __init__.py          # AgentManifest card
+├── agent.py             # BaseGraphAgent subclass (+ get_graph export)
+├── llm.py               # Stack-aware LLM helpers
 ├── config.py            # Pydantic config (MyAgentConfig)
 ├── schemas.py           # Custom request/response models
-├── tools.py             # LangChain tool definitions
-├── api.py               # Custom FastAPI router (replaces auto-routes)
-├── prompts.json         # v1/v2 prompt templates
-├── langgraph.json       # LangGraph Studio config
-├── .env.example         # Environment variable template
-└── README.md            # Agent documentation
+├── tools.py             # Tool definitions
+├── api.py               # Optional custom FastAPI router
+├── dataset.jsonl        # Sample train/eval data
+├── train.py / eval.py / optimize.py / predict.py
+├── search_space.yaml    # PromptFitter search space
+├── Makefile
+├── prompts.json
+├── langgraph.json       # Points at ./agent.py:get_graph
+├── .env.example
+└── README.md
 ```
 
 ??? example "Generated `config.py`"
@@ -207,65 +175,20 @@ agentomatic init knowledge_bot --template rag
 
 ```text
 agents/knowledge_bot/
-├── __init__.py          # Manifest with RAG keywords
-├── graph.py             # Two-stage: retrieve → generate → END
-├── nodes.py             # retrieve() + generate() nodes
+├── __init__.py          # AgentManifest with RAG keywords
+├── agent.py             # BaseGraphAgent: retrieve → generate
+├── llm.py               # Stack-aware LLM helpers
 ├── config.py            # Pydantic config
-├── tools.py             # Search tool definitions
-├── prompts.json         # v1/v2 prompt templates
-├── langgraph.json       # LangGraph Studio config
-├── .env.example         # Environment variable template
-└── README.md            # Agent documentation
+├── tools.py             # Search tool stubs
+├── prompts.json
+├── langgraph.json       # ./agent.py:get_graph
+├── .env.example
+└── README.md
 ```
 
-??? example "Generated RAG `graph.py`"
-
-    ```python
-    """RAG graph for knowledge_bot: retrieve -> generate."""
-    from functools import lru_cache
-    from langgraph.graph import END, StateGraph
-    from agentomatic import BaseAgentState
-    from . import nodes
-
-    def build_graph() -> StateGraph:
-        g = StateGraph(BaseAgentState)
-        g.add_node("retrieve", nodes.retrieve)
-        g.add_node("generate", nodes.generate)
-        g.set_entry_point("retrieve")
-        g.add_edge("retrieve", "generate")
-        g.add_edge("generate", END)
-        return g
-
-    @lru_cache(maxsize=1)
-    def get_graph():
-        return build_graph().compile()
-    ```
-
-??? example "Generated RAG `nodes.py`"
-
-    ```python
-    """RAG node functions for knowledge_bot."""
-
-    async def retrieve(state: dict) -> dict:
-        """Retrieve relevant documents."""
-        query = state.get("current_query", "")
-        # TODO: Replace with real vector search
-        docs = [
-            {"content": f"Document about {query}", "source": "knowledge_base"},
-        ]
-        return {"citations": docs, "steps_taken": ["retrieved_docs"]}
-
-    async def generate(state: dict) -> dict:
-        """Generate response using retrieved context."""
-        query = state.get("current_query", "")
-        citations = state.get("citations", [])
-        context = "\n".join(d.get("content", "") for d in citations)
-        return {
-            "response": f"Based on the knowledge base: Answer to '{query}'",
-            "agent_type": "agent-knowledge_bot",
-            "steps_taken": ["generated_response"],
-        }
-    ```
+!!! tip "Class-agent RAG"
+    The `rag` template is a `BaseGraphAgent` with `retrieve` + `generate`
+    nodes — not the legacy `graph.py` / `nodes.py` layout.
 
 ---
 
@@ -279,34 +202,19 @@ agentomatic init assistant --template chatbot
 
 ```text
 agents/assistant/
-├── __init__.py          # Manifest with chat keywords
-├── graph.py             # Single-node: respond → END
-├── nodes.py             # respond() with conversation history access
+├── __init__.py          # AgentManifest with chat keywords
+├── agent.py             # BaseGraphAgent conversational agent
+├── llm.py               # Stack-aware LLM helpers
 ├── config.py            # Pydantic config
-├── prompts.json         # v1/v2 prompt templates
-├── langgraph.json       # LangGraph Studio config
-├── .env.example         # Environment variable template
-└── README.md            # Agent documentation
+├── prompts.json
+├── langgraph.json       # ./agent.py:get_graph
+├── .env.example
+└── README.md
 ```
 
-??? example "Generated chatbot `nodes.py`"
-
-    ```python
-    """Chatbot node functions for assistant with conversation memory."""
-
-    async def respond(state: dict) -> dict:
-        """Generate a conversational response."""
-        query = state.get("current_query", "")
-        messages = state.get("messages", [])
-        history_len = len(messages)
-
-        # TODO: Replace with real LLM call
-        return {
-            "response": f"[Turn {history_len + 1}] You said: {query}",
-            "agent_type": "agent-assistant",
-            "suggestions": ["Tell me more", "Change topic", "Goodbye"],
-        }
-    ```
+!!! tip "Class-agent chatbot"
+    The `chatbot` template is a `BaseGraphAgent` subclass with prompt-backed
+    conversation, not the legacy `graph.py` / `nodes.py` layout.
 
 ---
 
@@ -726,7 +634,7 @@ All templates (except `custom` and `deepagent`) include these common files:
 | File | Purpose |
 |------|---------|
 | `prompts.json` | Two prompt versions (`v1` concise, `v2` detailed) with system and user templates |
-| `langgraph.json` | LangGraph Studio configuration pointing to `./graph.py:get_graph` |
+| `langgraph.json` | LangGraph Studio config (`./agent.py:get_graph` for class agents, `./graph.py:get_graph` for legacy) |
 | `.env.example` | Template for agent-specific env vars (LLM settings, feature flags) |
 | `README.md` | Auto-generated documentation with quick start commands and file reference |
 
