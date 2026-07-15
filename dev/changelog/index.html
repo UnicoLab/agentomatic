@@ -2583,6 +2583,9 @@ breaking API changes.</p>
 <li><strong><code>PromptFitterBridge.optimize()</code> (P2)</strong>: records a structured
   <code>agent._last_optimize_status</code> (<code>"ok"</code> / <code>"skipped: &lt;reason&gt;"</code>) so callers can
   tell whether optimization ran instead of silently no-op'ing</li>
+<li><strong>CORS hardening (P2)</strong>: wildcard origins (<code>cors_origins=["*"]</code>) no longer
+  send <code>Access-Control-Allow-Credentials: true</code> — credentials are auto-disabled
+  (with a one-time warning) unless explicit origins are configured</li>
 </ul>
 <hr />
 <h2 id="120-2026-07-15">[1.2.0] — 2026-07-15<a class="headerlink" href="#120-2026-07-15" title="Permanent link">&para;</a></h2>
