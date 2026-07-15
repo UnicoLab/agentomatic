@@ -95,9 +95,9 @@ This creates a self-contained agent package under `agents/`:
 
 ```text
 agents/my_chatbot/
-├── __init__.py      # Optional Python package init
-├── agent.py         # REQUIRED: Contains your BaseGraphAgent subclass
-├── config.py        # Pydantic configuration (model, temperature, etc.)
+├── __init__.py      # AgentManifest card
+├── agent.py         # REQUIRED: BaseGraphAgent subclass
+├── llm.py           # Stack-aware LLM helpers
 ├── prompts.json     # Versioned system and user prompt templates
 ├── langgraph.json   # LangGraph Studio local settings
 ├── .env.example     # Environment variables blueprint
@@ -107,14 +107,17 @@ agents/my_chatbot/
 !!! note "Available Templates"
     | Template | Description |
     |----------|-------------|
-    | `basic` | Minimal class-based agent (recommended) — quick start |
+    | `basic` / `class` | Minimal class-based agent (recommended) — quick start |
     | `chatbot` | Conversational class-based agent with memory |
     | `rag` | RAG class-based agent — retrieve → generate pipeline |
-    | `full` | All features: class agent with config, schemas, api, tools, prompts |
+    | `full` | All features: class agent with config, schemas, train/eval |
+    | `coordinator` | Orchestrator that routes to specialists |
+    | `pipeline` | Multi-step YAML workflow |
     | `deepagent` | Deep Agent with planning, tools, subagents |
     | `custom` | Framework-agnostic — no LangGraph dependency |
-    | `legacy_dict` | Legacy functional agent — `__init__.py` with `manifest` + `node_fn` |
-    | `plugin` | ML Model Plugin — wrap classical ML models with REST endpoints |
+    | `legacy_dict` | Legacy functional agent — `manifest` + `node_fn` |
+    | `plugin` | ML Model Plugin with REST endpoints |
+    | `endpoint` / `connection` / `ingestion` / `extraction` | Ops / RAG building blocks |
 
     Select interactively by omitting the `--template` flag:
     ```bash

@@ -124,6 +124,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         # Training lifecycle (Keras-style)
         self.history: History | None = None
         self.stop_training: bool = False
+        self._fit_optimize_options: dict[str, Any] | None = None
 
         # Evaluation
         self.evaluation_history: list[EvaluationReport] = []
@@ -420,7 +421,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
     def evaluate(
         self,
         dataset: list[AgentExample] | AgentDataset,
-        metrics: Sequence[Metric],
+        metrics: Sequence[Metric] | None = None,
     ) -> EvaluationReport:
         """Evaluate the agent on a dataset.
 
@@ -429,12 +430,23 @@ class BaseGraphAgent(ABC, Generic[StateT]):
 
         Args:
             dataset: Examples to evaluate on.
-            metrics: Metrics to compute.
+            metrics: Metrics to compute. Defaults to the metrics passed
+                to :meth:`compile` when omitted.
 
         Returns:
             An ``EvaluationReport`` with scores and per-example
             results.
+
+        Raises:
+            ValueError: If no metrics are available.
         """
+        if metrics is None:
+            metrics = list(self._compile_metrics)
+        if not metrics:
+            raise ValueError(
+                "No metrics provided. Pass metrics=... to evaluate() "
+                "or compile(metrics=...) first."
+            )
         examples = dataset.examples if isinstance(dataset, AgentDataset) else dataset
         dataset_name = dataset.name if isinstance(dataset, AgentDataset) else "inline"
 
@@ -519,6 +531,11 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             Self for chaining.
         """
         metrics = list(metrics or [])
+        if not metrics:
+            logger.warning(
+                "compile() called without metrics — fit()/evaluate() will "
+                "have no training signal until metrics are provided."
+            )
         self._optimizer = optimizer
         self._compile_metrics = metrics
         self._compile_dataset = dataset
@@ -543,6 +560,16 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         verbose: int = 1,
         callbacks: Sequence[Callback] | None = None,
         validation_data: AgentDataset | list[AgentExample] | None = None,
+        # --- Optimize surface (what to tune this fit) -------------------
+        search_space: Any | None = None,
+        optimize_mode: str | None = None,
+        optimize_prompt: bool | None = None,
+        optimize_params: bool | None = None,
+        optimize_few_shot: bool | None = None,
+        model_param_space: dict[str, list[Any]] | None = None,
+        max_trials: int | None = None,
+        optimizer: Optimizer | None = None,
+        **optimize_kwargs: Any,
     ) -> History:
         """Train the agent and return a Keras-style :class:`History`.
 
@@ -552,6 +579,23 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         values. Callbacks receive ``on_epoch_end(epoch, logs)`` and may set
         ``agent.stop_training`` to halt early (see :class:`EarlyStopping`).
 
+        Optimize configuration — optionally override what this ``fit()``
+        tunes without recompiling:
+
+        * ``search_space`` — a :class:`~agentomatic.optimize.PromptSearchSpace`,
+          a ``dict``, or a path to a YAML file (via ``load_search_space``).
+        * ``optimize_mode`` — fitter strategy
+          (``rewrite`` / ``param_search`` / ``gepa_like`` / ``mipro_like`` /
+          ``few_shot`` / ``prompt_only``).
+        * ``optimize_prompt`` / ``optimize_params`` / ``optimize_few_shot`` —
+          boolean toggles mirrored onto the search space.
+        * ``model_param_space`` — grid for model params
+          (e.g. ``{"temperature": [0.0, 0.2, 0.7]}``).
+        * ``max_trials`` — cap on optimization trials.
+        * ``optimizer`` — one-shot optimizer override for this call.
+        * ``**optimize_kwargs`` — forwarded to :class:`PromptFitter` /
+          :class:`PromptFitterBridge`.
+
         Args:
             dataset: Training data. Defaults to the dataset passed to
                 ``compile``. An ``AgentDataset`` uses its ``train`` split when
@@ -560,6 +604,15 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             verbose: ``0`` = silent, ``1`` = per-epoch log line.
             callbacks: Optional list of :class:`Callback` instances.
             validation_data: Optional held-out data scored as ``val_*`` keys.
+            search_space: What dimensions to search (see above).
+            optimize_mode: Fitter / optimizer strategy name.
+            optimize_prompt: Whether to rewrite prompts.
+            optimize_params: Whether to search model/rag/tool params.
+            optimize_few_shot: Whether to tune few-shot examples.
+            model_param_space: Explicit model-param grid.
+            max_trials: Trial budget for the fitter.
+            optimizer: Optional optimizer override for this call only.
+            **optimize_kwargs: Extra kwargs for the fitter bridge.
 
         Returns:
             A :class:`History` (also stored on ``self.history``).
@@ -572,14 +625,41 @@ class BaseGraphAgent(ABC, Generic[StateT]):
 
         metrics = list(self._compile_metrics)
         loss = self._loss
+
+        active_optimizer = optimizer if optimizer is not None else self._optimizer
+        fit_options = self._build_fit_optimize_options(
+            search_space=search_space,
+            optimize_mode=optimize_mode,
+            optimize_prompt=optimize_prompt,
+            optimize_params=optimize_params,
+            optimize_few_shot=optimize_few_shot,
+            model_param_space=model_param_space,
+            max_trials=max_trials,
+            **optimize_kwargs,
+        )
+        if fit_options and active_optimizer is None:
+            active_optimizer = self._maybe_make_prompt_fitter(fit_options)
+        elif fit_options and active_optimizer is not None:
+            from agentomatic.agents.optimizers import PromptFitterBridge
+
+            if not isinstance(active_optimizer, PromptFitterBridge):
+                logger.warning(
+                    "fit() optimize knobs (search_space / optimize_mode / …) are "
+                    f"ignored because optimizer is {type(active_optimizer).__name__}, "
+                    "not PromptFitterBridge. Pass optimizer=None to auto-build a "
+                    "bridge, or compile with PromptFitterBridge."
+                )
+        self._fit_optimize_options = fit_options or None
+
         history = History(
             params={
                 "epochs": epochs,
-                "optimizer": type(self._optimizer).__name__ if self._optimizer else "none",
+                "optimizer": type(active_optimizer).__name__ if active_optimizer else "none",
                 "metrics": [m.name for m in metrics],
                 "loss": loss.name if loss else "none",
                 "train_size": len(train_examples),
                 "val_size": len(val_examples),
+                "optimize": fit_options or {},
             }
         )
         self.history = history
@@ -595,44 +675,153 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             f"Fitting {self.agent_name}: {epochs} epoch(s), {len(train_examples)} train example(s)"
         )
 
-        for epoch in range(epochs):
-            for cb in callbacks:
-                cb.on_epoch_begin(epoch)
+        try:
+            for epoch in range(epochs):
+                for cb in callbacks:
+                    cb.on_epoch_begin(epoch)
 
-            # Optimization step (if an optimizer was compiled in).
-            if self._optimizer is not None and dataset is not None:
-                opt_dataset = dataset if isinstance(dataset, AgentDataset) else None
-                if opt_dataset is None:
-                    opt_dataset = AgentDataset(name="inline", examples=list(train_examples))
-                config = self._optimizer.optimize(self, opt_dataset, metrics)
-                if config:
-                    self.compiled_config.update(config)
-                    for key, value in config.items():
-                        if hasattr(self, key) and not key.startswith("_"):
-                            setattr(self, key, value)
-                    self.invalidate_graph()
+                # Optimization step (if an optimizer was compiled / passed in).
+                if active_optimizer is not None and dataset is not None:
+                    opt_dataset = dataset if isinstance(dataset, AgentDataset) else None
+                    if opt_dataset is None:
+                        opt_dataset = AgentDataset(name="inline", examples=list(train_examples))
+                    config = active_optimizer.optimize(self, opt_dataset, metrics)
+                    if config:
+                        self.compiled_config.update(config)
+                        for key, value in config.items():
+                            if hasattr(self, key) and not key.startswith("_"):
+                                setattr(self, key, value)
+                        self.invalidate_graph()
 
-            logs = self._epoch_logs(train_examples, metrics, loss)
-            if val_examples:
-                val_logs = self._epoch_logs(val_examples, metrics, loss)
-                logs.update({f"val_{k}": v for k, v in val_logs.items()})
+                logs = self._epoch_logs(train_examples, metrics, loss)
+                if val_examples:
+                    val_logs = self._epoch_logs(val_examples, metrics, loss)
+                    logs.update({f"val_{k}": v for k, v in val_logs.items()})
 
-            history.record(epoch, logs)
+                history.record(epoch, logs)
 
-            if verbose:
-                metric_str = " - ".join(f"{k}: {v:.4f}" for k, v in logs.items())
-                logger.info(f"Epoch {epoch + 1}/{epochs} - {metric_str}")
+                if verbose:
+                    metric_str = " - ".join(f"{k}: {v:.4f}" for k, v in logs.items())
+                    logger.info(f"Epoch {epoch + 1}/{epochs} - {metric_str}")
 
-            for cb in callbacks:
-                cb.on_epoch_end(epoch, logs)
+                for cb in callbacks:
+                    cb.on_epoch_end(epoch, logs)
 
-            if self.stop_training:
-                break
+                if self.stop_training:
+                    break
+        finally:
+            self._fit_optimize_options = None
 
         for cb in callbacks:
             cb.on_train_end()
 
         return history
+
+    def _build_fit_optimize_options(
+        self,
+        *,
+        search_space: Any | None = None,
+        optimize_mode: str | None = None,
+        optimize_prompt: bool | None = None,
+        optimize_params: bool | None = None,
+        optimize_few_shot: bool | None = None,
+        model_param_space: dict[str, list[Any]] | None = None,
+        max_trials: int | None = None,
+        **optimize_kwargs: Any,
+    ) -> dict[str, Any]:
+        """Normalize per-``fit()`` optimize knobs into a single dict."""
+        options: dict[str, Any] = dict(optimize_kwargs)
+        resolved_space = self._coerce_search_space(
+            search_space,
+            optimize_prompt=optimize_prompt,
+            optimize_params=optimize_params,
+            optimize_few_shot=optimize_few_shot,
+            model_param_space=model_param_space,
+        )
+        if resolved_space is not None:
+            options["search_space"] = resolved_space
+        if optimize_mode is not None:
+            options["optimizer"] = "rewrite" if optimize_mode == "prompt_only" else optimize_mode
+        if max_trials is not None:
+            options["max_trials"] = max_trials
+        if optimize_prompt is not None:
+            options["optimize_prompt"] = optimize_prompt
+        if optimize_params is not None:
+            options["optimize_params"] = optimize_params
+        if optimize_few_shot is not None:
+            options["optimize_few_shot"] = optimize_few_shot
+        return options
+
+    @staticmethod
+    def _coerce_search_space(
+        search_space: Any,
+        *,
+        optimize_prompt: bool | None = None,
+        optimize_params: bool | None = None,
+        optimize_few_shot: bool | None = None,
+        model_param_space: dict[str, list[Any]] | None = None,
+    ) -> Any | None:
+        """Accept PromptSearchSpace / dict / path / None and apply toggles."""
+        if (
+            search_space is None
+            and optimize_prompt is None
+            and optimize_params is None
+            and optimize_few_shot is None
+            and model_param_space is None
+        ):
+            return None
+
+        try:
+            from agentomatic.optimize.search_space import (
+                PromptSearchSpace,
+                load_search_space,
+            )
+        except Exception:  # noqa: BLE001
+            return search_space
+
+        space: Any
+        if search_space is None:
+            space = PromptSearchSpace()
+        elif isinstance(search_space, PromptSearchSpace):
+            space = search_space
+        elif isinstance(search_space, dict):
+            space = PromptSearchSpace.from_dict(search_space)
+        elif isinstance(search_space, (str, Path)):
+            space = load_search_space(search_space)
+        else:
+            space = search_space
+
+        if optimize_prompt is not None and hasattr(space, "optimize_system_prompt"):
+            space.optimize_system_prompt = optimize_prompt
+            space.optimize_user_template = optimize_prompt
+        if optimize_params is not None and hasattr(space, "optimize_model_params"):
+            space.optimize_model_params = optimize_params
+        if optimize_few_shot is not None and hasattr(space, "optimize_few_shot"):
+            space.optimize_few_shot = optimize_few_shot
+        if model_param_space is not None and hasattr(space, "model_param_space"):
+            space.model_param_space = dict(model_param_space)
+        return space
+
+    def _maybe_make_prompt_fitter(self, fit_options: dict[str, Any]) -> Any | None:
+        """Build a PromptFitterBridge when fit() was given optimize knobs."""
+        try:
+            from agentomatic.agents.optimizers import PromptFitterBridge
+        except Exception:  # noqa: BLE001
+            return None
+        kwargs = {
+            k: v
+            for k, v in fit_options.items()
+            if k
+            not in {
+                "optimize_prompt",
+                "optimize_params",
+                "optimize_few_shot",
+            }
+        }
+        return PromptFitterBridge(
+            agent_name=self.agent_name,
+            **kwargs,
+        )
 
     def _epoch_logs(
         self,
@@ -725,6 +914,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         - ``config.json`` — compiled configuration
         - ``metadata.json`` — compilation metadata
         - ``evaluation_history.json`` — past evaluation reports
+        - ``fit_history.json`` — Keras-style ``History`` from the last ``fit()``
 
         Args:
             path: Directory to save to.
@@ -746,7 +936,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         with open(path / "metadata.json", "w") as f:
             json.dump(meta, f, indent=2)
 
-        # Save evaluation history
+        # Save evaluation history (full round-trip payload)
         history = []
         for report in self.evaluation_history:
             history.append(
@@ -756,12 +946,37 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                     "scores": report.scores,
                     "num_examples": report.num_examples,
                     "pass_rate": report.pass_rate,
+                    "metadata": report.metadata,
+                    "example_results": [
+                        {
+                            "example_id": er.example_id,
+                            "prediction": er.prediction,
+                            "scores": er.scores,
+                            "duration_ms": er.duration_ms,
+                            "error": er.error,
+                            "metadata": er.metadata,
+                        }
+                        for er in report.example_results
+                    ],
                 }
             )
         with open(path / "evaluation_history.json", "w") as f:
             json.dump(history, f, indent=2)
 
+        # Save Keras-style fit History if present
+        if self.history is not None:
+            with open(path / "fit_history.json", "w") as f:
+                json.dump(self.history.to_dict(), f, indent=2)
+
         logger.info(f"Saved agent state to {path}")
+
+    def load(self, path: str | Path) -> None:
+        """Alias for :meth:`load_compiled` (Keras-style naming).
+
+        Args:
+            path: Directory containing saved state.
+        """
+        self.load_compiled(path)
 
     def load_compiled(self, path: str | Path) -> None:
         """Load compiled config from a saved directory.
@@ -785,6 +1000,49 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         for key, value in self.compiled_config.items():
             if hasattr(self, key) and not key.startswith("_"):
                 setattr(self, key, value)
+
+        fit_history_file = path / "fit_history.json"
+        if fit_history_file.exists():
+            with open(fit_history_file) as f:
+                raw = json.load(f)
+            restored = History(params=raw.get("params"))
+            restored.epoch = list(raw.get("epoch") or [])
+            restored.history = {k: list(v) for k, v in (raw.get("history") or {}).items()}
+            self.history = restored
+
+        eval_file = path / "evaluation_history.json"
+        if eval_file.exists():
+            with open(eval_file) as f:
+                raw_reports = json.load(f)
+            if isinstance(raw_reports, list):
+                from agentomatic.agents.types import EvaluationReport, ExampleResult
+
+                restored_reports: list[EvaluationReport] = []
+                for item in raw_reports:
+                    if not isinstance(item, dict):
+                        continue
+                    example_results = [
+                        ExampleResult(
+                            example_id=er.get("example_id", ""),
+                            prediction=er.get("prediction") or {},
+                            scores=er.get("scores") or {},
+                            duration_ms=float(er.get("duration_ms") or 0.0),
+                            error=er.get("error"),
+                            metadata=er.get("metadata") or {},
+                        )
+                        for er in (item.get("example_results") or [])
+                        if isinstance(er, dict)
+                    ]
+                    restored_reports.append(
+                        EvaluationReport(
+                            agent_name=item.get("agent_name", ""),
+                            dataset_name=item.get("dataset_name", ""),
+                            scores=item.get("scores") or {},
+                            example_results=example_results,
+                            metadata=item.get("metadata") or {},
+                        )
+                    )
+                self.evaluation_history = restored_reports
 
         self.invalidate_graph()
         logger.info(f"Loaded compiled config from {path}")
@@ -860,6 +1118,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             manifest=self.to_manifest(),
             node_fn=node_fn,
             graph_fn=graph_fn,
+            class_instance=self,
         )
 
     # ==================================================================

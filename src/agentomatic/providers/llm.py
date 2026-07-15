@@ -143,7 +143,21 @@ def set_llm(instance: Any) -> None:
 
 
 def _build_llm(provider: str, **kwargs: Any) -> Any:
-    """Build an LLM instance for the given provider."""
+    """Build an LLM instance for the given provider.
+
+    Recognised providers:
+
+    * ``ollama`` — local Ollama server (``base_url`` respected).
+    * ``openai`` — OpenAI Chat models; ``base_url`` (also accepted as
+      ``api_base``) forwards to ``langchain_openai.ChatOpenAI``.
+    * ``openai_compatible`` — any OpenAI-API-compatible endpoint (Groq,
+      Together, LM Studio, vLLM, LiteLLM, …) — same as ``openai`` but the
+      ``base_url`` is mandatory.
+    * ``azure`` — Azure OpenAI; accepts ``api_base`` / ``base_url`` as the
+      endpoint, plus ``api_version`` and ``deployment_name``.
+    * ``vertex`` — Google Vertex AI.
+    * ``dummy`` — deterministic fake for tests.
+    """
     provider = provider.lower()
 
     if provider == "ollama":
@@ -158,22 +172,40 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
     elif provider == "azure":
         from langchain_openai import AzureChatOpenAI
 
+        endpoint = (
+            kwargs.get("azure_endpoint") or kwargs.get("api_base") or kwargs.get("base_url") or ""
+        )
+        deployment = (
+            kwargs.get("azure_deployment")
+            or kwargs.get("deployment_name")
+            or kwargs.get("model")
+            or ""
+        )
         return AzureChatOpenAI(
             api_key=kwargs.get("api_key", ""),
-            azure_endpoint=kwargs.get("api_base", ""),
+            azure_endpoint=endpoint,
             api_version=kwargs.get("api_version", "2024-02-15-preview"),
-            azure_deployment=kwargs.get("deployment_name", ""),
+            azure_deployment=deployment,
             temperature=kwargs.get("temperature", 0.1),
         )
 
-    elif provider == "openai":
+    elif provider in ("openai", "openai_compatible"):
         from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(
-            api_key=kwargs.get("api_key", ""),
-            model=kwargs.get("model", "gpt-4"),
-            temperature=kwargs.get("temperature", 0.1),
-        )
+        base_url = kwargs.get("base_url") or kwargs.get("api_base") or None
+        if provider == "openai_compatible" and not base_url:
+            raise ValueError(
+                "openai_compatible LLMs require a base_url (or api_base). "
+                "Pass e.g. base_url='https://api.groq.com/openai/v1'."
+            )
+        ctor_kwargs: dict[str, Any] = {
+            "api_key": kwargs.get("api_key", ""),
+            "model": kwargs.get("model", "gpt-4"),
+            "temperature": kwargs.get("temperature", 0.1),
+        }
+        if base_url:
+            ctor_kwargs["base_url"] = base_url
+        return ChatOpenAI(**ctor_kwargs)
 
     elif provider == "vertex":
         from langchain_google_vertexai import ChatVertexAI
@@ -256,6 +288,55 @@ def get_named_llm(
             built = _build_dummy_llm()
             _named_instances[name] = built
         return built
+
+
+def apply_stack_defaults(stack_manager: StackManager | None) -> Any:
+    """Apply the active stack's default LLM profile to ``get_llm()``.
+
+    Reads the ``"default"`` profile from the active stack and reuses
+    :func:`get_named_llm` to build (and cache) it under the same name.
+    The resulting instance is then promoted to the global singleton via
+    :func:`set_llm` so :func:`get_llm` becomes stack-aware — every
+    caller that has not explicitly injected an LLM now gets one built
+    from the current stack.
+
+    Args:
+        stack_manager: The platform's active :class:`StackManager` (or
+            ``None`` when no stack was loaded — the function then no-ops).
+
+    Returns:
+        The built LLM instance, or ``None`` when nothing was applied.
+    """
+    if stack_manager is None:
+        return None
+    try:
+        entry = stack_manager.get_llm_config("default")
+    except (ValueError, KeyError):
+        logger.debug("No 'default' LLM profile in active stack; skipping apply_stack_defaults()")
+        return None
+
+    kwargs: dict[str, Any] = {
+        "provider": entry.provider,
+        "model": entry.model,
+        "temperature": entry.temperature,
+    }
+    if entry.api_key:
+        kwargs["api_key"] = entry.api_key
+    if entry.base_url:
+        kwargs["base_url"] = entry.base_url
+    kwargs.update(entry.extra)
+
+    try:
+        instance = get_named_llm(name="default", **kwargs)
+        set_llm(instance)
+        logger.info(
+            f"🧠 Global LLM initialised from active stack "
+            f"(provider={entry.provider}, model={entry.model})"
+        )
+        return instance
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"Failed to apply stack default LLM: {exc}")
+        return None
 
 
 def get_llm_for_agent(

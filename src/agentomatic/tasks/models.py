@@ -51,6 +51,25 @@ class TargetType(StrEnum):
     INGESTION = "ingestion"
 
 
+class TaskRetryConfig(BaseModel):
+    """Optional retry configuration for a submitted task.
+
+    Retries wrap the *entire* task execution: when the dispatcher raises
+    an exception, the manager waits ``base_delay`` seconds (using the
+    chosen backoff strategy) and re-invokes the dispatcher, up to
+    ``max_attempts`` attempts total. Partial map-step checkpoints (see
+    :attr:`TaskRecord.checkpoints`) are re-injected into the pipeline
+    input on retry so already-completed items are not re-run.
+    """
+
+    max_attempts: int = Field(1, ge=1, le=10, description="Total attempts, including the first.")
+    backoff: str = Field(
+        default="exponential",
+        description="Backoff strategy: fixed | linear | exponential.",
+    )
+    base_delay: float = Field(default=1.0, ge=0.0, le=60.0)
+
+
 class TaskProgress(BaseModel):
     """Progress information for a running task.
 
@@ -114,6 +133,22 @@ class TaskRecord(BaseModel):
         description="Optional webhook POSTed with the final record on completion.",
     )
     parent_id: str | None = Field(default=None, description="Parent task (for A2A / sub-tasks).")
+    retry: TaskRetryConfig | None = Field(
+        default=None,
+        description="Optional task-level retry configuration.",
+    )
+    attempts: int = Field(
+        default=0,
+        description="Number of dispatcher invocations attempted so far.",
+    )
+    checkpoints: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=(
+            "Lightweight per-step checkpoints. For map/fan-out steps this "
+            "holds ``{step_name: {index: sub_result_dict}}`` so a restart can "
+            "skip already-completed items."
+        ),
+    )
 
     @property
     def duration_ms(self) -> float | None:

@@ -152,6 +152,7 @@ def cli(ctx: click.Context, version: bool) -> None:
             table.add_row("[dim]── Advanced ──[/dim]", "")
             table.add_row("  stack <cmd>", "Manage environment stacks")
             table.add_row("  pipeline <cmd>", "Manage and execute pipelines")
+            table.add_row("  deploy", "Generate Dockerfile + compose + .env")
 
             console.print(table)
             console.print()
@@ -168,10 +169,24 @@ def cli(ctx: click.Context, version: bool) -> None:
 # =====================================================================
 
 
+# Default top-level directories for non-agent templates (platform discovery paths).
+_TEMPLATE_DEFAULT_DIRS: dict[str, str] = {
+    "plugin": "plugins",
+    "endpoint": "endpoints",
+    "ingestion": "ingestion",
+    "pipeline": "pipelines",
+    # "connection" stays in agents/<name>/ (per-agent connections.py)
+}
+
+
 @cli.command()
-@click.argument("name")
+@click.argument("name", required=False, default=None)
 @click.option(
-    "--dir", "-d", "agents_dir", default="agents", help="Agents directory (default: agents)"
+    "--dir",
+    "-d",
+    "target_dir",
+    default=None,
+    help="Target parent directory (default: agents/ or template-specific)",
 )
 @click.option(
     "--template",
@@ -179,6 +194,7 @@ def cli(ctx: click.Context, version: bool) -> None:
     type=click.Choice(
         [
             "basic",
+            "class",  # alias for basic (class-owned BaseGraphAgent)
             "full",
             "coordinator",
             "pipeline",
@@ -191,23 +207,67 @@ def cli(ctx: click.Context, version: bool) -> None:
             "endpoint",
             "connection",
             "ingestion",
+            "extraction",
         ]
     ),
     default=None,
     help="Template to use (default: interactive selection)",
 )
+@click.option(
+    "--project",
+    "as_project",
+    is_flag=True,
+    help="Scaffold a full Agentomatic project (main.py, stacks, dirs)",
+)
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
-def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
-    """Create a new agent from a template (basic, full, rag, chatbot, ...)."""
-    from .templates import TEMPLATES, get_template_files
+def init(
+    name: str | None,
+    target_dir: str | None,
+    template: str | None,
+    as_project: bool,
+    force: bool,
+) -> None:
+    """Create a new agent/project from a template.
 
-    target = Path(agents_dir) / name
+    Examples::
+
+        agentomatic init my_bot --template basic
+        agentomatic init --project my_platform
+        agentomatic init docs --template ingestion   # → ingestion/docs/
+        agentomatic init scoring --template endpoint # → endpoints/scoring/
+    """
+    from .templates import TEMPLATES, get_template_files
 
     _print_banner()
 
+    # --- Project-level scaffold -------------------------------------------
+    if as_project:
+        if not name:
+            name = "agentomatic-app"
+        from .project import scaffold_project
+
+        dest = Path(target_dir) if target_dir else Path(name)
+        result = scaffold_project(dest, name, force=force)
+        click.echo()
+        logger.success(f"Created project '{name}'")
+        click.echo(f"   📍 Location: {result['path']}")
+        click.echo(f"   📦 Written: {len(result['written'])} files")
+        if result["skipped"]:
+            click.echo(f"   ⏭️  Skipped (exists): {len(result['skipped'])} files")
+        click.echo()
+        click.echo("Next steps:")
+        click.echo(f"  cd {result['path']}")
+        click.echo("  cp .env.example .env")
+        click.echo("  agentomatic init hello --template basic")
+        click.echo("  agentomatic run --studio")
+        return
+
+    if not name:
+        _print_error("NAME is required (or use --project NAME)")
+        sys.exit(1)
+
     # Template selection
     if not template:
-        # Interactive selection if questionary is available
         try:
             import questionary
 
@@ -224,22 +284,28 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
             template = "basic"
             _print_warning("Install questionary for interactive mode: pip install questionary")
 
-    # Validate template
     if template not in TEMPLATES:
         _print_error(f"Unknown template: {template}. Choose from: {list(TEMPLATES.keys())}")
         sys.exit(1)
 
-    # Check if target exists
-    if target.exists() and any(target.iterdir()):
-        _print_warning(f"Directory {target} already exists and is not empty")
-        if not force:
-            if not click.confirm("Overwrite?", default=False):
-                logger.info("Cancelled")
-                return
+    # Resolve target directory: ingestion→ingestion/, plugins→plugins/, etc.
+    if target_dir is None:
+        parent = _TEMPLATE_DEFAULT_DIRS.get(template, "agents")
+    else:
+        parent = target_dir
+    target = Path(parent) / name
 
-    # Generate files
-    target.mkdir(parents=True, exist_ok=True)
     files = get_template_files(template, name)
+
+    # Existing non-empty dir: per-file merge unless --force
+    existing = target.exists() and any(target.iterdir()) if target.exists() else False
+    if existing and not force:
+        _print_warning(
+            f"Directory {target} already exists — will only write missing files "
+            "(pass --force to overwrite)"
+        )
+
+    target.mkdir(parents=True, exist_ok=True)
 
     if HAS_RICH:
         tree = Tree(f"[bold cyan]📁 {target}[/bold cyan]")
@@ -251,15 +317,21 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
         for rel_path in sorted(files.keys()):
             click.echo(f"  📄 {rel_path}")
 
+    written = 0
+    skipped = 0
     for rel_path, content in files.items():
         file_path = target / rel_path
         file_path.parent.mkdir(parents=True, exist_ok=True)
+        if file_path.exists() and not force:
+            skipped += 1
+            continue
         file_path.write_text(content)
+        written += 1
 
     click.echo()
-    logger.success(f"Created agent '{name}' with template '{template}'")
+    logger.success(f"Created '{name}' with template '{template}'")
     click.echo(f"   📍 Location: {target}")
-    click.echo(f"   📦 Files: {len(files)}")
+    click.echo(f"   📦 Written: {written}  ·  Skipped: {skipped}")
     click.echo()
 
     if template == "plugin":
@@ -270,6 +342,8 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
         edit_file = "connections.py"
     elif template == "ingestion":
         edit_file = "ingestor.py"
+    elif template == "extraction":
+        edit_file = "agent.py"
     elif template in ["legacy_dict", "custom"]:
         edit_file = "nodes.py" if template == "legacy_dict" else "__init__.py"
     elif template == "pipeline":
@@ -281,82 +355,150 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
     if template == "pipeline":
         steps = (
             f"[bold]Next steps:[/bold]\n\n"
-            f"  1. Edit [yellow]{name}/pipeline.yaml[/yellow] — "
+            f"  1. Edit [yellow]{target / 'pipeline.yaml'}[/yellow] — "
             f"define steps and agents\n"
             f"  2. Create the agents referenced in the pipeline:\n"
             f"     [cyan]agentomatic init classifier --template basic[/cyan]\n"
             f"     [cyan]agentomatic init processor --template basic[/cyan]\n"
             f"  3. [cyan]agentomatic run[/cyan] — pipeline auto-discovered\n\n"
-            f"  [bold]API:[/bold]\n"
-            f"  [blue]POST /api/v1/pipelines/{name}/run[/blue]  "
-            f"[dim]— Execute the pipeline[/dim]\n"
-            f"  [blue]GET  /api/v1/pipelines/{name}/validate[/blue]  "
-            f"[dim]— Pre-flight check[/dim]\n"
-            f"  [blue]GET  /api/v1/pipelines[/blue]               "
-            f"[dim]— List all pipelines[/dim]"
+        )
+    elif template == "ingestion":
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  2. Ensure platform ``ingestion_dir`` points at "
+            f"[cyan]{parent}/[/cyan] (default)\n"
+            f"  3. [cyan]agentomatic run[/cyan] — appears under /status + "
+            f"/api/v1/ingestion/{name}/run\n\n"
+        )
+    elif template == "plugin":
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  2. [cyan]agentomatic run[/cyan] — "
+            f"POST /api/v1/plugins/{name}/predict\n\n"
+        )
+    elif template == "endpoint":
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. Edit [yellow]{target / edit_file}[/yellow] + .env\n"
+            f"  2. [cyan]agentomatic run[/cyan] — "
+            f"POST /api/v1/endpoints/{name}/call\n\n"
+        )
+    elif template == "connection":
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  2. Prefer: [cyan]agentomatic add connection {name}[/cyan] "
+            f"to attach to an existing agent without overwrite\n\n"
         )
     else:
         steps = (
             f"[bold]Next steps:[/bold]\n\n"
-            f"  1. [cyan]cd {agents_dir}[/cyan]\n"
-            f"  2. Edit [yellow]{name}/{edit_file}[/yellow] with your logic\n"
-            f"  3. [cyan]agentomatic run[/cyan] to start\n"
-            f"  4. [cyan]agentomatic test {name}[/cyan] to test\n"
-            f"  5. Open [blue]http://localhost:8000/docs[/blue] for API docs"
-        )
-
-    if template == "coordinator":
-        steps += (
-            f"\n\n"
-            f"[bold]Delegation Setup:[/bold]\n\n"
-            f"  1. Create specialist agents:\n"
-            f"     [cyan]agentomatic init researcher --template basic[/cyan]\n"
-            f"     [cyan]agentomatic init writer --template basic[/cyan]\n"
-            f"  2. Edit [yellow]{name}/delegation.py[/yellow] — "
-            f"add targets to DELEGATION_TARGETS\n"
-            f"  3. [cyan]agentomatic run[/cyan] — all agents auto-discovered\n\n"
-            f"  [bold]API:[/bold] [blue]POST /api/v1/{name}/invoke[/blue]"
-        )
-
-    if template in ["full", "pipeline", "plugin"]:
-        prefix = (
-            "pipelines"
-            if template == "pipeline"
-            else ("plugins" if template == "plugin" else "agents")
-        )
-        steps += "\n\n[bold]ML Lifecycle:[/bold]\n\n"
-        if template in ["full", "plugin"]:
-            steps += (
-                f"  [cyan]python -m {prefix}.{name}.train[/cyan]     "
-                f"[dim]— Train & save model[/dim]\n"
-            )
-        steps += (
-            f"  [cyan]python -m {prefix}.{name}.eval[/cyan]      "
-            f"[dim]— Evaluate quality[/dim]\n"
-            f"  [cyan]python -m {prefix}.{name}.optimize[/cyan]  "
-            f"[dim]— Prompt/Hyperparameter optimization[/dim]\n"
-            f"  [cyan]python -m {prefix}.{name}.predict[/cyan]   "
-            f"[dim]— Batch / interactive inference[/dim]\n"
-            f"  [cyan]make all[/cyan]                          "
-            f"[dim]— Full ML lifecycle[/dim]"
+            f"  1. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  2. Review [yellow]{target / '__init__.py'}[/yellow] "
+            f"(AgentManifest / card) and [yellow]llm.py[/yellow]\n"
+            f"  3. [cyan]agentomatic run --studio[/cyan]\n"
+            f"  4. Open [link=http://localhost:8000/docs]"
+            f"http://localhost:8000/docs[/link]\n\n"
         )
 
     if HAS_RICH:
-        console.print(Panel(steps, title="🚀 What's next?", border_style="green"))
+        console.print(Panel(steps, border_style="cyan", expand=False))
     else:
-        click.echo("Next steps:")
-        click.echo(f"  1. Edit {name}/{edit_file} with your logic")
-        click.echo("  2. agentomatic run")
-        click.echo(f"  3. agentomatic test {name}")
-        if template == "full":
-            click.echo(f"  4. python -m agents.{name}.train")
-            click.echo(f"  5. python -m agents.{name}.eval")
-            click.echo(f"  6. python -m agents.{name}.optimize")
-        if template == "coordinator":
-            click.echo(f"  4. Edit {name}/delegation.py — add targets")
-            click.echo(f"  5. POST /api/v1/{name}/invoke")
-        if template == "pipeline":
-            click.echo(f"  4. POST /api/v1/pipelines/{name}/run")
+        click.echo(
+            steps.replace("[bold]", "")
+            .replace("[/bold]", "")
+            .replace("[yellow]", "")
+            .replace("[/yellow]", "")
+            .replace("[cyan]", "")
+            .replace("[/cyan]", "")
+            .replace("[link=http://localhost:8000/docs]", "")
+            .replace("[/link]", "")
+        )
+
+
+@cli.command("new")
+@click.argument("name")
+@click.option("--dir", "-d", "target_dir", default=None, help="Parent directory")
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+def new_project(name: str, target_dir: str | None, force: bool) -> None:
+    """Scaffold a full Agentomatic project (alias for ``init --project``)."""
+    ctx = click.get_current_context()
+    ctx.invoke(init, name=name, target_dir=target_dir, template=None, as_project=True, force=force)
+
+
+@cli.group()
+def add() -> None:
+    """Add components to an existing agent without overwriting its package."""
+
+
+@add.command("connection")
+@click.argument("agent_name")
+@click.option("--dir", "-d", "agents_dir", default="agents", help="Agents directory")
+@click.option("--force", "-f", is_flag=True, help="Overwrite connections.py if present")
+def add_connection(agent_name: str, agents_dir: str, force: bool) -> None:
+    """Add ``connections.py`` to an existing agent package."""
+    from .templates import _connections_env_example, _connections_py, _connections_readme
+
+    target = Path(agents_dir) / agent_name
+    if not target.exists():
+        _print_error(f"Agent directory not found: {target}")
+        sys.exit(1)
+
+    files = {
+        "connections.py": _connections_py(agent_name),
+        "connections.README.md": _connections_readme(agent_name),
+        "connections.env.example": _connections_env_example(agent_name),
+    }
+    written = 0
+    for rel, content in files.items():
+        # Prefer connections.py only; keep README/env as optional sidecars
+        path = target / ("connections.py" if rel.startswith("connections.py") else rel)
+        if rel.endswith("README.md"):
+            path = target / "CONNECTIONS.md"
+        if rel.endswith("env.example"):
+            path = target / "connections.env.example"
+        if path.exists() and not force:
+            _print_warning(f"Skip existing {path.name} (use --force to overwrite)")
+            continue
+        path.write_text(content)
+        written += 1
+        click.echo(f"  ✅ {path}")
+
+    # Soft-patch __init__.py with a re-export comment if missing CONNECTIONS hint
+    init_py = target / "__init__.py"
+    if init_py.exists():
+        text = init_py.read_text()
+        if "CONNECTIONS" not in text and "connections" not in text:
+            init_py.write_text(
+                text.rstrip() + "\n\n# Connections are auto-discovered from connections.py "
+                "(CONNECTIONS list).\n"
+            )
+    logger.success(f"Added connection files to '{agent_name}' ({written} written)")
+
+
+@add.command("ingestion")
+@click.argument("name")
+@click.option(
+    "--dir",
+    "-d",
+    "ingestion_dir",
+    default="ingestion",
+    help="Ingestion directory (default: ingestion)",
+)
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+def add_ingestion(name: str, ingestion_dir: str, force: bool) -> None:
+    """Scaffold an ingestor under ``ingestion/<name>/`` (never into agents/)."""
+    ctx = click.get_current_context()
+    ctx.invoke(
+        init,
+        name=name,
+        target_dir=ingestion_dir,
+        template="ingestion",
+        as_project=False,
+        force=force,
+    )
 
 
 # =====================================================================
@@ -367,6 +509,9 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
 @cli.command()
 @click.option("--agents-dir", default="agents", help="Agents directory")
 @click.option("--plugins-dir", default="plugins", help="Plugins directory")
+@click.option("--endpoints-dir", default="endpoints", help="Custom endpoints directory")
+@click.option("--ingestion-dir", default="ingestion", help="Ingestion packages directory")
+@click.option("--stacks-dir", default="stacks", help="Stack YAML directory")
 @click.option("--host", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", type=int, default=8000, help="Port to listen on")
 @click.option("--reload", is_flag=True, help="Enable auto-reload")
@@ -378,9 +523,27 @@ def init(name: str, agents_dir: str, template: str | None, force: bool) -> None:
     default=True,
     help="Enable Agentomatic Studio debug UI at /studio/ui (default: on)",
 )
+@click.option(
+    "--ssl-certfile",
+    default=None,
+    help="Path to a PEM-encoded TLS certificate (enables HTTPS).",
+)
+@click.option(
+    "--ssl-keyfile",
+    default=None,
+    help="Path to the private key matching --ssl-certfile.",
+)
+@click.option(
+    "--require-auth-globally",
+    is_flag=True,
+    help="Require authenticated JWT claims for every agent request.",
+)
 def run(
     agents_dir: str,
     plugins_dir: str,
+    endpoints_dir: str,
+    ingestion_dir: str,
+    stacks_dir: str,
     host: str,
     port: int,
     reload: bool,
@@ -388,6 +551,9 @@ def run(
     log_level: str,
     with_ui: bool,
     studio: bool,
+    ssl_certfile: str | None,
+    ssl_keyfile: str | None,
+    require_auth_globally: bool,
 ) -> None:
     """Run the platform with Rich status output."""
     _print_banner()
@@ -397,10 +563,19 @@ def run(
 
     kwargs: dict[str, Any] = {
         "plugins_dir": plugins_dir,
+        "endpoints_dir": endpoints_dir,
+        "ingestion_dir": ingestion_dir,
+        "stacks_dir": stacks_dir,
         "title": title or "Agentomatic Platform",
         "log_level": log_level,
         "enable_studio": studio,
     }
+    if require_auth_globally:
+        # Auto-enable the zero-trust enforcer so the flag actually has effect.
+        kwargs["enable_zero_trust"] = True
+        kwargs["require_auth_globally"] = True
+        # Without JWT (or API key), every request would be rejected.
+        kwargs.setdefault("enable_jwt_auth", True)
 
     # Auto-detect and enable UI
     if with_ui:
@@ -423,7 +598,107 @@ def run(
             if platform._app:
                 mount(platform._app)
 
-    platform.run(host=host, port=port, reload=reload)
+    run_kwargs: dict[str, Any] = {"host": host, "port": port, "reload": reload}
+    if ssl_certfile:
+        run_kwargs["ssl_certfile"] = ssl_certfile
+    if ssl_keyfile:
+        run_kwargs["ssl_keyfile"] = ssl_keyfile
+    if ssl_certfile or ssl_keyfile:
+        logger.info(f"🔐 HTTPS enabled — cert={ssl_certfile} key={ssl_keyfile}")
+
+    platform.run(**run_kwargs)
+
+
+# =====================================================================
+# DEPLOY — Generate Dockerfile + docker-compose + .env.example
+# =====================================================================
+
+
+@cli.command()
+@click.option(
+    "--stack",
+    default=None,
+    help="Stack name to derive env from (defaults to active or 'local').",
+)
+@click.option(
+    "--distroless",
+    is_flag=True,
+    help="Emit Dockerfile.distroless instead of the standard multi-stage image.",
+)
+@click.option(
+    "--out",
+    "out_dir",
+    default="deploy/generated",
+    help="Output directory for generated files.",
+    show_default=True,
+)
+@click.option(
+    "--agents-dir",
+    default="agents",
+    help="Agents directory (used for per-agent compose stubs).",
+    show_default=True,
+)
+@click.option(
+    "--stacks-dir",
+    default="stacks",
+    help="Stacks directory (used to resolve --stack).",
+    show_default=True,
+)
+@click.option(
+    "--with-nginx/--no-nginx",
+    default=True,
+    help="Emit an nginx.conf reverse-proxy template.",
+)
+@click.option(
+    "--with-agent-stubs",
+    is_flag=True,
+    help="Emit a docker-compose service stub per discovered agent.",
+)
+def deploy(
+    stack: str | None,
+    distroless: bool,
+    out_dir: str,
+    agents_dir: str,
+    stacks_dir: str,
+    with_nginx: bool,
+    with_agent_stubs: bool,
+) -> None:
+    """Generate Dockerfile, docker-compose, and .env for deployment."""
+    from .deploy import generate_deploy
+
+    _print_banner()
+
+    plan = generate_deploy(
+        out_dir=out_dir,
+        stack_name=stack,
+        stacks_dir=stacks_dir,
+        agents_dir=agents_dir,
+        distroless=distroless,
+        include_nginx=with_nginx,
+        include_agent_stubs=with_agent_stubs,
+    )
+
+    if HAS_RICH:
+        tree = Tree(f"[bold cyan]📦 {plan.out_dir}[/bold cyan]")
+        for rel_path in sorted(plan.files):
+            tree.add(f"[green]📄 {rel_path}[/green]")
+        console.print(tree)
+        console.print(
+            Panel(
+                f"[bold]Stack:[/bold] {plan.stack_name}\n"
+                f"[bold]Distroless:[/bold] {plan.distroless}\n"
+                f"[bold]Next:[/bold] cp {plan.out_dir}/.env.example {plan.out_dir}/.env"
+                f" && cd {plan.out_dir} && docker compose up -d --build",
+                title="🚀 Ready to deploy",
+                border_style="green",
+            )
+        )
+    else:
+        click.echo(f"📦 Deploy files written to {plan.out_dir}")
+        for rel_path in sorted(plan.files):
+            click.echo(f"  📄 {rel_path}")
+        click.echo(f"\nStack: {plan.stack_name}")
+        click.echo(f"Distroless: {plan.distroless}")
 
 
 # =====================================================================
@@ -537,7 +812,7 @@ def list_agents(agents_dir: str) -> None:
             pass
 
         # Detect features
-        info["has_graph"] = (entry / "graph.py").exists()
+        info["has_graph"] = (entry / "graph.py").exists() or (entry / "agent.py").exists()
         info["has_schemas"] = (entry / "schemas.py").exists()
         info["has_config"] = (entry / "config.py").exists()
         info["has_tools"] = (entry / "tools.py").exists()
@@ -843,7 +1118,10 @@ def inspect(name: str, agents_dir: str) -> None:
 
         core_caps = [
             ("🏗️  Agent Class (agent.py)", (target / "agent.py").exists()),
-            ("📊 Graph (graph.py)", (target / "graph.py").exists()),
+            (
+                "📊 Graph (graph.py / agent.py)",
+                (target / "graph.py").exists() or (target / "agent.py").exists(),
+            ),
             ("⚙️  Config (config.py)", (target / "config.py").exists()),
             ("📝 Prompts (prompts.json)", (target / "prompts.json").exists()),
             ("📐 Schemas (schemas.py)", (target / "schemas.py").exists()),
@@ -1060,28 +1338,238 @@ def ui(host: str, port: int, ui_port: int) -> None:
 # =====================================================================
 
 
+# Fitter modes map CLI strings to fitter-optimizer names used internally.
+_FITTER_MODES: tuple[str, ...] = (
+    "rewrite",
+    "param_search",
+    "gepa_like",
+    "mipro_like",
+    "few_shot",
+)
+
+
+def _parse_param_overrides(raw_values: tuple[str, ...]) -> dict[str, list[Any]]:
+    """Parse ``--param name=v1,v2,v3`` overrides into a param-space dict.
+
+    Values are best-effort coerced to ``int`` / ``float`` / ``bool`` so
+    ``temperature=0.0,0.2,0.7`` produces floats and ``top_k=3,5,10``
+    produces ints.  Empty inputs are ignored.
+
+    Args:
+        raw_values: Sequence of ``"name=v1,v2,..."`` strings from Click.
+
+    Returns:
+        Mapping from parameter name to list of candidate values.
+
+    Raises:
+        click.BadParameter: If a value is malformed (missing ``=``).
+    """
+    overrides: dict[str, list[Any]] = {}
+    for raw in raw_values:
+        if not raw:
+            continue
+        if "=" not in raw:
+            raise click.BadParameter(
+                f"--param expects 'name=v1,v2,...' but got: {raw!r}",
+                param_hint="--param",
+            )
+        name, values_str = raw.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise click.BadParameter(f"--param has empty name in {raw!r}", param_hint="--param")
+        parsed: list[Any] = []
+        for token in values_str.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            parsed.append(_coerce_param_value(token))
+        if parsed:
+            overrides[name] = parsed
+    return overrides
+
+
+def _coerce_param_value(token: str) -> Any:
+    """Best-effort coerce a token to bool / int / float / str."""
+    lowered = token.lower()
+    if lowered in {"true", "false"}:
+        return lowered == "true"
+    if lowered in {"none", "null"}:
+        return None
+    try:
+        as_int = int(token)
+        if str(as_int) == token or (token.startswith("-") and str(as_int) == token):
+            return as_int
+    except ValueError:
+        pass
+    try:
+        return float(token)
+    except ValueError:
+        return token
+
+
 @cli.command()
 @click.argument("agent")
 @click.option("--dataset", "-d", required=True, help="Path to JSONL/CSV dataset")
+@click.option(
+    "--val-dataset",
+    default=None,
+    help="Validation dataset for PromptFitter modes (defaults to --dataset)",
+)
+@click.option(
+    "--test-dataset",
+    default=None,
+    help="Optional held-out test dataset for PromptFitter modes",
+)
 @click.option("--metrics", "-m", default="exact_match", help="Comma-separated metrics")
+@click.option(
+    "--mode",
+    type=click.Choice(["prompt_only", *_FITTER_MODES]),
+    default="prompt_only",
+    help=(
+        "Optimization mode. 'prompt_only' uses the legacy PromptOptimizer; "
+        "'rewrite', 'param_search', 'gepa_like', 'mipro_like', 'few_shot' "
+        "route through PromptFitter with the matching fitter optimizer."
+    ),
+)
 @click.option(
     "--strategy",
     "-s",
     default="iterative_rewrite",
     type=click.Choice(["iterative_rewrite", "few_shot", "chain_of_thought"]),
-    help="Optimization strategy",
+    help="Strategy for the 'prompt_only' mode.",
+)
+@click.option(
+    "--search-space",
+    "search_space_path",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a YAML file describing the PromptSearchSpace.",
+)
+@click.option(
+    "--optimize-prompt/--no-optimize-prompt",
+    "optimize_prompt",
+    default=True,
+    help="Toggle system-prompt optimization in the search space (fitter modes).",
+)
+@click.option(
+    "--optimize-params/--no-optimize-params",
+    "optimize_params",
+    default=True,
+    help="Toggle model-parameter optimization in the search space (fitter modes).",
+)
+@click.option(
+    "--param",
+    "param_overrides",
+    multiple=True,
+    default=(),
+    help=(
+        "Override / add a model-param grid entry. "
+        "Format: --param temperature=0.0,0.2,0.7  (repeatable)."
+    ),
 )
 @click.option("--max-iterations", type=int, default=10, help="Max iterations")
+@click.option(
+    "--max-trials",
+    type=int,
+    default=30,
+    help="Total candidate evaluations budget for fitter modes.",
+)
 @click.option("--target-score", type=float, default=0.9, help="Target score")
 @click.option("--rewrite-llm", default=None, help="LLM for prompt rewriting")
 @click.option("--eval-llm", default=None, help="LLM for evaluation")
-@click.option("--llm", default="ollama/mistral:7b", help="Default LLM")
+@click.option(
+    "--llm",
+    default=None,
+    help="Default LLM (falls back to AGENTOMATIC_TASK_MODEL / LLM__MODEL / ollama/mistral:7b).",
+)
 @click.option("--patience", type=int, default=3, help="Early stopping patience")
 @click.option("--prompt", default=None, help="Initial prompt (overrides prompts.json)")
 @click.option("--no-report", is_flag=True, help="Skip HTML report generation")
 @click.option("--apply", "auto_apply", is_flag=True, help="Auto-apply best prompt")
 @click.option("--host", default="http://localhost:8000", help="Platform API base")
 def optimize(
+    agent: str,
+    dataset: str,
+    val_dataset: str | None,
+    test_dataset: str | None,
+    metrics: str,
+    mode: str,
+    strategy: str,
+    search_space_path: str | None,
+    optimize_prompt: bool,
+    optimize_params: bool,
+    param_overrides: tuple[str, ...],
+    max_iterations: int,
+    max_trials: int,
+    target_score: float,
+    rewrite_llm: str | None,
+    eval_llm: str | None,
+    llm: str | None,
+    patience: int,
+    prompt: str | None,
+    no_report: bool,
+    auto_apply: bool,
+    host: str,
+) -> None:
+    """Run prompt / parameter optimization for an agent.
+
+    Two families of optimization are supported:
+
+    - ``--mode prompt_only`` (default) runs the legacy PromptOptimizer
+      loop and is backward compatible with previous CLI usage.
+    - ``--mode {rewrite,param_search,gepa_like,mipro_like,few_shot}``
+      routes through PromptFitter with the matching fitter optimizer and
+      a PromptSearchSpace loaded from ``--search-space`` (if provided)
+      plus any ``--param`` overrides.
+    """
+    import os
+
+    llm = (
+        llm
+        or os.environ.get("AGENTOMATIC_TASK_MODEL")
+        or os.environ.get("LLM__MODEL")
+        or "ollama/mistral:7b"
+    )
+    if mode == "prompt_only":
+        _run_prompt_only_optimize(
+            agent=agent,
+            dataset=dataset,
+            metrics=metrics,
+            strategy=strategy,
+            max_iterations=max_iterations,
+            target_score=target_score,
+            rewrite_llm=rewrite_llm,
+            eval_llm=eval_llm,
+            llm=llm,
+            patience=patience,
+            prompt=prompt,
+            no_report=no_report,
+            auto_apply=auto_apply,
+            host=host,
+        )
+        return
+
+    _run_fitter_optimize(
+        agent=agent,
+        dataset=dataset,
+        val_dataset=val_dataset,
+        test_dataset=test_dataset,
+        metric_names=[m.strip() for m in metrics.split(",") if m.strip()],
+        mode=mode,
+        search_space_path=search_space_path,
+        optimize_prompt=optimize_prompt,
+        optimize_params=optimize_params,
+        param_overrides=param_overrides,
+        llm=llm,
+        rewrite_llm=rewrite_llm,
+        max_trials=max_trials,
+        no_report=no_report,
+        auto_apply=auto_apply,
+        host=host,
+    )
+
+
+def _run_prompt_only_optimize(
     agent: str,
     dataset: str,
     metrics: str,
@@ -1097,7 +1585,7 @@ def optimize(
     auto_apply: bool,
     host: str,
 ) -> None:
-    """Run prompt optimization for an agent."""
+    """Run the legacy PromptOptimizer flow (backward compatible)."""
     import asyncio
 
     try:
@@ -1107,7 +1595,6 @@ def optimize(
         click.echo("Install: pip install agentomatic[optimize]")
         return
 
-    # Load dataset
     if dataset.endswith(".csv"):
         ds = Dataset.from_csv(dataset)
     else:
@@ -1115,10 +1602,8 @@ def optimize(
 
     logger.info(f"Dataset: {len(ds)} points from {dataset}")
 
-    # Parse metrics
     metric_list = [m.strip() for m in metrics.split(",")]
 
-    # Create optimizer
     optimizer = PromptOptimizer(
         agent=agent,
         metrics=metric_list,  # type: ignore[arg-type]
@@ -1130,7 +1615,6 @@ def optimize(
         auto_report=not no_report,
     )
 
-    # Run optimization
     result = asyncio.run(
         optimizer.optimize(
             dataset=ds,
@@ -1141,13 +1625,116 @@ def optimize(
         )
     )
 
-    # Print report
     click.echo(result.report())
 
-    # Auto-apply if requested
     if auto_apply:
         version = result.apply()
         logger.success(f"Applied as '{version}'")
+
+
+def _run_fitter_optimize(
+    agent: str,
+    dataset: str,
+    val_dataset: str | None,
+    test_dataset: str | None,
+    metric_names: list[str],
+    mode: str,
+    search_space_path: str | None,
+    optimize_prompt: bool,
+    optimize_params: bool,
+    param_overrides: tuple[str, ...],
+    llm: str,
+    rewrite_llm: str | None,
+    max_trials: int,
+    no_report: bool,
+    auto_apply: bool,
+    host: str,
+) -> None:
+    """Run PromptFitter with the selected fitter optimizer mode."""
+    import asyncio
+
+    try:
+        from agentomatic.optimize import (
+            CompositeMetric,
+            Dataset,
+            PromptFitter,
+            PromptSearchSpace,
+            WeightedMetric,
+            load_search_space,
+            resolve_metrics,
+        )
+    except ImportError:
+        logger.error("Optimization module not available.")
+        click.echo("Install: pip install agentomatic[optimize]")
+        return
+
+    def _load(path: str) -> Any:
+        return Dataset.from_csv(path) if path.endswith(".csv") else Dataset.from_jsonl(path)
+
+    train_ds = _load(dataset)
+    val_ds = _load(val_dataset) if val_dataset else train_ds
+    test_ds = _load(test_dataset) if test_dataset else None
+    logger.info(
+        "Datasets — train: {} pts | val: {} pts | test: {} pts",
+        len(train_ds),
+        len(val_ds),
+        len(test_ds) if test_ds is not None else 0,
+    )
+
+    if search_space_path:
+        space = load_search_space(search_space_path)
+        logger.info("Loaded search space from {}", search_space_path)
+    else:
+        space = PromptSearchSpace()
+
+    space.optimize_system_prompt = optimize_prompt
+    space.optimize_model_params = optimize_params
+
+    overrides = _parse_param_overrides(param_overrides)
+    if overrides:
+        space.model_param_space = {**space.model_param_space, **overrides}
+        logger.info(
+            "Applied {} --param override(s): {}",
+            len(overrides),
+            ", ".join(overrides),
+        )
+    logger.info(
+        "Active spaces: {} — total combinations: {}",
+        space.active_spaces(),
+        space.total_search_size(),
+    )
+
+    resolved = resolve_metrics(metric_names, model=llm)  # type: ignore[arg-type]
+    if len(resolved) == 1:
+        metric: Any = resolved[0]
+    else:
+        weight = 1.0 / len(resolved)
+        metric = CompositeMetric(
+            metrics=[
+                WeightedMetric(name=m.name or f"m{i}", metric=m, weight=weight)
+                for i, m in enumerate(resolved)
+            ],
+        )
+
+    fitter = PromptFitter(
+        agent=agent,
+        task_model=llm,
+        rewrite_model=rewrite_llm,
+        optimizer=mode,
+        search_space=space,
+        max_trials=max_trials,
+        api_base=host,
+        auto_report=not no_report,
+    )
+
+    result = asyncio.run(
+        fitter.fit(trainset=train_ds, valset=val_ds, metric=metric, testset=test_ds),
+    )
+    click.echo(result.summary())
+
+    if auto_apply:
+        version = result.apply()
+        logger.success(f"Applied best config as '{version}'")
 
 
 # =====================================================================
@@ -1286,6 +1873,44 @@ def stack_use(name: str, stacks_dir: str) -> None:
     active_file.write_text(name)
     _print_success(f"Active stack set to '{name}'")
     _echo(f"  Stack file: {stack_file}")
+
+
+@stack.command("export")
+@click.option(
+    "--stack",
+    "stack_name",
+    default=None,
+    help="Stack name to export (defaults to active or 'local').",
+)
+@click.option(
+    "--env",
+    "env_file",
+    default=None,
+    help="Output path for the .env file (defaults to stdout).",
+)
+@click.option("--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory")
+def stack_export(
+    stack_name: str | None,
+    env_file: str | None,
+    stacks_dir: str,
+) -> None:
+    """Dump a .env file from the active (or named) stack.
+
+    The exported file contains ``LLM__*`` / ``EMBEDDING__*`` / ``DB__*`` /
+    ``FEATURES__*`` keys resolved from the stack.  Values that reference
+    ``${ENV_VAR}`` placeholders are preserved verbatim so operators know
+    which secrets still need to be injected at runtime.
+    """
+    from .deploy import load_stack, render_env_example, render_env_example_default
+
+    stack = load_stack(stack_name, stacks_dir=stacks_dir)
+    content = render_env_example(stack) if stack is not None else render_env_example_default()
+
+    if env_file:
+        Path(env_file).write_text(content)
+        _print_success(f"Exported stack '{stack.name if stack else 'default'}' to {env_file}")
+    else:
+        click.echo(content)
 
 
 # =====================================================================

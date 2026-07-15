@@ -79,6 +79,32 @@ pip install redis
     Database URLs must use an **async** driver:
     `postgresql+asyncpg://…`, `mysql+aiomysql://…`, `sqlite+aiosqlite:///…`.
 
+## 1b. Generate production containers (CLI)
+
+Agentomatic is both a **dev platform** and a **production deploy target**.
+Generate rootless / distroless images, compose, and a stack-derived env file::
+
+```bash
+agentomatic stack use remote
+agentomatic deploy --stack remote --distroless --out deploy/generated
+agentomatic stack export --env .env.production
+
+# HTTPS + global auth at runtime
+agentomatic run --stack remote \
+  --ssl-certfile /certs/fullchain.pem \
+  --ssl-keyfile /certs/privkey.pem \
+  --require-auth-globally
+```
+
+`deploy/` also includes a ready observability stack
+(`deploy/observability/`) with Prometheus + OTel + Grafana.
+
+!!! tip "Vendor backends stay yours"
+    Register custom vector / embedding / store backends with
+    `register_vector_provider`, `register_embedding_provider`, and
+    `register_store_provider`. Agentomatic provides the ops; you bring the
+    SDK (Cosmos, proprietary search, …).
+
 ## 2. Keep secrets out of code
 
 Every config value that touches a credential supports `${ENV}` interpolation,

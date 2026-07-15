@@ -491,18 +491,19 @@ print(report.summary())
 #     exact_key_match: 0.900
 ```
 
-### `save(path)` / `load_compiled(path)`
+### `save(path)` / `load(path)` / `load_compiled(path)`
 
-Persist and restore the compiled state:
+Persists compiled config, metadata, evaluation reports, and the Keras-style
+`History` from the last `fit()` (`fit_history.json`). `load()` is an alias of
+`load_compiled()`:
 
 ```python
-# Save
 agent.save("compiled/summarizer_v1")
-# Creates: config.json, metadata.json, evaluation_history.json
+# Creates: config.json, metadata.json, evaluation_history.json, fit_history.json
 
-# Load into a fresh instance
 fresh = MyAgent(llm=my_llm)
-fresh.load_compiled("compiled/summarizer_v1")
+fresh.load("compiled/summarizer_v1")  # or load_compiled(...)
+assert fresh.history is not None
 ```
 
 ??? example "Full ML Workflow"

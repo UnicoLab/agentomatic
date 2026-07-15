@@ -44,7 +44,10 @@ class TestBasicTemplate:
     def test_basic_init_content(self):
         files = get_template_files("basic", "my_agent")
         init = files["__init__.py"]
-        assert "Agent package" in init
+        assert "AgentManifest" in init
+        assert 'name="my_agent"' in init
+        assert "llm.py" in files
+        assert "AgentLLMConfig" in files["llm.py"]
 
     def test_basic_agent_content(self):
         files = get_template_files("basic", "my_agent")

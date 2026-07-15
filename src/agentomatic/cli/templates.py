@@ -7,6 +7,19 @@ Templates: basic, full, rag, chatbot, custom, deepagent, legacy_dict.
 from __future__ import annotations
 
 
+def _class_agent_get_graph_export(title: str) -> str:
+    """Append a ``get_graph()`` export for langgraph.json / Studio tools."""
+    return f'''
+
+def get_graph():
+    """Entrypoint for ``langgraph.json`` / LangGraph tooling.
+
+    Prefer Agentomatic Studio at ``/studio/ui/`` for class-agent debugging.
+    """
+    return {title}Agent().graph
+'''
+
+
 def _class_agent_py(name: str, template: str = "basic") -> str:
     title = name.replace("_", " ").title().replace(" ", "")
 
@@ -29,14 +42,28 @@ class {title}State:
 
 
 class {title}Agent(BaseGraphAgent[{title}State]):
-    """RAG class agent for {name}."""
+    """RAG class agent for {name}.
+
+    LLM and prompts come from the active stack + ``prompts.json`` —
+    do not hardcode model names here.
+    """
 
     agent_name = "{name}"
     agent_description = "RAG agent"
+    agent_framework = "graph_agent"
 
-    def __init__(self, *, llm: Any = None) -> None:
+    def __init__(self, *, llm: Any = None, prompt_manager: Any = None) -> None:
         super().__init__()
         self.llm = llm
+        self.prompt_manager = prompt_manager
+
+    def _system_prompt(self) -> str:
+        if self.prompt_manager is not None:
+            try:
+                return self.prompt_manager.get_prompt("v1", prompt_type="system")
+            except Exception:  # noqa: BLE001
+                pass
+        return "You are a helpful RAG assistant. Ground answers in retrieved context."
 
     def build_graph(self):
         g = self.new_graph()
@@ -48,7 +75,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return g.compile()
 
     def retrieve(self, state: {title}State) -> {title}State:
-        # TODO: Replace with real vector search
+        # TODO: use get_connections("{name}").vector("kb").as_store() for real RAG
         state.citations = [
             {{"content": f"Document about {{state.request}}", "source": "knowledge_base"}}
         ]
@@ -56,8 +83,24 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     def generate(self, state: {title}State) -> {title}State:
         context = "\\n".join(d.get("content", "") for d in state.citations)
+        prompt = self._system_prompt()
+        if self.llm is not None:
+            try:
+                msg = (
+                    f"{{prompt}}\\n\\nContext:\\n{{context}}\\n\\n"
+                    f"Question: {{state.request}}"
+                )
+                result = self.llm.invoke(msg)
+                text = getattr(result, "content", None) or str(result)
+            except Exception as exc:  # noqa: BLE001
+                text = f"(llm error: {{exc}}) Answer for '{{state.request}}'"
+        else:
+            text = (
+                f"Based on the knowledge base: Answer to '{{state.request}}' "
+                f"using context: {{context}}"
+            )
         state.output = {{
-            "response": f"Based on the knowledge base: Answer to '{{state.request}}' using context: {{context}}",
+            "response": text,
             "agent_type": "{name}",
             "citations": state.citations,
         }}
@@ -68,7 +111,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:
         return state.output
-'''
+''' + _class_agent_get_graph_export(title)
     elif template == "chatbot":
         return f'''"""Chatbot class-based agent: {name}."""
 from __future__ import annotations
@@ -92,10 +135,20 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     agent_name = "{name}"
     agent_description = "Chatbot agent"
+    agent_framework = "graph_agent"
 
-    def __init__(self, *, llm: Any = None) -> None:
+    def __init__(self, *, llm: Any = None, prompt_manager: Any = None) -> None:
         super().__init__()
         self.llm = llm
+        self.prompt_manager = prompt_manager
+
+    def _system_prompt(self) -> str:
+        if self.prompt_manager is not None:
+            try:
+                return self.prompt_manager.get_prompt("v1", prompt_type="system")
+            except Exception:  # noqa: BLE001
+                pass
+        return "You are a friendly conversational assistant."
 
     def build_graph(self):
         g = self.new_graph()
@@ -106,8 +159,19 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     def respond(self, state: {title}State) -> {title}State:
         history_len = len(state.messages)
+        prompt = self._system_prompt()
+        if self.llm is not None:
+            try:
+                result = self.llm.invoke(
+                    f"{{prompt}}\\n\\nUser: {{state.request}}"
+                )
+                text = getattr(result, "content", None) or str(result)
+            except Exception as exc:  # noqa: BLE001
+                text = f"[Turn {{history_len + 1}}] (llm error: {{exc}})"
+        else:
+            text = f"[Turn {{history_len + 1}}] You said: {{state.request}}"
         state.output = {{
-            "response": f"[Turn {{history_len + 1}}] You said: {{state.request}}",
+            "response": text,
             "agent_type": "{name}",
             "suggestions": ["Tell me more", "Change topic", "Goodbye"],
         }}
@@ -121,7 +185,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:
         return state.output
-'''
+''' + _class_agent_get_graph_export(title)
     else:
         # Basic / Full
         return f'''"""Basic class-based agent: {name}."""
@@ -144,18 +208,31 @@ class {title}State:
 class {title}Agent(BaseGraphAgent[{title}State]):
     """Class agent for {name}.
 
+    The platform injects ``llm`` from the active stack (see ``llm.py``) and
+    ``prompt_manager`` from ``prompts.json``. Prefer those over hardcoding.
+
     Usage::
+
         agent = {title}Agent(llm=my_llm)
         result = agent.transform({{"current_query": "Hello"}})
     """
 
     agent_name = "{name}"
     agent_description = "{title} agent"
+    agent_framework = "graph_agent"
 
-    def __init__(self, *, llm: Any = None) -> None:
+    def __init__(self, *, llm: Any = None, prompt_manager: Any = None) -> None:
         super().__init__()
         self.llm = llm
-        self.system_prompt = "You are a helpful assistant."
+        self.prompt_manager = prompt_manager
+
+    def _system_prompt(self) -> str:
+        if self.prompt_manager is not None:
+            try:
+                return self.prompt_manager.get_prompt("v1", prompt_type="system")
+            except Exception:  # noqa: BLE001
+                pass
+        return "You are a helpful assistant."
 
     def build_graph(self):
         g = self.new_graph()
@@ -165,9 +242,20 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return g.compile()
 
     def process(self, state: {title}State) -> {title}State:
+        prompt = self._system_prompt()
         state.context = [f"Processed: {{state.request}}"]
+        if self.llm is not None:
+            try:
+                result = self.llm.invoke(
+                    f"{{prompt}}\\n\\nUser: {{state.request}}"
+                )
+                text = getattr(result, "content", None) or str(result)
+            except Exception as exc:  # noqa: BLE001
+                text = f"Result for: {{state.request}} (llm error: {{exc}})"
+        else:
+            text = f"Result for: {{state.request}}"
         state.output = {{
-            "response": f"Result for: {{state.request}}",
+            "response": text,
             "agent_type": "{name}",
         }}
         return state
@@ -177,6 +265,58 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:
         return state.output
+''' + _class_agent_get_graph_export(title)
+
+
+def _agent_manifest_init_py(name: str, description: str, keywords: str) -> str:
+    """Generate ``__init__.py`` with an explicit AgentManifest (agent card)."""
+    return f'''"""Agent: {name}."""
+from __future__ import annotations
+
+from agentomatic import AgentManifest
+
+manifest = AgentManifest(
+    name="{name}",
+    slug="agent-{name}",
+    description="{description}",
+    intent_keywords=[{keywords}],
+    framework="graph_agent",
+    version="1.0.0",
+)
+
+__all__ = ["manifest"]
+'''
+
+
+def _llm_py(name: str) -> str:
+    """Generate stack-driven ``llm.py`` for an agent package."""
+    return f'''"""LLM wiring for {name} — driven by the active stack, not hardcoded.
+
+The registry discovers ``llm_config`` / ``AgentLLMConfig`` and the platform
+resolves the named profile from ``stacks/<active>.yaml``.
+
+Roles map logical agent roles → stack LLM profile names
+(e.g. ``default``, ``fast``, ``judge``).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class AgentLLMConfig:
+    """Per-agent LLM role → stack profile mapping."""
+
+    roles: dict[str, str] = field(
+        default_factory=lambda: {{
+            "default": "default",
+            # "planner": "default",
+            # "fast": "fast",
+        }}
+    )
+
+
+llm_config = AgentLLMConfig()
 '''
 
 
@@ -212,14 +352,15 @@ def _prompts_json() -> str:
 """
 
 
-def _langgraph_json() -> str:
-    return """{
+def _langgraph_json(*, graph_target: str = "./agent.py:get_graph") -> str:
+    """Return langgraph.json pointing at a real module export."""
+    return f"""{{
     "dependencies": ["."],
-    "graphs": {
-        "agent": "./graph.py:get_graph"
-    },
+    "graphs": {{
+        "agent": "{graph_target}"
+    }},
     "env": ".env"
-}
+}}
 """
 
 
@@ -242,7 +383,74 @@ def _deepagent_init_py(name: str, description: str, keywords: str) -> str:
 
 def _deepagent_agent_py(name: str) -> str:
     safe_title = name.replace("_", " ").title()
-    return f'''"""Deep Agent definition for {name}.\n\nUses LangChain\'s `deepagents` harness for planning, tools,\nsubagent delegation, and context management.\n"""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\n\ndef internet_search(query: str, max_results: int = 5) -> str:\n    """Search the internet for information.\n\n    Args:\n        query: Search query string.\n        max_results: Maximum number of results.\n\n    Returns:\n        Search results as text.\n    """\n    # TODO: Replace with real search (Tavily, SerpAPI, etc.)\n    return f"Search results for: {{query}} ({{max_results}} results)"\n\n\n@lru_cache(maxsize=1)\ndef create_agent():\n    """Create and compile the deep agent."""\n    from deepagents import create_deep_agent\n\n    return create_deep_agent(\n        model="openai:gpt-4o",  # Change to your preferred model\n        system_prompt=(\n            "You are {safe_title}, "\n            "an expert AI assistant. Be thorough and accurate."\n        ),\n        tools=[internet_search],\n    )\n'''
+    return f'''"""Deep Agent definition for {name}.
+
+Uses LangChain's `deepagents` harness for planning, tools,
+subagent delegation, and context management.
+
+The model id is resolved from the active stack's default LLM profile
+(``stacks/<active>.yaml``) via ``get_llm_for_agent``, with an env-var
+override. Never hardcode production model names here.
+"""
+from __future__ import annotations
+
+import os
+from functools import lru_cache
+
+
+def internet_search(query: str, max_results: int = 5) -> str:
+    """Search the internet for information.
+
+    Args:
+        query: Search query string.
+        max_results: Maximum number of results.
+
+    Returns:
+        Search results as text.
+    """
+    # TODO: Replace with real search (Tavily, SerpAPI, etc.)
+    return f"Search results for: {{query}} ({{max_results}} results)"
+
+
+def _resolve_model() -> str:
+    """Resolve the deep-agent model from env override or stack config."""
+    override = os.getenv("{name.upper()}_MODEL") or os.getenv("DEEPAGENT_MODEL")
+    if override:
+        return override
+    try:
+        from agentomatic.providers.llm import get_llm_for_agent
+
+        llm = get_llm_for_agent("{name}", role="default")
+        # Best-effort extract a provider:model string
+        model = getattr(llm, "model", None) or getattr(llm, "model_name", None)
+        provider = getattr(llm, "_llm_type", None)
+        if model:
+            return f"{{provider}}:{{model}}" if provider else str(model)
+    except Exception:  # noqa: BLE001
+        pass
+    # Provider-agnostic default: honour the platform task-model env vars before
+    # falling back to a local model, rather than silently assuming OpenAI. Pin
+    # explicitly with {name.upper()}_MODEL / DEEPAGENT_MODEL.
+    return os.getenv(
+        "AGENTOMATIC_TASK_MODEL",
+        os.getenv("LLM__MODEL", "ollama/qwen2.5:7b"),
+    )
+
+
+@lru_cache(maxsize=1)
+def create_agent():
+    """Create and compile the deep agent."""
+    from deepagents import create_deep_agent
+
+    return create_deep_agent(
+        model=_resolve_model(),
+        system_prompt=(
+            "You are {safe_title}, "
+            "an expert AI assistant. Be thorough and accurate."
+        ),
+        tools=[internet_search],
+    )
+'''
 
 
 # --- Custom (no LangGraph) template ---
@@ -1018,6 +1226,7 @@ all: validate eval optimize  ## Full lifecycle: validate → eval → optimize
 
 TEMPLATES: dict[str, str] = {
     "basic": "Minimal class-based agent (recommended) — 1 file, quick start",
+    "class": "Alias for basic — class-owned BaseGraphAgent",
     "full": "All files — class agent with config, schemas, tools, dataset, train/eval scripts",
     "coordinator": "Orchestrator — classify & route queries to specialist agents via delegation",
     "pipeline": "Pipeline — multi-step YAML workflow chaining multiple agents",
@@ -1030,6 +1239,10 @@ TEMPLATES: dict[str, str] = {
     "endpoint": "Custom Endpoint — call deployed model services (httpx + auth) and aggregate",
     "connection": "Connections — per-agent authenticated database + HTTP service connections",
     "ingestion": "Ingestor — package your own doc-ingestion code (any library) as a task-run job",
+    "extraction": (
+        "Extraction agent — scope-parameterized markdown extractor for parallel "
+        "fan-out via map pipeline steps"
+    ),
 }
 
 
@@ -1096,32 +1309,72 @@ def _plugin_dataset_jsonl(name: str) -> str:
 
 def _plugin_train_py(name: str) -> str:
     return f'''"""Training script for {name} ML plugin.
-Demonstrates a standard classical ML training loop.
-"""
-import json
-from pathlib import Path
-import logging
 
-logging.basicConfig(level=logging.INFO)
+Demonstrates a standard classical ML training loop with a JSONL dataset,
+train / eval split, and pluggable weighted metrics — swap the ``fit`` /
+``predict`` stubs for scikit-learn / PyTorch / etc.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-def load_data(filepath: str) -> list[dict]:
+DATA_DIR = Path(__file__).parent
+DATASET = DATA_DIR / "dataset.jsonl"
+MODEL_PATH = DATA_DIR / "model_weights.pkl"
+
+# Weighted evaluation config — mirror this in eval.py + optimize.py.
+# Weights should reflect what actually matters for your task.
+METRIC_WEIGHTS = {{
+    "accuracy": 0.6,
+    "confidence": 0.4,
+}}
+
+
+def load_data(filepath: str | Path) -> list[dict]:
+    """Load a JSONL dataset from *filepath*."""
     with open(filepath) as f:
-        return [json.loads(line) for line in f]
+        return [json.loads(line) for line in f if line.strip()]
 
-def train():
-    logger.info(f"Training {name} plugin...")
-    data = load_data("dataset.jsonl")
-    logger.info(f"Loaded {{len(data)}} training examples.")
 
-    # TODO: Implement classical ML training (e.g. Scikit-learn, PyTorch)
-    # X = [d["text"] for d in data]
-    # y = [d["label"] for d in data]
+def train_eval_split(data: list[dict], eval_fraction: float = 0.2) -> tuple[list[dict], list[dict]]:
+    """Deterministic tail-split (last N% held out for eval)."""
+    if not data:
+        return data, []
+    n_eval = max(1, int(len(data) * eval_fraction))
+    return data[:-n_eval], data[-n_eval:]
+
+
+def train() -> None:
+    """Train the {name} plugin and persist model weights."""
+    logger.info("Training {name} plugin...")
+
+    data = load_data(DATASET)
+    train_data, eval_data = train_eval_split(data)
+    logger.info(
+        "Loaded %d examples (train=%d, eval=%d).",
+        len(data), len(train_data), len(eval_data),
+    )
+
+    # Placeholder — replace with your real classical-ML train + save path.
+    # from sklearn.linear_model import LogisticRegression
+    # import joblib
+    # X = [d["text"] for d in train_data]
+    # y = [d["label"] for d in train_data]
     # model = LogisticRegression().fit(X, y)
+    # joblib.dump(model, MODEL_PATH)
 
-    logger.info("Saving model weights to disk...")
-    # TODO: joblib.dump(model, "model_weights.pkl")
-    logger.info("Training complete.")
+    logger.error(
+        "Plugin train.py is a stub — implement sklearn/joblib training and save "
+        "to %s before relying on `make train`.",
+        MODEL_PATH,
+    )
+    raise SystemExit(1)
+
 
 if __name__ == "__main__":
     train()
@@ -1129,33 +1382,116 @@ if __name__ == "__main__":
 
 
 def _plugin_eval_py(name: str) -> str:
+    title = name.replace("_", "").title()
     return f'''"""Evaluation script for {name} ML plugin.
-Evaluates the loaded model against a test dataset.
-"""
-import json
-import asyncio
-import logging
-from plugin import {name.replace("_", "").title()}Plugin, {name.replace("_", "").title()}Input
 
-logging.basicConfig(level=logging.INFO)
+Loads the plugin, runs it against the labelled dataset, and computes a
+weighted score across multiple criteria (accuracy + confidence).
+
+The accuracy is computed *honestly*: a prediction only counts as correct
+when :func:`to_label` maps the plugin output to the same class as the
+example's ground-truth ``label``. If the plugin still returns the stub
+response (no derivable label), eval exits non-zero instead of reporting a
+fabricated score — swap :func:`to_label` and ``predict`` for your real
+model, then add F1 / ROC / etc.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from pathlib import Path
+
+from .plugin import {title}Input, {title}Plugin
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-async def evaluate():
-    logger.info(f"Evaluating {name} plugin...")
-    plugin = {name.replace("_", "").title()}Plugin()
+DATA_DIR = Path(__file__).parent
+DATASET = DATA_DIR / "dataset.jsonl"
+
+# Keep aligned with train.py / optimize.py.
+METRIC_WEIGHTS = {{
+    "accuracy": 0.6,
+    "confidence": 0.4,
+}}
+
+
+def load_data(filepath: Path) -> list[dict]:
+    """Load a JSONL dataset from *filepath*."""
+    with open(filepath) as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def to_label(result: str) -> int | None:
+    """Map a raw plugin output string to a class label.
+
+    Adapt this to your label space. Returns ``None`` when the output cannot
+    be interpreted as a label so eval never counts an unparseable prediction
+    as correct (which would inflate accuracy).
+    """
+    text = str(result).strip()
+    if text.lstrip("-").isdigit():
+        return int(text)
+    return None
+
+
+def weighted_score(component_scores: dict[str, float], weights: dict[str, float]) -> float:
+    """Return a weight-normalised composite score across components."""
+    total_w = sum(weights.get(k, 0.0) for k in component_scores) or 1.0
+    return sum(component_scores.get(k, 0.0) * weights.get(k, 0.0) for k in component_scores) / total_w
+
+
+async def evaluate() -> None:
+    """Load the plugin, run predictions, and report honest weighted metrics."""
+    logger.info("Evaluating {name} plugin...")
+    plugin = {title}Plugin()
     await plugin.load_model()
 
-    # Mock data loading
-    examples = [{{"text": "Test input", "expected_label": 1}}]
+    if not DATASET.exists():
+        logger.error("No dataset at %s — add labelled JSONL rows before evaluating.", DATASET)
+        raise SystemExit(1)
+
+    examples = load_data(DATASET)
+    labelled = [ex for ex in examples if "label" in ex]
+    if not labelled:
+        logger.error(
+            "Dataset has no `label` field — cannot compute accuracy. Add "
+            'ground-truth labels (e.g. {{"text": ..., "label": 1}}) first.'
+        )
+        raise SystemExit(1)
 
     correct = 0
-    for ex in examples:
-        result = await plugin.predict({name.replace("_", "").title()}Input(text=ex["text"]))
-        # TODO: Compute real metrics like F1, Accuracy
-        if result.result:
-            correct += 1
+    scored = 0
+    confidence_sum = 0.0
+    for ex in labelled:
+        result = await plugin.predict({title}Input(text=ex["text"]))
+        predicted = to_label(result.result)
+        if predicted is not None:
+            scored += 1
+            if predicted == ex["label"]:
+                correct += 1
+        confidence_sum += float(getattr(result, "confidence", 0.0))
 
-    logger.info(f"Accuracy: {{correct / len(examples):.2f}}")
+    if scored == 0:
+        logger.error(
+            "Could not derive a single prediction/label from plugin output — the "
+            "plugin still returns the stub response. Implement `predict()` and "
+            "`to_label()` so eval compares real predictions to ground truth "
+            "instead of reporting a fabricated score."
+        )
+        raise SystemExit(1)
+
+    scores = {{
+        "accuracy": correct / scored,
+        "confidence": confidence_sum / len(labelled),
+    }}
+    composite = weighted_score(scores, METRIC_WEIGHTS)
+
+    logger.info("Scored %d/%d labelled examples.", scored, len(labelled))
+    logger.info("Component scores: %s", scores)
+    logger.info("Weighted composite score: %.3f", composite)
+
 
 if __name__ == "__main__":
     asyncio.run(evaluate())
@@ -1164,16 +1500,24 @@ if __name__ == "__main__":
 
 def _plugin_optimize_py(name: str) -> str:
     return f'''"""Hyperparameter optimization script for {name} plugin."""
+from __future__ import annotations
+
 import logging
+import sys
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def optimize():
-    logger.info(f"Optimizing {name} plugin hyperparameters...")
-    # TODO: Implement GridSearchCV, Optuna, or random search
-    # Best params -> retrain model -> save
-    logger.info("Optimization complete.")
+
+def optimize() -> None:
+    """Optimize hyperparameters (stub — exit until you wire a real search)."""
+    logger.error(
+        "Plugin optimize.py is a stub. Implement GridSearchCV / Optuna / "
+        "random search (then retrain + save), or call `agentomatic optimize` "
+        "for prompt-level tuning of class agents."
+    )
+    raise SystemExit(1)
+
 
 if __name__ == "__main__":
     optimize()
@@ -1184,7 +1528,7 @@ def _plugin_predict_py(name: str) -> str:
     title = name.replace("_", "").title()
     return f'''"""Local inference script for {name} plugin."""
 import asyncio
-from plugin import {title}Plugin, {title}Input
+from .plugin import {title}Plugin, {title}Input
 
 async def predict(text: str):
     plugin = {title}Plugin()
@@ -1268,13 +1612,38 @@ from .agent import {title}Agent
 
 from agentomatic.agents import AgentDataset
 from agentomatic.agents.metrics import (
+    CallableMetric,
     ContainsTermsMetric,
     ExactKeyMatchMetric,
+    WeightedMetric,
 )
 from agentomatic.agents.optimizers import NoOpOptimizer
 
 DATA_DIR = Path(__file__).parent
 COMPILED_DIR = Path("compiled") / "{name}"
+
+
+# Multi-criteria evaluation config — tune weights to reflect what matters.
+# Each row: (name, metric_instance, weight). Weights are auto-normalised.
+METRICS = [
+    ("exact_response", ExactKeyMatchMetric(["response"]), 0.5),
+    ("contains_terms", ContainsTermsMetric(["Result"]), 0.3),
+    (
+        "has_output",
+        CallableMetric(
+            "has_output",
+            lambda example, pred: 1.0 if pred.get("response") else 0.0,
+        ),
+        0.2,
+    ),
+]
+
+
+def build_metrics() -> list:
+    """Return the list of metrics + composite used during train/eval."""
+    individual = [m for _, m, _ in METRICS]
+    composite = WeightedMetric(METRICS, name="composite")
+    return [*individual, composite]
 
 
 def main() -> None:
@@ -1289,12 +1658,12 @@ def main() -> None:
           f"(train={{len(dataset.train)}}, test={{len(dataset.test)}})")
 
     # 3. Compile — register metrics + optimizer
-    metrics = [
-        ExactKeyMatchMetric(["response"]),
-        ContainsTermsMetric(["Result"]),
-    ]
+    metrics = build_metrics()
     agent.compile(dataset, metrics, optimizer=NoOpOptimizer())
-    print("Compiled with 2 metrics + NoOpOptimizer")
+    print(
+        f"Compiled with {{len(metrics)}} metrics "
+        f"(composite = {{len(METRICS)}} weighted components) + NoOpOptimizer"
+    )
 
     # 4. Fit — run optimization loop
     agent.fit(dataset)
@@ -1336,9 +1705,33 @@ from agentomatic.agents.metrics import (
     CallableMetric,
     ContainsTermsMetric,
     ExactKeyMatchMetric,
+    WeightedMetric,
 )
 
 DATA_DIR = Path(__file__).parent
+
+
+# Multi-criteria evaluation config — mirrors train.py so train + eval agree.
+# Each row: (name, metric_instance, weight). Weights are auto-normalised.
+METRICS = [
+    ("exact_response", ExactKeyMatchMetric(["response"]), 0.5),
+    ("contains_terms", ContainsTermsMetric(["Result"]), 0.3),
+    (
+        "has_output",
+        CallableMetric(
+            "has_output",
+            lambda example, pred: 1.0 if pred.get("response") else 0.0,
+        ),
+        0.2,
+    ),
+]
+
+
+def build_metrics() -> list:
+    """Return metrics for evaluation (individual + weighted composite)."""
+    individual = [m for _, m, _ in METRICS]
+    composite = WeightedMetric(METRICS, name="composite")
+    return [*individual, composite]
 
 
 def main() -> None:
@@ -1376,15 +1769,8 @@ def main() -> None:
         examples = dataset.examples
     print(f"Evaluating on {{len(examples)}} examples (split={{args.split}})")
 
-    # 3. Define metrics
-    metrics = [
-        ExactKeyMatchMetric(["response"]),
-        ContainsTermsMetric(["Result"]),
-        CallableMetric(
-            "has_output",
-            lambda example, pred: 1.0 if pred.get("response") else 0.0,
-        ),
-    ]
+    # 3. Build metrics (weighted composite + individual components)
+    metrics = build_metrics()
 
     # 4. Evaluate
     report = agent.evaluate(examples, metrics)
@@ -1422,43 +1808,82 @@ if __name__ == "__main__":
 
 def _optimize_py(name: str) -> str:
     title = name.replace("_", " ").title().replace(" ", "")
-    return f'''"""Prompt optimization script for {name}.
+    return f'''"""Prompt / parameter optimization script for {name}.
 
-Supports two optimization strategies:
-  - GridSearch: brute-force parameter sweep (temperature, prompt_version)
-  - PromptFitter: LLM-powered prompt rewriting (requires agentomatic[optimize])
+Two families of optimization are supported:
+
+- **prompt_only**: rewrite the system prompt only. Fast, low-risk, uses
+  the built-in ``GridSearchOptimizer`` on a curated list of prompt
+  variants defined below.
+- **param_search**: PromptFitter-based parameter search over the space
+  declared in ``search_space.yaml``. Also supports ``rewrite``,
+  ``gepa_like``, ``mipro_like``, ``few_shot`` fitter modes.
 
 Usage::
 
-    python -m agents.{name}.optimize
-    python -m agents.{name}.optimize --strategy grid
-    python -m agents.{name}.optimize --strategy prompt
+    # Prompt-only (fast, no external LLM required)
+    python -m agents.{name}.optimize --strategy prompt_only
+
+    # Parameter search using the local search_space.yaml grid
+    python -m agents.{name}.optimize --strategy param_search
+
+    # Full PromptFitter with GEPA-style rewrites + params
+    python -m agents.{name}.optimize --strategy gepa_like \\
+        --search-space agents/{name}/search_space.yaml
+
+Equivalent CLI (skips this script entirely)::
+
+    agentomatic optimize {name} \\
+        --dataset agents/{name}/dataset.jsonl \\
+        --mode param_search \\
+        --search-space agents/{name}/search_space.yaml
 """
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from .agent import {title}Agent
 
 from agentomatic.agents import AgentDataset
 from agentomatic.agents.metrics import (
+    CallableMetric,
     ContainsTermsMetric,
     ExactKeyMatchMetric,
+    WeightedMetric,
 )
 from agentomatic.agents.optimizers import GridSearchOptimizer, PromptFitterBridge
 
 DATA_DIR = Path(__file__).parent
 COMPILED_DIR = Path("compiled") / "{name}"
+DEFAULT_SEARCH_SPACE = DATA_DIR / "search_space.yaml"
 
 
-def run_grid_search(agent: {title}Agent, dataset: AgentDataset) -> None:
-    """Run GridSearch optimization."""
-    metrics = [
-        ExactKeyMatchMetric(["response"]),
-        ContainsTermsMetric(["Result"]),
-    ]
+# Reuse the same weighted metric config as train.py / eval.py.
+METRICS = [
+    ("exact_response", ExactKeyMatchMetric(["response"]), 0.5),
+    ("contains_terms", ContainsTermsMetric(["Result"]), 0.3),
+    (
+        "has_output",
+        CallableMetric(
+            "has_output",
+            lambda example, pred: 1.0 if pred.get("response") else 0.0,
+        ),
+        0.2,
+    ),
+]
 
+
+def build_metrics() -> list:
+    """Return metrics used by all optimization strategies."""
+    individual = [m for _, m, _ in METRICS]
+    composite = WeightedMetric(METRICS, name="composite")
+    return [*individual, composite]
+
+
+def run_prompt_only(agent: {title}Agent, dataset: AgentDataset) -> None:
+    """Optimise the system prompt only via GridSearch over prompt variants."""
     optimizer = GridSearchOptimizer(
         param_grid={{
             "system_prompt": [
@@ -1466,48 +1891,78 @@ def run_grid_search(agent: {title}Agent, dataset: AgentDataset) -> None:
                 "You are a precise, detail-oriented assistant.",
                 "You are a concise assistant. Be brief and accurate.",
             ],
-            # Add more parameters to tune:
-            # "temperature": [0.0, 0.2, 0.5, 0.8],
-            # "retrieval_top_k": [3, 5, 8],
         }},
         max_examples=10,  # limit examples per combo for speed
     )
 
-    print("Running GridSearch optimization...")
+    print("Running prompt-only optimization (GridSearch on prompts)...")
     print(f"  Training examples: {{len(dataset.train)}}")
-    agent.compile(dataset, metrics, optimizer=optimizer)
+    agent.compile(dataset, build_metrics(), optimizer=optimizer)
     agent.fit(dataset)
 
     print("\\nOptimized config:")
     for key, value in agent.compiled_config.items():
         print(f"  {{key}}: {{value}}")
 
-    # Evaluate optimized agent
-    report = agent.evaluate(dataset.test, metrics)
+    report = agent.evaluate(dataset.test, build_metrics())
     print(f"\\nTest pass rate: {{report.pass_rate:.1%}}")
     print(report.summary())
 
-    # Save
     agent.save(str(COMPILED_DIR))
     print(f"\\nSaved optimized agent to {{COMPILED_DIR}}/")
 
 
-def run_prompt_fitter(agent: {title}Agent, dataset: AgentDataset) -> None:
-    """Run PromptFitter optimization (LLM-powered prompt rewriting)."""
-    metrics = [
-        ExactKeyMatchMetric(["response"]),
-        ContainsTermsMetric(["Result"]),
-    ]
+def run_param_search(
+    agent: {title}Agent,
+    dataset: AgentDataset,
+    *,
+    search_space_path: Path | None = None,
+    mode: str = "param_search",
+) -> None:
+    """Optimize prompt + parameters via PromptFitter and the search space.
+
+    Loads a ``PromptSearchSpace`` from ``search_space.yaml`` (or the
+    ``--search-space`` argument) and dispatches to the requested fitter
+    mode (``param_search``, ``rewrite``, ``gepa_like``, ``mipro_like``,
+    ``few_shot``).
+    """
+    try:
+        from agentomatic.optimize import load_search_space  # type: ignore
+    except ImportError:
+        print(
+            "agentomatic[optimize] is required for param_search. "
+            "Install with: pip install 'agentomatic[optimize]'"
+        )
+        return
+
+    ss_path = Path(search_space_path or DEFAULT_SEARCH_SPACE)
+    if ss_path.exists():
+        space = load_search_space(ss_path)
+        print(f"Loaded search space from {{ss_path}}")
+    else:
+        from agentomatic.optimize import PromptSearchSpace  # type: ignore
+        space = PromptSearchSpace()
+        print(f"No search_space.yaml at {{ss_path}} — using defaults")
+
+    print(f"Active spaces: {{space.active_spaces()}}")
+    print(f"Total combinations: {{space.total_search_size()}}")
 
     optimizer = PromptFitterBridge(
         agent_name="{name}",
-        task_model="ollama/qwen2.5:7b",      # model that runs your agent
-        rewrite_model="openai/gpt-4.1",       # model that rewrites prompts
+        task_model=os.environ.get(
+            "AGENTOMATIC_TASK_MODEL",
+            os.environ.get("LLM__MODEL", "ollama/qwen2.5:7b"),
+        ),
+        rewrite_model=os.environ.get(
+            "AGENTOMATIC_REWRITE_MODEL",
+            os.environ.get("REWRITE_LLM__MODEL", "openai/gpt-4.1"),
+        ),
+        optimizer=mode,
+        search_space=space,
     )
 
-    print("Running PromptFitter optimization...")
-    print("  This uses an LLM to rewrite your system prompt for better quality.")
-    agent.compile(dataset, metrics, optimizer=optimizer)
+    print(f"Running PromptFitter (mode={{mode}})...")
+    agent.compile(dataset, build_metrics(), optimizer=optimizer)
     agent.fit(dataset)
 
     print("\\nOptimized config:")
@@ -1522,22 +1977,37 @@ def main() -> None:
     """Run optimization."""
     parser = argparse.ArgumentParser(description="Optimize {name}")
     parser.add_argument(
-        "--strategy", choices=["grid", "prompt"], default="grid",
-        help="Optimization strategy: grid (GridSearch) or prompt (PromptFitter)"
+        "--strategy",
+        choices=["prompt_only", "param_search", "rewrite", "gepa_like",
+                 "mipro_like", "few_shot"],
+        default="prompt_only",
+        help=(
+            "Optimization mode. 'prompt_only' rewrites prompts only. "
+            "The rest go through PromptFitter with a search space."
+        ),
     )
     parser.add_argument(
         "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
         help="Path to training dataset (JSONL)"
+    )
+    parser.add_argument(
+        "--search-space", type=str, default=None,
+        help="Path to a search_space.yaml (defaults to agents/{name}/search_space.yaml)"
     )
     args = parser.parse_args()
 
     agent = {title}Agent(llm=None)
     dataset = AgentDataset.from_jsonl(args.dataset)
 
-    if args.strategy == "grid":
-        run_grid_search(agent, dataset)
-    elif args.strategy == "prompt":
-        run_prompt_fitter(agent, dataset)
+    if args.strategy == "prompt_only":
+        run_prompt_only(agent, dataset)
+    else:
+        run_param_search(
+            agent,
+            dataset,
+            search_space_path=Path(args.search_space) if args.search_space else None,
+            mode=args.strategy,
+        )
 
 
 if __name__ == "__main__":
@@ -1652,17 +2122,63 @@ if __name__ == "__main__":
 '''
 
 
+def _search_space_yaml(name: str) -> str:
+    """Return the default PromptSearchSpace YAML for the ``full`` template.
+
+    Keys mirror :meth:`agentomatic.optimize.PromptSearchSpace.to_dict` so
+    the file loads cleanly via :func:`agentomatic.optimize.load_search_space`.
+    """
+    return f"""# Default search space for {name}
+#
+# Loaded by `agentomatic optimize {name} --mode param_search --search-space
+# agents/{name}/search_space.yaml` or by `agents.{name}.optimize` via the
+# `PromptFitterBridge`.  All keys are optional — omit any you don't need.
+
+# Toggle which knobs are considered by PromptFitter.
+optimize_system_prompt: true
+optimize_user_template: false
+optimize_few_shot: true
+optimize_model_params: true
+optimize_rag_params: false
+optimize_tool_params: false
+optimize_model_choice: false
+
+# Model hyper-parameter grid (candidates per parameter).
+model_param_space:
+  temperature: [0.0, 0.2, 0.5, 0.7]
+  top_p: [0.9, 1.0]
+  max_tokens: [800, 1200, 2000]
+
+# RAG parameter grid — populate if `optimize_rag_params` is enabled.
+rag_param_space: {{}}
+
+# Tool parameter grid — populate if `optimize_tool_params` is enabled.
+tool_param_space: {{}}
+
+# Alternative model choices for `optimize_model_choice: true`.
+model_choices: []
+fallback_models: []
+routing_weight_space: {{}}
+
+# Few-shot config.
+max_few_shot_examples: 5
+few_shot_selection_strategy: diversity_weighted   # top_k | diversity_weighted | random_search
+"""
+
+
 def _makefile(name: str) -> str:
     return f"""# Makefile for {name} agent — ML lifecycle commands
 #
 # Usage:
-#   make train      — Compile, fit, and save the agent
-#   make eval       — Evaluate on the test split
-#   make optimize   — Run GridSearch parameter optimization
-#   make predict    — Start interactive prediction mode
-#   make all        — Full pipeline: train → eval
+#   make train              — Compile, fit, and save the agent
+#   make eval               — Evaluate on the test split
+#   make optimize           — Prompt-only optimization (fast, no external LLM)
+#   make optimize-params    — Full parameter search via PromptFitter
+#   make optimize-gepa      — GEPA-style feedback-guided prompt mutations
+#   make predict            — Start interactive prediction mode
+#   make all                — Full pipeline: train → eval
 
-.PHONY: train eval optimize predict all clean
+.PHONY: train eval optimize optimize-params optimize-gepa predict all clean
 
 AGENT = {name}
 COMPILED = compiled/$(AGENT)
@@ -1680,12 +2196,16 @@ eval-all:
 \tpython -m agents.$(AGENT).eval --split all
 
 optimize:
-\t@echo "\\n🔧 Optimizing $(AGENT) with GridSearch..."
-\tpython -m agents.$(AGENT).optimize --strategy grid
+\t@echo "\\n🔧 Optimizing $(AGENT) — prompt only..."
+\tpython -m agents.$(AGENT).optimize --strategy prompt_only
 
-optimize-prompt:
-\t@echo "\\n🔧 Optimizing $(AGENT) with PromptFitter..."
-\tpython -m agents.$(AGENT).optimize --strategy prompt
+optimize-params:
+\t@echo "\\n🔧 Optimizing $(AGENT) — param search via search_space.yaml..."
+\tpython -m agents.$(AGENT).optimize --strategy param_search
+
+optimize-gepa:
+\t@echo "\\n🔧 Optimizing $(AGENT) — GEPA-style mutations..."
+\tpython -m agents.$(AGENT).optimize --strategy gepa_like
 
 predict:
 \t@echo "\\n🔮 Starting interactive prediction..."
@@ -2095,6 +2615,213 @@ with `await ctx.report(...)` and honour `ctx.cancelled` in long loops.
 """
 
 
+def _extraction_agent_py(name: str) -> str:
+    """Return the extraction agent module content for template ``extraction``.
+
+    The scaffold produces a scope-parameterized class agent that reads a
+    markdown blob (``markdown`` in state) and extracts a set of fields for a
+    given ``scope``.  Designed to be fanned out via a pipeline ``map`` step,
+    one agent invocation per scope, with retry/progress/checkpoint support.
+    """
+    title = name.replace("_", " ").title().replace(" ", "")
+    body = '''"""Scope-parameterized extraction agent: {name}.
+
+Extracts a set of structured fields from a markdown document for one *scope*
+at a time.  Designed to be fanned out via a pipeline ``map`` step so N scopes
+are extracted concurrently::
+
+    steps:
+      - ingestion: markdown
+        name: to_md
+        input:
+          source: $.input.source
+
+      - name: extract_all
+        map:
+          agent: {name}
+          items: $.input.scopes         # e.g. ["parties", "dates", "amounts"]
+          item_key: scope
+          max_concurrency: 4
+          retry:
+            max_attempts: 3
+            backoff: exponential
+            base_delay: 1.0
+          input:
+            markdown: $.steps.to_md.output.path
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from agentomatic.agents import BaseGraphAgent
+
+
+@dataclass
+class {title}State:
+    """Per-run state — carries markdown + the current scope."""
+
+    markdown: str = ""
+    scope: str = ""
+    index: int = 0
+    fields: dict[str, Any] = field(default_factory=dict)
+    output: dict[str, Any] = field(default_factory=dict)
+
+
+class {title}Agent(BaseGraphAgent[{title}State]):
+    """Extract structured fields from a markdown document for one scope.
+
+    The agent is *scope-parameterized*: each pipeline map iteration passes a
+    different ``scope`` (e.g. ``"parties"``, ``"dates"``, ``"amounts"``) so
+    the same agent produces N parallel extractions.  Replace the body of
+    :meth:`extract` with your LLM/regex/parser of choice.
+    """
+
+    agent_name = "{name}"
+    agent_description = "Scope-parameterized markdown extraction agent"
+
+    def __init__(self, *, llm: Any = None) -> None:
+        super().__init__()
+        self.llm = llm
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("load", self.load)
+        g.add_node("extract", self.extract)
+        g.set_entry_point("load")
+        g.add_edge("load", "extract")
+        g.set_finish_point("extract")
+        return g.compile()
+
+    def load(self, state: {title}State) -> {title}State:
+        """Resolve markdown from either an inline string or a file path."""
+        raw = state.markdown
+        if not raw:
+            return state
+        candidate = Path(raw).expanduser()
+        if candidate.exists() and candidate.is_file() and candidate.stat().st_size < 5_000_000:
+            try:
+                state.markdown = candidate.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                state.markdown = candidate.read_bytes().decode("utf-8", errors="replace")
+        return state
+
+    def extract(self, state: {title}State) -> {title}State:
+        """Extract fields for ``state.scope`` from ``state.markdown``.
+
+        Replace this method with your real extraction logic (LLM prompt,
+        regex chains, structured output parser, etc).
+        """
+        scope = state.scope or "default"
+        snippet = state.markdown[:200].replace("\\n", " ")
+        state.fields = {{
+            "scope": scope,
+            "sample": snippet,
+            "length": len(state.markdown),
+        }}
+        state.output = {{
+            "response": f"Extracted scope '{{scope}}' ({{len(state.markdown)}} chars)",
+            "scope": scope,
+            "fields": state.fields,
+        }}
+        return state
+
+    def input_to_state(self, data: dict[str, Any]) -> {title}State:
+        """Coerce pipeline input into per-run state."""
+        scope = data.get("scope") or data.get("item") or ""
+        markdown = data.get("markdown") or data.get("current_query") or ""
+        try:
+            index = int(data.get("index", 0))
+        except (TypeError, ValueError):
+            index = 0
+        return {title}State(markdown=str(markdown), scope=str(scope), index=index)
+
+    def state_to_output(self, state: {title}State) -> dict[str, Any]:
+        return state.output
+'''
+    return body.format(name=name, title=title) + _class_agent_get_graph_export(title)
+
+
+def _extraction_pipeline_yaml(name: str) -> str:
+    return f"""# Extraction pipeline for {name}
+#
+# ingestion → map(extractor, scope)
+#
+# POST /api/v1/pipelines/{name}/run  {{"input": {{
+#   "source": "/path/to/document.pdf",
+#   "scopes": ["parties", "dates", "amounts"]
+# }}}}
+
+name: {name}
+description: "Parallel scope extraction over markdown ingestion"
+version: "1.0.0"
+
+steps:
+  - ingestion: markdown
+    name: to_md
+    input:
+      source: $.input.source
+      output_dir: $.input.output_dir
+
+  - name: extract_all
+    map:
+      agent: {name}
+      items: $.input.scopes
+      item_key: scope
+      max_concurrency: 4
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        base_delay: 1.0
+      input:
+        markdown: $.steps.to_md.output.path
+
+on_error: fail_fast
+timeout: 300.0
+"""
+
+
+def _extraction_readme(name: str) -> str:
+    title = name.replace("_", " ").title()
+    return f"""# {title} Extraction Agent
+
+Generated with `agentomatic init {name} --template extraction`.
+
+A **scope-parameterized** extraction agent designed to be fanned out via a
+pipeline `map` step — one agent invocation per scope, with retry / progress
+/ checkpoint support baked in.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `agent.py` | Extraction agent (edit `extract()` with your logic) |
+| `pipeline.yaml` | Ingestion → map fan-out pipeline |
+| `README.md` | This file |
+
+## Quick start
+
+```bash
+agentomatic run
+
+curl -X POST http://localhost:8000/api/v1/pipelines/{name}/run \\
+  -H 'content-type: application/json' \\
+  -d '{{"input": {{
+        "source": "./document.pdf",
+        "scopes": ["parties", "dates", "amounts"]
+      }}}}'
+```
+
+## Customise
+
+Open `agent.py` and replace the body of `extract()` with your real
+extraction logic (LLM prompt, regex chains, structured-output parser,
+etc.).  Each map iteration receives a different `scope` under
+`state.scope`, so a single agent produces N parallel extractions.
+"""
+
+
 def get_template_files(template: str, name: str) -> dict[str, str]:
     """Get all files for a given template.
 
@@ -2105,6 +2832,9 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
     Returns:
         Dict mapping relative file paths to content strings.
     """
+    if template == "class":
+        template = "basic"
+
     title = name.replace("_", " ").title()
     description = f"{title} agent"
     keywords = f'"{name}"'
@@ -2115,18 +2845,26 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
         ".env.example": _env_example(name),
         "README.md": _readme_md(name, template),
     }
+    legacy_common = {
+        "prompts.json": _prompts_json(),
+        "langgraph.json": _langgraph_json(graph_target="./graph.py:get_graph"),
+        ".env.example": _env_example(name),
+        "README.md": _readme_md(name, template),
+    }
 
     if template == "basic":
         return {
-            "__init__.py": '"""Agent package."""\n',
+            "__init__.py": _agent_manifest_init_py(name, description, keywords),
             "agent.py": _class_agent_py(name, "basic"),
+            "llm.py": _llm_py(name),
             **common,
         }
 
     elif template == "full":
         return {
-            "__init__.py": '"""Agent package."""\n',
+            "__init__.py": _agent_manifest_init_py(name, description, keywords),
             "agent.py": _class_agent_py(name, "full"),
+            "llm.py": _llm_py(name),
             "config.py": _config_py(name),
             "schemas.py": _schemas_py(name),
             "tools.py": _tools_py(name),
@@ -2136,14 +2874,18 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "eval.py": _eval_py(name),
             "optimize.py": _optimize_py(name),
             "predict.py": _predict_py(name),
+            "search_space.yaml": _search_space_yaml(name),
             "Makefile": _makefile(name),
             **common,
         }
 
     elif template == "coordinator":
         return {
-            "__init__.py": '"""Agent package."""\n',
+            "__init__.py": _agent_manifest_init_py(
+                name, f"{title} coordinator / orchestrator", keywords
+            ),
             "agent.py": _coordinator_agent_py(name),
+            "llm.py": _llm_py(name),
             "delegation.py": _coordinator_delegation_py(name),
             "security.py": _coordinator_security_py(name),
             "config.py": _config_py(name),
@@ -2163,8 +2905,9 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "rag":
         return {
-            "__init__.py": '"""Agent package."""\n',
+            "__init__.py": _agent_manifest_init_py(name, f"{title} RAG agent", keywords),
             "agent.py": _class_agent_py(name, "rag"),
+            "llm.py": _llm_py(name),
             "config.py": _config_py(name),
             "tools.py": _tools_py(name),
             **common,
@@ -2172,8 +2915,9 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
 
     elif template == "chatbot":
         return {
-            "__init__.py": '"""Agent package."""\n',
+            "__init__.py": _agent_manifest_init_py(name, f"{title} chatbot agent", keywords),
             "agent.py": _class_agent_py(name, "chatbot"),
+            "llm.py": _llm_py(name),
             "config.py": _config_py(name),
             **common,
         }
@@ -2182,6 +2926,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
         return {
             "__init__.py": _deepagent_init_py(name, f"{title} deep agent", keywords),
             "agent.py": _deepagent_agent_py(name),
+            "llm.py": _llm_py(name),
             "config.py": _config_py(name),
             ".env.example": _env_example(name),
             "README.md": _readme_md(name, template),
@@ -2201,7 +2946,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "__init__.py": _legacy_init_py(name, description, keywords),
             "graph.py": _legacy_graph_py(name),
             "nodes.py": _legacy_nodes_py(name),
-            **common,
+            **legacy_common,
         }
 
     elif template == "plugin":
@@ -2238,6 +2983,17 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "__init__.py": '"""Ingestor package."""\n',
             "ingestor.py": _ingestor_py(name),
             "README.md": _ingestor_readme(name),
+        }
+
+    elif template == "extraction":
+        return {
+            "__init__.py": _agent_manifest_init_py(name, f"{title} extraction agent", keywords),
+            "agent.py": _extraction_agent_py(name),
+            "llm.py": _llm_py(name),
+            "pipeline.yaml": _extraction_pipeline_yaml(name),
+            "prompts.json": _prompts_json(),
+            ".env.example": _env_example(name),
+            "README.md": _extraction_readme(name),
         }
 
     else:

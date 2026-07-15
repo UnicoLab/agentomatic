@@ -106,9 +106,7 @@ def attach_execution_modes(
         summary=f"{summary_label} (async task)",
     )
 
-    async def batch_endpoint(
-        request: BatchSubmitRequest, _target: str = target
-    ) -> dict[str, Any]:
+    async def batch_endpoint(request: BatchSubmitRequest, _target: str = target) -> dict[str, Any]:
         record = await task_manager.submit(
             target_type,
             _target,

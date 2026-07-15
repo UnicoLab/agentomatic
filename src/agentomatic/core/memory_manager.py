@@ -127,6 +127,8 @@ class ConversationMemoryManager:
             The thread ID (existing or newly created).
         """
         if thread_id:
+            if not self.store:
+                return thread_id
             existing = await self.store.get_thread(thread_id)
             if existing:
                 return thread_id
@@ -134,6 +136,9 @@ class ConversationMemoryManager:
             logger.debug(f"Thread {thread_id} not found, creating new one")
 
         new_id = thread_id or f"thread_{uuid.uuid4().hex[:12]}"
+        if not self.store:
+            logger.debug("Thread store not ready — returning ephemeral thread id")
+            return new_id
         await self.store.create_thread(
             thread_id=new_id,
             user_id=user_id,

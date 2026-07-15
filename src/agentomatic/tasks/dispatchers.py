@@ -173,8 +173,10 @@ def make_pipeline_dispatcher(
 ) -> Dispatcher:
     """Return a dispatcher that runs a pipeline as a task.
 
-    Per-step progress is reported when the engine supports a progress
-    callback; otherwise the task reports indeterminate progress.
+    Threads the task context's progress reporter and a checkpoint hook
+    through :meth:`PipelineEngine.run` so every step and every map item
+    reports a percent + message that reaches SSE subscribers, and partial
+    map-item results are persisted to the task record as they complete.
     """
 
     async def run(target: str, payload: Any, ctx: TaskContext) -> Any:
@@ -200,7 +202,55 @@ def make_pipeline_dispatcher(
 
         total_steps = len(getattr(config, "steps", []) or [])
         await ctx.report(message=f"Running pipeline '{target}'", total=total_steps)
-        result = await engine.run(payload if isinstance(payload, dict) else {})
-        return _to_jsonable(result)
+
+        partial: dict[str, dict[str, Any]] = {}
+
+        async def progress_cb(
+            *,
+            current: int,
+            total: int,
+            message: str,
+            stage: str,
+            event: str,
+        ) -> None:
+            await ctx.report(
+                message=message,
+                current=current,
+                total=total,
+                stage=stage,
+                event=event,
+            )
+
+        async def checkpoint_cb(step_name: str, index: int, sub_result: Any) -> None:
+            partial.setdefault(step_name, {})[str(index)] = sub_result
+            await ctx.report(
+                message=f"Checkpoint '{step_name}' item {index}",
+                stage=step_name,
+                event="checkpoint",
+                partial_step=step_name,
+                partial_index=index,
+                sub_result=sub_result,
+            )
+
+        input_payload = payload if isinstance(payload, dict) else {}
+        completed_hint = input_payload.pop("__completed_indices", None)
+        completed_indices: dict[str, set[int]] | None = None
+        if isinstance(completed_hint, dict):
+            completed_indices = {
+                k: set(int(i) for i in v)
+                for k, v in completed_hint.items()
+                if isinstance(v, list | set | tuple)
+            }
+
+        result = await engine.run(
+            input_payload,
+            progress_cb=progress_cb,
+            checkpoint_cb=checkpoint_cb,
+            completed_indices=completed_indices,
+        )
+        jsonable = _to_jsonable(result)
+        if isinstance(jsonable, dict) and partial:
+            jsonable.setdefault("checkpoints", partial)
+        return jsonable
 
     return run

@@ -59,6 +59,7 @@ from agentomatic.agents.metrics import (
     ContainsTermsMetric,
     ExactKeyMatchMetric,
     OptimizeMetricAdapter,
+    WeightedMetric,
 )
 from agentomatic.agents.optimizers import (
     GridSearchOptimizer,
@@ -102,6 +103,7 @@ __all__ = [
     "ExactKeyMatchMetric",
     "ContainsTermsMetric",
     "CallableMetric",
+    "WeightedMetric",
     "OptimizeMetricAdapter",
     # Optimizers
     "NoOpOptimizer",

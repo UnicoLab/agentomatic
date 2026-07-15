@@ -5,10 +5,20 @@ from __future__ import annotations
 import typing
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 InputT = TypeVar("InputT", bound=BaseModel)
 OutputT = TypeVar("OutputT", bound=BaseModel)
+
+
+class _EmptyPluginInput(BaseModel):
+    """Fallback input schema when a plugin omits its generic parameters."""
+
+
+class _EmptyPluginOutput(BaseModel):
+    """Fallback output schema when a plugin omits its generic parameters."""
+
+    result: dict[str, Any] = Field(default_factory=dict)
 
 
 class BaseMLPlugin(Generic[InputT, OutputT]):
@@ -31,24 +41,36 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         return self._is_loaded
 
     def get_input_schema(self) -> type[BaseModel]:
-        """Extract the InputT Pydantic schema from the generic typing."""
-        for base in getattr(self.__class__, "__orig_bases__", []):
-            origin = typing.get_origin(base)
-            if origin is BaseMLPlugin or origin is self.__class__:
-                args = typing.get_args(base)
-                if len(args) >= 1:
-                    return args[0]
-        return BaseModel  # Fallback
+        """Extract the InputT Pydantic schema from the generic typing.
+
+        Returns a concrete :class:`~pydantic.BaseModel` subclass only.
+        Falls back to a safe empty model when generics are missing or
+        unresolved (avoids OpenAPI schema generation failures).
+        """
+        schema = self._generic_arg(0)
+        return schema or _EmptyPluginInput
 
     def get_output_schema(self) -> type[BaseModel]:
-        """Extract the OutputT Pydantic schema from the generic typing."""
+        """Extract the OutputT Pydantic schema from the generic typing.
+
+        Returns a concrete :class:`~pydantic.BaseModel` subclass only.
+        Falls back to a safe empty model when generics are missing or
+        unresolved (avoids OpenAPI schema generation failures).
+        """
+        schema = self._generic_arg(1)
+        return schema or _EmptyPluginOutput
+
+    def _generic_arg(self, index: int) -> type[BaseModel] | None:
+        """Return the ``index``-th generic type argument, if a BaseModel."""
         for base in getattr(self.__class__, "__orig_bases__", []):
             origin = typing.get_origin(base)
             if origin is BaseMLPlugin or origin is self.__class__:
                 args = typing.get_args(base)
-                if len(args) >= 2:
-                    return args[1]
-        return BaseModel  # Fallback
+                if len(args) > index:
+                    candidate = args[index]
+                    if isinstance(candidate, type) and issubclass(candidate, BaseModel):
+                        return candidate
+        return None
 
     async def load_model(self) -> None:
         """Load the ML model weights into memory.

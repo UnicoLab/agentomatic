@@ -144,6 +144,50 @@ class TestFit:
         assert history["accuracy"] == [1.0, 1.0, 1.0]
         assert history["loss"] == [0.0, 0.0, 0.0]
 
+    def test_fit_accepts_optimize_config(self):
+        """fit() should accept search_space / mode toggles without recompile."""
+        agent = EchoAgent()
+        agent.compile(_dataset(), metrics=[_Accuracy()])
+
+        class CapturingOptimizer:
+            def __init__(self) -> None:
+                self.seen: dict | None = None
+
+            def optimize(self, agent, dataset, metrics):
+                self.seen = getattr(agent, "_fit_optimize_options", None)
+                return {"system_prompt": "tuned"}
+
+        opt = CapturingOptimizer()
+        history = agent.fit(
+            epochs=1,
+            verbose=0,
+            optimizer=opt,
+            optimize_mode="param_search",
+            optimize_prompt=False,
+            optimize_params=True,
+            model_param_space={"temperature": [0.0, 0.5]},
+            max_trials=3,
+        )
+        assert opt.seen is not None
+        assert opt.seen["optimizer"] == "param_search"
+        assert opt.seen["max_trials"] == 3
+        assert opt.seen["optimize_params"] is True
+        assert history.params["optimize"]["optimizer"] == "param_search"
+        assert (
+            agent.system_prompt == "tuned" or agent.compiled_config.get("system_prompt") == "tuned"
+        )
+
+    def test_fit_coerce_search_space_dict(self):
+        agent = EchoAgent()
+        space = agent._coerce_search_space(
+            {"optimize_system_prompt": True, "optimize_model_params": False},
+            optimize_params=True,
+            model_param_space={"temperature": [0.1]},
+        )
+        assert space is not None
+        assert space.optimize_model_params is True
+        assert space.model_param_space["temperature"] == [0.1]
+
     def test_fit_uses_compiled_dataset_by_default(self):
         agent = EchoAgent()
         agent.compile(_dataset(), metrics=[_Accuracy()])
@@ -293,3 +337,11 @@ class TestPromptFitterBridge:
         empty = AgentDataset(name="empty", examples=[])
         config = bridge.optimize(agent, empty, [])
         assert config == {}
+
+    def test_bridge_surfaces_skip_status(self):
+        """P2-1: a skipped optimize records a structured status on the agent."""
+        bridge = PromptFitterBridge(fitter=object(), metric=object())
+        agent = EchoAgent()
+        empty = AgentDataset(name="empty", examples=[])
+        bridge.optimize(agent, empty, [])
+        assert agent._last_optimize_status == "skipped: empty dataset"

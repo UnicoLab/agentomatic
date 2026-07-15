@@ -61,7 +61,7 @@ except ImportError:
     PipelineConfig = None  # type: ignore[assignment,misc]
     PipelineResult = None  # type: ignore[assignment,misc]
 
-# Class-owned graph agents (v0.7)
+# Class-owned graph agents + Keras-style training (v0.7 / v1.2)
 from agentomatic.agents import (
     AgentDataset,
     AgentExample,
@@ -69,9 +69,14 @@ from agentomatic.agents import (
     BaseGraphAgent,
     Callback,
     EarlyStopping,
+    ExactKeyMatchMetric,
     GraphBuilder,
+    GridSearchOptimizer,
     History,
     Loss,
+    NoOpOptimizer,
+    PromptFitterBridge,
+    WeightedMetric,
     agent_node,
 )
 
@@ -82,8 +87,10 @@ from agentomatic.connections import (
     DatabaseConnectionConfig,
     HttpConnectionConfig,
     VectorConnectionConfig,
+    VectorStore,
     get_connections,
     register_connection_type,
+    register_store_provider,
     register_vector_provider,
 )
 
@@ -104,6 +111,7 @@ from agentomatic.ingestion import (
     IngestionRequest,
     IngestionResult,
 )
+from agentomatic.providers.embeddings import register_embedding_provider
 
 # Unified task/execution subsystem (v0.12)
 from agentomatic.tasks import (
@@ -158,9 +166,12 @@ __all__ = [
     "VectorConnectionConfig",
     "CustomConnectionConfig",
     "ConnectionPurpose",
+    "VectorStore",
     "get_connections",
     "register_connection_type",
     "register_vector_provider",
+    "register_store_provider",
+    "register_embedding_provider",
     # Class-owned graph agents (v0.7)
     "BaseGraphAgent",
     "AgentGraph",
@@ -173,6 +184,11 @@ __all__ = [
     "Callback",
     "EarlyStopping",
     "Loss",
+    "ExactKeyMatchMetric",
+    "WeightedMetric",
+    "NoOpOptimizer",
+    "GridSearchOptimizer",
+    "PromptFitterBridge",
     # Version
     "__version__",
 ]

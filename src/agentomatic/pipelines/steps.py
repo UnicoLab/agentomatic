@@ -19,7 +19,9 @@ from .models import (
     ErrorPolicy,
     IngestionStepConfig,
     LoopStepConfig,
+    MapStepConfig,
     ParallelStepConfig,
+    ParallelStrategy,
     PluginStepConfig,
     StepResult,
     StepStatus,
@@ -73,25 +75,13 @@ async def execute_agent_step(
         # Resolve input mapping → build state dict
         state = _build_agent_state(config, ctx)
 
-        # Invoke: prefer graph_fn, fall back to node_fn
-        if agent.graph_fn:
-            graph = agent.graph_fn()
-            result = await asyncio.wait_for(
-                graph.ainvoke(state),
-                timeout=config.timeout,
-            )
-        elif agent.node_fn:
-            result = await asyncio.wait_for(
-                agent.node_fn(state),
-                timeout=config.timeout,
-            )
-        else:
-            return StepResult(
-                name=config.name,
-                status=StepStatus.FAILED,
-                error=f"Agent '{agent_name}' has no callable (graph_fn/node_fn)",
-                agent_used=agent_name,
-            )
+        # Class agents need input_to_state — see invoke_registered_agent.
+        from agentomatic.core.agent_invoke import invoke_registered_agent
+
+        result = await asyncio.wait_for(
+            invoke_registered_agent(agent, state),
+            timeout=config.timeout,
+        )
 
         duration = (time.perf_counter() - t0) * 1000
         output = _normalize_output(result)
@@ -305,6 +295,7 @@ async def execute_plugin_step(
 
         # Coerce the raw payload into the plugin's declared input schema.
         input_schema = plugin.get_input_schema()
+        model_input: Any
         try:
             model_input = input_schema.model_validate(payload)
         except Exception:  # noqa: BLE001 - fall back to raw payload
@@ -571,6 +562,219 @@ async def execute_parallel_step(
     except Exception as exc:
         duration = (time.perf_counter() - t0) * 1000
         logger.error(f"Parallel step '{config.name}' failed: {exc}")
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=str(exc),
+            duration_ms=duration,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Map Step (dynamic fan-out over a runtime list)
+# ---------------------------------------------------------------------------
+
+
+async def execute_map_step(
+    config: MapStepConfig,
+    ctx: PipelineContext,
+    registry: AgentRegistry,
+    *,
+    progress_cb: Any | None = None,
+    checkpoint_cb: Any | None = None,
+) -> StepResult:
+    """Fan out one agent over every element of a runtime list.
+
+    The items list is resolved from ``config.items`` against ``ctx``
+    (e.g. ``$.input.scopes``).  Each element is passed to the same agent
+    under the configured ``item_key`` (and its index under ``index_key``).
+    Any additional ``config.input`` mappings are merged into the per-item
+    agent state.  Concurrency is capped by ``config.max_concurrency`` and
+    each item can retry independently via ``config.retry``.
+
+    Results are aggregated into a keyed fan-in dict so no keys are silently
+    overwritten by :meth:`dict.update`::
+
+        {
+            "items": [<result_0>, <result_1>, ...],
+            "by_key": {"0": <result_0>, ...},
+            "count":  <n>,
+            "succeeded": <k>,
+        }
+
+    Args:
+        config: Map step configuration.
+        ctx: Pipeline context (used to resolve ``items`` and mappings).
+        registry: Agent registry (must contain ``config.agent``).
+        progress_cb: Optional ``async def cb(current, total, message)``
+            invoked whenever an item completes.
+        checkpoint_cb: Optional ``async def cb(index, sub_result)``
+            invoked as soon as each item finishes so callers can persist
+            partial progress (used by task-level checkpointing).
+
+    Returns:
+        A :class:`StepResult` with ``sub_results`` for each item and a keyed
+        ``output`` dictionary preserving order and per-index results.
+    """
+    t0 = time.perf_counter()
+
+    raw_items = ctx.resolve(config.items)
+    if raw_items is None:
+        raw_items = []
+    if not isinstance(raw_items, list):
+        return StepResult(
+            name=config.name,
+            status=StepStatus.FAILED,
+            error=(
+                f"Map step '{config.name}': items expression '{config.items}' "
+                f"did not resolve to a list (got {type(raw_items).__name__})."
+            ),
+            duration_ms=(time.perf_counter() - t0) * 1000,
+        )
+
+    total = len(raw_items)
+    if total == 0:
+        return StepResult(
+            name=config.name,
+            status=StepStatus.SUCCESS,
+            output={"items": [], "by_key": {}, "count": 0, "succeeded": 0},
+            sub_results=[],
+            duration_ms=(time.perf_counter() - t0) * 1000,
+            metadata={"map_items": 0},
+        )
+
+    sem = asyncio.Semaphore(config.max_concurrency)
+
+    extra_mappings = dict(config.input.mappings) if config.input else {}
+    resolved_extras = ctx.resolve_mapping(extra_mappings) if extra_mappings else {}
+
+    async def _run_one(index: int, item: Any) -> StepResult:
+        """Run the single agent against one item, honouring retry."""
+        step_name = f"{config.name}_item_{index}"
+
+        input_mappings: dict[str, Any] = {}
+        input_mappings[config.item_key] = item
+        input_mappings[config.index_key] = index
+        input_mappings.setdefault("current_query", item)
+        for key, value in resolved_extras.items():
+            input_mappings[key] = value
+
+        sub_config = AgentStepConfig(
+            name=step_name,
+            agent=config.agent,
+            input=type(config.input)(mappings=input_mappings),
+            on_error=config.on_error,
+            fallback_agent=config.fallback_agent,
+            retry=config.retry,
+            timeout=config.item_timeout,
+        )
+
+        async with sem:
+            if config.retry:
+                sub_result = await execute_with_retry(
+                    execute_agent_step,
+                    sub_config,
+                    ctx,
+                    registry,
+                    retry_config=config.retry,
+                    on_error=config.on_error,
+                    fallback_agent=config.fallback_agent,
+                    registry=registry,
+                    ctx=ctx,
+                    step_config=sub_config,
+                )
+            else:
+                sub_result = await execute_agent_step(sub_config, ctx, registry)
+
+        sub_result.metadata["map_index"] = index
+        return sub_result
+
+    try:
+        pending = {asyncio.create_task(_run_one(i, item)): i for i, item in enumerate(raw_items)}
+        sub_results: list[StepResult | None] = [None] * total
+        completed = 0
+
+        try:
+            while pending:
+                done, _ = await asyncio.wait(pending.keys(), return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    index = pending.pop(task)
+                    try:
+                        sub_result = task.result()
+                    except Exception as exc:  # noqa: BLE001 - map errors, keep others
+                        sub_result = StepResult(
+                            name=f"{config.name}_item_{index}",
+                            status=StepStatus.FAILED,
+                            error=str(exc),
+                        )
+                    sub_results[index] = sub_result
+                    completed += 1
+
+                    if progress_cb is not None:
+                        try:
+                            await progress_cb(
+                                completed,
+                                total,
+                                f"Map '{config.name}': {completed}/{total} items done",
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            logger.debug(f"map progress_cb failed: {exc}")
+
+                    if checkpoint_cb is not None:
+                        try:
+                            await checkpoint_cb(index, sub_result)
+                        except Exception as exc:  # noqa: BLE001
+                            logger.debug(f"map checkpoint_cb failed: {exc}")
+        finally:
+            for task in pending:
+                task.cancel()
+
+        finalized: list[StepResult] = [r for r in sub_results if r is not None]
+        successes = sum(1 for r in finalized if r.status == StepStatus.SUCCESS)
+
+        if config.strategy == ParallelStrategy.ALL:
+            status = StepStatus.SUCCESS if successes == total else StepStatus.FAILED
+        elif config.strategy == ParallelStrategy.FIRST:
+            status = StepStatus.SUCCESS if successes >= 1 else StepStatus.FAILED
+        else:  # majority
+            status = StepStatus.SUCCESS if successes > total / 2 else StepStatus.FAILED
+
+        # Keyed fan-in — no dict.update() overwriting.
+        by_key: dict[str, dict[str, Any]] = {}
+        items_out: list[dict[str, Any]] = []
+        for i, sr in enumerate(finalized):
+            entry: dict[str, Any] = {
+                "index": i,
+                "status": sr.status.value,
+                "output": dict(sr.output),
+                "error": sr.error,
+                "duration_ms": sr.duration_ms,
+                "retries": sr.retries,
+            }
+            items_out.append(entry)
+            by_key[str(i)] = entry
+
+        duration = (time.perf_counter() - t0) * 1000
+        return StepResult(
+            name=config.name,
+            status=status,
+            output={
+                "items": items_out,
+                "by_key": by_key,
+                "count": total,
+                "succeeded": successes,
+            },
+            sub_results=finalized,
+            duration_ms=duration,
+            metadata={
+                "map_items": total,
+                "map_succeeded": successes,
+                "map_concurrency": config.max_concurrency,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        duration = (time.perf_counter() - t0) * 1000
+        logger.error(f"Map step '{config.name}' failed: {exc}")
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,

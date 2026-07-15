@@ -52,10 +52,10 @@ except ImportError as exc:  # pragma: no cover - exercised only without the extr
 # Cache of (Base, Model) per table name so repeated stores with the same table
 # reuse the mapped class (avoids duplicate-table registration errors), while
 # different table names get independent metadata.
-_MODEL_CACHE: dict[str, tuple[type, type]] = {}
+_MODEL_CACHE: dict[str, tuple[Any, Any]] = {}
 
 
-def _get_model(table_name: str) -> tuple[type, type]:
+def _get_model(table_name: str) -> tuple[Any, Any]:
     """Return ``(Base, Model)`` for ``table_name``, building it once."""
     cached = _MODEL_CACHE.get(table_name)
     if cached is not None:
@@ -268,7 +268,7 @@ class SQLAlchemyTaskStore(TaskStore):
                     self._model.finished_at < cutoff,
                 )
                 result = await session.execute(stmt)
-                deleted += result.rowcount or 0
+                deleted += getattr(result, "rowcount", 0) or 0
 
             if self._max_records is not None:
                 total = (

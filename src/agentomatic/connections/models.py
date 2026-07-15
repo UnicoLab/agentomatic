@@ -93,11 +93,15 @@ class HttpConnectionConfig(BaseModel):
 class VectorConnectionConfig(BaseModel):
     """Configuration for a vector-store connection (RAG / vector search).
 
-    Provider-agnostic: pick a ``provider`` (``qdrant``, ``chroma``,
-    ``weaviate``, ``pinecone``, ``milvus`` or a custom name registered with
-    :func:`~agentomatic.connections.vector.register_vector_provider`) and the
-    matching client is built lazily.  Every string field supports ``${ENV}``
-    interpolation so endpoints and API keys never live in code.
+    Provider-agnostic: pick a ``provider`` (built-in ``qdrant``, ``chroma``,
+    ``weaviate``, ``pinecone``, ``milvus``, **or any custom name** registered
+    with :func:`~agentomatic.connections.vector.register_vector_provider`) and
+    the matching client is built lazily.  Agentomatic provides the ops
+    (auth interpolation, lifecycle, ``VectorStore`` Protocol); you own the
+    vendor SDK.
+
+    Every string field supports ``${ENV}`` interpolation so endpoints and API
+    keys never live in code.  Extra vendor knobs go in ``options``.
 
     Note:
         For ``pgvector`` use a :class:`DatabaseConnectionConfig` with
@@ -114,17 +118,30 @@ class VectorConnectionConfig(BaseModel):
     provider: str = Field(
         ...,
         min_length=1,
-        description="Vector backend: qdrant | chroma | weaviate | pinecone | milvus | <custom>.",
+        description=(
+            "Vector backend: qdrant | chroma | weaviate | pinecone | milvus | "
+            "<custom via register_vector_provider>."
+        ),
     )
-    url: str = Field("", description="Server URL / host (supports ${ENV}).")
+    url: str = Field(
+        "",
+        description="Server URL / host / endpoint (supports ${ENV}).",
+    )
     api_key: str = Field("", description="Optional API key (supports ${ENV}).")
-    collection: str = Field("", description="Default collection / index / class name.")
+    collection: str = Field(
+        "",
+        description="Default collection / index / class / container name.",
+    )
     dimension: int | None = Field(None, ge=1, description="Embedding dimension, if fixed.")
     distance: str = Field("cosine", description="Distance metric (cosine, euclid, dot…).")
     namespace: str = Field("", description="Optional namespace / tenant.")
     options: dict[str, Any] = Field(
         default_factory=dict,
-        description="Extra keyword arguments forwarded to the provider client.",
+        description=(
+            "Extra keyword arguments forwarded to the provider client. "
+            "Provider-specific keys (e.g. Cosmos ``database`` / ``container`` / "
+            "``vector_path`` / ``index``) are read from here."
+        ),
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
 

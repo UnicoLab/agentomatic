@@ -67,10 +67,13 @@ def create_studio_router(
     # ------------------------------------------------------------------
 
     def _resolve_agent(name: str):
-        """Look up an agent by name or raise 404."""
+        """Look up an agent by folder name or slug, or raise 404."""
         agent = registry.get(name)
         if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Agent '{name}' not found (tried name and slug)",
+            )
         return agent
 
     def _get_adapter(name: str):

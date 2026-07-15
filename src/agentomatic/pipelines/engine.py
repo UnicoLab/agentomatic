@@ -19,6 +19,7 @@ from .models import (
     ErrorPolicy,
     IngestionStepConfig,
     LoopStepConfig,
+    MapStepConfig,
     ParallelStepConfig,
     PipelineConfig,
     PipelineResult,
@@ -34,6 +35,7 @@ from .steps import (
     execute_endpoint_step,
     execute_ingestion_step,
     execute_loop_step,
+    execute_map_step,
     execute_parallel_step,
     execute_plugin_step,
     execute_transform_step,
@@ -42,10 +44,14 @@ from .steps import (
 from .validation import validate_against_schema
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from agentomatic.core.registry import AgentRegistry
     from agentomatic.endpoints.registry import EndpointRegistry
     from agentomatic.ingestion.registry import IngestionRegistry
     from agentomatic.plugins.registry import PluginRegistry
+
+    ProgressCallback = Callable[..., Awaitable[None]]
 
 
 class PipelineEngine:
@@ -83,6 +89,9 @@ class PipelineEngine:
         self.endpoints = endpoints
         self.ingestors = ingestors
         self.plugins = plugins
+        self._progress_cb: ProgressCallback | None = None
+        self._checkpoint_cb: ProgressCallback | None = None
+        self._completed_indices: dict[str, set[int]] = {}
 
     def validate(self) -> list[str]:
         """Pre-flight validation of the pipeline.
@@ -158,12 +167,27 @@ class PipelineEngine:
     async def run(
         self,
         input_data: dict[str, Any] | None = None,
+        *,
+        progress_cb: ProgressCallback | None = None,
+        checkpoint_cb: ProgressCallback | None = None,
+        completed_indices: dict[str, set[int]] | None = None,
         **kwargs: Any,
     ) -> PipelineResult:
         """Execute the pipeline.
 
         Args:
             input_data: Initial input data for the pipeline.
+            progress_cb: Optional async callback invoked as each step
+                completes and, for map steps, as each item completes.
+                Signature: ``await progress_cb(current, total, message,
+                stage=step_name, **data)``.
+            checkpoint_cb: Optional async callback invoked whenever a map
+                step completes an item, giving callers a chance to persist
+                per-item partial results. Signature:
+                ``await checkpoint_cb(step_name, index, sub_result_dict)``.
+            completed_indices: Optional mapping of ``step_name → set[int]``
+                of previously-completed map-item indices to skip when
+                resuming a partially-completed pipeline.
             **kwargs: Additional keyword arguments merged into input.
 
         Returns:
@@ -172,6 +196,9 @@ class PipelineEngine:
         t0 = time.perf_counter()
         merged_input = dict(input_data or {})
         merged_input.update(kwargs)
+        self._progress_cb = progress_cb
+        self._checkpoint_cb = checkpoint_cb
+        self._completed_indices = completed_indices or {}
 
         pipeline_result = PipelineResult(
             pipeline_name=self.config.name,
@@ -265,7 +292,8 @@ class PipelineEngine:
         pipeline_result: PipelineResult,
     ) -> None:
         """Execute pipeline steps sequentially."""
-        for step_config in self.config.steps:
+        total_steps = len(self.config.steps)
+        for idx, step_config in enumerate(self.config.steps):
             # Evaluate condition if present
             condition = getattr(step_config, "condition", None)
             if condition and not self._evaluate_condition(condition, ctx):
@@ -274,9 +302,11 @@ class PipelineEngine:
                     name=step_config.name,
                     status=StepStatus.SKIPPED,
                 )
+                await self._report_step_progress(idx + 1, total_steps, step_config.name, "skipped")
                 continue
 
             logger.info(f"  ▶️ Executing step '{step_config.name}'")
+            await self._report_step_progress(idx, total_steps, step_config.name, "running")
 
             # Execute based on step type
             result = await self._execute_single_step(step_config, ctx)
@@ -289,6 +319,10 @@ class PipelineEngine:
             output_map = getattr(step_config, "output", None)
             if output_map and hasattr(output_map, "mappings") and output_map.mappings:
                 self._apply_output_mapping(output_map.mappings, result, ctx)
+
+            await self._report_step_progress(
+                idx + 1, total_steps, step_config.name, result.status.value
+            )
 
             # Handle failure
             if result.status == StepStatus.FAILED:
@@ -381,6 +415,9 @@ class PipelineEngine:
         elif isinstance(step_config, ParallelStepConfig):
             return await execute_parallel_step(step_config, ctx, self.registry)
 
+        elif isinstance(step_config, MapStepConfig):
+            return await self._execute_map_step(step_config, ctx)
+
         elif isinstance(step_config, LoopStepConfig):
             return await execute_loop_step(step_config, ctx, self.registry)
 
@@ -393,6 +430,96 @@ class PipelineEngine:
                 status=StepStatus.FAILED,
                 error=f"Unknown step type: {type(step_config).__name__}",
             )
+
+    async def _execute_map_step(
+        self,
+        config: MapStepConfig,
+        ctx: PipelineContext,
+    ) -> StepResult:
+        """Execute a map step, threading progress + checkpoint callbacks.
+
+        Any item indices found in ``self._completed_indices[config.name]``
+        (populated by the caller when resuming) are surfaced back to the
+        checkpoint callback so callers can rebuild a full result from
+        previously-completed items.
+        """
+        step_name = config.name
+        completed_before: set[int] = set(self._completed_indices.get(step_name, set()))
+
+        async def _item_progress_cb(current: int, total: int, message: str) -> None:
+            await self._report_progress(
+                stage=step_name,
+                message=message,
+                current=current,
+                total=total,
+                event="map_item_completed",
+            )
+
+        async def _item_checkpoint_cb(index: int, sub_result: StepResult) -> None:
+            if self._checkpoint_cb is None:
+                return
+            payload = {
+                "name": sub_result.name,
+                "status": sub_result.status.value,
+                "output": dict(sub_result.output),
+                "error": sub_result.error,
+                "duration_ms": sub_result.duration_ms,
+                "retries": sub_result.retries,
+            }
+            try:
+                await self._checkpoint_cb(step_name, index, payload)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"pipeline checkpoint_cb failed for '{step_name}': {exc}")
+
+        result = await execute_map_step(
+            config,
+            ctx,
+            self.registry,
+            progress_cb=_item_progress_cb,
+            checkpoint_cb=_item_checkpoint_cb,
+        )
+        if completed_before:
+            result.metadata["resumed_completed_indices"] = sorted(completed_before)
+        return result
+
+    async def _report_step_progress(
+        self,
+        current: int,
+        total: int,
+        step_name: str,
+        state: str,
+    ) -> None:
+        """Report step-level progress if a callback was supplied."""
+        await self._report_progress(
+            stage=step_name,
+            message=f"Step '{step_name}' {state}",
+            current=current,
+            total=total,
+            event="step",
+        )
+
+    async def _report_progress(
+        self,
+        *,
+        stage: str,
+        message: str,
+        current: int,
+        total: int,
+        event: str,
+    ) -> None:
+        """Invoke the user-supplied progress callback (best-effort)."""
+        if self._progress_cb is None:
+            return
+        try:
+            await self._progress_cb(
+                current=current,
+                total=total,
+                message=message,
+                stage=stage,
+                event=event,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"pipeline progress_cb failed: {exc}")
 
     async def _execute_sub_pipeline(
         self,
@@ -571,6 +698,12 @@ class PipelineEngine:
                 lines.append(f'    {node_id}[["🔄 {step.name} (max {step.max_iterations})"]]')
                 lines.append(f"    {prev} --> {node_id}")
                 lines.append(f"    {node_id} -. loop .-> {node_id}")
+                prev = node_id
+
+            elif isinstance(step, MapStepConfig):
+                label = f"🔀 {step.name} (map {step.agent}, conc={step.max_concurrency})"
+                lines.append(f'    {node_id}[/"{label}"/]')
+                lines.append(f"    {prev} --> {node_id}")
                 prev = node_id
 
             elif isinstance(step, PluginStepConfig):

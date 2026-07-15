@@ -138,19 +138,16 @@ class AgentHandle:
 
         state = self._build_state(input_data)
 
-        # Prefer compiled graph, fall back to node function
-        if agent.graph_fn is not None:
-            graph = agent.graph_fn()
-            result = await graph.ainvoke(state)
-            return self._normalise_output(result)
+        from agentomatic.core.agent_invoke import invoke_registered_agent
 
-        if agent.node_fn is not None:
-            result = await agent.node_fn(state)
-            return self._normalise_output(result)
-
-        raise RuntimeError(
-            f"Agent {self.name!r} has neither graph_fn nor node_fn — cannot invoke."
-        )
+        try:
+            result = await invoke_registered_agent(agent, state)
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"Agent {self.name!r} has neither class_instance, graph_fn, "
+                "nor node_fn — cannot invoke."
+            ) from exc
+        return self._normalise_output(result)
 
     # -- helpers ----------------------------------------------------------
 
