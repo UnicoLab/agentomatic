@@ -58,6 +58,43 @@ class TestProjectScaffold:
         assert "plugins/__init__.py" in files
 
 
+class TestDeployRunParity:
+    """The deployed ``uvicorn main:app`` must expose the same surface as run."""
+
+    @staticmethod
+    def _build_scaffold_app(
+        tmp_path: Path,
+        monkeypatch,
+        env: dict[str, str] | None = None,
+    ):
+        """Scaffold a project, exec its ``main.py``, and return the built app."""
+        scaffold_project(tmp_path / "proj", "demo_app", force=True)
+        monkeypatch.chdir(tmp_path / "proj")
+        for key, value in (env or {}).items():
+            monkeypatch.setenv(key, value)
+        namespace: dict[str, object] = {}
+        source = (tmp_path / "proj" / "main.py").read_text()
+        exec(compile(source, "main.py", "exec"), namespace)  # noqa: S102
+        return namespace["app"]
+
+    def test_app_exposes_run_parity_routes(self, tmp_path: Path, monkeypatch) -> None:
+        app = self._build_scaffold_app(tmp_path, monkeypatch)
+        paths = {getattr(route, "path", None) for route in app.routes}
+        # Platform surface `agentomatic run` always mounts.
+        for expected in ("/health", "/readiness", "/docs", "/openapi.json", "/", "/studio"):
+            assert expected in paths, f"missing route: {expected}"
+
+    def test_env_flags_drive_features(self, tmp_path: Path, monkeypatch) -> None:
+        app = self._build_scaffold_app(
+            tmp_path,
+            monkeypatch,
+            env={"AGENTOMATIC_ENABLE_STUDIO": "0", "AGENTOMATIC_TITLE": "Env Title"},
+        )
+        paths = {getattr(route, "path", None) for route in app.routes}
+        assert "/studio" not in paths  # studio redirect only added when enabled
+        assert app.title == "Env Title"
+
+
 class TestClassTemplateAlias:
     def test_class_alias_matches_basic(self) -> None:
         basic = get_template_files("basic", "hello")

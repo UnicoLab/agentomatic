@@ -437,6 +437,17 @@ Run it:
     agentomatic run agents/ --host 0.0.0.0 --port 8000
     ```
 
+!!! tip "Scaffolded `main.py` matches `agentomatic run`"
+    Projects created with `agentomatic init --project` (and containers built by
+    `agentomatic deploy`) ship a `main.py` whose module-level `app` is **feature-
+    identical to `agentomatic run`**: it discovers every component directory and
+    turns Studio, docs, health, and metrics on by default. Auth, control plane,
+    and rate limiting are driven by `AGENTOMATIC_*` env vars
+    (`AGENTOMATIC_ENABLE_AUTH`, `AGENTOMATIC_ENABLE_JWT`, `AGENTOMATIC_REQUIRE_AUTH`,
+    `AGENTOMATIC_ENABLE_CONTROL_PLANE`, `AGENTOMATIC_ENABLE_RATE_LIMIT`,
+    `AGENTOMATIC_TITLE`, `AGENTOMATIC_LOG_LEVEL`), so `uvicorn main:app` in the
+    generated Dockerfile drops no functionality versus running the CLI.
+
 !!! warning "Workers and in-memory state"
     Connection pools and per-process caches live **per worker**. Keep shared
     state (threads, memory, cache) in external services (Postgres, redis) so it
