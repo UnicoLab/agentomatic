@@ -2939,6 +2939,18 @@ configuration for the five-agent deployment:</p>
 </div>
 </div>
 </div>
+<div class="admonition tip">
+<p class="admonition-title">Scaffolded <code>main.py</code> matches <code>agentomatic run</code></p>
+<p>Projects created with <code>agentomatic init --project</code> (and containers built by
+<code>agentomatic deploy</code>) ship a <code>main.py</code> whose module-level <code>app</code> is <strong>feature-
+identical to <code>agentomatic run</code></strong>: it discovers every component directory and
+turns Studio, docs, health, and metrics on by default. Auth, control plane,
+and rate limiting are driven by <code>AGENTOMATIC_*</code> env vars
+(<code>AGENTOMATIC_ENABLE_AUTH</code>, <code>AGENTOMATIC_ENABLE_JWT</code>, <code>AGENTOMATIC_REQUIRE_AUTH</code>,
+<code>AGENTOMATIC_ENABLE_CONTROL_PLANE</code>, <code>AGENTOMATIC_ENABLE_RATE_LIMIT</code>,
+<code>AGENTOMATIC_TITLE</code>, <code>AGENTOMATIC_LOG_LEVEL</code>), so <code>uvicorn main:app</code> in the
+generated Dockerfile drops no functionality versus running the CLI.</p>
+</div>
 <div class="admonition warning">
 <p class="admonition-title">Workers and in-memory state</p>
 <p>Connection pools and per-process caches live <strong>per worker</strong>. Keep shared

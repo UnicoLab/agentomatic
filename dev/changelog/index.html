@@ -2586,6 +2586,13 @@ breaking API changes.</p>
 <li><strong>CORS hardening (P2)</strong>: wildcard origins (<code>cors_origins=["*"]</code>) no longer
   send <code>Access-Control-Allow-Credentials: true</code> — credentials are auto-disabled
   (with a one-time warning) unless explicit origins are configured</li>
+<li><strong>Deploy parity (<code>uvicorn main:app</code> == <code>agentomatic run</code>)</strong>: the scaffolded
+  <code>main.py</code> now builds a fully-featured, env-driven <code>app</code> (Studio, docs, health,
+  metrics on by default; all component dirs discovered) so a deployed container
+  serves the exact same surface as <code>agentomatic run</code>. Feature flags read from
+  <code>AGENTOMATIC_*</code> env vars (<code>ENABLE_STUDIO</code>, <code>ENABLE_METRICS</code>, <code>ENABLE_AUTH</code>,
+  <code>ENABLE_JWT</code>, <code>REQUIRE_AUTH</code>, <code>ENABLE_CONTROL_PLANE</code>, <code>ENABLE_RATE_LIMIT</code>,
+  <code>TITLE</code>, <code>LOG_LEVEL</code>) so the same file works in dev and in the container</li>
 </ul>
 <hr />
 <h2 id="120-2026-07-15">[1.2.0] — 2026-07-15<a class="headerlink" href="#120-2026-07-15" title="Permanent link">&para;</a></h2>
