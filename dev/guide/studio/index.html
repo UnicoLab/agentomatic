@@ -3259,8 +3259,8 @@
 <ul>
 <li><strong>Studio Router</strong>: Framework-agnostic FastAPI endpoints that delegate to adapters.</li>
 <li><strong>Adapter Factory</strong>: Automatically selects the best adapter based on the agent's <code>framework</code> field and available decorators.</li>
-<li><strong>LangGraphAdapter</strong>: Full-featured — uses <code>CompiledGraph</code> APIs natively for graph extraction, checkpoint state, breakpoints, and HITL. Triggered by <code>framework="langgraph"</code>.</li>
-<li><strong>GraphAgentAdapter</strong>: For class-based agents (<code>BaseGraphAgent</code>). Provides graph topology extraction, streaming, and trace support. Triggered by <code>framework="graph_agent"</code>.</li>
+<li><strong>LangGraphAdapter</strong>: Full-featured — uses <code>CompiledGraph</code> APIs natively for graph extraction, checkpoint state, breakpoints, and HITL. Triggered by <code>framework="langgraph"</code> / <code>"deepagent"</code> (or a non-class agent with <code>graph_fn</code>).</li>
+<li><strong>GraphAgentAdapter</strong>: For class-based agents (<code>BaseGraphAgent</code>). Provides graph topology extraction, streaming, and trace support. Triggered by <code>framework="graph_agent"</code> or a registered <code>class_instance</code> — resolved <strong>before</strong> the generic <code>graph_fn</code> → LangGraph branch, because class agents also expose <code>graph_fn</code>.</li>
 <li><strong>LangChainAdapter</strong>: Extracts LCEL graphs via <code>.get_graph()</code>, streams via <code>astream_events</code>, and tracks messages per thread. Triggered by <code>framework="langchain"</code>.</li>
 <li><strong>GenericAdapter</strong>: Trace-based — wraps <code>node_fn()</code> with timing and I/O capture for any Python agent. Fallback for <code>framework="custom"</code> or unknown frameworks.</li>
 <li><strong>Custom Adapter</strong>: User-registered via <code>@studio_graph</code>, <code>@studio_state</code>, and <code>@studio_stream</code> decorators.</li>

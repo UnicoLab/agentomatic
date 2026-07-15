@@ -2683,9 +2683,9 @@ This checks your Python version, installed packages, optional extras, and extern
 </span></code></pre></div>
 <p>This creates a self-contained agent package under <code>agents/</code>:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>agents/my_chatbot/
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>├── __init__.py      # Optional Python package init
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>├── agent.py         # REQUIRED: Contains your BaseGraphAgent subclass
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>├── config.py        # Pydantic configuration (model, temperature, etc.)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>├── __init__.py      # AgentManifest card
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>├── agent.py         # REQUIRED: BaseGraphAgent subclass
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>├── llm.py           # Stack-aware LLM helpers
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>├── prompts.json     # Versioned system and user prompt templates
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>├── langgraph.json   # LangGraph Studio local settings
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>├── .env.example     # Environment variables blueprint
@@ -2702,7 +2702,7 @@ This checks your Python version, installed packages, optional extras, and extern
 </thead>
 <tbody>
 <tr>
-<td><code>basic</code></td>
+<td><code>basic</code> / <code>class</code></td>
 <td>Minimal class-based agent (recommended) — quick start</td>
 </tr>
 <tr>
@@ -2715,7 +2715,15 @@ This checks your Python version, installed packages, optional extras, and extern
 </tr>
 <tr>
 <td><code>full</code></td>
-<td>All features: class agent with config, schemas, api, tools, prompts</td>
+<td>All features: class agent with config, schemas, train/eval</td>
+</tr>
+<tr>
+<td><code>coordinator</code></td>
+<td>Orchestrator that routes to specialists</td>
+</tr>
+<tr>
+<td><code>pipeline</code></td>
+<td>Multi-step YAML workflow</td>
 </tr>
 <tr>
 <td><code>deepagent</code></td>
@@ -2727,11 +2735,15 @@ This checks your Python version, installed packages, optional extras, and extern
 </tr>
 <tr>
 <td><code>legacy_dict</code></td>
-<td>Legacy functional agent — <code>__init__.py</code> with <code>manifest</code> + <code>node_fn</code></td>
+<td>Legacy functional agent — <code>manifest</code> + <code>node_fn</code></td>
 </tr>
 <tr>
 <td><code>plugin</code></td>
-<td>ML Model Plugin — wrap classical ML models with REST endpoints</td>
+<td>ML Model Plugin with REST endpoints</td>
+</tr>
+<tr>
+<td><code>endpoint</code> / <code>connection</code> / <code>ingestion</code> / <code>extraction</code></td>
+<td>Ops / RAG building blocks</td>
 </tr>
 </tbody>
 </table>

@@ -927,10 +927,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#savepath-load_compiledpath" class="md-nav__link">
+  <a href="#savepath-loadpath-load_compiledpath" class="md-nav__link">
     <span class="md-ellipsis">
       
-        save(path) / load_compiled(path)
+        save(path) / load(path) / load_compiled(path)
       
     </span>
   </a>
@@ -2763,10 +2763,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#savepath-load_compiledpath" class="md-nav__link">
+  <a href="#savepath-loadpath-load_compiledpath" class="md-nav__link">
     <span class="md-ellipsis">
       
-        save(path) / load_compiled(path)
+        save(path) / load(path) / load_compiled(path)
       
     </span>
   </a>
@@ -3752,15 +3752,16 @@ computes all metrics, and returns an <code>EvaluationReport</code>.</p>
 </span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="c1">#   Scores:</span>
 </span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="c1">#     exact_key_match: 0.900</span>
 </span></code></pre></div>
-<h3 id="savepath-load_compiledpath"><code>save(path)</code> / <code>load_compiled(path)</code><a class="headerlink" href="#savepath-load_compiledpath" title="Permanent link">&para;</a></h3>
-<p>Persist and restore the compiled state:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Save</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">agent</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;compiled/summarizer_v1&quot;</span><span class="p">)</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="c1"># Creates: config.json, metadata.json, evaluation_history.json</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="c1"># Load into a fresh instance</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">fresh</span> <span class="o">=</span> <span class="n">MyAgent</span><span class="p">(</span><span class="n">llm</span><span class="o">=</span><span class="n">my_llm</span><span class="p">)</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="n">fresh</span><span class="o">.</span><span class="n">load_compiled</span><span class="p">(</span><span class="s2">&quot;compiled/summarizer_v1&quot;</span><span class="p">)</span>
+<h3 id="savepath-loadpath-load_compiledpath"><code>save(path)</code> / <code>load(path)</code> / <code>load_compiled(path)</code><a class="headerlink" href="#savepath-loadpath-load_compiledpath" title="Permanent link">&para;</a></h3>
+<p>Persists compiled config, metadata, evaluation reports, and the Keras-style
+<code>History</code> from the last <code>fit()</code> (<code>fit_history.json</code>). <code>load()</code> is an alias of
+<code>load_compiled()</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">agent</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;compiled/summarizer_v1&quot;</span><span class="p">)</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="c1"># Creates: config.json, metadata.json, evaluation_history.json, fit_history.json</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="n">fresh</span> <span class="o">=</span> <span class="n">MyAgent</span><span class="p">(</span><span class="n">llm</span><span class="o">=</span><span class="n">my_llm</span><span class="p">)</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">fresh</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;compiled/summarizer_v1&quot;</span><span class="p">)</span>  <span class="c1"># or load_compiled(...)</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="k">assert</span> <span class="n">fresh</span><span class="o">.</span><span class="n">history</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 </span></code></pre></div>
 <details class="example">
 <summary>Full ML Workflow</summary>
