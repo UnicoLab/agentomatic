@@ -2080,6 +2080,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#130-2026-07-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [1.3.0] — 2026-07-16
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[1.3.0] — 2026-07-16">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#121-2026-07-16" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2107,17 +2135,6 @@
     <span class="md-ellipsis">
       
         Fixed (production-readiness audit)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Added
       
     </span>
   </a>
@@ -2320,6 +2337,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#130-2026-07-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [1.3.0] — 2026-07-16
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[1.3.0] — 2026-07-16">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#121-2026-07-16" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2347,17 +2392,6 @@
     <span class="md-ellipsis">
       
         Fixed (production-readiness audit)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Added
       
     </span>
   </a>
@@ -2557,6 +2591,36 @@
 <p>All notable changes to this project will be documented in this file.
 This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</p>
 <hr />
+<h2 id="130-2026-07-16">[1.3.0] — 2026-07-16<a class="headerlink" href="#130-2026-07-16" title="Permanent link">&para;</a></h2>
+<p>Minor release: deployment ergonomics and coding-agent enablement. Builds on the
+1.2.x production-readiness fixes (which ship together in this release). No
+breaking API changes.</p>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Fully-featured, env-driven scaffolded <code>main.py</code></strong>: the project <code>main.py</code>
+  builds a module-level <code>app</code> that is feature-identical to <code>agentomatic run</code>
+  (Studio, docs, health, metrics on by default; all component dirs discovered),
+  so a deployed container running <code>uvicorn main:app</code> drops no functionality.
+  Behaviour is driven by <code>AGENTOMATIC_*</code> env vars (<code>ENABLE_STUDIO</code>,
+  <code>ENABLE_METRICS</code>, <code>ENABLE_AUTH</code>, <code>ENABLE_JWT</code>, <code>REQUIRE_AUTH</code>,
+  <code>ENABLE_CONTROL_PLANE</code>, <code>ENABLE_RATE_LIMIT</code>, <code>TITLE</code>, <code>LOG_LEVEL</code>) so the same
+  file works in dev and in the container</li>
+<li><strong>Deploy profiles</strong>: <code>agentomatic deploy --profile full|minimal</code> (and the
+  <code>--minimal</code> shorthand). <code>full</code> (default) runs everything; <code>minimal</code> is a
+  production-lean image that disables the Studio debug UI and quiets logging
+  via baked-in <code>AGENTOMATIC_*</code> env vars while keeping the core REST API,
+  health/readiness, metrics, and auth. <strong>Swagger/OpenAPI (<code>/docs</code>, <code>/redoc</code>,
+  <code>/openapi.json</code>) is always available in both profiles.</strong> Both profiles share
+  one env-driven <code>main.py</code> code path (no separate image), and <code>minimal</code> still
+  installs <code>agentomatic[all]</code> so no required functionality is dropped</li>
+<li><strong><code>agentomatic agents-guide</code> command</strong>: prints an Agentomatic primer for
+  bootstrapping any coding agent, or writes it into a project with
+  <code>--write AGENTS.md|CLAUDE.md|.cursor/skills/agentomatic/SKILL.md</code> (refuses to
+  overwrite without <code>--force</code>). Content comes from a single source of truth
+  (<code>agentomatic.cli.agent_guide</code>) so the CLI, docs, and in-repo agent knowledge
+  files stay in sync</li>
+</ul>
+<hr />
 <h2 id="121-2026-07-16">[1.2.1] — 2026-07-16<a class="headerlink" href="#121-2026-07-16" title="Permanent link">&para;</a></h2>
 <p>Patch release: production/wiring fixes that landed after the 1.2.0 cut. No
 breaking API changes.</p>
@@ -2608,24 +2672,6 @@ breaking API changes.</p>
 <li><strong>CORS hardening (P2)</strong>: wildcard origins (<code>cors_origins=["*"]</code>) no longer
   send <code>Access-Control-Allow-Credentials: true</code> — credentials are auto-disabled
   (with a one-time warning) unless explicit origins are configured</li>
-<li><strong>Deploy parity (<code>uvicorn main:app</code> == <code>agentomatic run</code>)</strong>: the scaffolded
-  <code>main.py</code> now builds a fully-featured, env-driven <code>app</code> (Studio, docs, health,
-  metrics on by default; all component dirs discovered) so a deployed container
-  serves the exact same surface as <code>agentomatic run</code>. Feature flags read from
-  <code>AGENTOMATIC_*</code> env vars (<code>ENABLE_STUDIO</code>, <code>ENABLE_METRICS</code>, <code>ENABLE_AUTH</code>,
-  <code>ENABLE_JWT</code>, <code>REQUIRE_AUTH</code>, <code>ENABLE_CONTROL_PLANE</code>, <code>ENABLE_RATE_LIMIT</code>,
-  <code>TITLE</code>, <code>LOG_LEVEL</code>) so the same file works in dev and in the container</li>
-</ul>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Deploy profiles</strong>: <code>agentomatic deploy --profile full|minimal</code> (and the
-  <code>--minimal</code> shorthand). <code>full</code> (default) runs everything; <code>minimal</code> is a
-  production-lean image that disables the Studio debug UI and quiets logging
-  via baked-in <code>AGENTOMATIC_*</code> env vars while keeping the core REST API,
-  health/readiness, metrics, and auth. <strong>Swagger/OpenAPI (<code>/docs</code>, <code>/redoc</code>,
-  <code>/openapi.json</code>) is always available in both profiles.</strong> Both profiles share
-  one env-driven <code>main.py</code> code path (no separate image), and <code>minimal</code> still
-  installs <code>agentomatic[all]</code> so no required functionality is dropped</li>
 </ul>
 <hr />
 <h2 id="120-2026-07-15">[1.2.0] — 2026-07-15<a class="headerlink" href="#120-2026-07-15" title="Permanent link">&para;</a></h2>
