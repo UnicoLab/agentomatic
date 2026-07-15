@@ -96,6 +96,35 @@ agentomatic run --stack remote \
   --require-auth-globally
 ```
 
+### Deploy profiles: `--profile full|minimal`
+
+`agentomatic deploy` picks how much of the platform the image runs. Both
+profiles drive the **same** env-driven `main.py` (via `AGENTOMATIC_*` env vars
+baked into the Dockerfile + compose) — there is one code path, not two images.
+
+| Feature | `full` (default) | `minimal` |
+| --- | :---: | :---: |
+| Core agent REST API (`/api/v1/...`) | ✅ | ✅ |
+| **Swagger / OpenAPI** (`/docs`, `/redoc`, `/openapi.json`) | ✅ | ✅ *(always on)* |
+| Health / readiness (`/health`, `/readiness`) | ✅ | ✅ |
+| Metrics / observability | ✅ | ✅ |
+| Auth wiring (API-key / JWT / zero-trust) | ✅ | ✅ |
+| Studio debug UI (`/studio/ui`) | ✅ | ❌ |
+| Verbose/dev logging | ✅ (`INFO`) | ❌ (`WARNING`) |
+
+```bash
+# Production-lean image (Studio off, quieter logs; Swagger still served)
+agentomatic deploy --profile minimal --stack remote --distroless
+agentomatic deploy --minimal --stack remote          # shorthand
+```
+
+!!! warning "Swagger is always available"
+    `--profile minimal` **never** disables `/docs`, `/redoc`, or
+    `/openapi.json`. It only sets `AGENTOMATIC_ENABLE_STUDIO=0` and
+    `AGENTOMATIC_LOG_LEVEL=WARNING`; the REST API, health, metrics, and auth
+    stay enabled. The image still installs `agentomatic[all]`, so no required
+    functionality is dropped — minimal just doesn't mount the Studio routes.
+
 `deploy/` also includes a ready observability stack
 (`deploy/observability/`) with Prometheus + OTel + Grafana.
 

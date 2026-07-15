@@ -94,6 +94,23 @@ class TestDeployRunParity:
         assert "/studio" not in paths  # studio redirect only added when enabled
         assert app.title == "Env Title"
 
+    def test_minimal_profile_env_keeps_swagger_disables_studio(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """Minimal deploy profile env: Studio off, but Swagger MUST stay on."""
+        app = self._build_scaffold_app(
+            tmp_path,
+            monkeypatch,
+            # Mirrors the env baked into a `deploy --profile minimal` image.
+            env={"AGENTOMATIC_ENABLE_STUDIO": "0", "AGENTOMATIC_LOG_LEVEL": "WARNING"},
+        )
+        paths = {getattr(route, "path", None) for route in app.routes}
+        # Studio debug UI is gone in minimal…
+        assert "/studio" not in paths
+        # …but Swagger/OpenAPI and health MUST remain (explicit requirement).
+        for kept in ("/docs", "/redoc", "/openapi.json", "/health", "/api/v1/agents"):
+            assert kept in paths, f"minimal profile dropped required route: {kept}"
+
 
 class TestClassTemplateAlias:
     def test_class_alias_matches_basic(self) -> None:

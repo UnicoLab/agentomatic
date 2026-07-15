@@ -654,6 +654,23 @@ def run(
     is_flag=True,
     help="Emit a docker-compose service stub per discovered agent.",
 )
+@click.option(
+    "--profile",
+    type=click.Choice(["full", "minimal"]),
+    default="full",
+    show_default=True,
+    help=(
+        "Deploy profile: 'full' (everything on) or 'minimal' "
+        "(Studio off + quieter logs; REST API, Swagger, health, metrics, "
+        "and auth stay on)."
+    ),
+)
+@click.option(
+    "--minimal",
+    "minimal",
+    is_flag=True,
+    help="Shorthand for --profile minimal (production-lean image).",
+)
 def deploy(
     stack: str | None,
     distroless: bool,
@@ -662,11 +679,16 @@ def deploy(
     stacks_dir: str,
     with_nginx: bool,
     with_agent_stubs: bool,
+    profile: str,
+    minimal: bool,
 ) -> None:
     """Generate Dockerfile, docker-compose, and .env for deployment."""
     from .deploy import generate_deploy
 
     _print_banner()
+
+    # --minimal is a shorthand that overrides --profile.
+    resolved_profile = "minimal" if minimal else profile
 
     plan = generate_deploy(
         out_dir=out_dir,
@@ -676,6 +698,7 @@ def deploy(
         distroless=distroless,
         include_nginx=with_nginx,
         include_agent_stubs=with_agent_stubs,
+        profile=resolved_profile,
     )
 
     if HAS_RICH:
@@ -686,6 +709,7 @@ def deploy(
         console.print(
             Panel(
                 f"[bold]Stack:[/bold] {plan.stack_name}\n"
+                f"[bold]Profile:[/bold] {plan.profile}\n"
                 f"[bold]Distroless:[/bold] {plan.distroless}\n"
                 f"[bold]Next:[/bold] cp {plan.out_dir}/.env.example {plan.out_dir}/.env"
                 f" && cd {plan.out_dir} && docker compose up -d --build",
@@ -698,6 +722,7 @@ def deploy(
         for rel_path in sorted(plan.files):
             click.echo(f"  📄 {rel_path}")
         click.echo(f"\nStack: {plan.stack_name}")
+        click.echo(f"Profile: {plan.profile}")
         click.echo(f"Distroless: {plan.distroless}")
 
 

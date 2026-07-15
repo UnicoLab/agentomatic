@@ -66,6 +66,17 @@ breaking API changes.
   `ENABLE_JWT`, `REQUIRE_AUTH`, `ENABLE_CONTROL_PLANE`, `ENABLE_RATE_LIMIT`,
   `TITLE`, `LOG_LEVEL`) so the same file works in dev and in the container
 
+### Added
+
+- **Deploy profiles**: `agentomatic deploy --profile full|minimal` (and the
+  `--minimal` shorthand). `full` (default) runs everything; `minimal` is a
+  production-lean image that disables the Studio debug UI and quiets logging
+  via baked-in `AGENTOMATIC_*` env vars while keeping the core REST API,
+  health/readiness, metrics, and auth. **Swagger/OpenAPI (`/docs`, `/redoc`,
+  `/openapi.json`) is always available in both profiles.** Both profiles share
+  one env-driven `main.py` code path (no separate image), and `minimal` still
+  installs `agentomatic[all]` so no required functionality is dropped
+
 ---
 
 ## [1.2.0] — 2026-07-15
