@@ -40,6 +40,10 @@ Full detail lives in [`docs/changelog.md`](docs/changelog.md); highlights:
   skipped run is observable
 - CORS: wildcard origins auto-disable `allow_credentials` (safer default);
   configure explicit `cors_origins=[...]` to enable credentialed CORS
+- Deploy parity: scaffolded `main.py` builds a fully-featured, env-driven `app`
+  so `uvicorn main:app` in a container serves the same surface as
+  `agentomatic run` (Studio/docs/health/metrics on by default; auth, control
+  plane, and rate limiting toggle via `AGENTOMATIC_*` env vars)
 
 
 ## v1.2.0 (2026-07-14)

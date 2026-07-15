@@ -58,6 +58,13 @@ breaking API changes.
 - **CORS hardening (P2)**: wildcard origins (`cors_origins=["*"]`) no longer
   send `Access-Control-Allow-Credentials: true` — credentials are auto-disabled
   (with a one-time warning) unless explicit origins are configured
+- **Deploy parity (`uvicorn main:app` == `agentomatic run`)**: the scaffolded
+  `main.py` now builds a fully-featured, env-driven `app` (Studio, docs, health,
+  metrics on by default; all component dirs discovered) so a deployed container
+  serves the exact same surface as `agentomatic run`. Feature flags read from
+  `AGENTOMATIC_*` env vars (`ENABLE_STUDIO`, `ENABLE_METRICS`, `ENABLE_AUTH`,
+  `ENABLE_JWT`, `REQUIRE_AUTH`, `ENABLE_CONTROL_PLANE`, `ENABLE_RATE_LIMIT`,
+  `TITLE`, `LOG_LEVEL`) so the same file works in dev and in the container
 
 ---
 

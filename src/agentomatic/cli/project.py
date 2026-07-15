@@ -24,24 +24,69 @@ def _requirements() -> str:
 
 
 def _main_py(name: str) -> str:
-    """Return a starter ``main.py`` with an explicit AgentPlatform config."""
+    """Return a starter ``main.py`` whose module-level ``app`` matches ``run``.
+
+    The generated module exposes ``app = platform.build()`` so a deployed
+    container (``uvicorn main:app``) serves the exact same feature set as
+    ``agentomatic run`` (Studio, docs, health, metrics, all component dirs).
+    Every feature is driven from ``AGENTOMATIC_*`` env vars, so the same file
+    works unchanged in dev and in production without code edits.
+
+    Args:
+        name: Project directory / display name.
+
+    Returns:
+        Rendered ``main.py`` source.
+    """
     display = name.replace("_", " ").title()
     return f'''"""{name} — Agentomatic platform entrypoint.
 
-Edit the AgentPlatform kwargs below to enable auth, metrics, stores, etc.
-Stacks in ``stacks/`` supply LLM / embedding / DB defaults — switch with::
+Serves an identical feature set whether launched with ``agentomatic run``
+(dev) or ``uvicorn main:app`` (container). Toggle features with
+``AGENTOMATIC_*`` env vars — no code edits required. Stacks in ``stacks/``
+supply LLM / embedding / DB defaults — switch with::
 
     agentomatic stack use local   # or remote
 """
 from __future__ import annotations
+
+import os
 
 from agentomatic import AgentPlatform
 
 # Optional: SQLAlchemyStore, MemoryStore, connection configs, JWTConfig, …
 
 
+def _env_bool(var: str, default: bool) -> bool:
+    """Parse a boolean feature flag from the environment.
+
+    Args:
+        var: Environment variable name.
+        default: Value used when the variable is unset or empty.
+
+    Returns:
+        ``True`` for ``1/true/yes/on`` (case-insensitive), else ``False``.
+    """
+    raw = os.getenv(var)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in {{"1", "true", "yes", "on"}}
+
+
 def create_platform() -> AgentPlatform:
-    """Build the platform from discovered agents/plugins/endpoints/ingestion."""
+    """Build a fully-featured platform matching ``agentomatic run`` defaults.
+
+    Discovers every component directory (agents, plugins, endpoints, ingestion,
+    pipelines, stacks) and enables Studio, docs, health, and metrics by default.
+    Auth, control plane, and rate limiting stay opt-in via ``AGENTOMATIC_*``
+    env vars so the deployed container is configurable without code changes.
+
+    Returns:
+        A configured :class:`AgentPlatform` ready to :meth:`build`.
+    """
+    # ``require_auth`` mirrors ``agentomatic run --require-auth-globally``:
+    # it implies zero-trust + JWT unless those are overridden individually.
+    require_auth = _env_bool("AGENTOMATIC_REQUIRE_AUTH", False)
     return AgentPlatform.from_folder(
         "agents/",
         plugins_dir="plugins/",
@@ -50,18 +95,21 @@ def create_platform() -> AgentPlatform:
         stacks_dir="stacks/",
         # Pipelines are auto-discovered from ../pipelines/ (sibling of agents/).
         # stack="local",              # or set via .agentomatic-stack / STACK env
-        title="{display} Platform",
+        title=os.getenv("AGENTOMATIC_TITLE", "{display} Platform"),
         description="Agentomatic multi-agent platform for {name}",
-        enable_studio=True,
-        enable_metrics=True,
-        # enable_auth=True,
-        # auth_api_key="${{API_KEY}}",  # prefer env / stack auth
-        # enable_jwt_auth=True,        # set jwt_config / JWKS via stack
-        # enable_zero_trust=True,
-        # require_auth_globally=False,  # needs JWT or API-key auth wired
-        # enable_control_plane=True,
-        # control_token="${{CONTROL_TOKEN}}",
-        # enable_rate_limit=True,
+        log_level=os.getenv("AGENTOMATIC_LOG_LEVEL", "INFO"),
+        # On by default — matches `agentomatic run` (Studio) + prod observability.
+        enable_studio=_env_bool("AGENTOMATIC_ENABLE_STUDIO", True),
+        enable_metrics=_env_bool("AGENTOMATIC_ENABLE_METRICS", True),
+        # Opt-in hardening — drive from env / stack; no code edits needed.
+        enable_auth=_env_bool("AGENTOMATIC_ENABLE_AUTH", False),
+        auth_api_key=os.getenv("AGENTOMATIC_API_KEY", ""),
+        enable_jwt_auth=_env_bool("AGENTOMATIC_ENABLE_JWT", require_auth),
+        enable_zero_trust=_env_bool("AGENTOMATIC_ENABLE_ZERO_TRUST", require_auth),
+        require_auth_globally=require_auth,
+        enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", False),
+        control_token=os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
+        enable_rate_limit=_env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
     )
 
 
@@ -70,7 +118,10 @@ app = _platform.build()
 
 
 if __name__ == "__main__":
-    _platform.run(host="0.0.0.0", port=8000)
+    _platform.run(
+        host=os.getenv("AGENTOMATIC_HOST", "0.0.0.0"),
+        port=int(os.getenv("AGENTOMATIC_PORT", "8000")),
+    )
 '''
 
 
@@ -129,6 +180,20 @@ def _env_example() -> str:
 
 # Active stack (optional; prefer: agentomatic stack use local)
 # AGENTOMATIC_STACK=local
+
+# --- Deploy feature flags (main.py reads these; parity with `agentomatic run`) ---
+# Studio + metrics are ON by default; auth/control-plane/rate-limit are opt-in.
+# AGENTOMATIC_TITLE=My Platform
+# AGENTOMATIC_LOG_LEVEL=INFO
+# AGENTOMATIC_ENABLE_STUDIO=1
+# AGENTOMATIC_ENABLE_METRICS=1
+# AGENTOMATIC_ENABLE_AUTH=0            # API-key auth (needs AGENTOMATIC_API_KEY)
+# AGENTOMATIC_ENABLE_JWT=0             # JWT auth (set JWKS via stack)
+# AGENTOMATIC_REQUIRE_AUTH=0           # implies JWT + zero-trust; needs auth wired
+# AGENTOMATIC_ENABLE_CONTROL_PLANE=0   # needs AGENTOMATIC_CONTROL_TOKEN
+# AGENTOMATIC_ENABLE_RATE_LIMIT=0
+# AGENTOMATIC_API_KEY=
+# AGENTOMATIC_CONTROL_TOKEN=
 
 # --- LLM providers ---
 OPENAI_API_KEY=
