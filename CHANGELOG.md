@@ -44,6 +44,10 @@ Full detail lives in [`docs/changelog.md`](docs/changelog.md); highlights:
   so `uvicorn main:app` in a container serves the same surface as
   `agentomatic run` (Studio/docs/health/metrics on by default; auth, control
   plane, and rate limiting toggle via `AGENTOMATIC_*` env vars)
+- Deploy profiles: `agentomatic deploy --profile full|minimal` (`--minimal`
+  shorthand). `minimal` bakes `AGENTOMATIC_ENABLE_STUDIO=0` + quieter logs into
+  the image/compose for a production-lean runtime; REST API, health, metrics,
+  auth, and Swagger (`/docs`, `/redoc`, `/openapi.json`) always stay enabled
 
 
 ## v1.2.0 (2026-07-14)

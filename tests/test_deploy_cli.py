@@ -102,6 +102,124 @@ class TestComposeRendering:
 
 
 # =========================================================================
+# Deploy profiles — full (default) vs minimal (Studio off, Swagger stays on)
+# =========================================================================
+
+
+class TestDeployProfiles:
+    def test_profile_env_helper(self) -> None:
+        assert deploy_mod.profile_env("full") == {}
+        minimal = deploy_mod.profile_env("minimal")
+        assert minimal["AGENTOMATIC_ENABLE_STUDIO"] == "0"
+        assert minimal["AGENTOMATIC_LOG_LEVEL"] == "WARNING"
+        # Swagger/docs are never toggled by the profile.
+        assert not any("DOCS" in key or "OPENAPI" in key for key in minimal)
+
+    def test_profile_env_rejects_unknown(self) -> None:
+        with pytest.raises(ValueError, match="unknown deploy profile"):
+            deploy_mod.profile_env("turbo")
+
+    def test_full_dockerfile_has_no_studio_override(self) -> None:
+        content = deploy_mod.render_dockerfile(profile="full")
+        assert "AGENTOMATIC_ENABLE_STUDIO" not in content
+        assert 'CMD ["uvicorn", "main:app"' in content  # same single code path
+
+    def test_minimal_dockerfile_disables_studio_keeps_docs(self) -> None:
+        content = deploy_mod.render_dockerfile(profile="minimal")
+        assert "AGENTOMATIC_ENABLE_STUDIO=0" in content
+        assert "AGENTOMATIC_LOG_LEVEL=WARNING" in content
+        # Swagger/docs must NOT be disabled by the profile: no env var flips
+        # docs/openapi off (only the two known minimal overrides are injected).
+        env_vars = {
+            line.split("=", 1)[0].removeprefix("ENV ").strip()
+            for line in content.splitlines()
+            if "AGENTOMATIC_" in line and "=" in line and not line.lstrip().startswith("#")
+        }
+        assert env_vars == {"AGENTOMATIC_ENABLE_STUDIO", "AGENTOMATIC_LOG_LEVEL"}
+        # Same launch command — behavior is env-driven, not a different CMD.
+        assert 'CMD ["uvicorn", "main:app"' in content
+
+    def test_minimal_distroless_disables_studio(self) -> None:
+        content = deploy_mod.render_dockerfile_distroless(profile="minimal")
+        assert "AGENTOMATIC_ENABLE_STUDIO=0" in content
+        assert '"main:app"' in content
+
+    def test_minimal_compose_sets_studio_off(self) -> None:
+        content = deploy_mod.render_docker_compose(stack_name="local", profile="minimal")
+        assert "AGENTOMATIC_ENABLE_STUDIO=0" in content
+        assert "AGENTOMATIC_LOG_LEVEL=WARNING" in content
+
+    def test_full_compose_has_no_studio_override(self) -> None:
+        content = deploy_mod.render_docker_compose(stack_name="local", profile="full")
+        assert "AGENTOMATIC_ENABLE_STUDIO" not in content
+
+    def test_generate_deploy_minimal_profile(self, tmp_path: Path) -> None:
+        plan = deploy_mod.generate_deploy(
+            out_dir=tmp_path / "out",
+            stack_name="local",
+            stacks_dir=tmp_path / "no-stacks",
+            profile="minimal",
+        )
+        assert plan.profile == "minimal"
+        dockerfile = plan.files["Dockerfile"].read_text()
+        compose = plan.files["docker-compose.yml"].read_text()
+        assert "AGENTOMATIC_ENABLE_STUDIO=0" in dockerfile
+        assert "AGENTOMATIC_ENABLE_STUDIO=0" in compose
+        # README documents the profile.
+        assert "minimal" in plan.files["README.md"].read_text()
+
+    def test_generate_deploy_default_profile_is_full(self, tmp_path: Path) -> None:
+        plan = deploy_mod.generate_deploy(
+            out_dir=tmp_path / "out",
+            stack_name="local",
+            stacks_dir=tmp_path / "no-stacks",
+        )
+        assert plan.profile == "full"
+        assert "AGENTOMATIC_ENABLE_STUDIO" not in plan.files["Dockerfile"].read_text()
+
+    def test_cli_minimal_flag(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        out = tmp_path / "generated"
+        result = runner.invoke(
+            cli,
+            [
+                "deploy",
+                "--minimal",
+                "--stack",
+                "local",
+                "--out",
+                str(out),
+                "--stacks-dir",
+                str(tmp_path / "no-stacks"),
+                "--no-nginx",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "AGENTOMATIC_ENABLE_STUDIO=0" in (out / "Dockerfile").read_text()
+
+    def test_cli_profile_full_default(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        out = tmp_path / "generated"
+        result = runner.invoke(
+            cli,
+            [
+                "deploy",
+                "--profile",
+                "full",
+                "--stack",
+                "local",
+                "--out",
+                str(out),
+                "--stacks-dir",
+                str(tmp_path / "no-stacks"),
+                "--no-nginx",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "AGENTOMATIC_ENABLE_STUDIO" not in (out / "Dockerfile").read_text()
+
+
+# =========================================================================
 # render_env_example — StackConfig derivation
 # =========================================================================
 
@@ -453,6 +571,86 @@ class TestDiscoverAgentNames:
 
         names = deploy_mod.discover_agent_names(tmp_path)
         assert names == ["a", "b"]
+
+
+# =========================================================================
+# Minimal profile — runtime route surface (Studio off, REST + Swagger on)
+# =========================================================================
+
+
+class TestMinimalProfileRuntimeRoutes:
+    """A platform built with minimal-profile settings keeps the REST API +
+
+    Swagger while dropping Studio — mirroring the env a
+    ``deploy --profile minimal`` image bakes into the env-driven ``main.py``.
+    """
+
+    @staticmethod
+    def _minimal_app(tmp_path: Path):
+        """Build an app with one agent using minimal-profile settings."""
+        from dataclasses import dataclass, field
+        from typing import Any
+
+        from agentomatic import AgentPlatform
+        from agentomatic.agents import BaseGraphAgent
+
+        @dataclass
+        class _EchoState:
+            request: str = ""
+            output: dict[str, Any] = field(default_factory=dict)
+
+        class _Echo(BaseGraphAgent[_EchoState]):
+            agent_name = "echo"
+            agent_description = "Echo agent"
+            agent_framework = "graph_agent"
+
+            def build_graph(self) -> Any:
+                g = self.new_graph()
+                g.add_node("respond", self.respond)
+                g.set_entry_point("respond")
+                g.set_finish_point("respond")
+                return g.compile()
+
+            def respond(self, state: _EchoState) -> _EchoState:
+                state.output = {"response": state.request}
+                return state
+
+            def input_to_state(self, input_data: dict[str, Any]) -> _EchoState:
+                return _EchoState(request=input_data.get("current_query", ""))
+
+            def state_to_output(self, state: _EchoState) -> dict[str, Any]:
+                return state.output
+
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        platform = AgentPlatform(
+            agents_dir=agents_dir,
+            title="Minimal Profile",
+            # Minimal profile: Studio OFF, quieter logs; metrics/docs stay on.
+            enable_studio=False,
+            log_level="WARNING",
+            enable_metrics=True,
+        )
+        reg = _Echo().as_registered_agent()
+        platform.register_agent(
+            manifest=reg.manifest,
+            node_fn=reg.node_fn,
+            graph_fn=reg.graph_fn,
+            class_instance=reg.class_instance,
+        )
+        return platform.build()
+
+    def test_minimal_keeps_rest_and_swagger_drops_studio(self, tmp_path: Path) -> None:
+        app = self._minimal_app(tmp_path)
+        paths = {getattr(route, "path", None) for route in app.routes}
+        # REST API surface present, including the per-agent invoke route.
+        assert "/api/v1/echo/invoke" in paths
+        assert "/api/v1/agents" in paths
+        # Swagger/OpenAPI + health MUST remain in minimal.
+        for kept in ("/docs", "/redoc", "/openapi.json", "/health"):
+            assert kept in paths, f"minimal dropped required route: {kept}"
+        # Studio debug UI redirect is gone.
+        assert "/studio" not in paths
 
 
 if __name__ == "__main__":  # pragma: no cover
