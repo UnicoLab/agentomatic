@@ -138,6 +138,7 @@ nav:
     - Status Dashboard: guide/status.md
     - Ingestion & RAG: guide/ingestion.md
     - Per-Agent Connections: guide/connections.md
+    - Custom DB & Vector Connections: guide/custom-connections.md
     - Prompt Optimization: guide/optimization.md
     - Observability & Monitoring: guide/observability.md
     - Telemetry & Feedback: guide/telemetry.md

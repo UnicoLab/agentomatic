@@ -257,17 +257,22 @@ class VectorConnection:
             self._client = self._build_client()
 
     async def close(self) -> None:
-        """Close the underlying client if it exposes a close method."""
+        """Close the underlying client if it exposes a shutdown method.
+
+        Any client is accepted: the first of ``aclose`` / ``close`` /
+        ``disconnect`` that exists is called (awaited when it returns an
+        awaitable).  Clients exposing none of these are dropped silently.
+        """
         client = self._client
         if client is None:
             return
-        for attr in ("aclose", "close"):
+        for attr in ("aclose", "close", "disconnect"):
             fn = getattr(client, attr, None)
-            if fn is None:
+            if not callable(fn):
                 continue
             try:
                 result = fn()
-                if hasattr(result, "__await__"):
+                if inspect.isawaitable(result):
                     await result
             except Exception as exc:  # noqa: BLE001
                 logger.debug(f"Vector connection '{self.name}' close error: {exc}")
