@@ -30,12 +30,26 @@ def create_plugin_router(
             "status": "ok" if plugin.is_loaded else "unloaded",
             "plugin_name": plugin.plugin_name,
             "version": plugin.plugin_version,
+            "loaded_at": plugin.loaded_at,
         }
 
     @router.get("/model_card", response_model=dict[str, Any])
     async def get_model_card() -> dict[str, Any]:
         """Retrieve the model card / metadata."""
         return plugin.model_card()
+
+    @router.post("/reload", response_model=dict[str, Any])
+    async def reload_plugin() -> dict[str, Any]:
+        """Reload model weights from the current artifact pointer.
+
+        Re-calls ``load_model()`` on the live registry instance so subsequent
+        ``predict`` and pipeline ``plugin:`` steps use the fresh weights.
+        """
+        try:
+            return await plugin.reload_model()
+        except Exception as exc:
+            logger.error("Reload failed for plugin '{}': {}", plugin.plugin_name, exc)
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     # Create the dynamic predict endpoint
     async def predict_endpoint(request: Any) -> Any:

@@ -50,6 +50,7 @@ async def build_status_payload(platform: AgentPlatform) -> dict[str, Any]:
         plugins[name] = {
             "status": "healthy" if getattr(plugin, "is_loaded", True) else "unloaded",
             "version": getattr(plugin, "plugin_version", "?"),
+            "loaded_at": getattr(plugin, "loaded_at", None),
         }
 
     # Custom endpoints
