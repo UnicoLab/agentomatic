@@ -978,6 +978,19 @@ steps:
         pipelines = PipelineLoader.discover_pipelines(tmp_path)
         assert "research" in pipelines
 
+    def test_discover_pipelines_flat_pipelines_dir(self, tmp_path):
+        """When callers pass pipelines/ itself, flat *.yaml must load."""
+        from agentomatic.pipelines.loader import PipelineLoader
+
+        pipelines_dir = tmp_path / "pipelines"
+        pipelines_dir.mkdir()
+        (pipelines_dir / "estimation.yaml").write_text(
+            "name: estimation\nsteps:\n  - agent: scope_analysis\n"
+        )
+
+        pipelines = PipelineLoader.discover_pipelines(pipelines_dir)
+        assert "estimation" in pipelines
+
 
 # =====================================================================
 # Integration
