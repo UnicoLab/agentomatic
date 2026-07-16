@@ -205,6 +205,15 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
         }
         if base_url:
             ctor_kwargs["base_url"] = base_url
+        if kwargs.get("max_tokens") is not None:
+            ctor_kwargs["max_tokens"] = kwargs["max_tokens"]
+        for key in ("timeout", "max_retries", "default_headers", "default_query"):
+            if kwargs.get(key) is not None:
+                ctor_kwargs[key] = kwargs[key]
+
+        # Stack ``extra:`` + flat kwargs → model_kwargs / extra_body (oMLX, vLLM, …)
+        openai_bits = _openai_compat_kwargs(kwargs)
+        ctor_kwargs.update(openai_bits)
         return ChatOpenAI(**ctor_kwargs)
 
     elif provider == "vertex":
@@ -222,6 +231,101 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
+
+
+def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Map stack ``extra`` / vendor knobs onto ChatOpenAI constructor args.
+
+    Supports modern OpenAI-compatible servers (oMLX, vLLM, Groq, …):
+
+    * ``response_format`` — JSON mode when the server supports it
+    * ``enable_thinking`` / ``chat_template_kwargs`` — Qwen-style thinking
+    * ``extra_body`` / ``model_kwargs`` — passthrough for other vendor fields
+    * ``default_headers`` — custom HTTP headers
+    * ``tools`` / ``tool_choice`` — function calling when bound later via
+      ``.bind_tools``; stored in ``model_kwargs`` when provided at build time
+    """
+    import inspect
+
+    from langchain_openai import ChatOpenAI
+
+    extra = dict(kwargs.get("extra") or {})
+    # Flat aliases often set directly on the stack profile
+    for alias in (
+        "response_format",
+        "enable_thinking",
+        "chat_template_kwargs",
+        "extra_body",
+        "model_kwargs",
+        "tools",
+        "tool_choice",
+        "parallel_tool_calls",
+    ):
+        if alias in kwargs and alias not in extra:
+            extra[alias] = kwargs[alias]
+
+    model_kwargs = dict(extra.pop("model_kwargs", None) or {})
+    extra_body = dict(extra.pop("extra_body", None) or {})
+
+    response_format = extra.pop("response_format", None)
+    if response_format is not None:
+        model_kwargs["response_format"] = response_format
+
+    enable_thinking = extra.pop("enable_thinking", None)
+    if enable_thinking is not None:
+        extra_body["enable_thinking"] = enable_thinking
+
+    chat_template_kwargs = extra.pop("chat_template_kwargs", None)
+    if chat_template_kwargs is not None:
+        extra_body["chat_template_kwargs"] = chat_template_kwargs
+
+    for tool_key in ("tools", "tool_choice", "parallel_tool_calls"):
+        if tool_key in extra:
+            model_kwargs[tool_key] = extra.pop(tool_key)
+
+    # Remaining unknown keys → extra_body (vendor extensions)
+    reserved = {
+        "provider",
+        "model",
+        "temperature",
+        "max_tokens",
+        "api_key",
+        "base_url",
+        "api_base",
+        "timeout",
+        "max_retries",
+        "default_headers",
+        "default_query",
+        "extra",
+        "fallbacks",
+        "instance",
+        "name",
+    }
+    for key, value in list(extra.items()):
+        if key in reserved or value is None:
+            continue
+        if key == "default_headers":
+            continue
+        extra_body.setdefault(key, value)
+
+    out: dict[str, Any] = {}
+    if "default_headers" in kwargs or "default_headers" in extra:
+        out["default_headers"] = kwargs.get("default_headers") or extra.get("default_headers")
+
+    sig = inspect.signature(ChatOpenAI.__init__)
+    supports_extra_body = "extra_body" in sig.parameters
+
+    if extra_body:
+        if supports_extra_body:
+            out["extra_body"] = extra_body
+        else:
+            model_kwargs = {
+                **model_kwargs,
+                "extra_body": {**model_kwargs.get("extra_body", {}), **extra_body},
+            }
+    if model_kwargs:
+        out["model_kwargs"] = model_kwargs
+    return {k: v for k, v in out.items() if v is not None}
 
 
 def _build_dummy_llm() -> Any:
@@ -319,6 +423,7 @@ def apply_stack_defaults(stack_manager: StackManager | None) -> Any:
         "provider": entry.provider,
         "model": entry.model,
         "temperature": entry.temperature,
+        "max_tokens": entry.max_tokens,
     }
     if entry.api_key:
         kwargs["api_key"] = entry.api_key
@@ -381,6 +486,7 @@ def get_llm_for_agent(
         provider=entry.provider,
         model=entry.model,
         temperature=entry.temperature,
+        max_tokens=entry.max_tokens,
         api_key=entry.api_key,
         base_url=entry.base_url,
         **entry.extra,
@@ -392,15 +498,56 @@ async def invoke_with_retry(
     messages: list,
     max_retries: int = 3,
     retry_delay: float = 1.0,
+    *,
+    strip_thinking: bool = True,
+    keep_thinking_metadata: bool = True,
 ) -> Any:
-    """Invoke LLM with retry logic."""
+    """Invoke LLM with retry logic.
+
+    Args:
+        llm: Chat model / runnable with ``ainvoke``.
+        messages: Chat messages.
+        max_retries: Retries after the first failure.
+        retry_delay: Base delay (exponential backoff).
+        strip_thinking: When ``True`` (default), separate thinking/reasoning
+            from the final answer so ``.content`` is safe for JSON / UX.
+        keep_thinking_metadata: Store thinking on ``additional_kwargs`` when
+            stripping (debug / Studio). Ignored when ``strip_thinking`` is
+            ``False``.
+
+    Returns:
+        The model result (optionally normalized).
+    """
     import asyncio
+
+    from agentomatic.providers.message_utils import attach_thinking_metadata
 
     last_exc = None
 
     for attempt in range(max_retries + 1):
         try:
-            return await llm.ainvoke(messages)
+            result = await llm.ainvoke(messages)
+            if not strip_thinking:
+                return result
+            normalized = attach_thinking_metadata(result, strip_content=True)
+            if not keep_thinking_metadata:
+                additional = dict(getattr(normalized, "additional_kwargs", None) or {})
+                additional.pop("thinking", None)
+                additional.pop("reasoning_content", None)
+                if hasattr(normalized, "model_copy"):
+                    try:
+                        return normalized.model_copy(update={"additional_kwargs": additional})
+                    except Exception:  # noqa: BLE001
+                        pass
+                from types import SimpleNamespace
+
+                return SimpleNamespace(
+                    content=getattr(normalized, "content", ""),
+                    additional_kwargs=additional,
+                    response_metadata=getattr(normalized, "response_metadata", {}),
+                    raw=result,
+                )
+            return normalized
         except Exception as exc:
             last_exc = exc
             if attempt < max_retries:
@@ -409,6 +556,166 @@ async def invoke_with_retry(
                 await asyncio.sleep(delay)
 
     raise last_exc  # type: ignore[misc]
+
+
+async def astream_with_thinking(
+    llm: Any,
+    messages: list,
+    *,
+    emit_thinking: bool = False,
+) -> Any:
+    """Async-stream an LLM, separating thinking tokens from answer tokens.
+
+    Yields dicts::
+
+        {"type": "thinking" | "answer" | "done", "text": str, "thinking": str}
+
+    When the server streams reasoning in separate fields / block types those
+    chunks are classified as ``thinking``. Tagged ``<think>`` spans that arrive
+    inline are buffered until the closing tag when possible.
+    """
+    from agentomatic.providers.message_utils import (
+        THINK_TAG_RE,
+        message_text,
+        message_thinking,
+        split_thinking_text,
+    )
+
+    if not hasattr(llm, "astream"):
+        result = await invoke_with_retry(llm, messages, max_retries=0)
+        thinking = message_thinking(result)
+        answer = message_text(result)
+        if emit_thinking and thinking:
+            yield {"type": "thinking", "text": thinking, "thinking": thinking}
+        if answer:
+            yield {"type": "answer", "text": answer, "thinking": thinking}
+        yield {"type": "done", "text": answer, "thinking": thinking}
+        return
+
+    answer_buf: list[str] = []
+    thinking_buf: list[str] = []
+    inline_buf = ""
+    in_think_tag = False
+
+    async for chunk in llm.astream(messages):
+        # Structured reasoning on the chunk
+        for attr in ("reasoning_content", "reasoning", "thinking"):
+            piece = getattr(chunk, attr, None)
+            if piece:
+                text = str(piece)
+                thinking_buf.append(text)
+                if emit_thinking:
+                    yield {"type": "thinking", "text": text, "thinking": "".join(thinking_buf)}
+
+        additional = getattr(chunk, "additional_kwargs", None) or {}
+        if isinstance(additional, dict):
+            for key in ("reasoning_content", "reasoning", "thinking"):
+                if additional.get(key):
+                    text = str(additional[key])
+                    thinking_buf.append(text)
+                    if emit_thinking:
+                        yield {
+                            "type": "thinking",
+                            "text": text,
+                            "thinking": "".join(thinking_buf),
+                        }
+
+        content = getattr(chunk, "content", None)
+        if content is None:
+            continue
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and str(block.get("type", "")).lower() in {
+                    "thinking",
+                    "reasoning",
+                    "reason",
+                }:
+                    text = str(block.get("thinking") or block.get("text") or "")
+                    if text:
+                        thinking_buf.append(text)
+                        if emit_thinking:
+                            yield {
+                                "type": "thinking",
+                                "text": text,
+                                "thinking": "".join(thinking_buf),
+                            }
+                elif isinstance(block, dict) and block.get("text"):
+                    content = block["text"]
+                    break
+                else:
+                    content = str(block)
+                    break
+            else:
+                continue
+
+        text = str(content)
+        inline_buf += text
+
+        # Flush complete <think>...</think> regions from the inline buffer.
+        while True:
+            match = THINK_TAG_RE.search(inline_buf)
+            if not match:
+                break
+            thinking_buf.append(match.group(1).strip())
+            if emit_thinking and match.group(1).strip():
+                yield {
+                    "type": "thinking",
+                    "text": match.group(1).strip(),
+                    "thinking": "\n\n".join(thinking_buf),
+                }
+            inline_buf = inline_buf[: match.start()] + inline_buf[match.end() :]
+
+        open_idx = inline_buf.lower().find("<think")
+        if open_idx != -1 and "</think>" not in inline_buf.lower():
+            # Hold partial think tag; emit any leading answer text.
+            leading = inline_buf[:open_idx]
+            inline_buf = inline_buf[open_idx:]
+            in_think_tag = True
+            if leading:
+                answer_buf.append(leading)
+                yield {
+                    "type": "answer",
+                    "text": leading,
+                    "thinking": "\n\n".join(thinking_buf),
+                }
+            continue
+
+        if in_think_tag:
+            continue
+
+        if inline_buf:
+            answer_buf.append(inline_buf)
+            yield {
+                "type": "answer",
+                "text": inline_buf,
+                "thinking": "\n\n".join(thinking_buf),
+            }
+            inline_buf = ""
+
+    # Trailing buffer (unclosed think → treat as thinking; else answer)
+    if inline_buf:
+        split = split_thinking_text(inline_buf)
+        if split.thinking:
+            thinking_buf.append(split.thinking)
+            if emit_thinking:
+                yield {
+                    "type": "thinking",
+                    "text": split.thinking,
+                    "thinking": "\n\n".join(thinking_buf),
+                }
+        if split.answer:
+            answer_buf.append(split.answer)
+            yield {
+                "type": "answer",
+                "text": split.answer,
+                "thinking": "\n\n".join(thinking_buf),
+            }
+
+    yield {
+        "type": "done",
+        "text": "".join(answer_buf),
+        "thinking": "\n\n".join(thinking_buf),
+    }
 
 
 class StructuredOutputFallbackWrapper:
@@ -427,7 +734,10 @@ class StructuredOutputFallbackWrapper:
         return self._parse_to_model(res)
 
     def _parse_to_model(self, res: Any) -> Any:
-        content = res.content if hasattr(res, "content") else str(res)
+        from agentomatic.providers.message_utils import message_text, strip_thinking_for_json
+
+        content = message_text(res)
+        content = strip_thinking_for_json(content)
         import json
 
         from pydantic import BaseModel
@@ -437,14 +747,22 @@ class StructuredOutputFallbackWrapper:
             try:
                 data = json.loads(content)
                 return self.response_model.model_validate(data)
-            except Exception as exc:
-                logger.warning(
-                    f"Structured output parse failed for "
-                    f"{self.response_model.__name__}: {exc}. "
-                    f"Falling back to dummy values. "
-                    f"Raw content (first 200 chars): "
-                    f"{content[:200]!r}"
-                )
+            except Exception:
+                # Try first balanced object after thinking strip
+                try:
+                    start = content.find("{")
+                    end = content.rfind("}")
+                    if start != -1 and end > start:
+                        data = json.loads(content[start : end + 1])
+                        return self.response_model.model_validate(data)
+                except Exception as exc:
+                    logger.warning(
+                        f"Structured output parse failed for "
+                        f"{self.response_model.__name__}: {exc}. "
+                        f"Falling back to dummy values. "
+                        f"Raw content (first 200 chars): "
+                        f"{content[:200]!r}"
+                    )
                 fields = {}
                 for name, field in self.response_model.model_fields.items():
                     if field.default is not PydanticUndefined:
@@ -483,7 +801,8 @@ def get_structured_llm(
     If *instance* is provided, it is used directly instead of
     building from the factory.  This lets users inject a custom
     LLM (LangChain model, callable, etc.) and still get
-    structured output parsing.
+    structured output parsing. Thinking preambles are stripped in the
+    fallback parser path.
 
     Args:
         response_model: Pydantic model class for output parsing.

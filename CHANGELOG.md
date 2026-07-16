@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- **providers**: Modern LLM thinking/reasoning support for Qwen3.5, Gemma, oMLX
+  - `message_text` / `message_thinking` / `strip_thinking_for_json` /
+    `astream_with_thinking` / `invoke_with_retry(strip_thinking=…)`
+  - OpenAI-compatible stack `extra:` → `enable_thinking`,
+    `chat_template_kwargs`, `response_format`, `extra_body`, headers
+  - Structured-output fallback strips thinking before JSON parse
+
+
 ## v1.4.0 (2026-07-16)
 
 ### Features
