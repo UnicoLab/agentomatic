@@ -1,22 +1,46 @@
 # CHANGELOG
 
 
-## Unreleased
+## v1.5.0 (2026-07-16)
 
-### Fixes
+### Bug Fixes
 
-- **deploy**: When ``--out`` is outside the project tree, emit absolute
-  ``build.context`` / ``dockerfile`` / volume paths so Compose does not
-  reference a Dockerfile that escapes the Docker build context.
+- **invoke**: Expose structured agent output on AgentInvokeResponse
+  ([`e8a6c33`](https://github.com/UnicoLab/agentomatic/commit/e8a6c3333704f76900f324f9f57cc8813216e0c8))
+
+Class-agent state_to_output dicts were stringified into response via str(result), breaking frontend
+  parsers. Add an output field and coerce payloads so sync/chat/A2A paths return JSON-friendly
+  structured data.
+
+- **pipelines**: Discover flat YAML when scanning pipelines/ itself
+  ([`0ea8def`](https://github.com/UnicoLab/agentomatic/commit/0ea8defb92ecbd2e28a0432a4405297ff6735f49))
+
+AgentPlatform.build passes the pipelines/ directory into discover_pipelines, which previously only
+  loaded pipelines/pipelines/*.yaml or pipeline.yaml.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+### Continuous Integration
+
+- Fix lint, typing, and commit message display
+  ([`718b031`](https://github.com/UnicoLab/agentomatic/commit/718b03156b4cf1564b951ced58d0a1cc8a1dc1f9))
+
+Reformat files that failed ruff format check; narrow OptimizeInvokeResponse field types for mypy.
+  Add a commit-msg hook that strips ANSI/bat line numbers when cat is aliased to bat, and document
+  using /bin/cat in HEREDOCs.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
 
 ### Features
 
-- **providers**: Modern LLM thinking/reasoning support for Qwen3.5, Gemma, oMLX
-  - `message_text` / `message_thinking` / `strip_thinking_for_json` /
-    `astream_with_thinking` / `invoke_with_retry(strip_thinking=…)`
-  - OpenAI-compatible stack `extra:` → `enable_thinking`,
-    `chat_template_kwargs`, `response_format`, `extra_body`, headers
-  - Structured-output fallback strips thinking before JSON parse
+- **plugins**: Add reload API and full invoke context passthrough
+  ([`a42a7bf`](https://github.com/UnicoLab/agentomatic/commit/a42a7bf3a55bf1ced2cadbf709c4b8ec1aaf17c1))
+
+Expose POST /api/v1/plugins[/name]/reload so platforms can refresh in-memory weights after artifact
+  promotion, and preserve the entire client payload (rich context + top-level extras) through to
+  input_to_state.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
 
 
 ## v1.4.0 (2026-07-16)
