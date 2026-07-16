@@ -3,6 +3,12 @@
 
 ## Unreleased
 
+### Fixes
+
+- **deploy**: When ``--out`` is outside the project tree, emit absolute
+  ``build.context`` / ``dockerfile`` / volume paths so Compose does not
+  reference a Dockerfile that escapes the Docker build context.
+
 ### Features
 
 - **providers**: Modern LLM thinking/reasoning support for Qwen3.5, Gemma, oMLX
