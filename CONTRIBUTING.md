@@ -40,6 +40,22 @@ refactor: simplify router factory
 perf: optimize registry lookup
 ```
 
+When creating commits via a HEREDOC, use **`/bin/cat`** (not bare `cat`). Many
+developer shells alias `cat` to `bat`, which injects ANSI colors and line numbers
+into the message and breaks Python Semantic Release / GitHub CI titles. Example:
+
+```bash
+git commit -m "$(/bin/cat <<'EOF'
+ci: fix lint and typing
+
+EOF
+)"
+```
+
+A `commit-msg` pre-commit hook (`scripts/strip_commit_msg_ansi.py`) also strips
+ANSI/line-number garbage if it slips through — install hooks with
+`pre-commit install --hook-type commit-msg`.
+
 ## Pull Request Process
 
 1. **Fork** the repository

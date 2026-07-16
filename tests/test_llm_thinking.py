@@ -28,7 +28,7 @@ class _Out(BaseModel):
 
 
 def test_split_think_tags() -> None:
-    raw = "<think>internal plan</think>\n{\"project_name\": \"Portail\", \"ok\": true}"
+    raw = '<think>internal plan</think>\n{"project_name": "Portail", "ok": true}'
     split = split_thinking_text(raw)
     assert "internal plan" in split.thinking
     assert "Portail" in split.answer
@@ -73,7 +73,7 @@ def test_attach_thinking_metadata_strips_content() -> None:
 
 
 def test_strip_thinking_for_json() -> None:
-    raw = "Thinking Process:\n1. foo\n\n```json\n{\"ok\": true}\n```"
+    raw = 'Thinking Process:\n1. foo\n\n```json\n{"ok": true}\n```'
     cleaned = strip_thinking_for_json(raw)
     assert cleaned.strip().startswith("{") or "ok" in cleaned
 

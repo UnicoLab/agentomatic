@@ -194,9 +194,7 @@ class AgentExample:
         # Ensure invoke payload carries agent inputs when not already set.
         if "invoke" not in meta and self.input:
             invoke = {
-                k: v
-                for k, v in self.input.items()
-                if k not in {"query", "request", "question"}
+                k: v for k, v in self.input.items() if k not in {"query", "request", "question"}
             }
             if invoke:
                 meta["invoke"] = invoke
