@@ -312,11 +312,27 @@ class PromptFitterBridge:
 
     @staticmethod
     def _split(opt_dataset: Any) -> tuple[Any, Any]:
-        """Split into (train, val); fall back to using the same set for both."""
+        """Prefer ``metadata.split`` labels; else fall back to an 80/20 cut."""
+        from agentomatic.optimize.dataset import Dataset
+
+        points = list(getattr(opt_dataset, "points", []) or [])
+        train = [
+            p
+            for p in points
+            if (getattr(p, "metadata", None) or {}).get("split", "train") == "train"
+        ]
+        val = [
+            p
+            for p in points
+            if (getattr(p, "metadata", None) or {}).get("split")
+            in ("validation", "val")
+        ]
+        if train and val:
+            return Dataset(points=train), Dataset(points=val)
         try:
-            train, val = opt_dataset.split(0.8)
-            if len(train) and len(val):
-                return train, val
+            train_ds, val_ds = opt_dataset.split(0.8)
+            if len(train_ds) and len(val_ds):
+                return train_ds, val_ds
         except Exception:  # noqa: BLE001
             pass
         return opt_dataset, opt_dataset
