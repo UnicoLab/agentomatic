@@ -3036,7 +3036,7 @@ If no matching classes are found in <code>schemas.py</code>, or if the file does
 4. You will see your exact custom Request and Response models documented with field types, descriptions, and examples!</p>
 <hr />
 <h2 id="agent-to-agent-a2a-discovery">🤝 Agent-to-Agent (A2A) Discovery<a class="headerlink" href="#agent-to-agent-a2a-discovery" title="Permanent link">&para;</a></h2>
-<p>Custom schemas are also automatically serialized into the agent's <strong>A2A Agent Card</strong> at <code>GET /api/v1/agents/{agent_name}/card</code> (and the universal <code>.well-known/agent.json</code> directory).</p>
+<p>Custom schemas are also automatically serialized into the agent's <strong>A2A Agent Card</strong> at <code>GET /api/v1/{agent_name}/card</code> (and the universal <code>.well-known/agent.json</code> directory).</p>
 <p>This allows other agents running on the platform or external client orchestrators to programmatically read the exact types, required fields, and descriptions of what your agent expects and outputs, paving the way for autonomous collaboration.</p>
 <hr />
 <h2 id="related-documentation">📚 Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>

@@ -4742,6 +4742,19 @@ whatever key your API sends:</p>
 </span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>    <span class="k">return</span> <span class="n">MyState</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">input_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span>
 </span></code></pre></div>
 </details>
+<details class="question">
+<summary>How do I read fields from <code>context</code> in <code>input_to_state</code>?</summary>
+<p>Keys under <code>AgentInvokeRequest.context</code> are <strong>flattened</strong> into the
+transform payload before <code>input_to_state</code> runs (top-level keys win on
+collision). So for <code>{"query": "...", "context": {"snapshot": {...}}}</code>
+you can write <code>input_data.get("snapshot")</code>. The nested <code>context</code> dict
+remains available as well.</p>
+</details>
+<div class="admonition important">
+<p class="admonition-title">REST path</p>
+<p>Class agents are mounted at <code>POST /api/v1/{agent_name}/invoke</code> — there
+is no <code>/agents/</code> segment in the URL.</p>
+</div>
 <hr />
 <h2 id="related-documentation">📚 Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <table>
