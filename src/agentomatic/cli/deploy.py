@@ -777,7 +777,7 @@ def generate_deploy(
     # ``deploy/generated/``, so the build context / bind mounts must point
     # back at the project root relative to the compose file.
     project_root = Path(agents_dir).resolve().parent
-    rel_context = os.path.relpath(project_root, out_path.resolve()).replace(os.sep, "/") or "."
+    out_resolved = out_path.resolve()
 
     stack = load_stack(stack_name, stacks_dir=stacks_dir)
     resolved_name = stack.name if stack is not None else (stack_name or "local")
@@ -801,17 +801,27 @@ def generate_deploy(
     dockerfile_path.write_text(dockerfile_content)
     plan.files[dockerfile_name] = dockerfile_path
 
-    # Dockerfile path expressed relative to the build context (project root).
-    dockerfile_rel = os.path.relpath(dockerfile_path.resolve(), project_root).replace(os.sep, "/")
+    # Compose ``dockerfile`` is resolved relative to ``context``. Prefer tidy
+    # relative paths when artefacts live under the project (``deploy/generated``).
+    # When ``--out`` is outside the project, a relative dockerfile would escape
+    # the build context and break ``docker compose build`` — use absolutes.
+    try:
+        dockerfile_for_compose = dockerfile_path.resolve().relative_to(project_root).as_posix()
+        build_context = os.path.relpath(project_root, out_resolved).replace(os.sep, "/") or "."
+        volume_prefix = build_context
+    except ValueError:
+        build_context = str(project_root.resolve())
+        dockerfile_for_compose = str(dockerfile_path.resolve())
+        volume_prefix = build_context
 
     agent_names = discover_agent_names(agents_dir) if include_agent_stubs else None
     compose_content = render_docker_compose(
         stack_name=resolved_name,
         agent_names=agent_names,
-        dockerfile_name=dockerfile_rel,
+        dockerfile_name=dockerfile_for_compose,
         env_file=".env",
-        build_context=rel_context,
-        volume_prefix=rel_context,
+        build_context=build_context,
+        volume_prefix=volume_prefix,
         profile=profile,
     )
     compose_path = out_path / "docker-compose.yml"
