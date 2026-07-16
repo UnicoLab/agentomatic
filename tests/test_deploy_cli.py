@@ -355,6 +355,43 @@ class TestGenerateDeploy:
         assert "COPY --chown=appuser:appuser main.py ./main.py" in dockerfile
         assert "COPY --chown=appuser:appuser agents/ ./agents/" in dockerfile
 
+    def test_out_of_tree_out_uses_absolute_compose_paths(self, tmp_path: Path) -> None:
+        """``--out`` outside the project must not escape the build context.
+
+        Relative ``dockerfile: ../../../../tmp/...`` paths break Docker builds
+        because the Dockerfile would sit outside ``context``. Absolute context
+        + absolute dockerfile keep ``docker compose build`` valid.
+        """
+        project = tmp_path / "proj"
+        (project / "agents").mkdir(parents=True)
+        (project / "main.py").write_text("app = None\n")
+        out = tmp_path / "elsewhere" / "generated"
+
+        plan = deploy_mod.generate_deploy(
+            out_dir=out,
+            stack_name="local",
+            stacks_dir=tmp_path / "no-stacks",
+            agents_dir=project / "agents",
+        )
+        compose = plan.files["docker-compose.yml"].read_text()
+        context_line = next(
+            line.strip() for line in compose.splitlines() if line.strip().startswith("context:")
+        )
+        dockerfile_line = next(
+            line.strip()
+            for line in compose.splitlines()
+            if line.strip().startswith("dockerfile:")
+        )
+        assert Path(context_line.split(":", 1)[1].strip()).resolve() == project.resolve()
+        assert (
+            Path(dockerfile_line.split(":", 1)[1].strip()).resolve()
+            == (out / "Dockerfile").resolve()
+        )
+        assert str(project.resolve()) in compose or project.resolve().as_posix() in compose
+        # Volume mounts must also resolve to the project (absolute, not ../ escapes).
+        assert "/agents:/app/agents:ro" in compose
+        assert "../" not in dockerfile_line
+
     def test_nginx_can_be_disabled(self, tmp_path: Path) -> None:
         plan = deploy_mod.generate_deploy(
             out_dir=tmp_path / "out",
