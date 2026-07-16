@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## v1.4.0 (2026-07-16)
+
+### Features
+
+- **connections**: Support arbitrary custom DB/vector clients + docs
+  ([`1ec9d0a`](https://github.com/UnicoLab/agentomatic/commit/1ec9d0a21d36590a0d27c3151966585ea36b168c))
+
+Make the connection abstraction robustly accept ANY custom Python client (async or sync SDK,
+  graph/time-series DB, in-house package) with correct lifecycle, and document the setup end-to-end.
+
+Gaps closed: - VectorConnection.close() now also handles clients exposing only `disconnect` (was
+  aclose/close only); uses inspect.isawaitable and a callable check so any client — async, sync, or
+  none — is closed gracefully - add public async helper `initialize_connections(scope, configs)`
+  that registers AND initialises connections in one call, for standalone runs (bare get_graph(),
+  scripts, langgraph dev) that have no platform lifecycle - export initialize_connections /
+  register_connections / register_vector_store_adapter from the top-level `agentomatic` package and
+  connections package
+
+Confirmed already-working (kept, with tests): arbitrary registered provider names resolve via
+  VectorConnectionConfig(provider="<name>") with a clear error when unregistered; generic duck-typed
+  adapter and preferred custom adapter; custom non-vector backends via
+  CustomConnectionConfig(factory=...) and register_connection_type are lifecycle-managed and closed
+  on shutdown.
+
+Tests (tests/test_custom_client_integration.py, +7): custom async vector client full round-trip
+  through a scope (initialize/as_store/upsert/query/delete + close on shutdown); sync-only SDK via
+  asyncio.to_thread; non-vector factory backend + env interpolation; register_connection_type
+  arbitrary backend; unknown-provider error; disconnect-only close path.
+
+Docs: new guide docs/guide/custom-connections.md (3-layer model; async, sync, and factory examples;
+  ${ENV}; scoping; lifecycle; standalone helper; testing) wired into mkdocs nav; cross-link from
+  connections.md; primer (cli/agent_guide.py) gets a custom-connections section; regenerated repo
+  CLAUDE.md; extended .agents/AGENTS.md; 1.3.0 changelog bullets in docs/changelog.md +
+  CHANGELOG.md.
+
+Part of the unreleased 1.3.0 (no version bump). Provider-agnostic: no first-party vendor connectors
+  added.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+
 ## v1.3.0 (2026-07-15)
 
 ### Features
