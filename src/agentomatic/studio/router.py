@@ -458,20 +458,22 @@ def create_studio_router(
         request: StudioRunRequest,
         thread_id: str,
     ) -> dict[str, Any]:
-        """Build the initial state dict for a studio run."""
-        return {
-            "current_query": request.query,
-            "user_id": request.user_id,
-            "thread_id": thread_id,
-            "messages": [],
-            "context": request.context,
-            "metadata": request.metadata,
-            "steps_taken": [],
-            "response": "",
-            "suggestions": [],
-            "citations": [],
-            "prompt_version": request.prompt_version,
-        }
+        """Build the initial state dict for a studio run.
+
+        Preserves the full client payload (including unknown top-level
+        extras) so class agents receive everything in ``input_to_state``.
+        """
+        from agentomatic.core.agent_invoke import build_invoke_state
+
+        payload = request.model_dump()
+        # Studio-only controls should not leak into agent input.
+        for studio_only in ("breakpoints", "checkpoint_id"):
+            payload.pop(studio_only, None)
+        return build_invoke_state(
+            payload,
+            default_thread_id=thread_id,
+            prompt_version=request.prompt_version,
+        )
 
     logger.info("🎨 Studio debug API router created")
     return router

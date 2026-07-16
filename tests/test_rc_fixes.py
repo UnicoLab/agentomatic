@@ -220,6 +220,105 @@ class TestContextFlatten:
             assert body["response"] == "Echo: hello"
             assert body.get("context", {}).get("snapshot_keys") == ["n"]
 
+    def test_sync_invoke_preserves_rich_context_and_extras(self, tmp_path: Any) -> None:
+        """Rich ``context`` + unknown top-level fields reach ``input_to_state``."""
+
+        @dataclass
+        class _RichState:
+            request: str = ""
+            seen: dict[str, Any] = field(default_factory=dict)
+            output: dict[str, Any] = field(default_factory=dict)
+
+        class _RichAgent(BaseGraphAgent[_RichState]):
+            agent_name = "rich_class"
+            agent_description = "Rich context agent"
+            agent_framework = "graph_agent"
+
+            def build_graph(self) -> Any:
+                g = self.new_graph()
+                g.add_node("answer", self.answer)
+                g.set_entry_point("answer")
+                g.set_finish_point("answer")
+                return g.compile()
+
+            def answer(self, state: _RichState) -> _RichState:
+                state.output = {
+                    "response": f"Echo: {state.request}",
+                    "context": state.seen,
+                    "agent_type": "rich-class",
+                }
+                return state
+
+            def input_to_state(self, input_data: dict[str, Any]) -> _RichState:
+                return _RichState(
+                    request=input_data.get("current_query") or input_data.get("query") or "",
+                    seen={
+                        "features": input_data.get("features"),
+                        "language": input_data.get("language"),
+                        "custom_top": input_data.get("custom_top"),
+                        "nested_ctx": (input_data.get("context") or {}).get("features"),
+                    },
+                )
+
+            def state_to_output(self, state: _RichState) -> dict[str, Any]:
+                return state.output
+
+        platform = AgentPlatform(
+            agents_dir=tmp_path / "agents",
+            title="Rich Context Test",
+            version="0.0.1",
+            enable_studio=False,
+        )
+        reg = _RichAgent().as_registered_agent()
+        platform.register_agent(
+            manifest=reg.manifest,
+            node_fn=reg.node_fn,
+            graph_fn=reg.graph_fn,
+            class_instance=reg.class_instance,
+        )
+        app = platform.build()
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/v1/rich_class/invoke",
+                json={
+                    "query": "estimate",
+                    "context": {
+                        "features": {"project_name": "Alpha", "modules": [{"name": "A"}]},
+                        "language": "fr",
+                    },
+                    "custom_top": {"trace_id": "abc-123"},
+                },
+            )
+            assert resp.status_code == 200, resp.text
+            seen = resp.json().get("context") or {}
+            assert seen["language"] == "fr"
+            assert seen["features"]["project_name"] == "Alpha"
+            assert seen["custom_top"]["trace_id"] == "abc-123"
+            assert seen["nested_ctx"]["project_name"] == "Alpha"
+
+    def test_build_invoke_state_passthrough(self) -> None:
+        """``build_invoke_state`` keeps extras at top level and context nested."""
+        from agentomatic.core.agent_invoke import build_invoke_state
+
+        state = build_invoke_state(
+            {
+                "query": "q",
+                "context": {"language": "fr", "snapshot": {"n": 1}},
+                "custom_top": 42,
+                "temperature": 0.2,
+            }
+        )
+        assert state["current_query"] == "q"
+        assert state["custom_top"] == 42
+        assert state["temperature"] == 0.2
+        assert state["context"]["language"] == "fr"
+        assert state["metadata"]["temperature"] == 0.2
+        flat = _input_from_state(state)
+        assert flat["language"] == "fr"
+        assert flat["snapshot"] == {"n": 1}
+        assert flat["custom_top"] == 42
+        assert flat["context"]["language"] == "fr"
+
 
 # ---------------------------------------------------------------------------
 # C / F helpers

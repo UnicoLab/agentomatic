@@ -8,7 +8,6 @@ handles batching, concurrency, cancellation, and progress on top of them.
 
 from __future__ import annotations
 
-import uuid
 from typing import TYPE_CHECKING, Any, Protocol
 
 from loguru import logger
@@ -44,31 +43,12 @@ def _to_jsonable(value: Any) -> Any:
 def _build_agent_state(payload: Any) -> dict[str, Any]:
     """Build a minimal agent state dict from a raw input payload.
 
-    Mirrors the standard fields produced by the synchronous invoke path so
-    that agents behave identically whether called sync or as a task.
+    Mirrors the synchronous invoke path so agents behave identically
+    whether called sync or as a task. Preserves every top-level field.
     """
-    data: dict[str, Any] = payload if isinstance(payload, dict) else {"query": payload}
-    query = data.get("query") or data.get("current_query") or ""
-    if not query:
-        for key, val in data.items():
-            if key.endswith("_query") and isinstance(val, str):
-                query = val
-                break
-    standard = {"query", "current_query", "user_id", "thread_id", "context", "metadata"}
-    extra = {k: v for k, v in data.items() if k not in standard}
-    return {
-        "current_query": query,
-        "user_id": data.get("user_id") or "default-user",
-        "thread_id": data.get("thread_id") or f"thread_{uuid.uuid4().hex[:12]}",
-        "messages": [],
-        "context": data.get("context") or {},
-        "metadata": {**(data.get("metadata") or {}), **extra},
-        "steps_taken": [],
-        "response": "",
-        "suggestions": [],
-        "citations": [],
-        "prompt_version": data.get("prompt_version", "v1"),
-    }
+    from agentomatic.core.agent_invoke import build_invoke_state
+
+    return build_invoke_state(payload)
 
 
 def make_agent_dispatcher(registry: AgentRegistry) -> Dispatcher:

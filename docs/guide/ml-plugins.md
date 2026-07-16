@@ -126,12 +126,48 @@ Once you run `agentomatic run`, Agentomatic will dynamically generate the follow
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET`  | `/api/v1/plugins` | Lists all registered plugins across the platform. |
+| `GET`  | `/api/v1/plugins` | Lists all registered plugins (name, version, `is_loaded`, `loaded_at`). |
+| `POST` | `/api/v1/plugins/reload` | Reload **all** plugins — re-calls `load_model()` on each live instance. |
 | `POST` | `/api/v1/plugins/sentiment_analyzer/predict` | Executes `predict()`. Requires `SentimentInput` body, returns `SentimentOutput`. |
+| `POST` | `/api/v1/plugins/sentiment_analyzer/reload` | Reload this plugin from the current artifact pointer. |
 | `GET`  | `/api/v1/plugins/sentiment_analyzer/health` | Returns `{"status": "ok"}` if `load_model()` has finished running. |
 | `GET`  | `/api/v1/plugins/sentiment_analyzer/model_card` | Returns the output of `model_card()`. |
 
 You can view these directly in the Swagger UI at `http://localhost:8000/docs`.
+
+### Reloading after artifact updates
+
+When a pipeline (for example `historical_update`) promotes a new artifact
+bundle and updates the `current` pointer on disk, in-memory plugin weights
+are **not** refreshed automatically. Call reload after promotion:
+
+```bash
+# All plugins
+curl -X POST http://127.0.0.1:8000/api/v1/plugins/reload
+
+# Single plugin
+curl -X POST http://127.0.0.1:8000/api/v1/plugins/similarity_effort/reload
+```
+
+Response shape (single plugin):
+
+```json
+{
+  "name": "similarity_effort",
+  "description": "...",
+  "version": "1.0.0",
+  "is_loaded": true,
+  "loaded_at": "2026-07-16T10:00:00+00:00",
+  "model_card": { "name": "similarity_effort", "status": "loaded", "...": "..." }
+}
+```
+
+Pipeline `plugin:` steps always resolve the live registry instance, so the
+next predict after reload uses the fresh weights — no process restart.
+
+Optional future flag: `AGENTOMATIC_PLUGIN_AUTORELOAD=1` (mtime watch of the
+artifact `current` pointer). Prefer the explicit REST reload for deterministic
+promotion flows.
 
 ## Framework Agnosticism
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # ---------------------------------------------------------------------------
 # Server / Discovery
@@ -104,7 +104,13 @@ class StudioAgentSchemas(BaseModel):
 
 
 class StudioRunRequest(BaseModel):
-    """Request to execute an agent run with optional debugging features."""
+    """Request to execute an agent run with optional debugging features.
+
+    Unknown top-level fields are preserved (``extra='allow'``) and passed
+    through to class-agent ``input_to_state``.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     query: str = Field(..., description="User query or input text")
     user_id: str = Field("default-user", description="User identifier")

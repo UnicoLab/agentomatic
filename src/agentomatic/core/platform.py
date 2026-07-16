@@ -1091,16 +1091,18 @@ class AgentPlatform:
 
         @plugins_router.get("", response_model=list[dict[str, Any]], tags=["Plugins"])
         async def list_plugins() -> list[dict[str, Any]]:
-            """List all registered plugins."""
-            return [
-                {
-                    "name": p.plugin_name,
-                    "description": p.plugin_description,
-                    "version": p.plugin_version,
-                    "is_loaded": p.is_loaded,
-                }
-                for p in self._plugin_registry.list_plugins().values()
-            ]
+            """List all registered plugins with load status."""
+            return self._plugin_registry.list_info()
+
+        @plugins_router.post("/reload", response_model=dict[str, Any], tags=["Plugins"])
+        async def reload_all_plugins() -> dict[str, Any]:
+            """Reload every registered plugin (re-call ``load_model``).
+
+            Use after promoting a new artifact bundle (e.g. historical_update
+            pipeline) so in-memory models pick up the ``current`` pointer.
+            Per-plugin: ``POST /api/v1/plugins/{name}/reload``.
+            """
+            return await self._plugin_registry.reload_all()
 
         for plugin_name, plugin in self._plugin_registry.list_plugins().items():
             plugin_router = create_plugin_router(

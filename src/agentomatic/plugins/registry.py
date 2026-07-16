@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -32,6 +33,65 @@ class PluginRegistry:
     def list_names(self) -> list[str]:
         """List names of all registered plugins."""
         return list(self._plugins.keys())
+
+    def list_info(self, *, include_model_card: bool = False) -> list[dict[str, Any]]:
+        """Return status snapshots for every registered plugin.
+
+        Args:
+            include_model_card: When True, embed each plugin's model card.
+
+        Returns:
+            List of :meth:`BaseMLPlugin.info` dicts.
+        """
+        return [
+            plugin.info(include_model_card=include_model_card) for plugin in self._plugins.values()
+        ]
+
+    async def reload_plugin(self, name: str) -> dict[str, Any]:
+        """Reload a single plugin by re-calling ``load_model``.
+
+        Args:
+            name: Registered plugin name.
+
+        Returns:
+            Status dict from :meth:`BaseMLPlugin.reload_model`.
+
+        Raises:
+            KeyError: If no plugin with ``name`` is registered.
+        """
+        plugin = self._plugins.get(name)
+        if plugin is None:
+            raise KeyError(name)
+        logger.info("🔄 Reloading plugin '{}'", name)
+        result = await plugin.reload_model()
+        logger.info(
+            "✅ Plugin '{}' reloaded (v{}, loaded_at={})",
+            name,
+            result.get("version"),
+            result.get("loaded_at"),
+        )
+        return result
+
+    async def reload_all(self) -> dict[str, Any]:
+        """Reload every registered plugin.
+
+        Returns:
+            Dict with ``reloaded`` count and per-plugin ``results``.
+        """
+        results: list[dict[str, Any]] = []
+        errors: list[dict[str, str]] = []
+        for name in list(self._plugins.keys()):
+            try:
+                results.append(await self.reload_plugin(name))
+            except Exception as exc:  # noqa: BLE001 - collect and continue
+                logger.error("Plugin '{}' reload failed: {}", name, exc)
+                errors.append({"name": name, "error": str(exc)})
+        return {
+            "reloaded": len(results),
+            "failed": len(errors),
+            "results": results,
+            "errors": errors,
+        }
 
     def discover(self, plugins_dir: Path, package_prefix: str = "") -> None:
         """Auto-discover plugins from a directory.
