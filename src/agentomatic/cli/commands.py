@@ -19,6 +19,8 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import json
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -508,6 +510,53 @@ def add_ingestion(name: str, ingestion_dir: str, force: bool) -> None:
 # =====================================================================
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse a boolean environment variable (``1``/``true``/``yes``/``on``)."""
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _has_project_main_app(cwd: Path | None = None) -> bool:
+    """Return True when ``main.py`` exports a module-level ASGI ``app``.
+
+    Matches the scaffold convention (``app = _platform.build()``) so
+    ``agentomatic run`` can prefer ``uvicorn main:app`` and pick up JWT,
+    metrics, custom dispatchers, and other project wiring.
+    """
+    main_py = (cwd or Path.cwd()) / "main.py"
+    if not main_py.is_file():
+        return False
+    try:
+        source = main_py.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return bool(
+        re.search(r"^app\s*=", source, re.MULTILINE)
+        or re.search(r"^app:\s*\w+", source, re.MULTILINE)
+    )
+
+
+def _sync_run_env_from_cli(
+    *,
+    studio: bool,
+    title: str | None,
+    log_level: str,
+    require_auth_globally: bool,
+) -> None:
+    """Map CLI flags onto ``AGENTOMATIC_*`` env vars for ``main:app``."""
+    os.environ["AGENTOMATIC_ENABLE_STUDIO"] = "1" if studio else "0"
+    os.environ["AGENTOMATIC_LOG_LEVEL"] = log_level
+    if title:
+        os.environ["AGENTOMATIC_TITLE"] = title
+    if require_auth_globally:
+        os.environ["AGENTOMATIC_REQUIRE_AUTH"] = "1"
+    # Honour explicit env; default metrics on (parity with scaffolded main.py).
+    if os.getenv("AGENTOMATIC_ENABLE_METRICS") is None:
+        os.environ["AGENTOMATIC_ENABLE_METRICS"] = "1"
+
+
 @cli.command()
 @click.option("--agents-dir", default="agents", help="Agents directory")
 @click.option("--plugins-dir", default="plugins", help="Plugins directory")
@@ -557,8 +606,38 @@ def run(
     ssl_keyfile: str | None,
     require_auth_globally: bool,
 ) -> None:
-    """Run the platform with Rich status output."""
+    """Run the platform with Rich status output.
+
+    When a project ``main.py`` exporting ``app`` is present, prefers
+    ``uvicorn main:app`` so Metrics, JWT, startup hooks, and other project
+    wiring load. Falls back to ``AgentPlatform.from_folder`` otherwise
+    (or when ``--with-ui`` needs the programmatic mount path).
+    """
     _print_banner()
+
+    run_kwargs: dict[str, Any] = {"host": host, "port": port, "reload": reload}
+    if ssl_certfile:
+        run_kwargs["ssl_certfile"] = ssl_certfile
+    if ssl_keyfile:
+        run_kwargs["ssl_keyfile"] = ssl_keyfile
+    if ssl_certfile or ssl_keyfile:
+        logger.info(f"🔐 HTTPS enabled — cert={ssl_certfile} key={ssl_keyfile}")
+
+    # Prefer scaffolded main:app so project wiring (metrics, JWT, hooks) loads.
+    # --with-ui needs a programmatic mount, so keep the from_folder path then.
+    if _has_project_main_app() and not with_ui:
+        import uvicorn
+
+        _sync_run_env_from_cli(
+            studio=studio,
+            title=title,
+            log_level=log_level,
+            require_auth_globally=require_auth_globally,
+        )
+        logger.info("Found main.py — starting via uvicorn main:app ...")
+        uvicorn.run("main:app", **run_kwargs)
+        return
+
     logger.info(f"Starting platform from {agents_dir} (plugins: {plugins_dir})...")
 
     from agentomatic import AgentPlatform
@@ -571,6 +650,8 @@ def run(
         "title": title or "Agentomatic Platform",
         "log_level": log_level,
         "enable_studio": studio,
+        # Map AGENTOMATIC_ENABLE_METRICS so /metrics works under `run` too.
+        "enable_metrics": _env_bool("AGENTOMATIC_ENABLE_METRICS", True),
     }
     if require_auth_globally:
         # Auto-enable the zero-trust enforcer so the flag actually has effect.
@@ -587,6 +668,11 @@ def run(
             logger.success("Debug UI will be available at /chat")
         else:
             logger.warning("Chainlit not installed. Install: pip install agentomatic[ui]")
+        if _has_project_main_app():
+            logger.warning(
+                "Using AgentPlatform.from_folder (not main:app) because --with-ui "
+                "needs a programmatic UI mount. Omit --with-ui to use main:app."
+            )
 
     platform = AgentPlatform.from_folder(agents_dir, **kwargs)
 
@@ -599,14 +685,6 @@ def run(
 
             if platform._app:
                 mount(platform._app)
-
-    run_kwargs: dict[str, Any] = {"host": host, "port": port, "reload": reload}
-    if ssl_certfile:
-        run_kwargs["ssl_certfile"] = ssl_certfile
-    if ssl_keyfile:
-        run_kwargs["ssl_keyfile"] = ssl_keyfile
-    if ssl_certfile or ssl_keyfile:
-        logger.info(f"🔐 HTTPS enabled — cert={ssl_certfile} key={ssl_keyfile}")
 
     platform.run(**run_kwargs)
 

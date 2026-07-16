@@ -14,14 +14,31 @@ if TYPE_CHECKING:
 
 
 def _input_from_state(state: dict[str, Any]) -> dict[str, Any]:
-    """Build a ``transform()`` input dict from a pipeline/flow state dict."""
+    """Build a ``transform()`` input dict from a pipeline/flow state dict.
+
+    Flattens ``context`` into the top-level payload so class-agent
+    ``input_to_state`` implementations can read fields that arrived under
+    :class:`~agentomatic.core.router_factory.AgentInvokeRequest`'s
+    ``context`` dict without digging into a nested key. Explicit top-level
+    keys always win over colliding context keys.
+    """
     query = state.get("current_query", state.get("query", ""))
-    payload = {
+    skip = {"messages", "thread_id", "context"}
+    payload: dict[str, Any] = {
         "query": query,
-        **{k: v for k, v in state.items() if k not in ("messages", "thread_id")},
+        **{k: v for k, v in state.items() if k not in skip},
     }
-    if "query" not in payload or payload["query"] == "":
+    context = state.get("context")
+    if isinstance(context, dict):
+        for key, value in context.items():
+            payload.setdefault(key, value)
+    # Keep nested context available for agents that still read it explicitly.
+    if context is not None:
+        payload["context"] = context
+    if not payload.get("query"):
         payload["query"] = query
+    if "current_query" not in payload:
+        payload["current_query"] = query
     return payload
 
 

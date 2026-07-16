@@ -5,6 +5,23 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **OpenAPI full schema**: `StudioResumeRequest` moved to module scope so
+  `/openapi.json` no longer falls back to the ~13-path stub catalog
+- **Class-agent async tasks**: default agent dispatcher uses
+  `invoke_registered_agent` (same as sync REST) so `input_to_state` runs
+- **`agentomatic run` + `main.py`**: prefers `uvicorn main:app` when present;
+  maps `AGENTOMATIC_ENABLE_METRICS` on the `from_folder` fallback path
+- **Invoke `context`**: flattened into the transform payload before
+  `input_to_state` for class agents
+- **Docs**: invoke paths documented as `/api/v1/{name}/invoke` (not
+  `/api/v1/agents/{name}/invoke`)
+
+---
+
 ## [1.3.0] — 2026-07-16
 
 Minor release: deployment ergonomics and coding-agent enablement. Builds on the

@@ -38,6 +38,21 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+class StudioResumeRequest(BaseModel):
+    """Request to resume a paused/interrupted execution.
+
+    Defined at module scope so FastAPI/Pydantic can resolve the type when
+    generating the OpenAPI schema (a nested ForwardRef inside
+    :func:`create_studio_router` previously blanked the full schema).
+    """
+
+    value: Any = Field(None, description="Human response or approval value")
+    action: str = Field("approve", description="'approve' or 'reject'")
+
+
+StudioResumeRequest.model_rebuild()
+
+
 def create_studio_router(
     registry: AgentRegistry,
     store: BaseStore | None = None,
@@ -366,12 +381,6 @@ def create_studio_router(
     # ==================================================================
     # Resume endpoint (deep_agent / HITL interrupt support)
     # ==================================================================
-
-    class StudioResumeRequest(BaseModel):
-        """Request to resume a paused/interrupted execution."""
-
-        value: Any = Field(None, description="Human response or approval value")
-        action: str = Field("approve", description="'approve' or 'reject'")
 
     @router.post(
         "/agents/{name}/threads/{thread_id}/resume",
