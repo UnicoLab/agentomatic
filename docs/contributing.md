@@ -158,6 +158,10 @@ test: add adapter resolution tests
 chore: update ruff configuration
 ```
 
+Use `/bin/cat` (not bare `cat`) in commit HEREDOCs — a `cat`→`bat` alias can
+embed ANSI/line numbers into the subject and break semantic-release. See
+`CONTRIBUTING.md` and `scripts/strip_commit_msg_ansi.py`.
+
 ---
 
 ## Making Changes

@@ -30,6 +30,16 @@ repos:
         pass_filenames: false
         files: ^src/agentomatic/
 
+  # Strip ANSI / bat line numbers before conventional-commit validation.
+  # Needed when `cat` is aliased to `bat` and HEREDOC commit messages get colored.
+  - repo: local
+    hooks:
+      - id: strip-commit-msg-ansi
+        name: strip ANSI from commit message
+        entry: python3 scripts/strip_commit_msg_ansi.py
+        language: system
+        stages: [commit-msg]
+
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.0.0
     hooks:

@@ -95,18 +95,14 @@ class AgentRunner:
                 inputs from ``metadata.invoke`` on a dataset point).
         """
         if self.use_optimize_endpoint and self._optimize_available is not False:
-            result = await self._run_optimize(
-                query, prompt_override, context, invoke=invoke
-            )
+            result = await self._run_optimize(query, prompt_override, context, invoke=invoke)
             if result.error and "404" in result.error:
                 # Optimize endpoint not available, fall back
                 self._optimize_available = False
                 logger.info(
                     f"Optimize endpoint not available for '{self.agent}', falling back to /invoke"
                 )
-                return await self._run_invoke(
-                    query, prompt_override, context, invoke=invoke
-                )
+                return await self._run_invoke(query, prompt_override, context, invoke=invoke)
             self._optimize_available = True
             return result
         return await self._run_invoke(query, prompt_override, context, invoke=invoke)
@@ -130,9 +126,7 @@ class AgentRunner:
                 "include_steps": True,
             }
             if invoke:
-                payload.update(
-                    {k: v for k, v in invoke.items() if k not in {"query", "user_id"}}
-                )
+                payload.update({k: v for k, v in invoke.items() if k not in {"query", "user_id"}})
             if prompt_override:
                 payload["system_prompt_override"] = prompt_override
             if context:
@@ -190,9 +184,7 @@ class AgentRunner:
                 "user_id": "optimizer",
             }
             if invoke:
-                payload.update(
-                    {k: v for k, v in invoke.items() if k not in {"query", "user_id"}}
-                )
+                payload.update({k: v for k, v in invoke.items() if k not in {"query", "user_id"}})
             ctx: dict[str, Any] = {}
             if isinstance(payload.get("context"), dict):
                 ctx.update(payload.pop("context"))
