@@ -2700,6 +2700,12 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Thinking / reasoning LLMs</strong>: <code>message_text</code>, <code>message_thinking</code>,
+  <code>strip_thinking_for_json</code>, <code>astream_with_thinking</code>, and
+  <code>invoke_with_retry(strip_thinking=…)</code> normalize Qwen3 / tagged <code>&lt;think&gt;</code> /
+  <code>reasoning_content</code> responses. Stack <code>extra:</code> forwards <code>enable_thinking</code>,
+  <code>chat_template_kwargs</code>, <code>response_format</code>, and <code>extra_body</code> for oMLX /
+  OpenAI-compatible servers. See <a href="../guide/llm-providers/">LLM Providers</a>.</li>
 <li><strong>Plugin reload API</strong>: <code>POST /api/v1/plugins/reload</code> (all) and
   <code>POST /api/v1/plugins/{name}/reload</code> re-call <code>load_model()</code> on the live
   registry instance and return status + <code>loaded_at</code> + <code>model_card</code>. List
