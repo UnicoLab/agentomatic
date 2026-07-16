@@ -41,7 +41,15 @@ class LLMStackEntry(BaseModel):
     max_tokens: int = Field(4096, ge=1)
     api_key: str = Field("", description="API key (supports ${ENV_VAR} interpolation)")
     base_url: str = Field("", description="Custom base URL for the provider")
-    extra: dict[str, Any] = Field(default_factory=dict, description="Provider-specific params")
+    extra: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Provider-specific params forwarded to the LLM factory. For OpenAI-"
+            "compatible servers (oMLX / vLLM) common keys include: "
+            "enable_thinking, chat_template_kwargs, response_format, "
+            "extra_body, model_kwargs, default_headers."
+        ),
+    )
 
 
 class AuthStackConfig(BaseModel):
@@ -251,6 +259,9 @@ class StackManager:
     def get_llm_config(self, name: str = "default") -> LLMStackEntry:
         """Return the named LLM config from the active stack.
 
+        String fields are env-interpolated (``${VAR}``) so callers always
+        receive concrete model / base_url / api_key values.
+
         Args:
             name: Profile name (e.g. ``"default"``, ``"fast"``, ``"judge"``).
 
@@ -268,7 +279,17 @@ class StackManager:
                 f"LLM profile '{name}' not found in stack "
                 f"'{self._active_stack.name}'. Available: {available}"
             )
-        return self._active_stack.llm[name]
+        entry = self._active_stack.llm[name]
+        data = entry.model_dump()
+        for key, value in list(data.items()):
+            if isinstance(value, str):
+                data[key] = self.interpolate_env(value)
+            elif isinstance(value, dict):
+                data[key] = {
+                    k: self.interpolate_env(v) if isinstance(v, str) else v
+                    for k, v in value.items()
+                }
+        return LLMStackEntry.model_validate(data)
 
     def get_settings(self) -> PlatformSettings:
         """Construct a :class:`PlatformSettings` from the active stack.

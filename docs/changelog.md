@@ -9,6 +9,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Thinking / reasoning LLMs**: `message_text`, `message_thinking`,
+  `strip_thinking_for_json`, `astream_with_thinking`, and
+  `invoke_with_retry(strip_thinking=…)` normalize Qwen3 / tagged `<think>` /
+  `reasoning_content` responses. Stack `extra:` forwards `enable_thinking`,
+  `chat_template_kwargs`, `response_format`, and `extra_body` for oMLX /
+  OpenAI-compatible servers. See [LLM Providers](guide/llm-providers.md).
 - **Plugin reload API**: `POST /api/v1/plugins/reload` (all) and
   `POST /api/v1/plugins/{name}/reload` re-call `load_model()` on the live
   registry instance and return status + `loaded_at` + `model_card`. List
