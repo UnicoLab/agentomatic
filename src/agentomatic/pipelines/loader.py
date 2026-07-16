@@ -587,12 +587,17 @@ class PipelineLoader:
         Scans for:
         - ``pipeline.yaml`` or ``pipeline.yml`` files directly in
           *directory*.
-        - ``*.yaml`` / ``*.yml`` files in a ``pipelines/`` subdirectory.
+        - All ``*.yaml`` / ``*.yml`` files directly in *directory* when
+          *directory* is itself named ``pipelines`` (flat project layout:
+          ``pipelines/estimation.yaml``).
+        - ``*.yaml`` / ``*.yml`` files in a ``pipelines/`` subdirectory
+          (when *directory* is the project root).
         - ``pipeline.yaml`` inside each agent folder
           (``agents/*/pipeline.yaml``).
 
         Args:
-            directory: Root directory to scan.
+            directory: Root directory to scan (project root **or** the
+                ``pipelines/`` folder itself).
 
         Returns:
             A mapping of ``pipeline_name → PipelineConfig`` for every
@@ -625,18 +630,29 @@ class PipelineLoader:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skipping {} – failed to load: {}", path, exc)
 
+        def _load_yaml_files(folder: Path) -> None:
+            """Load every YAML file in *folder* (non-recursive)."""
+            if not folder.is_dir():
+                return
+            for child in sorted(folder.iterdir()):
+                if child.is_file() and child.suffix in _YAML_SUFFIXES:
+                    _try_load(child)
+
         # 1. pipeline.yaml / pipeline.yml in the root directory
         for suffix in ("yaml", "yml"):
             candidate = directory / f"pipeline.{suffix}"
             if candidate.is_file():
                 _try_load(candidate)
 
-        # 2. All YAML files under a `pipelines/` subdirectory
+        # 1b. Flat layout: callers often pass the pipelines/ folder itself
+        # (AgentPlatform.build). Load all YAML files in that folder.
+        if directory.name == "pipelines":
+            _load_yaml_files(directory)
+
+        # 2. All YAML files under a `pipelines/` subdirectory (project root)
         pipelines_dir = directory / "pipelines"
         if pipelines_dir.is_dir():
-            for child in sorted(pipelines_dir.iterdir()):
-                if child.is_file() and child.suffix in _YAML_SUFFIXES:
-                    _try_load(child)
+            _load_yaml_files(pipelines_dir)
 
         # 3. pipeline.yaml inside each `agents/*/` folder
         agents_dir = directory / "agents"
