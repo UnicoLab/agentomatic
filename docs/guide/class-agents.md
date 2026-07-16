@@ -1303,6 +1303,17 @@ agents/my_agent/
         return MyState(query=input_data.get("query", ""))
     ```
 
+??? question "How do I read fields from `context` in `input_to_state`?"
+    Keys under `AgentInvokeRequest.context` are **flattened** into the
+    transform payload before `input_to_state` runs (top-level keys win on
+    collision). So for `{"query": "...", "context": {"snapshot": {...}}}`
+    you can write `input_data.get("snapshot")`. The nested `context` dict
+    remains available as well.
+
+!!! important "REST path"
+    Class agents are mounted at `POST /api/v1/{agent_name}/invoke` — there
+    is no `/agents/` segment in the URL.
+
 ---
 
 ## 📚 Related Documentation

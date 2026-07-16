@@ -72,9 +72,18 @@ def _build_agent_state(payload: Any) -> dict[str, Any]:
 
 
 def make_agent_dispatcher(registry: AgentRegistry) -> Dispatcher:
-    """Return a dispatcher that runs a registered agent as a task."""
+    """Return a dispatcher that runs a registered agent as a task.
+
+    Uses :func:`~agentomatic.core.agent_invoke.invoke_registered_agent` so
+    class agents (``BaseGraphAgent``) go through ``atransform`` /
+    ``input_to_state`` — the same path as synchronous REST ``/invoke``.
+    Preferring ``graph_fn().ainvoke(dict)`` would skip that conversion and
+    break dataclass-typed states.
+    """
 
     async def run(target: str, payload: Any, ctx: TaskContext) -> Any:
+        from agentomatic.core.agent_invoke import invoke_registered_agent
+
         agent = registry.get(target)
         if agent is None:
             raise TargetNotFoundError(
@@ -89,13 +98,7 @@ def make_agent_dispatcher(registry: AgentRegistry) -> Dispatcher:
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"before_node hook error: {exc}")
 
-        if agent.graph_fn:
-            graph = agent.graph_fn()
-            result = await graph.ainvoke(state)
-        elif agent.node_fn:
-            result = await agent.node_fn(state)
-        else:
-            raise RuntimeError(f"Agent '{target}' has no callable (node_fn/graph_fn)")
+        result = await invoke_registered_agent(agent, state)
 
         for hook in registry.after_node_hooks:
             try:

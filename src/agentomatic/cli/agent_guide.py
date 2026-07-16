@@ -57,6 +57,7 @@ agentomatic new my_platform && cd my_platform
 agentomatic init hello --template basic     # add an agent under agents/
 
 # 2. Develop: run everything locally (Studio at /studio/ui, docs at /docs)
+#    Prefers uvicorn main:app when main.py is present (same as deploy).
 agentomatic run                              # http://127.0.0.1:8000
 
 # 3. Optimize (prompt tuning / Keras-style fit) against a dataset
@@ -74,7 +75,7 @@ agentomatic deploy --profile minimal --stack remote     # production-lean
 | `agentomatic new NAME` | Scaffold a full project (alias for `init --project`) |
 | `agentomatic init NAME [--project] [--template basic\\|full\\|class\\|rag\\|chatbot\\|coordinator\\|extraction\\|deepagent\\|legacy_dict\\|ingestion]` | Scaffold an agent (or project) |
 | `agentomatic add connection\\|ingestion NAME` | Add components to an existing agent |
-| `agentomatic run [--studio/--no-studio] [--with-ui] [--port 8000] [--ssl-certfile ...] [--require-auth-globally]` | Start the platform |
+| `agentomatic run [--studio/--no-studio] [--with-ui] [--port 8000] [--ssl-certfile ...] [--require-auth-globally]` | Start the platform (prefers `main:app` when present) |
 | `agentomatic deploy [--profile full\\|minimal] [--minimal] [--distroless] [--stack NAME]` | Generate Dockerfile/compose/.env |
 | `agentomatic demo` | Run a self-contained demo platform + Studio |
 | `agentomatic list` / `inspect NAME` / `doctor` | Discover, inspect, diagnose |
@@ -132,9 +133,12 @@ class HelloAgent(BaseGraphAgent[HelloState]):
 
 ## Deployed container == `agentomatic run`
 
-`agentomatic deploy` renders a Dockerfile that runs `uvicorn main:app`. The
-scaffolded `main.py` builds a fully-featured, **env-driven** `app` so the container
-serves the exact same surface as `agentomatic run` — nothing is silently dropped.
+`agentomatic deploy` renders a Dockerfile that runs `uvicorn main:app`. Locally,
+`agentomatic run` also prefers `main:app` when a project `main.py` is present
+(so Metrics/JWT/startup hooks match deploy). The scaffolded `main.py` builds a
+fully-featured, **env-driven** `app` — nothing is silently dropped.
+
+Agents mount at **`/api/v1/{{agent_name}}/invoke`** (no `/agents/` segment).
 
 ### Deploy profiles
 

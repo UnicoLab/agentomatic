@@ -132,6 +132,15 @@ agentomatic init helper_bot --template full --force
 
 Start the platform microservice. Runs a local `uvicorn` web server hosting the FastAPI routing stack with auto-discovered agents.
 
+**Project entrypoint:** when a scaffolded `main.py` exporting `app` is present
+in the current directory, `agentomatic run` prefers `uvicorn main:app` so
+Metrics, JWT, startup hooks, and other project wiring load — the same path as
+`agentomatic deploy`. Without `main.py` (or when `--with-ui` needs a
+programmatic mount), it falls back to `AgentPlatform.from_folder(...)`.
+
+Prometheus metrics honour `AGENTOMATIC_ENABLE_METRICS` (default on) for both
+paths.
+
 ```text
 Usage: agentomatic run [OPTIONS]
 

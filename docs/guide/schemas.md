@@ -247,7 +247,7 @@ To view and interact with the custom schemas:
 
 ## 🤝 Agent-to-Agent (A2A) Discovery
 
-Custom schemas are also automatically serialized into the agent's **A2A Agent Card** at `GET /api/v1/agents/{agent_name}/card` (and the universal `.well-known/agent.json` directory).
+Custom schemas are also automatically serialized into the agent's **A2A Agent Card** at `GET /api/v1/{agent_name}/card` (and the universal `.well-known/agent.json` directory).
 
 This allows other agents running on the platform or external client orchestrators to programmatically read the exact types, required fields, and descriptions of what your agent expects and outputs, paving the way for autonomous collaboration.
 

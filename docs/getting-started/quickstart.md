@@ -562,13 +562,17 @@ When Agentomatic receives a REST request and invokes your agent, it maps the req
 | `query` | `current_query` | The user's input text |
 | `user_id` | `user_id` | User identifier (default: `"default-user"`) |
 | `thread_id` | `thread_id` | Conversation thread (for multi-turn chat) |
-| `context` | `context` | Arbitrary context dict |
+| `context` | `context` **and** flattened top-level keys | Arbitrary context dict; keys are also merged into the transform payload for class agents |
 | `metadata` | `metadata` | Request metadata dict |
 | `prompt_version` | `prompt_version` | Active prompt version (default: `"v1"`) |
 
 !!! tip "Class-based agents vs functional agents"
-    - **Class-based agents**: You control mapping via `input_to_state()` — use `input_data.get("current_query")` or any key you prefer
-    - **Functional agents** (`node_fn`): The state dict is passed directly with keys above — use `state.get("current_query")`
+    - **Class-based agents**: You control mapping via `input_to_state()` — use `input_data.get("current_query")` or any key you prefer. Fields sent under `context` are **flattened** into that dict (top-level keys win on collision), so `input_data.get("snapshot")` works for `{"query": "...", "context": {"snapshot": {...}}}`.
+    - **Functional agents** (`node_fn`): The state dict is passed directly with keys above — use `state.get("current_query")` / `state.get("context")`.
+
+!!! important "Invoke URL shape"
+    Agents mount at **`/api/v1/{agent_name}/invoke`** — there is no `/agents/` segment.
+    Example: `POST /api/v1/my_chatbot/invoke` (not `/api/v1/agents/my_chatbot/invoke`).
 
 ---
 
