@@ -1148,6 +1148,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Generated API Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reloading-after-artifact-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reloading after artifact updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2299,6 +2316,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Generated API Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reloading-after-artifact-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reloading after artifact updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2504,12 +2538,22 @@
 <tr>
 <td><code>GET</code></td>
 <td><code>/api/v1/plugins</code></td>
-<td>Lists all registered plugins across the platform.</td>
+<td>Lists all registered plugins (name, version, <code>is_loaded</code>, <code>loaded_at</code>).</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/plugins/reload</code></td>
+<td>Reload <strong>all</strong> plugins — re-calls <code>load_model()</code> on each live instance.</td>
 </tr>
 <tr>
 <td><code>POST</code></td>
 <td><code>/api/v1/plugins/sentiment_analyzer/predict</code></td>
 <td>Executes <code>predict()</code>. Requires <code>SentimentInput</code> body, returns <code>SentimentOutput</code>.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/plugins/sentiment_analyzer/reload</code></td>
+<td>Reload this plugin from the current artifact pointer.</td>
 </tr>
 <tr>
 <td><code>GET</code></td>
@@ -2524,6 +2568,31 @@
 </tbody>
 </table>
 <p>You can view these directly in the Swagger UI at <code>http://localhost:8000/docs</code>.</p>
+<h3 id="reloading-after-artifact-updates">Reloading after artifact updates<a class="headerlink" href="#reloading-after-artifact-updates" title="Permanent link">&para;</a></h3>
+<p>When a pipeline (for example <code>historical_update</code>) promotes a new artifact
+bundle and updates the <code>current</code> pointer on disk, in-memory plugin weights
+are <strong>not</strong> refreshed automatically. Call reload after promotion:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># All plugins</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/api/v1/plugins/reload
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Single plugin</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/api/v1/plugins/similarity_effort/reload
+</span></code></pre></div>
+<p>Response shape (single plugin):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;similarity_effort&quot;</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">&quot;is_loaded&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">&quot;loaded_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-16T10:00:00+00:00&quot;</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">&quot;model_card&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;similarity_effort&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;loaded&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Pipeline <code>plugin:</code> steps always resolve the live registry instance, so the
+next predict after reload uses the fresh weights — no process restart.</p>
+<p>Optional future flag: <code>AGENTOMATIC_PLUGIN_AUTORELOAD=1</code> (mtime watch of the
+artifact <code>current</code> pointer). Prefer the explicit REST reload for deterministic
+promotion flows.</p>
 <h2 id="framework-agnosticism">Framework Agnosticism<a class="headerlink" href="#framework-agnosticism" title="Permanent link">&para;</a></h2>
 <p>Agentomatic has absolutely zero opinion on what you put inside <code>load_model()</code> and <code>predict()</code>. You can run blocking code like <code>sklearn.predict()</code> or async code like HTTP calls to external APIs. Agentomatic uses FastAPI, which automatically manages thread-pooling for synchronous code.</p>
 
