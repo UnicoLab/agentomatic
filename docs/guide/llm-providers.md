@@ -200,6 +200,11 @@ response = await invoke_with_retry(
 
 The delay doubles after each attempt: `delay × 2^attempt`.
 
+By default `invoke_with_retry` **strips thinking / reasoning** from
+`.content` (Qwen3, DeepSeek-R1, tagged `<think>` blocks, etc.) and stores it
+on `additional_kwargs["thinking"]` for debugging. Pass
+`strip_thinking=False` to keep the raw payload.
+
 | Attempt | Wait before retry |
 |---------|-------------------|
 | 0       | 1.0 s             |
@@ -210,6 +215,58 @@ The delay doubles after each attempt: `delay × 2^attempt`.
     **Retry** re-attempts the *same* provider (good for transient 429 / 503
     errors). **Failover** switches to a *different* provider (good for
     persistent outages). Combine both for maximum resilience.
+
+---
+
+## Thinking / reasoning models
+
+Modern instruct models (Qwen3.5, Gemma reasoning builds, oMLX servers) may
+emit chain-of-thought separately from the final answer. Agentomatic normalizes
+this so agents never dump thinking into user-facing text or JSON parsers by
+default.
+
+| Helper | Purpose |
+|--------|---------|
+| `message_text(result)` | Final answer only |
+| `message_thinking(result)` | Reasoning trail (may be empty) |
+| `llm_result_metadata(result)` | Compact debug dict (`has_thinking`, …) |
+| `strip_thinking_for_json(text)` | Answer text safe for `json.loads` |
+| `astream_with_thinking(llm, msgs)` | Yields `{type: thinking\|answer\|done}` |
+| `invoke_with_retry(..., strip_thinking=True)` | Normalize after each invoke |
+
+```python
+from agentomatic.providers import message_text, message_thinking, invoke_with_retry
+
+result = await invoke_with_retry(llm, messages)
+answer = message_text(result)                 # safe for FR UX / JSON
+thinking = message_thinking(result)           # optional debug
+# or result.additional_kwargs.get("thinking")
+```
+
+### Stack `extra:` knobs (OpenAI-compatible / oMLX)
+
+Vendor-specific fields on a stack LLM profile are forwarded via
+`extra_body` / `model_kwargs` without breaking other providers:
+
+```yaml
+llm:
+  structured:
+    provider: openai
+    model: Qwen3.5-9B-MLX-4bit
+    base_url: ${AI_LLM_BASE_URL}
+    api_key: ${AI_LLM_API_KEY}
+    extra:
+      enable_thinking: false          # recommended for JSON agents
+      chat_template_kwargs:
+        enable_thinking: false
+      # response_format: { type: json_object }
+      # default_headers: { X-Custom: "…" }
+      # extra_body: { … }             # any other server fields
+```
+
+Set `enable_thinking: true` only when you intentionally want reasoning in
+Studio / debug metadata. Structured-output fallback still strips thinking
+before Pydantic validation.
 
 ---
 
