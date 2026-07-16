@@ -1327,6 +1327,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guide/custom-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom DB & Vector Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guide/optimization/" class="md-nav__link">
         
   
@@ -2619,6 +2647,16 @@ breaking API changes.</p>
   overwrite without <code>--force</code>). Content comes from a single source of truth
   (<code>agentomatic.cli.agent_guide</code>) so the CLI, docs, and in-repo agent knowledge
   files stay in sync</li>
+<li><strong>Custom DB / vector-store connections for any Python client</strong>: the connection
+  abstraction robustly accepts arbitrary custom clients (async or sync SDKs,
+  graph/time-series DBs, in-house packages) with correct lifecycle. Provider
+  names are no longer limited to the built-ins — any name registered via
+  <code>register_vector_provider</code> resolves (unknown names raise a clear, actionable
+  error); <code>VectorConnection.close()</code> now also handles clients exposing only
+  <code>disconnect</code>; and a new <code>initialize_connections(scope, configs)</code> helper
+  registers <strong>and</strong> initialises connections in one call for standalone runs
+  (<code>get_graph()</code>, scripts) that have no platform lifecycle. New dedicated guide:
+  <a href="../guide/custom-connections/">Custom DB &amp; Vector Store Connections</a></li>
 </ul>
 <hr />
 <h2 id="121-2026-07-16">[1.2.1] — 2026-07-16<a class="headerlink" href="#121-2026-07-16" title="Permanent link">&para;</a></h2>

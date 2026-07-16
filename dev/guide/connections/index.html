@@ -18,7 +18,7 @@
         <link rel="prev" href="../ingestion/">
       
       
-        <link rel="next" href="../optimization/">
+        <link rel="next" href="../custom-connections/">
       
       
         
@@ -1545,6 +1545,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../custom-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom DB & Vector Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../optimization/" class="md-nav__link">
         
   
@@ -2538,6 +2566,13 @@ once, per agent, and access them at runtime with almost no boilerplate.</p>
 <li>Per-request access via <code>request.state.connections</code> (<a href="#accessing-connections-from-middleware">middleware</a>)</li>
 <li>Health checks surfaced through the <a href="../control-plane/">control plane</a></li>
 </ul>
+<div class="admonition tip">
+<p class="admonition-title">Wiring a custom / specialised client?</p>
+<p>To integrate <strong>any</strong> custom Python client (a vendor SDK, an in-house
+wrapper, a graph/time-series DB, a sync-only SDK) with correct lifecycle,
+see the dedicated guide:
+<a href="../custom-connections/">Custom DB &amp; Vector Store Connections</a>.</p>
+</div>
 <h2 id="connection-kinds-and-purposes">Connection kinds and purposes<a class="headerlink" href="#connection-kinds-and-purposes" title="Permanent link">&para;</a></h2>
 <p>A connection has a <strong>kind</strong> (how it connects) and a <strong>purpose</strong> (what it is
 used for). The two are orthogonal — the same Postgres database can serve
@@ -2885,13 +2920,13 @@ through the control plane at <code>GET /api/v1/control/connections</code>. See t
         
         
           
-          <a href="../optimization/" class="md-footer__link md-footer__link--next" aria-label="Next: Prompt Optimization">
+          <a href="../custom-connections/" class="md-footer__link md-footer__link--next" aria-label="Next: Custom DB &amp; Vector Connections">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Prompt Optimization
+                Custom DB & Vector Connections
               </div>
             </div>
             <div class="md-footer__button md-icon">
