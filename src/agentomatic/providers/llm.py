@@ -452,7 +452,8 @@ def get_llm_for_agent(
     """Get an LLM instance for a specific agent and role.
 
     Resolution order:
-      1. Agent's ``llm_config`` maps *role* → stack profile name.
+      1. Agent's ``llm_config`` / ``AgentLLMConfig.roles`` maps *role* → stack
+         profile name (discovered under ``agents/<name>/llm.py`` when possible).
       2. Stack's ``llm[profile_name]`` provides provider / model / credentials.
       3. Falls back to the stack's ``"default"`` profile.
       4. Falls back to the global :func:`get_llm` singleton.
@@ -468,15 +469,16 @@ def get_llm_for_agent(
     if stack_manager is None:
         return get_llm()
 
+    profile = _resolve_agent_llm_profile(agent_name, role)
     try:
-        entry = stack_manager.get_llm_config(role)
+        entry = stack_manager.get_llm_config(profile)
     except (ValueError, KeyError):
         try:
             entry = stack_manager.get_llm_config("default")
         except (ValueError, KeyError):
             logger.debug(
-                f"No stack LLM config for agent={agent_name} role={role}, "
-                "falling back to global LLM"
+                f"No stack LLM config for agent={agent_name} role={role} "
+                f"profile={profile}, falling back to global LLM"
             )
             return get_llm()
 
@@ -491,6 +493,53 @@ def get_llm_for_agent(
         base_url=entry.base_url,
         **entry.extra,
     )
+
+
+def _resolve_agent_llm_profile(agent_name: str, role: str) -> str:
+    """Map an agent logical *role* to a stack LLM profile name.
+
+    Looks for ``agents/<agent_name>/llm.py`` exposing ``llm_config.roles`` or
+    an ``AgentLLMConfig`` instance. Falls back to *role* itself when no
+    mapping is found (so ``role="structured"`` still works as a direct
+    profile name).
+    """
+    import importlib
+    import sys
+    from pathlib import Path
+
+    candidates = [
+        f"agents.{agent_name}.llm",
+        f"{agent_name}.llm",
+    ]
+    # Also try loading from a local agents/ folder on sys.path / cwd.
+    agents_dir = Path.cwd() / "agents" / agent_name / "llm.py"
+    for mod_name in candidates:
+        try:
+            mod = importlib.import_module(mod_name)
+        except Exception:  # noqa: BLE001
+            continue
+        cfg = getattr(mod, "llm_config", None) or getattr(mod, "AgentLLMConfig", None)
+        if cfg is None:
+            continue
+        roles = getattr(cfg, "roles", None)
+        if callable(cfg) and roles is None:
+            try:
+                cfg = cfg()
+                roles = getattr(cfg, "roles", None)
+            except Exception:  # noqa: BLE001
+                roles = None
+        if isinstance(roles, dict) and role in roles:
+            return str(roles[role])
+        if isinstance(roles, dict) and "default" in roles and role == "default":
+            return str(roles["default"])
+
+    if agents_dir.is_file() and str(Path.cwd()) not in sys.path:
+        # Best-effort: path exists but module not importable yet.
+        logger.debug(
+            "Agent llm.py present at {} but not importable as a module",
+            agents_dir,
+        )
+    return role
 
 
 async def invoke_with_retry(

@@ -15,6 +15,19 @@ from typing import Any
 from loguru import logger
 
 
+def _response_text(data: dict[str, Any]) -> str:
+    """Prefer structured ``output`` dict, else string ``response``."""
+    import json
+
+    output = data.get("output")
+    if isinstance(output, dict) and output:
+        return json.dumps(output, ensure_ascii=False)
+    response = data.get("response", "")
+    if not isinstance(response, str):
+        return json.dumps(response, ensure_ascii=False)
+    return response or str(data)
+
+
 @dataclass
 class RunResult:
     """Result of running a single data point through an agent."""
@@ -67,30 +80,43 @@ class AgentRunner:
         query: str,
         prompt_override: str | None = None,
         context: list[str] | None = None,
+        invoke: dict[str, Any] | None = None,
     ) -> RunResult:
         """Run a single query through the agent.
 
         Tries ``/optimize/invoke`` first for full context, falls back
         to ``/invoke`` if not available.
+
+        Args:
+            query: User query string.
+            prompt_override: Optional system prompt override.
+            context: Optional retrieval / document context list.
+            invoke: Extra top-level invoke fields (e.g. agent-specific
+                inputs from ``metadata.invoke`` on a dataset point).
         """
         if self.use_optimize_endpoint and self._optimize_available is not False:
-            result = await self._run_optimize(query, prompt_override, context)
+            result = await self._run_optimize(
+                query, prompt_override, context, invoke=invoke
+            )
             if result.error and "404" in result.error:
                 # Optimize endpoint not available, fall back
                 self._optimize_available = False
                 logger.info(
                     f"Optimize endpoint not available for '{self.agent}', falling back to /invoke"
                 )
-                return await self._run_invoke(query, prompt_override, context)
+                return await self._run_invoke(
+                    query, prompt_override, context, invoke=invoke
+                )
             self._optimize_available = True
             return result
-        return await self._run_invoke(query, prompt_override, context)
+        return await self._run_invoke(query, prompt_override, context, invoke=invoke)
 
     async def _run_optimize(
         self,
         query: str,
         prompt_override: str | None = None,
         context: list[str] | None = None,
+        invoke: dict[str, Any] | None = None,
     ) -> RunResult:
         """Run via /optimize/invoke for full pipeline context."""
         import httpx
@@ -103,10 +129,20 @@ class AgentRunner:
                 "include_retrieval_context": True,
                 "include_steps": True,
             }
+            if invoke:
+                payload.update(
+                    {k: v for k, v in invoke.items() if k not in {"query", "user_id"}}
+                )
             if prompt_override:
                 payload["system_prompt_override"] = prompt_override
             if context:
-                payload["context"] = {"documents": context}
+                ctx = payload.get("context")
+                if not isinstance(ctx, dict):
+                    ctx = {}
+                docs = list(ctx.get("documents") or [])
+                docs.extend(context)
+                ctx["documents"] = docs
+                payload["context"] = ctx
 
             async with httpx.AsyncClient(base_url=self.api_base, timeout=self.timeout) as client:
                 resp = await client.post(
@@ -119,7 +155,7 @@ class AgentRunner:
             duration = (time.perf_counter() - t0) * 1000
             return RunResult(
                 query=query,
-                response=data.get("response", str(data)),
+                response=_response_text(data),
                 retrieval_context=data.get("retrieval_context", []),
                 tool_calls=data.get("tool_calls", []),
                 steps_taken=data.get("steps_taken", []),
@@ -142,6 +178,7 @@ class AgentRunner:
         query: str,
         prompt_override: str | None = None,
         context: list[str] | None = None,
+        invoke: dict[str, Any] | None = None,
     ) -> RunResult:
         """Run via standard /invoke endpoint."""
         import httpx
@@ -152,13 +189,22 @@ class AgentRunner:
                 "query": query,
                 "user_id": "optimizer",
             }
+            if invoke:
+                payload.update(
+                    {k: v for k, v in invoke.items() if k not in {"query", "user_id"}}
+                )
+            ctx: dict[str, Any] = {}
+            if isinstance(payload.get("context"), dict):
+                ctx.update(payload.pop("context"))
             if prompt_override:
-                payload["context"] = {
-                    "system_prompt_override": prompt_override,
-                }
+                ctx["system_prompt_override"] = prompt_override
             if context:
-                payload.setdefault("context", {})
-                payload["context"]["documents"] = context
+                docs = list(ctx.get("documents") or [])
+                docs.extend(context)
+                if docs:
+                    ctx["documents"] = docs
+            if ctx:
+                payload["context"] = ctx
 
             async with httpx.AsyncClient(base_url=self.api_base, timeout=self.timeout) as client:
                 resp = await client.post(
@@ -171,7 +217,7 @@ class AgentRunner:
             duration = (time.perf_counter() - t0) * 1000
             return RunResult(
                 query=query,
-                response=data.get("response", str(data)),
+                response=_response_text(data),
                 # Try to extract context from standard response
                 retrieval_context=data.get("metadata", {}).get("retrieval_context", []),
                 citations=data.get("citations", []),
@@ -198,7 +244,8 @@ class AgentRunner:
         """Run a list of data points through the agent.
 
         Args:
-            points: List of dicts with 'query', optionally 'expected_answer', 'context'.
+            points: List of dicts with 'query', optionally 'expected_answer',
+                'context', and ``metadata.invoke`` for agent-specific fields.
             prompt_override: Optional system prompt to inject.
             concurrency: Max concurrent requests.
 
@@ -208,23 +255,25 @@ class AgentRunner:
         import asyncio
 
         semaphore = asyncio.Semaphore(concurrency)
-        results: list[RunResult] = []
 
         async def _run_one(point: dict[str, Any]) -> RunResult:
             async with semaphore:
+                meta = point.get("metadata") or {}
+                invoke = meta.get("invoke") if isinstance(meta, dict) else None
+                if not isinstance(invoke, dict):
+                    invoke = {}
                 result = await self.run_single(
                     query=point["query"],
                     prompt_override=prompt_override,
                     context=point.get("context"),
+                    invoke=invoke,
                 )
                 result.expected = point.get("expected_answer")
                 if not result.context:
                     result.context = point.get("context", [])
                 return result
 
-        tasks = [_run_one(p) for p in points]
-        results = await asyncio.gather(*tasks)
-        return list(results)
+        return list(await asyncio.gather(*[_run_one(p) for p in points]))
 
     async def submit_feedback(
         self,

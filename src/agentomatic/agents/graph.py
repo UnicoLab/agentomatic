@@ -25,6 +25,25 @@ from .types import StateT, TraceEvent
 END = "__END__"
 
 
+def _run_coro_sync(coro: Any) -> Any:
+    """Run *coro* to completion from a sync caller.
+
+    Used by :meth:`AgentGraph.invoke` so async node handlers work under the
+    sync ``transform`` / ``evaluate`` / ``fit`` path. Raises if an event loop
+    is already running (callers should use :meth:`AgentGraph.ainvoke` then).
+    """
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    raise RuntimeError(
+        "Cannot await async graph nodes from sync invoke() while an event "
+        "loop is running — use ainvoke() / atransform() instead"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Graph Node
 # ---------------------------------------------------------------------------
@@ -184,7 +203,12 @@ class AgentGraph(Generic[StateT]):
 
             try:
                 logger.debug(f"🔄 Executing node: {current_node_name}")
-                result = node(state)
+                if inspect.iscoroutinefunction(node.handler):
+                    result = _run_coro_sync(node.handler(state))
+                else:
+                    result = node(state)
+                    if inspect.iscoroutine(result):
+                        result = _run_coro_sync(result)
                 if result is not None:
                     state = result
                 trace.finish(status="success")
@@ -208,6 +232,8 @@ class AgentGraph(Generic[StateT]):
             else:
                 # Conditional edge — call the function
                 next_name = edge(state)
+                if inspect.iscoroutine(next_name):
+                    next_name = _run_coro_sync(next_name)
                 if next_name == END:
                     break
                 current_node_name = next_name

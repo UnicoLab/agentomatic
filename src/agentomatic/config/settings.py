@@ -144,7 +144,9 @@ def load_environment(env_file: str | Path | None = None) -> None:
     try:
         from dotenv import load_dotenv
 
-        loaded = load_dotenv(target, override=True)
+        # Do not override vars already set by the process environment (Docker
+        # Compose, CI, shell exports). Host ``.env`` fills gaps only.
+        loaded = load_dotenv(target, override=False)
         if loaded:
             logger.debug(f"Loaded environment from {target}")
         else:

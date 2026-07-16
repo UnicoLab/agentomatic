@@ -244,8 +244,9 @@ class StackManager:
 
         stack = StackConfig.model_validate(data)
 
-        # Apply dotenv and inline env vars
-        self.apply_dotenv(stack.env_file)
+        # Apply dotenv (explicit stack env_file, else project ``.env``)
+        env_target = stack.env_file or ".env"
+        self.apply_dotenv(env_target)
         for key, value in stack.environment.items():
             os.environ.setdefault(key, value)
 

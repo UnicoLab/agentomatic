@@ -188,10 +188,22 @@ class AgentExample:
                 or self.expected_output.get("answer")
                 or json.dumps(self.expected_output)
             )
+        meta = dict(self.metadata or {})
+        if self.split and "split" not in meta:
+            meta["split"] = self.split
+        # Ensure invoke payload carries agent inputs when not already set.
+        if "invoke" not in meta and self.input:
+            invoke = {
+                k: v
+                for k, v in self.input.items()
+                if k not in {"query", "request", "question"}
+            }
+            if invoke:
+                meta["invoke"] = invoke
         return DataPoint(
             query=str(query),
             expected_answer=expected,
-            metadata=self.metadata,
+            metadata=meta,
         )
 
 
