@@ -63,9 +63,18 @@ class AgentInvokeRequest(BaseModel):
 
 
 class AgentInvokeResponse(BaseModel):
-    """Standard invocation response."""
+    """Standard invocation response.
 
-    response: str = Field("", description="Agent response text")
+    Class agents that return a structured ``state_to_output`` dict (without a
+    plain ``response`` string) expose that payload on ``output`` and also as
+    a JSON string on ``response`` for chat/memory consumers.
+    """
+
+    response: str = Field("", description="Agent response text or JSON of structured output")
+    output: Any = Field(
+        default=None,
+        description="Structured agent output (state_to_output) when available",
+    )
     agent_type: str = Field("", description="Agent slug")
     thread_id: str | None = Field(None, description="Thread ID")
     suggestions: list[str] = Field(default_factory=list)
@@ -77,6 +86,78 @@ class AgentInvokeResponse(BaseModel):
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
     duration_ms: float = Field(0.0, description="Processing time in ms")
+
+
+_FRAMEWORK_RESULT_KEYS = frozenset(
+    {
+        "response",
+        "agent_type",
+        "thread_id",
+        "suggestions",
+        "citations",
+        "steps_taken",
+        "context",
+        "metadata",
+        "messages",
+        "current_query",
+        "query",
+        "user_id",
+        "prompt_version",
+        "retrieved_documents",
+    }
+)
+
+
+def _json_dumps(value: Any) -> str:
+    """Serialize *value* as JSON text (fallback to ``str`` on failure)."""
+    try:
+        return json.dumps(value, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _human_response_text(payload: dict[str, Any]) -> str | None:
+    """Pick a user-facing string from common structured output keys."""
+    for key in ("content", "answer", "text", "markdown", "summary", "justification"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def coerce_agent_invoke_payload(
+    result: Any,
+) -> tuple[str, Any | None, Any]:
+    """Normalise raw agent/graph output into ``(response_text, output, context)``.
+
+    Args:
+        result: Return value from ``invoke_registered_agent`` / graph invoke.
+
+    Returns:
+        Triple of response text (always a string), optional structured
+        ``output`` dict/list, and ``context`` for the HTTP envelope.
+    """
+    if not isinstance(result, dict):
+        text = "" if result is None else str(result)
+        return text, None, {}
+
+    context = result.get("context", result.get("retrieved_documents", {}))
+    raw_response = result.get("response")
+
+    # Explicit string response (classic BaseAgentState / chat agents).
+    if isinstance(raw_response, str) and raw_response:
+        extras = {k: v for k, v in result.items() if k not in _FRAMEWORK_RESULT_KEYS}
+        output: Any | None = extras or None
+        return raw_response, output, context
+
+    # Explicit structured response value.
+    if isinstance(raw_response, (dict, list)):
+        return _json_dumps(raw_response), raw_response, context
+
+    # Class-agent ``state_to_output``: whole dict is the payload.
+    output = dict(result)
+    text = _human_response_text(output) or _json_dumps(output)
+    return text, output, context if context is not None else {}
 
 
 class AgentChatRequest(BaseModel):
@@ -386,7 +467,11 @@ def create_default_router(
         prompt_version: str | None = None,
     ) -> Any:
         """Extract a standardised response from raw graph output."""
-        res_metadata = result.get("metadata") or {}
+        res_metadata = result.get("metadata") if isinstance(result, dict) else {}
+        if not isinstance(res_metadata, dict):
+            res_metadata = {}
+        else:
+            res_metadata = dict(res_metadata)
         if prompt_version:
             res_metadata["prompt_version"] = prompt_version
 
@@ -395,16 +480,23 @@ def create_default_router(
         if output_model != AgentInvokeResponse:
             # If it's a custom schema and has a metadata field, set prompt_version there
             if hasattr(output_model, "metadata") or "metadata" in output_model.model_fields:
-                result["metadata"] = res_metadata
-            return output_model(**result)
+                if isinstance(result, dict):
+                    result = {**result, "metadata": res_metadata}
+            return output_model(
+                **(result if isinstance(result, dict) else {"response": str(result)})
+            )
+        response_text, structured_output, context = coerce_agent_invoke_payload(result)
         return AgentInvokeResponse(
-            response=result.get("response", str(result)),
-            agent_type=result.get("agent_type", agent_slug),
-            thread_id=result.get("thread_id"),
-            suggestions=result.get("suggestions", []),
-            citations=result.get("citations", []),
-            steps_taken=result.get("steps_taken", []),
-            context=result.get("context", result.get("retrieved_documents", {})),
+            response=response_text,
+            output=structured_output,
+            agent_type=(
+                result.get("agent_type", agent_slug) if isinstance(result, dict) else agent_slug
+            ),
+            thread_id=result.get("thread_id") if isinstance(result, dict) else None,
+            suggestions=result.get("suggestions", []) if isinstance(result, dict) else [],
+            citations=result.get("citations", []) if isinstance(result, dict) else [],
+            steps_taken=result.get("steps_taken", []) if isinstance(result, dict) else [],
+            context=context,
             metadata=res_metadata,
             duration_ms=duration_ms,
         )
@@ -462,7 +554,7 @@ def create_default_router(
                     logger.warning(f"Error executing after_node hook: {hook_exc}")
 
             # ── Persist the turn ──────────────────────────────────
-            response_text = result.get("response", str(result))
+            response_text, _, _ = coerce_agent_invoke_payload(result)
             if memory_mgr and thread_id and query:
                 await memory_mgr.save_turn(
                     thread_id,
@@ -743,11 +835,13 @@ def create_default_router(
                 except Exception as hook_exc:
                     logger.warning(f"Error executing after_node hook: {hook_exc}")
 
-            res_meta = result.get("metadata") or {}
+            res_meta = {}
+            if isinstance(result, dict) and isinstance(result.get("metadata"), dict):
+                res_meta = dict(result["metadata"])
             res_meta["prompt_version"] = state["prompt_version"]
 
             # ── Persist the turn ──────────────────────────────────
-            response_text = result.get("response", str(result))
+            response_text, structured_output, context = coerce_agent_invoke_payload(result)
             if memory_mgr and thread_id and request.persist:
                 await memory_mgr.save_turn(
                     thread_id,
@@ -756,18 +850,23 @@ def create_default_router(
                     agent_name=agent.slug,
                     assistant_metadata={
                         "prompt_version": state.get("prompt_version"),
-                        "agent_type": result.get("agent_type", agent.slug),
+                        "agent_type": result.get("agent_type", agent.slug)
+                        if isinstance(result, dict)
+                        else agent.slug,
                     },
                 )
 
             return {
                 "response": response_text,
+                "output": structured_output,
                 "thread_id": thread_id,
-                "agent_type": result.get("agent_type", agent.slug),
-                "suggestions": result.get("suggestions", []),
-                "citations": result.get("citations", []),
-                "steps_taken": result.get("steps_taken", []),
-                "context": result.get("context", result.get("retrieved_documents", [])),
+                "agent_type": result.get("agent_type", agent.slug)
+                if isinstance(result, dict)
+                else agent.slug,
+                "suggestions": result.get("suggestions", []) if isinstance(result, dict) else [],
+                "citations": result.get("citations", []) if isinstance(result, dict) else [],
+                "steps_taken": result.get("steps_taken", []) if isinstance(result, dict) else [],
+                "context": context,
                 "duration_ms": round(duration_ms, 2),
                 "metadata": res_meta,
                 "history_loaded": history_loaded,
@@ -929,10 +1028,12 @@ def create_default_router(
         }
         try:
             result = await invoke_registered_agent(agent, state)
+            response_text, structured_output, _ = coerce_agent_invoke_payload(result)
             return {
                 "task_id": task_id,
                 "status": "completed",
-                "result": result.get("response", str(result)),
+                "result": response_text,
+                "output": structured_output,
             }
         except Exception as exc:
             return {"task_id": task_id, "status": "failed", "error": str(exc)}
@@ -1127,19 +1228,26 @@ def create_default_router(
 
             duration_ms = (time.perf_counter() - t0) * 1000
 
+            response_text, _, _ = coerce_agent_invoke_payload(result)
             return OptimizeInvokeResponse(
-                response=result.get("response", str(result)),
+                response=response_text,
                 retrieval_context=result.get(
                     "retrieval_context", result.get("context_documents", [])
-                ),
-                tool_calls=result.get("tool_calls", result.get("tools_used", [])),
-                steps_taken=result.get("steps_taken", []),
-                reasoning=result.get("reasoning", result.get("chain_of_thought", "")),
-                citations=result.get("citations", []),
+                )
+                if isinstance(result, dict)
+                else [],
+                tool_calls=result.get("tool_calls", result.get("tools_used", []))
+                if isinstance(result, dict)
+                else [],
+                steps_taken=result.get("steps_taken", []) if isinstance(result, dict) else [],
+                reasoning=result.get("reasoning", result.get("chain_of_thought", ""))
+                if isinstance(result, dict)
+                else "",
+                citations=result.get("citations", []) if isinstance(result, dict) else [],
                 duration_ms=duration_ms,
                 metadata={
                     k: v
-                    for k, v in result.items()
+                    for k, v in (result.items() if isinstance(result, dict) else [])
                     if k
                     not in (
                         "response",
