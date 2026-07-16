@@ -153,6 +153,34 @@ platform.register_store_provider("my_store", my_store_factory)
 
 Do **not** add first-party Cosmos (or other vendor) connectors to the framework.
 
+### Custom DB & vector-store connections
+
+Wire **any** custom client (async or sync SDK, graph/time-series DB, in-house
+package) as a lifecycle-managed connection. Declare it in an agent's
+`connections.py`; the platform builds one client per process (lazily) and closes
+it on shutdown (`aclose`/`close`/`disconnect`).
+
+```python
+from agentomatic.connections import (
+    VectorConnectionConfig, CustomConnectionConfig,
+    register_vector_provider, register_vector_store_adapter,
+    register_connection_type, get_connections, initialize_connections,
+)
+
+register_vector_provider("my_db", lambda cfg: MyAsyncClient(cfg.url, **cfg.options))
+register_vector_store_adapter("my_db", MyDbStore)  # upsert/query/delete
+# In a node: store = await get_connections(self.agent_name).vector("kb").as_store()
+```
+
+- Provider names are **not** limited to the built-ins — any registered name works
+  (unknown names raise a clear error pointing at `register_vector_provider`).
+- Sync-only SDKs: wrap blocking calls in `asyncio.to_thread` inside the adapter.
+- Non-vector backends: `CustomConnectionConfig(factory="pkg.mod:make", args=[...])`.
+- **Never build the client in `BaseGraphAgent.__init__`** — use the builder/factory.
+- Standalone runs (bare `get_graph()`, scripts): call
+  `await initialize_connections(scope, CONNECTIONS)` since there's no platform
+  lifecycle. Full guide: `docs/guide/custom-connections.md`.
+
 ## Optimization & honest evaluation
 
 - `agent.compile(...)` / `agent.fit(...)` / `agent.save/load(...)` provide a

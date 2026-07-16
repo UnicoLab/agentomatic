@@ -35,6 +35,16 @@ breaking API changes.
   overwrite without `--force`). Content comes from a single source of truth
   (`agentomatic.cli.agent_guide`) so the CLI, docs, and in-repo agent knowledge
   files stay in sync
+- **Custom DB / vector-store connections for any Python client**: the connection
+  abstraction robustly accepts arbitrary custom clients (async or sync SDKs,
+  graph/time-series DBs, in-house packages) with correct lifecycle. Provider
+  names are no longer limited to the built-ins — any name registered via
+  `register_vector_provider` resolves (unknown names raise a clear, actionable
+  error); `VectorConnection.close()` now also handles clients exposing only
+  `disconnect`; and a new `initialize_connections(scope, configs)` helper
+  registers **and** initialises connections in one call for standalone runs
+  (`get_graph()`, scripts) that have no platform lifecycle. New dedicated guide:
+  [Custom DB & Vector Store Connections](guide/custom-connections.md)
 
 ---
 

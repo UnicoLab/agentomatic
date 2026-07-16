@@ -20,6 +20,12 @@ Connections provide:
 - Per-request access via `request.state.connections` ([middleware](#accessing-connections-from-middleware))
 - Health checks surfaced through the [control plane](control-plane.md)
 
+!!! tip "Wiring a custom / specialised client?"
+    To integrate **any** custom Python client (a vendor SDK, an in-house
+    wrapper, a graph/time-series DB, a sync-only SDK) with correct lifecycle,
+    see the dedicated guide:
+    [Custom DB & Vector Store Connections](custom-connections.md).
+
 ## Connection kinds and purposes
 
 A connection has a **kind** (how it connects) and a **purpose** (what it is
