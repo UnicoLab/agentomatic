@@ -7,8 +7,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Plugin reload API**: `POST /api/v1/plugins/reload` (all) and
+  `POST /api/v1/plugins/{name}/reload` re-call `load_model()` on the live
+  registry instance and return status + `loaded_at` + `model_card`. List
+  plugins now includes `loaded_at`. See [ML Plugins](guide/ml-plugins.md).
+
 ### Fixed
 
+- **Invoke context passthrough**: `AgentInvokeRequest` / chat / Studio /
+  async task dispatch use `extra="allow"` and
+  `build_invoke_state()` so the **entire** client payload (rich `context` +
+  unknown top-level keys) reaches class-agent `input_to_state`
 - **OpenAPI full schema**: `StudioResumeRequest` moved to module scope so
   `/openapi.json` no longer falls back to the ~13-path stub catalog
 - **Class-agent async tasks**: default agent dispatcher uses

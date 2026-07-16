@@ -11,9 +11,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from agentomatic.core.agent_invoke import invoke_registered_agent
+from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
@@ -44,7 +44,13 @@ def _is_openapi_model(candidate: Any) -> bool:
 
 
 class AgentInvokeRequest(BaseModel):
-    """Standard invocation request."""
+    """Standard invocation request.
+
+    Unknown top-level fields are preserved (``extra='allow'``) and passed
+    through to class-agent ``input_to_state`` alongside ``context``.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     query: str = Field(..., description="User query or input")
     user_id: str = Field("default-user", description="User identifier")
@@ -81,7 +87,11 @@ class AgentChatRequest(BaseModel):
     - Pass ``context`` dict that the agent code can consume
     - Disable auto-persistence with ``persist=False``
     - Control history loading with ``include_history`` and ``max_history``
+
+    Unknown top-level fields are preserved (``extra='allow'``).
     """
+
+    model_config = ConfigDict(extra="allow")
 
     content: str = Field(..., description="User message")
     user_id: str = Field("default-user", description="User identifier")
@@ -136,6 +146,8 @@ class A2ATaskRequest(BaseModel):
 
 class OptimizeInvokeRequest(BaseModel):
     """Optimization-specific invocation — returns full pipeline context."""
+
+    model_config = ConfigDict(extra="allow")
 
     query: str = Field(..., description="User query")
     system_prompt_override: str | None = Field(None, description="System prompt to inject")
@@ -332,60 +344,15 @@ def create_default_router(
         return agent
 
     def _build_initial_state(request: Any) -> dict[str, Any]:
-        """Build the initial state dict for graph invocation."""
+        """Build the initial state dict for graph invocation.
+
+        Preserves the full client payload (including unknown top-level
+        extras when the request model uses ``extra='allow'``) so class
+        agents receive everything in ``input_to_state``.
+        """
         agent = _get_agent()
-        if state_factory:
-            state = state_factory(request)
-            if "prompt_version" not in state:
-                chosen_version = None
-                if hasattr(request, "prompt_version") and request.prompt_version != "v1":
-                    chosen_version = request.prompt_version
-                else:
-                    ab_tests = (
-                        getattr(agent.config, "prompt_ab_tests", None)
-                        if (agent and agent.config)
-                        else None
-                    )
-                    if ab_tests and isinstance(ab_tests, dict):
-                        import random
 
-                        versions = list(ab_tests.keys())
-                        weights = [float(w) for w in ab_tests.values()]
-                        chosen_version = random.choices(versions, weights=weights, k=1)[0]
-                    else:
-                        chosen_version = getattr(request, "prompt_version", "v1")
-                state["prompt_version"] = chosen_version
-            return state
-
-        # Extract fields from model or dictionary
-        request_dict: dict[str, Any] = {}
-        if hasattr(request, "model_dump"):
-            request_dict = request.model_dump()
-        elif hasattr(request, "__dict__"):
-            request_dict = request.__dict__
-        elif isinstance(request, dict):
-            request_dict = request
-
-        # Resolve query/current_query or any field ending in _query
-        query = request_dict.get("query") or request_dict.get("current_query") or ""
-        if not query:
-            for k, v in request_dict.items():
-                if k.endswith("_query") and isinstance(v, str):
-                    query = v
-                    break
-
-        user_id = request_dict.get("user_id") or "default-user"
-        thread_id = request_dict.get("thread_id") or f"thread_{uuid.uuid4().hex[:12]}"
-
-        # Resolve context and metadata
-        context = request_dict.get("context") or {}
-        metadata = request_dict.get("metadata") or {}
-
-        # Capture other custom request parameters and merge them into metadata
-        standard_keys = {"query", "current_query", "user_id", "thread_id", "context", "metadata"}
-        extra_metadata = {k: v for k, v in request_dict.items() if k not in standard_keys}
-
-        # Resolve prompt version
+        # Resolve prompt version (explicit override or A/B weights).
         chosen_version = None
         if hasattr(request, "prompt_version") and request.prompt_version != "v1":
             chosen_version = request.prompt_version
@@ -404,19 +371,13 @@ def create_default_router(
             else:
                 chosen_version = getattr(request, "prompt_version", "v1")
 
-        return {
-            "current_query": query,
-            "user_id": user_id,
-            "thread_id": thread_id,
-            "messages": [],  # populated later by memory manager if available
-            "context": context,  # preserved as a separate state key for agent code
-            "metadata": {**metadata, **extra_metadata},
-            "steps_taken": [],
-            "response": "",
-            "suggestions": [],
-            "citations": [],
-            "prompt_version": chosen_version,
-        }
+        if state_factory:
+            state = state_factory(request)
+            if "prompt_version" not in state:
+                state["prompt_version"] = chosen_version
+            return state
+
+        return build_invoke_state(request, prompt_version=chosen_version)
 
     def _extract_response(
         result: dict[str, Any],
@@ -681,17 +642,16 @@ def create_default_router(
         agent = _get_agent()
         thread_id = request.thread_id or f"thread_{uuid.uuid4().hex[:12]}"
 
-        state: dict[str, Any] = {
-            "current_query": request.content,
-            "user_id": request.user_id,
-            "thread_id": thread_id,
-            "messages": [],
-            "context": request.context,
-            "metadata": request.metadata,
-            "steps_taken": [],
-        }
+        # Full payload passthrough: map chat ``content`` → query and keep
+        # every extra top-level field for ``input_to_state``.
+        chat_payload = request.model_dump()
+        chat_payload["query"] = request.content
+        chat_payload.pop("content", None)
+        # Chat-only controls should not leak into agent input.
+        for chat_only in ("include_history", "max_history", "persist", "messages"):
+            chat_payload.pop(chat_only, None)
 
-        # Handle A/B Test Prompt Routing for chat
+        # Resolve prompt version (A/B or explicit).
         ab_tests = (
             getattr(agent.config, "prompt_ab_tests", None) if (agent and agent.config) else None
         )
@@ -700,9 +660,15 @@ def create_default_router(
 
             versions = list(ab_tests.keys())
             weights = [float(w) for w in ab_tests.values()]
-            state["prompt_version"] = random.choices(versions, weights=weights, k=1)[0]
+            chosen_version = random.choices(versions, weights=weights, k=1)[0]
         else:
-            state["prompt_version"] = "v1"
+            chosen_version = request.prompt_version or "v1"
+
+        state: dict[str, Any] = build_invoke_state(
+            chat_payload,
+            default_thread_id=thread_id,
+            prompt_version=chosen_version,
+        )
 
         # ── Load conversation history ────────────────────────────
         history_loaded = 0
