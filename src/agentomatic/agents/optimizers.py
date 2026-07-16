@@ -324,8 +324,7 @@ class PromptFitterBridge:
         val = [
             p
             for p in points
-            if (getattr(p, "metadata", None) or {}).get("split")
-            in ("validation", "val")
+            if (getattr(p, "metadata", None) or {}).get("split") in ("validation", "val")
         ]
         if train and val:
             return Dataset(points=train), Dataset(points=val)

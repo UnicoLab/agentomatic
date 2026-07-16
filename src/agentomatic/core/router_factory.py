@@ -1229,25 +1229,23 @@ def create_default_router(
             duration_ms = (time.perf_counter() - t0) * 1000
 
             response_text, _, _ = coerce_agent_invoke_payload(result)
+            result_dict = result if isinstance(result, dict) else {}
+            raw_rc = result_dict.get("retrieval_context", result_dict.get("context_documents", []))
+            raw_tc = result_dict.get("tool_calls", result_dict.get("tools_used", []))
+            raw_steps = result_dict.get("steps_taken", [])
+            raw_reasoning = result_dict.get("reasoning", result_dict.get("chain_of_thought", ""))
+            raw_citations = result_dict.get("citations", [])
             return OptimizeInvokeResponse(
                 response=response_text,
-                retrieval_context=result.get(
-                    "retrieval_context", result.get("context_documents", [])
-                )
-                if isinstance(result, dict)
-                else [],
-                tool_calls=result.get("tool_calls", result.get("tools_used", []))
-                if isinstance(result, dict)
-                else [],
-                steps_taken=result.get("steps_taken", []) if isinstance(result, dict) else [],
-                reasoning=result.get("reasoning", result.get("chain_of_thought", ""))
-                if isinstance(result, dict)
-                else "",
-                citations=result.get("citations", []) if isinstance(result, dict) else [],
+                retrieval_context=raw_rc if isinstance(raw_rc, list) else [],
+                tool_calls=raw_tc if isinstance(raw_tc, list) else [],
+                steps_taken=raw_steps if isinstance(raw_steps, list) else [],
+                reasoning=raw_reasoning if isinstance(raw_reasoning, str) else "",
+                citations=raw_citations if isinstance(raw_citations, list) else [],
                 duration_ms=duration_ms,
                 metadata={
                     k: v
-                    for k, v in (result.items() if isinstance(result, dict) else [])
+                    for k, v in result_dict.items()
                     if k
                     not in (
                         "response",

@@ -113,7 +113,9 @@ def _collect_structured_thinking(result: Any) -> tuple[str, tuple[str, ...]]:
                 continue
             btype = str(block.get("type") or "").lower()
             if btype in {"thinking", "reasoning", "reason"}:
-                _take(f"content_block.{btype}", block.get("thinking") or block.get("text") or block)
+                _take(
+                    f"content_block.{btype}", block.get("thinking") or block.get("text") or block
+                )
 
     return "\n\n".join(chunks).strip(), tuple(sources)
 

@@ -378,9 +378,7 @@ class TestGenerateDeploy:
             line.strip() for line in compose.splitlines() if line.strip().startswith("context:")
         )
         dockerfile_line = next(
-            line.strip()
-            for line in compose.splitlines()
-            if line.strip().startswith("dockerfile:")
+            line.strip() for line in compose.splitlines() if line.strip().startswith("dockerfile:")
         )
         assert Path(context_line.split(":", 1)[1].strip()).resolve() == project.resolve()
         assert (
