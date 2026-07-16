@@ -89,9 +89,12 @@ from agentomatic.connections import (
     VectorConnectionConfig,
     VectorStore,
     get_connections,
+    initialize_connections,
     register_connection_type,
+    register_connections,
     register_store_provider,
     register_vector_provider,
+    register_vector_store_adapter,
 )
 
 # Custom endpoints (httpx calls to deployed model services)
@@ -168,8 +171,11 @@ __all__ = [
     "ConnectionPurpose",
     "VectorStore",
     "get_connections",
+    "initialize_connections",
     "register_connection_type",
+    "register_connections",
     "register_vector_provider",
+    "register_vector_store_adapter",
     "register_store_provider",
     "register_embedding_provider",
     # Class-owned graph agents (v0.7)

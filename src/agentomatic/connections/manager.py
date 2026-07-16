@@ -278,6 +278,38 @@ def register_connections(scope: str, configs: list[ConnectionConfig]) -> Connect
     return manager
 
 
+async def initialize_connections(
+    scope: str,
+    configs: list[ConnectionConfig],
+) -> ConnectionManager:
+    """Register *and* initialise connections in one call (standalone helper).
+
+    The platform wires connections automatically at startup, but standalone
+    runs — e.g. a bare ``get_graph()`` under ``langgraph dev`` or a script —
+    have no platform lifecycle.  Use this once (in an app factory, a lifespan
+    hook, or before first use) so agent code can call ``get_connections(scope)``
+    and get live clients::
+
+        from agentomatic.connections import initialize_connections
+        from my_agent.connections import CONNECTIONS
+
+        await initialize_connections("my_agent", CONNECTIONS)
+
+    It is idempotent per client (each connection's ``initialize`` is a no-op
+    once built), so calling it again only wires newly-added configs.
+
+    Args:
+        scope: The scope name (agent name, or ``PLATFORM_SCOPE``).
+        configs: Connection configurations to register and initialise.
+
+    Returns:
+        The initialised :class:`ConnectionManager` for the scope.
+    """
+    manager = register_connections(scope, configs)
+    await manager.initialize()
+    return manager
+
+
 def get_connections(scope: str = PLATFORM_SCOPE) -> ConnectionManager:
     """Return the connection manager for a scope, creating it if needed.
 
