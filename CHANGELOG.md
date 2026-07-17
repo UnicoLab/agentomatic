@@ -1,6 +1,70 @@
 # CHANGELOG
 
 
+## v1.5.1 (2026-07-17)
+
+### Bug Fixes
+
+- **lint+types+docs**: Ruff clean, mypy clean, docs improved
+  ([`7d25480`](https://github.com/UnicoLab/agentomatic/commit/7d254800946d503f5483b53cee7988e3aa3a88af))
+
+lint: remove unused json import from runner.py (F401/F811) sort imports in test_fitter.py (I001)
+  ruff format runner.py (1 file reformatted)
+
+types: fix mypy error in AgentRunner._run_local — cast sync callable before passing to
+  asyncio.to_thread to narrow away Awaitable branch
+
+docs(index): fix :octicons-zap-24: inside raw HTML h3 (renders as literal text — replace with ⚡
+  emoji which works in all contexts) update test badge 1049 → 1185 passing update Prompt
+  Optimization card: '7 strategies' → '5 optimizer strategies', add local-training mention
+
+docs(optimization): add comprehensive 'Local-mode Training' guide section - full annotated
+  compile→fit→evaluate example - architecture diagram (no HTTP server) - metric roles table
+  (WeightedMetric vs OptimizeMetricAdapter vs CustomMetric vs MetricLoss) - tip callout explaining
+  metric role separation - warning callout: do NOT use optimize.CompositeMetric as MetricLoss -
+  result.history documented with list[float] example
+
+- **optimize**: Local-mode training — 6 confirmed bugs fixed
+  ([`1b07416`](https://github.com/UnicoLab/agentomatic/commit/1b074164d132a199e8e338fd0f307053588a38e8))
+
+BUG-1: AgentRunner.agent_callable — local callable bypasses HTTP - Add agent_callable param to
+  AgentRunner.__init__ - Add _run_local() dispatching async/sync callables via asyncio.to_thread -
+  run_single() short-circuits to _run_local when callable is set
+
+BUG-2: LLMCaller._call_openai ignores base_url/api_key - _call_openai now accepts base_url/api_key,
+  forwards to AsyncOpenAI - LLMCaller.call() and call_with_json() thread base_url/api_key through -
+  New LLMCaller.configure(base_url, api_key) classmethod for global defaults
+
+BUG-3: PromptFitResult missing .history attribute
+
+- Add score_history: list[float] field to PromptFitResult - Add .history property (returns
+  score_history with fallback from trials) - fitter.fit() populates score_history on the result -
+  Switch auto-report from generate_html_report to generate_fit_report
+
+BUG-4: optimize.CompositeMetric has no .score() for training loops - Add .score(example, prediction)
+  to CompositeMetric - Sync bridge: extract query/response/expected, run evaluate() via asyncio.run
+  - Thread-pool fallback for nested event loops
+
+BUG-5: OptimizeMetricAdapter.score() wrong arg types + unawaited async - Rewrite score() to extract
+  query from example.input, serialize prediction - Properly await async evaluate() via asyncio.run +
+  thread-pool fallback - Return neutral 0.5 when judge is unavailable (not 0.0)
+
+BUG-6: PromptFitterBridge._build_fitter never passes live agent - Add local_agent, llm_base_url,
+  llm_api_key to PromptFitterBridge.__init__ - _build_fitter passes local_agent=agent (live
+  instance) to PromptFitter - PromptFitter.local_agent wires _wrap_local_agent into AgentRunner -
+  _wrap_local_agent: adapts transform()/atransform() to runner callable sig, injects prompt_override
+  via attribute + metadata.system_prompt_override, restores original prompt even on error
+
+feat(cli): update train.py template to local-mode pattern - Stack-driven (stacks/local.yaml), no
+  HTTP server, no env-var hacks - LocalJudgeMetric + OptimizeMetricAdapter + agents.WeightedMetric +
+  MetricLoss - PromptFitterBridge with llm_base_url forwarded from stack entry
+
+feat(tests): 19 new tests for local-mode (AgentRunner, _wrap_local_agent, PromptFitter,
+  LLMCaller.configure, PromptFitterBridge)
+
+docs: local-mode examples in optimization.md and class-agents.md
+
+
 ## v1.5.0 (2026-07-16)
 
 ### Bug Fixes
