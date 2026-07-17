@@ -514,6 +514,28 @@ result = await fitter.fit(
 )
 ```
 
+**Local-mode — no HTTP server required:**
+
+Pass `local_agent` to bypass the HTTP runner and call your agent in-process.
+Also pass `llm_base_url` / `llm_api_key` to route the optimizer's LLM calls to
+a local OpenAI-compatible server (omlx, Ollama, vLLM, LM Studio):
+
+```python
+fitter = PromptFitter(
+    agent="scope_agent",
+    task_model="openai/my-local-model",
+    local_agent=agent_instance,             # bypasses HTTP — calls transform() directly
+    llm_base_url="http://127.0.0.1:8000/v1",  # routes openai/ specs to local server
+    llm_api_key="local-key",               # arbitrary for local servers
+    optimizer="gepa_like",
+    max_trials=8,
+)
+result = await fitter.fit(trainset, valset, metric)
+print(result.summary())
+print(result.history)   # list[float] — per-round best scores
+result.apply(version="v2_fit")
+```
+
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `agent` | `str` | — | Agent name as defined in `agents.json` |
@@ -524,6 +546,9 @@ result = await fitter.fit(
 | `max_trials` | `int` | `20` | Maximum number of candidate evaluations |
 | `min_absolute_improvement` | `float` | `0.02` | Early stop if best improvement is below this threshold |
 | `concurrency` | `int` | `3` | Number of parallel evaluation workers |
+| `local_agent` | `Any \| None` | `None` | Live agent instance — bypasses HTTP runner entirely |
+| `llm_base_url` | `str \| None` | `None` | Base URL for the optimizer's OpenAI-compatible LLM server |
+| `llm_api_key` | `str \| None` | `None` | API key for the optimizer LLM server |
 
 ---
 
@@ -568,6 +593,10 @@ result.best_few_shot_examples   # list[dict] — selected few-shot examples
 # Evaluation metrics
 result.metric_deltas            # dict — per-dimension improvement
                                 # e.g. {"completeness": +0.12, "latency": -0.03}
+
+# Per-round history
+result.history                  # list[float] — best score per optimization round
+                                # e.g. [0.61, 0.67, 0.73, 0.79] (Keras-style)
 
 # Actionable output
 result.suggestions              # list[str] — human-readable recommendations

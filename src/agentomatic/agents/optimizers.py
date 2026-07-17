@@ -175,6 +175,16 @@ class PromptFitterBridge:
         max_trials: Maximum optimization trials.
         fitter: Pre-built fitter instance (mainly for testing / advanced use);
             when given, construction kwargs are ignored.
+        local_agent: A live agent instance (e.g. a
+            :class:`~agentomatic.agents.base.BaseGraphAgent` subclass).  When
+            provided, **no HTTP server is required** — evaluations call the
+            agent's ``transform()`` / ``atransform()`` method directly.  When
+            ``None`` (default) the bridge automatically uses the agent passed
+            to :meth:`optimize` so local-mode works transparently.
+        llm_base_url: Base URL for the OpenAI-compatible server used by the
+            optimizer LLM (prompt rewriting, failure clustering, etc.).
+            Example: ``"http://127.0.0.1:8000/v1"`` for omlx / Ollama / vLLM.
+        llm_api_key: API key for the optimizer LLM server.
         kwargs: Extra keyword arguments forwarded to ``PromptFitter``.
 
     Example::
@@ -187,6 +197,17 @@ class PromptFitterBridge:
         agent.compile(dataset, metrics, optimizer=optimizer)
         history = agent.fit(dataset)
         result = agent._last_fit_result  # full PromptFitResult
+
+    Local-only (no HTTP server needed)::
+
+        optimizer = PromptFitterBridge(
+            agent_name="assistant",
+            task_model="openai/LFM2.5-8B-A1B-MLX-4bit",
+            llm_base_url="http://127.0.0.1:8000/v1",
+            llm_api_key="any-key",
+        )
+        agent.compile(dataset, metrics, optimizer=optimizer)
+        agent.fit(dataset)
     """
 
     # Best-config keys we know how to apply back onto an agent.
@@ -200,6 +221,9 @@ class PromptFitterBridge:
         metric: Any | None = None,
         max_trials: int = 8,
         fitter: Any | None = None,
+        local_agent: Any | None = None,
+        llm_base_url: str | None = None,
+        llm_api_key: str | None = None,
         **kwargs: Any,
     ) -> None:
         self.agent_name = agent_name
@@ -208,6 +232,9 @@ class PromptFitterBridge:
         self.metric = metric
         self.max_trials = max_trials
         self.fitter = fitter
+        self.local_agent = local_agent
+        self.llm_base_url = llm_base_url
+        self.llm_api_key = llm_api_key
         self.kwargs = kwargs
 
     def optimize(
@@ -271,6 +298,12 @@ class PromptFitterBridge:
         Honours per-call overrides set by ``BaseGraphAgent.fit(...)`` via
         ``agent._fit_optimize_options`` (search_space, optimizer mode,
         max_trials, and other PromptFitter kwargs).
+
+        When *self.local_agent* is provided it is forwarded as the local
+        callable so no HTTP server is required.  If *self.local_agent* is
+        ``None`` the live *agent* argument is used as a fallback so that
+        ``agent.compile(…, optimizer=fitter)`` / ``agent.fit(…)`` always
+        invokes the agent locally when no ``api_base`` is configured.
         """
         if self.fitter is not None:
             return self.fitter
@@ -291,11 +324,18 @@ class PromptFitterBridge:
             "agent_name",
         ):
             kwargs.pop(key, None)
+
+        # Resolve local agent: explicit arg wins, otherwise use the live agent.
+        local_agent = self.local_agent if self.local_agent is not None else agent
+
         return PromptFitter(
             agent=name,
             task_model=kwargs.pop("task_model", self.task_model),
             rewrite_model=kwargs.pop("rewrite_model", self.rewrite_model),
             max_trials=max_trials,
+            local_agent=local_agent,
+            llm_base_url=kwargs.pop("llm_base_url", self.llm_base_url),
+            llm_api_key=kwargs.pop("llm_api_key", self.llm_api_key),
             **kwargs,
         )
 

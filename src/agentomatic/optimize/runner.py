@@ -8,7 +8,9 @@ tool calls, reasoning steps).
 
 from __future__ import annotations
 
+import json
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -52,12 +54,26 @@ class AgentRunner:
 
     Supports:
     - Remote: HTTP calls to the platform API
-    - Local: Direct function invocation (for speed)
+    - Local: Direct callable invocation (no HTTP server required)
     - Optimize: Dedicated ``/optimize/invoke`` endpoint with full context
 
-    The runner automatically tries ``/optimize/invoke`` first,
-    falling back to ``/invoke`` if the optimization endpoint
-    is not available.
+    When *agent_callable* is provided the runner bypasses all HTTP calls
+    and invokes the callable directly.  The callable must accept::
+
+        async def my_fn(
+            query: str,
+            *,
+            prompt_override: str | None,
+            context: list[str] | None,
+            invoke: dict[str, Any] | None,
+        ) -> str: ...
+
+    Sync callables are also accepted — they are run via
+    ``asyncio.to_thread`` so the event loop is never blocked.
+
+    The runner automatically tries ``/optimize/invoke`` first (HTTP mode),
+    falling back to ``/invoke`` if the optimization endpoint is not
+    available.
     """
 
     def __init__(
@@ -67,12 +83,14 @@ class AgentRunner:
         api_prefix: str = "/api/v1",
         timeout: float = 60.0,
         use_optimize_endpoint: bool = True,
+        agent_callable: Callable[..., str | Awaitable[str]] | None = None,
     ):
         self.agent = agent
         self.api_base = api_base
         self.api_prefix = api_prefix
         self.timeout = timeout
         self.use_optimize_endpoint = use_optimize_endpoint
+        self.agent_callable = agent_callable
         self._optimize_available: bool | None = None  # Auto-detect
 
     async def run_single(
@@ -84,8 +102,9 @@ class AgentRunner:
     ) -> RunResult:
         """Run a single query through the agent.
 
-        Tries ``/optimize/invoke`` first for full context, falls back
-        to ``/invoke`` if not available.
+        When *agent_callable* is set the call is dispatched locally
+        (no HTTP).  Otherwise tries ``/optimize/invoke`` first for full
+        context, falling back to ``/invoke`` if not available.
 
         Args:
             query: User query string.
@@ -94,6 +113,9 @@ class AgentRunner:
             invoke: Extra top-level invoke fields (e.g. agent-specific
                 inputs from ``metadata.invoke`` on a dataset point).
         """
+        if self.agent_callable is not None:
+            return await self._run_local(query, prompt_override, context, invoke=invoke)
+
         if self.use_optimize_endpoint and self._optimize_available is not False:
             result = await self._run_optimize(query, prompt_override, context, invoke=invoke)
             if result.error and "404" in result.error:
@@ -106,6 +128,55 @@ class AgentRunner:
             self._optimize_available = True
             return result
         return await self._run_invoke(query, prompt_override, context, invoke=invoke)
+
+    async def _run_local(
+        self,
+        query: str,
+        prompt_override: str | None = None,
+        context: list[str] | None = None,
+        invoke: dict[str, Any] | None = None,
+    ) -> RunResult:
+        """Invoke the agent via the local callable (no HTTP)."""
+        import asyncio
+        import inspect
+
+        t0 = time.perf_counter()
+        try:
+            fn = self.agent_callable
+            if inspect.iscoroutinefunction(fn):
+                raw = await fn(
+                    query,
+                    prompt_override=prompt_override,
+                    context=context,
+                    invoke=invoke,
+                )
+            else:
+                raw = await asyncio.to_thread(
+                    fn,
+                    query,
+                    prompt_override=prompt_override,
+                    context=context,
+                    invoke=invoke,
+                )
+            duration = (time.perf_counter() - t0) * 1000
+            if isinstance(raw, dict):
+                response = _response_text(raw)
+            else:
+                response = str(raw) if raw is not None else ""
+            return RunResult(
+                query=query,
+                response=response,
+                duration_ms=duration,
+            )
+        except Exception as exc:
+            duration = (time.perf_counter() - t0) * 1000
+            logger.warning(f"Local agent call failed for '{query[:50]}': {exc}")
+            return RunResult(
+                query=query,
+                response="",
+                duration_ms=duration,
+                error=str(exc),
+            )
 
     async def _run_optimize(
         self,

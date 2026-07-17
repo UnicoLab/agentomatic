@@ -311,6 +311,8 @@ class PromptFitResult:
     )
     agent: str = ""
     deployment_recommendation: Any = None  # DeploymentRecommendation
+    score_history: list[float] = field(default_factory=list)
+    """Per-round best scores (chronological). Populated by ``PromptFitter.fit()``."""
 
     # -- convenience properties ------------------------------------------
 
@@ -318,6 +320,27 @@ class PromptFitResult:
     def absolute_improvement(self) -> float:
         """Score lift: ``best_score − baseline_score``."""
         return self.best_score - self.baseline_score
+
+    @property
+    def history(self) -> list[float]:
+        """Per-round best scores — Keras-style history list.
+
+        Returns scores stored in :attr:`score_history`, falling back to
+        extracting the best ``"full_val"`` score from each trial round
+        when ``score_history`` is empty (backward compatibility).
+        """
+        if self.score_history:
+            return list(self.score_history)
+        # Fallback: derive from trials list for backward compat
+        rounds: dict[int, float] = {}
+        for t in self.trials:
+            r = t.get("round", 0)
+            s = t.get("score", 0.0)
+            if t.get("phase") == "full_val":
+                rounds[r] = max(rounds.get(r, 0.0), s)
+        if rounds:
+            return [rounds[k] for k in sorted(rounds)]
+        return [t.get("score", 0.0) for t in self.trials]
 
     @property
     def best_prompt(self) -> str:
