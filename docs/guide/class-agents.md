@@ -458,7 +458,8 @@ Write your own by subclassing `Callback` and overriding any of
 To run the full prompt-optimization engine as the optimizer, use
 `PromptFitterBridge` — `fit()` runs it, applies the best prompt config back
 onto the agent, and stashes the full `PromptFitResult` on
-`agent._last_fit_result`:
+`agent._last_fit_result`.  The live agent is automatically passed to the fitter,
+so **no running agentomatic HTTP server is required**:
 
 ```python
 from agentomatic.agents import PromptFitterBridge
@@ -466,10 +467,14 @@ from agentomatic.agents import PromptFitterBridge
 agent.compile(
     dataset,
     metrics=[ExactKeyMatchMetric(["summary"])],
-    optimizer=PromptFitterBridge(task_model="ollama/qwen2.5:7b"),
+    optimizer=PromptFitterBridge(
+        task_model="ollama/qwen2.5:7b",
+        llm_base_url="http://127.0.0.1:11434/v1",  # local Ollama
+    ),
 )
 history = agent.fit(dataset)
-result = agent._last_fit_result  # optimize.PromptFitResult
+result  = agent._last_fit_result   # optimize.PromptFitResult
+print(result.history)              # list[float] — per-round best scores
 ```
 
 ### `evaluate(dataset, metrics)`
@@ -783,6 +788,52 @@ class Optimizer(Protocol):
 
     agent.compile(dataset, metrics, optimizer=optimizer)
     agent.fit(dataset)
+    ```
+
+    **Local-mode — no HTTP server required:**
+
+    Pass `llm_base_url` / `llm_api_key` to route the optimizer's LLM calls to a
+    local OpenAI-compatible server.  The live agent is wired automatically:
+
+    ```python
+    from agentomatic.agents import (
+        PromptFitterBridge, OptimizeMetricAdapter,
+        WeightedMetric, MetricLoss,
+    )
+    from agentomatic.optimize import LocalJudgeMetric, CustomMetric, PromptSearchSpace
+
+    judge = LocalJudgeMetric(
+        model="openai/my-local-model",
+        criteria="Is the response relevant and accurate?",
+    )
+    judge_m = OptimizeMetricAdapter(judge, name="judge")
+    key_m   = ExactKeyMatchMetric(["summary", "risks"])
+
+    # agents.WeightedMetric has .score() — safe to use with MetricLoss
+    loss = WeightedMetric(
+        [("judge", judge_m, 0.6), ("keys", key_m, 0.4)],
+        name="composite_loss",
+    )
+
+    optimizer = PromptFitterBridge(
+        agent_name="summarizer",
+        task_model="openai/my-local-model",
+        # live agent injected automatically from optimize()
+        llm_base_url="http://127.0.0.1:8000/v1",  # local omlx / Ollama
+        llm_api_key="local-key",
+        max_trials=8,
+        metric=CustomMetric(fn=my_composite_fn, name="composite"),
+        search_space=PromptSearchSpace(optimize_system_prompt=True),
+        optimizer="gepa_like",
+    )
+    agent.compile(dataset, metrics=[key_m, judge_m], optimizer=optimizer,
+                  loss=MetricLoss(loss))
+    history = agent.fit(dataset, epochs=2)
+
+    result = agent._last_fit_result
+    print(result.summary())
+    print(result.history)   # list[float] — per-round best scores
+    result.apply(version="v2_fit")
     ```
 
     !!! note "Requires `agentomatic[optimize]`"

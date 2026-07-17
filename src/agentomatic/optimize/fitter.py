@@ -104,6 +104,95 @@ _CANDIDATES_PER_ROUND: int = 4
 
 
 # =====================================================================
+# Local agent wrapper
+# =====================================================================
+
+
+def _wrap_local_agent(agent: Any) -> Any:
+    """Return an async callable compatible with :class:`AgentRunner`.
+
+    Adapts a :class:`~agentomatic.agents.base.BaseGraphAgent` instance
+    (or any object with ``transform()`` / ``atransform()`` / ``invoke()``)
+    to the signature::
+
+        async fn(query, *, prompt_override, context, invoke) -> str
+
+    The *prompt_override* is injected via two mechanisms so that agents
+    which read from state metadata honour it:
+
+    1. Temporarily set ``agent.system_prompt = prompt_override`` (if the
+       attribute exists) and restore the original value after the call.
+    2. Include ``metadata.system_prompt_override`` in the input dict so
+       graph nodes that inspect metadata also receive the override.
+
+    The output dict is serialised to JSON; plain string outputs are
+    returned as-is.
+    """
+    import asyncio
+    import inspect
+    import json as _json
+
+    async def _callable(
+        query: str,
+        *,
+        prompt_override: str | None = None,
+        context: list | None = None,
+        invoke: dict | None = None,
+    ) -> str:
+        input_data: dict[str, Any] = {"current_query": query}
+        if invoke:
+            input_data.update({k: v for k, v in invoke.items() if k != "current_query"})
+        if context:
+            input_data.setdefault("context", {})
+            if isinstance(input_data["context"], dict):
+                input_data["context"]["documents"] = list(context)
+        if prompt_override:
+            input_data.setdefault("metadata", {})
+            if isinstance(input_data["metadata"], dict):
+                input_data["metadata"]["system_prompt_override"] = prompt_override
+
+        # Temporarily override the agent's system_prompt attribute so that
+        # nodes which read self.system_prompt pick up the candidate prompt.
+        original_prompt: str | None = None
+        has_prompt_attr = hasattr(agent, "system_prompt") and prompt_override is not None
+        if has_prompt_attr:
+            original_prompt = agent.system_prompt  # type: ignore[union-attr]
+            try:
+                agent.system_prompt = prompt_override  # type: ignore[union-attr]
+            except (AttributeError, TypeError):
+                has_prompt_attr = False
+
+        try:
+            if hasattr(agent, "atransform") and inspect.iscoroutinefunction(agent.atransform):
+                output = await agent.atransform(input_data)
+            elif hasattr(agent, "transform"):
+                output = await asyncio.to_thread(agent.transform, input_data)
+            elif hasattr(agent, "invoke"):
+                output = await asyncio.to_thread(agent.invoke, input_data)
+            else:
+                raise TypeError(f"Agent {type(agent)} has no transform/invoke method")
+        finally:
+            if has_prompt_attr and original_prompt is not None:
+                try:
+                    agent.system_prompt = original_prompt  # type: ignore[union-attr]
+                except (AttributeError, TypeError):
+                    pass
+
+        if isinstance(output, dict):
+            # Prefer structured output, else response field, else full dict
+            inner = output.get("output")
+            if isinstance(inner, dict) and inner:
+                return _json.dumps(inner, ensure_ascii=False)
+            response = output.get("response")
+            if response is not None:
+                return str(response)
+            return _json.dumps(output, ensure_ascii=False)
+        return str(output) if output is not None else ""
+
+    return _callable
+
+
+# =====================================================================
 # PromptFitter
 # =====================================================================
 
@@ -140,15 +229,31 @@ class PromptFitter:
     min_absolute_improvement : float
         Minimum composite-score lift for a candidate to be accepted.
     api_base : str
-        Base URL of the agent API server.
+        Base URL of the agent API server (ignored when *local_agent* is set).
     api_prefix : str
-        URL prefix for the agent API endpoints.
+        URL prefix for the agent API endpoints (ignored when *local_agent* is set).
     concurrency : int
         Maximum concurrent agent requests.
     experiment_dir : str
         Directory for experiment artefacts and reports.
     auto_report : bool
         Whether to generate an HTML report at the end.
+    local_agent : Any | None
+        A live agent instance (e.g. a :class:`~agentomatic.agents.base.BaseGraphAgent`
+        subclass).  When provided, **no HTTP server is required** — every
+        evaluation invokes the agent's ``transform()`` / ``atransform()``
+        method directly.  The runner builds a lightweight async wrapper
+        via :func:`_wrap_local_agent`.
+    llm_base_url : str | None
+        Base URL for the OpenAI-compatible server used by the **optimizer**
+        LLM (proposal rewriting, failure clustering, etc.).  Sets
+        :meth:`~agentomatic.optimize.llm_caller.LLMCaller.configure` so
+        all subsequent ``openai/`` model calls are routed correctly.
+        Example: ``"http://127.0.0.1:8000/v1"`` for a local omlx/vLLM
+        server.
+    llm_api_key : str | None
+        API key for the optimizer LLM server (may be arbitrary for local
+        servers, e.g. ``"any-key"``).
 
     Examples
     --------
@@ -161,6 +266,16 @@ class PromptFitter:
     >>> result = await fitter.fit(trainset, valset, metric)
     >>> print(result.summary())
     >>> result.apply(version="v2_fit")
+
+    Local-only (no HTTP server needed)::
+
+    >>> fitter = PromptFitter(
+    ...     agent="assistant",
+    ...     task_model="openai/LFM2.5-8B-A1B-MLX-4bit",
+    ...     local_agent=my_agent_instance,
+    ...     llm_base_url="http://127.0.0.1:8000/v1",
+    ...     llm_api_key="any-key",
+    ... )
     """
 
     def __init__(
@@ -181,6 +296,9 @@ class PromptFitter:
         auto_report: bool = True,
         callbacks: list[OptimizationCallback] | None = None,
         dashboard: bool = False,
+        local_agent: Any | None = None,
+        llm_base_url: str | None = None,
+        llm_api_key: str | None = None,
     ) -> None:
         # Public configuration
         self.agent = agent
@@ -194,11 +312,20 @@ class PromptFitter:
         self.experiment_dir = experiment_dir
         self.auto_report = auto_report
 
+        # Configure LLMCaller for OpenAI-compatible local servers if requested.
+        # This propagates base_url/api_key to all optimizer LLM calls automatically.
+        if llm_base_url or llm_api_key:
+            from agentomatic.optimize.llm_caller import LLMCaller
+
+            LLMCaller.configure(base_url=llm_base_url, api_key=llm_api_key)
+
         # Runner for agent invocations
+        agent_callable = _wrap_local_agent(local_agent) if local_agent is not None else None
         self._runner = AgentRunner(
             agent=agent,
             api_base=api_base,
             api_prefix=api_prefix,
+            agent_callable=agent_callable,
         )
 
         # Search space
@@ -777,6 +904,7 @@ class PromptFitter:
             duration_seconds=round(duration, 2),
             experiment_id=experiment_id,
             agent=self.agent,
+            score_history=[rs.score for rs in score_history],
         )
 
         # Build deployment recommendation
@@ -800,11 +928,11 @@ class PromptFitter:
         # Auto-generate HTML report
         if self.auto_report:
             try:
-                from agentomatic.optimize.report import generate_html_report
+                from agentomatic.optimize.report import generate_fit_report
 
                 report_dir = Path(self.experiment_dir) / self.agent
                 report_dir.mkdir(parents=True, exist_ok=True)
-                report_path = generate_html_report(
+                report_path = generate_fit_report(
                     result,
                     output_path=report_dir / f"fitter_report_{experiment_id}.html",
                 )

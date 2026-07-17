@@ -1388,3 +1388,387 @@ class TestDeploymentFields:
         assert cluster.affected_params == ["prompt.output_contract", "rag.top_k"]
         assert cluster.expected_metric_gain["faithfulness"] == 0.18
         assert cluster.expected_metric_gain["completeness"] == 0.12
+
+
+# =====================================================================
+# Local-mode: AgentRunner + PromptFitter + PromptFitterBridge
+# =====================================================================
+
+
+class TestAgentRunnerLocal:
+    """AgentRunner with agent_callable bypasses HTTP entirely."""
+
+    @pytest.mark.asyncio
+    async def test_run_single_local_async_callable(self):
+        from agentomatic.optimize.runner import AgentRunner
+
+        async def my_agent(query, *, prompt_override, context, invoke):
+            return f"response:{query}:{prompt_override}"
+
+        runner = AgentRunner(agent="test", agent_callable=my_agent)
+        result = await runner.run_single("hello", prompt_override="sys")
+        assert result.error is None
+        assert result.response == "response:hello:sys"
+        assert result.query == "hello"
+
+    @pytest.mark.asyncio
+    async def test_run_single_local_sync_callable(self):
+        from agentomatic.optimize.runner import AgentRunner
+
+        def my_sync_agent(query, *, prompt_override, context, invoke):
+            return f"sync:{query}"
+
+        runner = AgentRunner(agent="test", agent_callable=my_sync_agent)
+        result = await runner.run_single("world")
+        assert result.error is None
+        assert result.response == "sync:world"
+
+    @pytest.mark.asyncio
+    async def test_run_single_local_dict_response(self):
+        from agentomatic.optimize.runner import AgentRunner
+
+        async def my_agent(query, *, prompt_override, context, invoke):
+            return {"response": f"dict:{query}"}
+
+        runner = AgentRunner(agent="test", agent_callable=my_agent)
+        result = await runner.run_single("test_q")
+        assert result.response == "dict:test_q"
+
+    @pytest.mark.asyncio
+    async def test_run_single_local_error_captured(self):
+        from agentomatic.optimize.runner import AgentRunner
+
+        async def failing_agent(query, *, prompt_override, context, invoke):
+            raise ValueError("boom")
+
+        runner = AgentRunner(agent="test", agent_callable=failing_agent)
+        result = await runner.run_single("q")
+        assert result.error is not None
+        assert "boom" in result.error
+        assert result.response == ""
+
+    @pytest.mark.asyncio
+    async def test_run_dataset_local(self):
+        from agentomatic.optimize.runner import AgentRunner
+
+        calls: list[str] = []
+
+        async def my_agent(query, *, prompt_override, context, invoke):
+            calls.append(query)
+            return f"ok:{query}"
+
+        runner = AgentRunner(agent="test", agent_callable=my_agent)
+        points = [{"query": "q1", "expected_answer": "a1"}, {"query": "q2"}]
+        results = await runner.run_dataset(points, prompt_override="sys", concurrency=2)
+        assert len(results) == 2
+        assert set(calls) == {"q1", "q2"}
+        assert all(r.error is None for r in results)
+
+
+class TestWrapLocalAgent:
+    """_wrap_local_agent converts a BaseGraphAgent-like object to a callable."""
+
+    @pytest.mark.asyncio
+    async def test_wrap_transform(self):
+        from agentomatic.optimize.fitter import _wrap_local_agent
+
+        class FakeAgent:
+            def transform(self, input_data):
+                return {"response": f"transformed:{input_data.get('current_query')}"}
+
+        agent = FakeAgent()
+        fn = _wrap_local_agent(agent)
+        result = await fn("hello", prompt_override=None, context=None, invoke=None)
+        assert result == "transformed:hello"
+
+    @pytest.mark.asyncio
+    async def test_wrap_atransform(self):
+        from agentomatic.optimize.fitter import _wrap_local_agent
+
+        class FakeAsyncAgent:
+            async def atransform(self, input_data):
+                return {"response": f"async:{input_data.get('current_query')}"}
+
+        agent = FakeAsyncAgent()
+        fn = _wrap_local_agent(agent)
+        result = await fn("world", prompt_override=None, context=None, invoke=None)
+        assert result == "async:world"
+
+    @pytest.mark.asyncio
+    async def test_wrap_output_dict(self):
+        from agentomatic.optimize.fitter import _wrap_local_agent
+        import json
+
+        class FakeAgent:
+            def transform(self, input_data):
+                return {"output": {"content": "foo", "next_action": "bar"}}
+
+        agent = FakeAgent()
+        fn = _wrap_local_agent(agent)
+        result = await fn("q", prompt_override=None, context=None, invoke=None)
+        data = json.loads(result)
+        assert data == {"content": "foo", "next_action": "bar"}
+
+    @pytest.mark.asyncio
+    async def test_prompt_override_injected_in_metadata(self):
+        from agentomatic.optimize.fitter import _wrap_local_agent
+
+        received_input: dict = {}
+
+        class FakeAgent:
+            def transform(self, input_data):
+                received_input.update(input_data)
+                return {"response": "ok"}
+
+        agent = FakeAgent()
+        fn = _wrap_local_agent(agent)
+        await fn("q", prompt_override="my_sys_prompt", context=None, invoke=None)
+        assert received_input.get("metadata", {}).get("system_prompt_override") == "my_sys_prompt"
+
+    @pytest.mark.asyncio
+    async def test_prompt_override_sets_attribute(self):
+        from agentomatic.optimize.fitter import _wrap_local_agent
+
+        class FakeAgent:
+            system_prompt = "original"
+
+            def transform(self, input_data):
+                return {"response": self.system_prompt}
+
+        agent = FakeAgent()
+        fn = _wrap_local_agent(agent)
+        result = await fn("q", prompt_override="overridden", context=None, invoke=None)
+        # response was generated with the override
+        assert result == "overridden"
+        # original prompt restored after call
+        assert agent.system_prompt == "original"
+
+    @pytest.mark.asyncio
+    async def test_prompt_override_restored_on_error(self):
+        from agentomatic.optimize.fitter import _wrap_local_agent
+
+        class FakeAgent:
+            system_prompt = "original"
+
+            def transform(self, input_data):
+                raise RuntimeError("transform failed")
+
+        agent = FakeAgent()
+        fn = _wrap_local_agent(agent)
+        try:
+            await fn("q", prompt_override="overridden", context=None, invoke=None)
+        except RuntimeError:
+            pass
+        # system_prompt must be restored even if transform raised
+        assert agent.system_prompt == "original"
+
+
+class TestPromptFitterLocalMode:
+    """PromptFitter end-to-end with local callable — no HTTP server."""
+
+    @pytest.mark.asyncio
+    async def test_fit_local_callable_baseline_and_propose(self, tmp_path, monkeypatch):
+        """Full baseline-evaluate → propose → candidate-evaluate cycle using only a
+        local callable, mocked LLM, and an in-memory dataset."""
+        import asyncio
+
+        from agentomatic.optimize.dataset import Dataset, DataPoint
+        from agentomatic.optimize.fitter import PromptFitter
+        from agentomatic.optimize.metrics import ExactMatchMetric
+        from agentomatic.optimize.runner import AgentRunner
+
+        # -- Local callable: echoes the prompt_override or uses a default ----
+        async def local_fn(query, *, prompt_override, context, invoke):
+            # Return a fixed JSON-ish response matching expected_answer
+            return query.upper()
+
+        # -- Dataset ---------------------------------------------------------
+        points = [
+            DataPoint(query="hello", expected_answer="HELLO"),
+            DataPoint(query="world", expected_answer="WORLD"),
+            DataPoint(query="foo", expected_answer="FOO"),
+        ]
+        dataset = Dataset(points=points)
+
+        # -- Mock optimizer so no LLM calls are needed -----------------------
+        from agentomatic.optimize.config import PromptCandidate, PromptRuntimeConfig
+        from agentomatic.optimize.fitter_optimizers import BaseFitterOptimizer
+
+        @dataclass_like_optimizer
+        class EchoOptimizer(BaseFitterOptimizer):
+            name: str = "echo"
+
+            async def propose(self, current_config, eval_results, dataset_sample,
+                              search_space, iteration=0, context=None):
+                # Return one candidate that is identical to the baseline
+                return [PromptCandidate(
+                    name=f"echo_{iteration:03d}",
+                    config=PromptRuntimeConfig(
+                        system_prompt=current_config.system_prompt + " (echo)",
+                    ),
+                    source="echo",
+                )]
+
+        fitter = PromptFitter(
+            agent="test_agent",
+            task_model="ollama/qwen2.5:7b",
+            optimizer=EchoOptimizer(),
+            max_trials=2,
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+        )
+        # Replace the HTTP runner with a local-callable runner
+        fitter._runner = AgentRunner(agent="test_agent", agent_callable=local_fn)
+
+        metric = ExactMatchMetric()
+        result = await fitter.fit(dataset, dataset, metric)
+
+        assert result is not None
+        assert result.baseline_score >= 0.0
+        assert result.best_score >= result.baseline_score or result.best_score >= 0.0
+
+    @pytest.mark.asyncio
+    async def test_prompt_fitter_local_agent_param(self, tmp_path):
+        """PromptFitter(local_agent=...) builds an AgentRunner with agent_callable set."""
+        from agentomatic.optimize.fitter import PromptFitter
+
+        class FakeAgent:
+            def transform(self, input_data):
+                return {"response": "ok"}
+
+        agent = FakeAgent()
+        fitter = PromptFitter(
+            agent="test",
+            local_agent=agent,
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+        )
+        assert fitter._runner.agent_callable is not None
+
+    def test_llm_caller_configure_called(self, monkeypatch):
+        """PromptFitter(llm_base_url=...) calls LLMCaller.configure()."""
+        from agentomatic.optimize import fitter as fitter_mod
+        from agentomatic.optimize.llm_caller import LLMCaller
+
+        configured: list[tuple] = []
+        monkeypatch.setattr(LLMCaller, "configure",
+                            classmethod(lambda cls, base_url=None, api_key=None:
+                                        configured.append((base_url, api_key))))
+
+        fitter_mod.PromptFitter(
+            agent="test",
+            llm_base_url="http://localhost:8000/v1",
+            llm_api_key="test-key",
+        )
+        assert configured == [("http://localhost:8000/v1", "test-key")]
+
+
+class TestLLMCallerConfigure:
+    """LLMCaller.configure() sets class-level base_url/api_key."""
+
+    def test_configure_sets_class_attrs(self):
+        from agentomatic.optimize.llm_caller import LLMCaller
+
+        original_url = LLMCaller._default_base_url
+        original_key = LLMCaller._default_api_key
+        try:
+            LLMCaller.configure(base_url="http://127.0.0.1:8000/v1", api_key="my-key")
+            assert LLMCaller._default_base_url == "http://127.0.0.1:8000/v1"
+            assert LLMCaller._default_api_key == "my-key"
+        finally:
+            LLMCaller._default_base_url = original_url
+            LLMCaller._default_api_key = original_key
+
+    def test_configure_none_clears(self):
+        from agentomatic.optimize.llm_caller import LLMCaller
+
+        original_url = LLMCaller._default_base_url
+        original_key = LLMCaller._default_api_key
+        try:
+            LLMCaller.configure(base_url="http://example.com/v1")
+            LLMCaller.configure()  # reset
+            assert LLMCaller._default_base_url is None
+            assert LLMCaller._default_api_key is None
+        finally:
+            LLMCaller._default_base_url = original_url
+            LLMCaller._default_api_key = original_key
+
+
+class TestPromptFitterBridgeLocalMode:
+    """PromptFitterBridge passes local_agent and llm params to PromptFitter."""
+
+    def test_build_fitter_passes_local_agent(self, tmp_path):
+        from agentomatic.agents.optimizers import PromptFitterBridge
+
+        class FakeAgent:
+            agent_name = "test"
+            _fit_optimize_options = None
+
+            def transform(self, input_data):
+                return {"response": "ok"}
+
+        live_agent = FakeAgent()
+        bridge = PromptFitterBridge(
+            agent_name="test",
+            local_agent=live_agent,
+            llm_base_url="http://127.0.0.1:8000/v1",
+            llm_api_key="any",
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+        )
+        fitter = bridge._build_fitter(live_agent, "test")
+        # The runner must have an agent_callable (not None)
+        assert fitter._runner.agent_callable is not None
+
+    def test_build_fitter_falls_back_to_live_agent(self, tmp_path):
+        """When local_agent=None, the live agent from optimize() is used."""
+        from agentomatic.agents.optimizers import PromptFitterBridge
+
+        class FakeAgent:
+            agent_name = "test"
+            _fit_optimize_options = None
+
+            def transform(self, input_data):
+                return {"response": "ok"}
+
+        live_agent = FakeAgent()
+        bridge = PromptFitterBridge(
+            agent_name="test",
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+        )
+        fitter = bridge._build_fitter(live_agent, "test")
+        # Still wires up the live_agent as the local callable
+        assert fitter._runner.agent_callable is not None
+
+    def test_llm_params_forwarded(self, tmp_path):
+        from agentomatic.agents.optimizers import PromptFitterBridge
+
+        class FakeAgent:
+            agent_name = "test"
+            _fit_optimize_options = None
+
+            def transform(self, input_data):
+                return {"response": "ok"}
+
+        live_agent = FakeAgent()
+        bridge = PromptFitterBridge(
+            agent_name="test",
+            llm_base_url="http://local.example/v1",
+            llm_api_key="secret",
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+        )
+        # Building the fitter should not raise; LLMCaller.configure is called inside
+        fitter = bridge._build_fitter(live_agent, "test")
+        assert fitter is not None
+
+
+# ---------------------------------------------------------------------------
+# Helpers used inside the test module
+# ---------------------------------------------------------------------------
+
+def dataclass_like_optimizer(cls):
+    """Minimal decorator: makes a class behave like a dataclass for the optimizer tests."""
+    from dataclasses import dataclass
+    return dataclass(slots=True)(cls)

@@ -1596,90 +1596,262 @@ def _dataset_jsonl(name: str) -> str:
 
 def _train_py(name: str) -> str:
     title = name.replace("_", " ").title().replace(" ", "")
-    return f'''"""Train script for {name} — compile, fit, and save.
+    return f'''#!/usr/bin/env python3
+"""Fit **{name}** prompts + model params via Agentomatic compile/fit.
 
-Usage::
+Stack-driven — edit ``stacks/local.yaml`` to switch models/providers.
+No running agentomatic HTTP server required (local_agent mode).
 
-    python -m agents.{name}.train
+Usage (from project root)::
+
+    uv run python agents/{name}/train.py
     # or
-    python agents/{name}/train.py
+    python -m agents.{name}.train
 """
 from __future__ import annotations
 
+import json
+import os
+import sys
 from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]   # project root
+os.chdir(ROOT)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from agentomatic.agents import (
+    AgentDataset,
+    CallableMetric,
+    EarlyStopping,
+    ExactKeyMatchMetric,
+    MetricLoss,
+    OptimizeMetricAdapter,
+    PromptFitterBridge,
+    WeightedMetric,
+)
+from agentomatic.config.settings import load_environment
+from agentomatic.optimize import (
+    CustomMetric,
+    LocalJudgeMetric,
+    PromptSearchSpace,
+    generate_fit_report,
+)
+from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
+from agentomatic.stacks.manager import StackManager
 
 from .agent import {title}Agent
 
-from agentomatic.agents import AgentDataset
-from agentomatic.agents.metrics import (
-    CallableMetric,
-    ContainsTermsMetric,
-    ExactKeyMatchMetric,
-    WeightedMetric,
-)
-from agentomatic.agents.optimizers import NoOpOptimizer
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
 
-DATA_DIR = Path(__file__).parent
-COMPILED_DIR = Path("compiled") / "{name}"
+AGENT        = "{name}"
+HERE         = Path(__file__).resolve().parent
+DATASETS     = HERE / "datasets"
+REPORTS      = HERE / "reports"
+REQUIRED_KEYS: list[str] = ["response"]   # keys the agent must return
+
+# ---------------------------------------------------------------------------
+# Run config  (edit here instead of CLI flags)
+# ---------------------------------------------------------------------------
+
+STACK      : str      = os.getenv("AGENTOMATIC_STACK", "local")
+EPOCHS     : int      = 1
+MAX_TRIALS : int      = 8
+PATIENCE   : int      = 1
+OPTIMIZER  : str      = "gepa_like"   # gepa_like | rewrite | mipro_like | param_search
+APPLY      : bool     = False
+APPLY_AS   : str|None = None          # e.g. "v2_fit" to persist best prompt
+
+# ---------------------------------------------------------------------------
+# Metric helpers — customise for your task
+# ---------------------------------------------------------------------------
+
+def _json_valid(example: Any, prediction: dict[str, Any]) -> float:
+    """1.0 if prediction is a non-empty dict (valid structured output)."""
+    return 1.0 if isinstance(prediction, dict) and prediction else 0.0
 
 
-# Multi-criteria evaluation config — tune weights to reflect what matters.
-# Each row: (name, metric_instance, weight). Weights are auto-normalised.
-METRICS = [
-    ("exact_response", ExactKeyMatchMetric(["response"]), 0.5),
-    ("contains_terms", ContainsTermsMetric(["Result"]), 0.3),
-    (
-        "has_output",
-        CallableMetric(
-            "has_output",
-            lambda example, pred: 1.0 if pred.get("response") else 0.0,
-        ),
-        0.2,
+def _keyword_score(example: Any, prediction: dict[str, Any]) -> float:
+    expected = example.expected_output or {{}}
+    text = json.dumps(prediction, ensure_ascii=False).lower()
+    terms = [
+        str(v) for v in (expected.values() if isinstance(expected, dict) else [])
+        if isinstance(v, str) and v.strip()
+    ]
+    if not terms:
+        return 1.0
+    return sum(1 for t in terms if t.lower() in text) / len(terms)
+
+
+def _opt_composite(query: str, response: str,
+                   expected: str|None = None, context: Any = None) -> float:
+    """Optimization metric: JSON key presence (0.5) + keyword coverage (0.5)."""
+    try:
+        pred = json.loads(response) if response else {{}}
+    except (json.JSONDecodeError, TypeError):
+        pred = {{}}
+    key_score = sum(1 for k in REQUIRED_KEYS if k in pred) / max(len(REQUIRED_KEYS), 1)
+    try:
+        exp = json.loads(expected) if expected else {{}}
+    except (json.JSONDecodeError, TypeError):
+        exp = {{}}
+    text = json.dumps(pred, ensure_ascii=False).lower()
+    terms = [str(v) for v in (exp.values() if isinstance(exp, dict) else [])
+             if isinstance(v, str) and v.strip()]
+    kw_score = sum(1 for t in terms if t.lower() in text) / len(terms) if terms else key_score
+    return 0.5 * key_score + 0.5 * kw_score
+
+
+def _model_spec(entry: Any) -> str:
+    return f"{{entry.provider}}/{{entry.model}}"
+
+
+# ---------------------------------------------------------------------------
+# 0) Stack + environment
+# ---------------------------------------------------------------------------
+
+load_environment(ROOT.parent / ".env")        # load .env one level up
+stacks = StackManager(ROOT / "stacks")
+stacks.load(STACK)
+apply_stack_defaults(stacks)
+entry  = stacks.get_llm_config("default")
+model  = _model_spec(entry)
+REPORTS.mkdir(parents=True, exist_ok=True)
+
+print(f"stack={{STACK!r}}  model={{model}}  base_url={{entry.base_url!r}}")
+
+# ---------------------------------------------------------------------------
+# 1) Data
+# ---------------------------------------------------------------------------
+
+dataset = AgentDataset.from_jsonl(DATASETS / "all.jsonl", name=AGENT)
+print(f"{{AGENT}} train={{len(dataset.train)}} val={{len(dataset.validation)}} test={{len(dataset.test)}}")
+
+# ---------------------------------------------------------------------------
+# 2) Agent + metrics
+# ---------------------------------------------------------------------------
+
+llm   = get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
+agent = {title}Agent(llm=llm)
+
+# LLM-as-judge: OptimizeMetricAdapter bridges async .evaluate() to sync .score()
+judge   = LocalJudgeMetric(
+    model=model,
+    criteria=(
+        "Evaluate whether the response is relevant to the query, "
+        "accurate, and well-structured."
     ),
-]
+    dimensions=["relevance", "accuracy", "structure"],
+)
+judge_m   = OptimizeMetricAdapter(judge, name="judge")
+key_m     = ExactKeyMatchMetric(REQUIRED_KEYS)
+json_m    = CallableMetric("json_valid", _json_valid)
+keyword_m = CallableMetric("keywords",  _keyword_score)
 
+metrics = [judge_m, key_m, json_m, keyword_m]
 
-def build_metrics() -> list:
-    """Return the list of metrics + composite used during train/eval."""
-    individual = [m for _, m, _ in METRICS]
-    composite = WeightedMetric(METRICS, name="composite")
-    return [*individual, composite]
+# agents.WeightedMetric has .score() — compatible with MetricLoss
+loss_metric = WeightedMetric(
+    [
+        ("judge",      judge_m,   0.40),
+        ("key_match",  key_m,     0.30),
+        ("json_valid", json_m,    0.15),
+        ("keywords",   keyword_m, 0.15),
+    ],
+    name="composite_loss",
+)
 
+# ---------------------------------------------------------------------------
+# 3) Search space + PromptFitterBridge
+# ---------------------------------------------------------------------------
 
-def main() -> None:
-    """Compile, fit, and save the agent."""
-    # 1. Create agent
-    agent = {title}Agent(llm=None)
-    print(f"Agent: {{agent.agent_name}}")
+space = PromptSearchSpace(
+    optimize_system_prompt=True,
+    optimize_few_shot=True,
+    optimize_model_params=True,
+    model_param_space={{
+        "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
+        "top_p":       [0.7, 0.9, 1.0],
+    }},
+)
 
-    # 2. Load dataset
-    dataset = AgentDataset.from_jsonl(str(DATA_DIR / "dataset.jsonl"))
-    print(f"Dataset: {{len(dataset)}} examples "
-          f"(train={{len(dataset.train)}}, test={{len(dataset.test)}})")
+fitter = PromptFitterBridge(
+    agent_name=AGENT,
+    task_model=model,
+    rewrite_model=model,
+    # local_agent is wired automatically from the live agent in optimize()
+    llm_base_url=entry.base_url,          # routes openai/ specs to local server
+    llm_api_key=entry.api_key or "local",
+    max_trials=MAX_TRIALS,
+    metric=CustomMetric(fn=_opt_composite, name="composite"),
+    base_prompt_version="v1",
+    search_space=space,
+    optimizer=OPTIMIZER,
+    min_absolute_improvement=0.02,
+    concurrency=2,
+    experiment_dir=str(REPORTS / ".fit"),
+    auto_report=True,
+)
 
-    # 3. Compile — register metrics + optimizer
-    metrics = build_metrics()
-    agent.compile(dataset, metrics, optimizer=NoOpOptimizer())
-    print(
-        f"Compiled with {{len(metrics)}} metrics "
-        f"(composite = {{len(METRICS)}} weighted components) + NoOpOptimizer"
+# ---------------------------------------------------------------------------
+# 4) Compile → fit → evaluate
+# ---------------------------------------------------------------------------
+
+agent.compile(dataset, metrics=metrics, optimizer=fitter, loss=MetricLoss(loss_metric))
+history = agent.fit(
+    dataset,
+    epochs=EPOCHS,
+    validation_data=dataset.validation,
+    callbacks=[EarlyStopping(monitor="val_loss", patience=PATIENCE, mode="min")],
+    max_trials=MAX_TRIALS,
+    search_space=space,
+    optimize_mode=OPTIMIZER,
+    optimize_prompt=True,
+    optimize_params=True,
+    verbose=1,
+)
+fit_result  = getattr(agent, "_last_fit_result", None)
+opt_status  = getattr(agent, "_last_optimize_status", "")
+print(f"optimize_status={{opt_status!r}}")
+print(f"history={{getattr(history, 'history', history)}}")
+
+held_out = dataset.test or dataset.validation or dataset.train
+report   = agent.evaluate(held_out, metrics)
+print(f"scores={{report.scores}}")
+
+# ---------------------------------------------------------------------------
+# 5) HTML report
+# ---------------------------------------------------------------------------
+
+out = REPORTS / f"train_{{AGENT}}.html"
+if fit_result is not None:
+    generate_fit_report(fit_result, output_path=out)
+    print(f"score history={{fit_result.history}}")   # list[float]
+else:
+    out.write_text(
+        f"<html><body><h1>{{AGENT}} fit</h1>"
+        f"<pre>{{getattr(history, 'history', history)}}</pre></body></html>",
+        encoding="utf-8",
     )
+print(f"Report: {{out}}")
 
-    # 4. Fit — run optimization loop
-    agent.fit(dataset)
-    print("Fit complete")
+# ---------------------------------------------------------------------------
+# 6) Optional: apply best prompt
+# ---------------------------------------------------------------------------
 
-    # 5. Quick evaluation on test set
-    report = agent.evaluate(dataset.test, metrics)
-    print(f"Test pass rate: {{report.pass_rate:.1%}}")
-
-    # 6. Save compiled agent
-    agent.save(str(COMPILED_DIR))
-    print(f"Saved to {{COMPILED_DIR}}/")
+apply_as = APPLY_AS or ("v2_fit" if APPLY else None)
+if apply_as and fit_result is not None and hasattr(fit_result, "apply"):
+    fit_result.apply(version=apply_as, agent_dir=str(HERE))
+    print(f"Applied {{apply_as!r}} → {{HERE}}")
+else:
+    print("Dry-run: set APPLY=True to persist the best prompt.")
 
 
 if __name__ == "__main__":
-    main()
+    pass   # script runs at import; guarded by __main__ in each section
 '''
 
 

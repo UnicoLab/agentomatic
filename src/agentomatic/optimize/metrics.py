@@ -920,6 +920,65 @@ class CompositeMetric(BaseMetric):
         eval_result = await self.evaluate(query, response, expected, context)
         return eval_result.metadata.get("metric_result", MetricResult(score=eval_result.score))
 
+    def score(self, example: Any, prediction: Any) -> float:
+        """Sync bridge for the ``agents.Metric`` protocol.
+
+        Allows ``optimize.CompositeMetric`` to be used directly as a
+        component in ``agents.WeightedMetric`` or ``agents.MetricLoss``
+        without wrapping in ``OptimizeMetricAdapter``.
+
+        Extracts ``query``, ``response``, and ``expected`` from
+        *example* / *prediction* and runs :meth:`evaluate` synchronously
+        via :func:`asyncio.run` (or a thread-pool when a loop is already
+        running).
+
+        Args:
+            example: An ``AgentExample`` with ``.input`` and
+                ``.expected_output``.
+            prediction: The agent's output dict.
+
+        Returns:
+            Composite score in ``[0, 1]``.
+        """
+        import asyncio
+        import json as _json
+
+        query = ""
+        inp = getattr(example, "input", example)
+        if hasattr(inp, "get"):
+            query = inp.get("query", inp.get("current_query", ""))
+        else:
+            query = str(inp)
+
+        response = (
+            _json.dumps(prediction, ensure_ascii=False)
+            if isinstance(prediction, dict)
+            else str(prediction)
+        )
+
+        exp_out = getattr(example, "expected_output", None)
+        expected = (
+            _json.dumps(exp_out, ensure_ascii=False)
+            if isinstance(exp_out, dict)
+            else (str(exp_out) if exp_out is not None else None)
+        )
+
+        coro = self.evaluate(query, response, expected)
+        try:
+            result = asyncio.run(coro)
+        except RuntimeError:
+            # Running inside an existing event loop — use a thread pool
+            import concurrent.futures
+
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    result = pool.submit(asyncio.run, coro).result(timeout=60)
+            except Exception:
+                return 0.0
+        except Exception:
+            return 0.0
+        return float(getattr(result, "score", 0.0))
+
 
 class DeterministicMetric(BaseMetric):
     """Non-LLM metric for format compliance, regex matching, and structural checks.
