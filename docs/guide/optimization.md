@@ -552,6 +552,175 @@ result.apply(version="v2_fit")
 
 ---
 
+### Local-mode Training: `compile → fit → evaluate`
+
+The `PromptFitterBridge` (used via `BaseGraphAgent.compile()` + `fit()`) runs the
+full optimization loop **without a running agentomatic HTTP server**.  All you need
+is a local OpenAI-compatible LLM server (omlx, Ollama, LM Studio, vLLM).
+
+**Architecture:**
+
+```
+your script
+  └─ agent.compile(dataset, metrics, optimizer=PromptFitterBridge(...))
+       └─ agent.fit(dataset)
+            └─ PromptFitterBridge.optimize(agent, dataset, metrics)
+                 └─ PromptFitter.fit(trainset, valset, metric)
+                      ├─ AgentRunner._run_local()   ← calls agent.transform() in-process
+                      └─ LLMCaller._call_openai()   ← routed to http://127.0.0.1:8000/v1
+```
+
+**Key concepts:**
+
+| Class | Role | Import path |
+|---|---|---|
+| `agents.WeightedMetric` | Composite loss — has `.score()` | `agentomatic.agents` |
+| `OptimizeMetricAdapter` | Bridge async `optimize.BaseMetric` → sync `.score()` | `agentomatic.agents` |
+| `MetricLoss` | Wraps any `Metric` as a training loss | `agentomatic.agents` |
+| `PromptFitterBridge` | Drives `PromptFitter` from `fit()` | `agentomatic.agents` |
+| `LocalJudgeMetric` | LLM-as-judge over a local server | `agentomatic.optimize` |
+| `CustomMetric` | Function-based fitter objective | `agentomatic.optimize` |
+| `PromptSearchSpace` | Defines what the fitter can change | `agentomatic.optimize` |
+
+**Complete example — stack-driven, no env-var hacks, no HTTP server:**
+
+```python
+import json, os
+from pathlib import Path
+
+from agentomatic.agents import (
+    AgentDataset, CallableMetric, EarlyStopping, ExactKeyMatchMetric,
+    MetricLoss, OptimizeMetricAdapter, PromptFitterBridge, WeightedMetric,
+)
+from agentomatic.config.settings import load_environment
+from agentomatic.optimize import (
+    CustomMetric, LocalJudgeMetric, PromptSearchSpace, generate_fit_report,
+)
+from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
+from agentomatic.stacks.manager import StackManager
+
+from agents.my_agent.agent import MyAgent   # your BaseGraphAgent subclass
+
+# ── 0. Stack ─────────────────────────────────────────────────────────────────
+load_environment(Path(".env"))
+stacks = StackManager(Path("stacks"))
+stacks.load("local")
+apply_stack_defaults(stacks)
+entry = stacks.get_llm_config("default")
+model = f"{entry.provider}/{entry.model}"  # e.g. "openai/LFM2.5-8B-A1B-MLX-4bit"
+
+# ── 1. Data ───────────────────────────────────────────────────────────────────
+dataset = AgentDataset.from_jsonl("agents/my_agent/datasets/all.jsonl",
+                                   name="my_agent")
+print(f"train={len(dataset.train)} val={len(dataset.validation)}")
+
+# ── 2. Agent ──────────────────────────────────────────────────────────────────
+llm   = get_llm_for_agent("my_agent", role="default", stack_manager=stacks)
+agent = MyAgent(llm=llm)
+
+# ── 3. Metrics ────────────────────────────────────────────────────────────────
+# LLM-as-judge: OptimizeMetricAdapter bridges async .evaluate() → sync .score()
+judge   = LocalJudgeMetric(
+    model=model,
+    criteria="Is the response relevant, grounded, and actionable?",
+    dimensions=["relevance", "groundedness", "actionability"],
+)
+judge_m   = OptimizeMetricAdapter(judge, name="judge")
+key_m     = ExactKeyMatchMetric(["content", "next_action"])
+json_m    = CallableMetric("json_valid",
+                lambda ex, pred: 1.0 if isinstance(pred, dict) and pred else 0.0)
+
+metrics = [judge_m, key_m, json_m]
+
+# agents.WeightedMetric has .score() → compatible with MetricLoss
+loss_metric = WeightedMetric(
+    [("judge", judge_m, 0.40), ("key_match", key_m, 0.35), ("json", json_m, 0.25)],
+    name="composite_loss",
+)
+
+# ── 4. Fitter objective (used by PromptFitter internally) ────────────────────
+def composite_fn(query, response, expected=None, context=None):
+    """Score for the fitter's candidate ranking (query/response strings)."""
+    try:
+        pred = json.loads(response) if response else {}
+    except (json.JSONDecodeError, TypeError):
+        pred = {}
+    key_score = sum(1 for k in ["content", "next_action"] if k in pred) / 2
+    return key_score
+
+# ── 5. Search space ──────────────────────────────────────────────────────────
+space = PromptSearchSpace(
+    optimize_system_prompt=True,
+    optimize_few_shot=True,
+    optimize_model_params=True,
+    model_param_space={
+        "temperature": [0.0, 0.1, 0.2, 0.4],
+        "top_p":       [0.9, 1.0],
+    },
+)
+
+# ── 6. PromptFitterBridge ────────────────────────────────────────────────────
+fitter = PromptFitterBridge(
+    agent_name="my_agent",
+    task_model=model,
+    rewrite_model=model,
+    # local_agent is wired automatically from the live agent in optimize()
+    llm_base_url=entry.base_url,     # routes openai/ specs → local server
+    llm_api_key=entry.api_key or "local",
+    max_trials=8,
+    metric=CustomMetric(fn=composite_fn, name="composite"),
+    base_prompt_version="v1",
+    search_space=space,
+    optimizer="gepa_like",
+    min_absolute_improvement=0.02,
+    concurrency=2,
+    experiment_dir="reports/.fit",
+    auto_report=True,
+)
+
+# ── 7. compile → fit → evaluate ──────────────────────────────────────────────
+agent.compile(dataset, metrics=metrics, optimizer=fitter,
+              loss=MetricLoss(loss_metric))
+
+history = agent.fit(
+    dataset,
+    epochs=1,
+    validation_data=dataset.validation,
+    callbacks=[EarlyStopping(monitor="val_loss", patience=1, mode="min")],
+    max_trials=8,
+    search_space=space,
+    optimize_mode="gepa_like",
+    optimize_prompt=True,
+    optimize_params=True,
+    verbose=1,
+)
+
+print(f"History: {history.history}")
+print(f"Status:  {getattr(agent, '_last_optimize_status', '')!r}")
+
+report = agent.evaluate(dataset.test or dataset.validation, metrics)
+print(f"Scores:  {report.scores}")
+
+# ── 8. Report + apply ────────────────────────────────────────────────────────
+fit_result = getattr(agent, "_last_fit_result", None)
+if fit_result:
+    print(fit_result.summary())
+    print(f"Score history: {fit_result.history}")   # list[float]
+    generate_fit_report(fit_result, output_path="reports/fit.html")
+    # Persist the best prompt (set to True when satisfied):
+    # fit_result.apply(version="v2_fit", agent_dir="agents/my_agent")
+```
+
+!!! tip "Metric roles explained"
+    - **`agents.WeightedMetric` + `MetricLoss`** — drives the training loss that `fit()` minimises. Must use `agents.WeightedMetric` because it implements `score(example, prediction)`.
+    - **`OptimizeMetricAdapter`** — wraps any `optimize.BaseMetric` (e.g. `LocalJudgeMetric`) so it satisfies the `Metric` protocol expected by `agents.WeightedMetric`.
+    - **`CustomMetric`** — the fitter's internal objective, evaluated as `fn(query_str, response_str, expected_str)`. Separate from the training loss; used by `PromptFitter` to rank candidates.
+
+!!! warning "Do NOT use `optimize.CompositeMetric` directly as a MetricLoss"
+    `optimize.CompositeMetric` is designed for the `PromptFitter` pipeline (it takes string query/response args). For training loss, use `agents.WeightedMetric` wrapping `OptimizeMetricAdapter`-adapted metrics.
+
+---
+
 ### The 10-Step Fit Loop
 
 When you call `fitter.fit()`, the following steps execute:

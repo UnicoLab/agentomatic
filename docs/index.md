@@ -10,7 +10,7 @@ hide:
     <img src="assets/logo.png" width="300" alt="agentomatic logo">
   </p>
 
-  <h3>Drop agents, not code. :octicons-zap-24:</h3>
+  <h3>Drop agents, not code. ⚡</h3>
   <p><b>The zero-code multi-agent API platform framework.</b><br>
   Turn any Python function, LangGraph workflow, LangChain pipeline, or Deep Agent into a production-ready microservice — with auto-discovery, SSE streaming, thread persistence, visual debugging, and prompt optimization. Every agent, plugin, pipeline, endpoint, and ingestor is automatically callable <b>sync, async, batch, streaming, or as a tracked background task</b>, with a unified task board and a whole-platform status dashboard.</p>
 
@@ -18,7 +18,7 @@ hide:
     <a href="https://pypi.org/project/agentomatic/"><img src="https://img.shields.io/pypi/v/agentomatic.svg" alt="PyPI version"></a>
     <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
     <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
-    <img src="https://img.shields.io/badge/tests-1049%20passing-brightgreen.svg" alt="Tests passing">
+    <img src="https://img.shields.io/badge/tests-1185%20passing-brightgreen.svg" alt="Tests passing">
     <img src="https://img.shields.io/badge/framework-LangGraph%20%7C%20LangChain%20%7C%20Deep%20Agent%20%7C%20Python-purple.svg" alt="Frameworks">
   </p>
 </div>
@@ -139,11 +139,11 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
 
     [:octicons-arrow-right-24: CLI Reference](cli/commands.md)
 
-- :material-tune-vertical:{ .lg .middle } **Prompt Optimization**
+- :material-tune-vertical:{ .lg .middle } **Prompt Optimization & Local Training**
 
     ---
 
-    DSPy-inspired prompt tuning with **7 optimization strategies** and **8 evaluation metrics**. Generate synthetic datasets, run tuning loops, and track prompt version history with HTML reports.
+    DSPy-inspired prompt fitting with **5 optimizer strategies** (GEPA, MIPRO, rewrite, few-shot bootstrap, param search). Train against a local LLM — no cloud keys, no HTTP server — using the `compile → fit → evaluate` ML lifecycle.
 
     [:octicons-arrow-right-24: Optimization Guide](guide/optimization.md)
 
