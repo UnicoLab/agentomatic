@@ -19,7 +19,6 @@ from loguru import logger
 
 def _response_text(data: dict[str, Any]) -> str:
     """Prefer structured ``output`` dict, else string ``response``."""
-    import json
 
     output = data.get("output")
     if isinstance(output, dict) and output:
@@ -151,8 +150,12 @@ class AgentRunner:
                     invoke=invoke,
                 )
             else:
+                # fn is sync — run in a thread so the event loop stays free.
+                # Cast away the Awaitable branch: iscoroutinefunction already
+                # ruled it out, but mypy needs an explicit hint.
+                sync_fn: Callable[..., str] = fn  # type: ignore[assignment]
                 raw = await asyncio.to_thread(
-                    fn,
+                    sync_fn,
                     query,
                     prompt_override=prompt_override,
                     context=context,
