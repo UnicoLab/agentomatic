@@ -1496,8 +1496,9 @@ class TestWrapLocalAgent:
 
     @pytest.mark.asyncio
     async def test_wrap_output_dict(self):
-        from agentomatic.optimize.fitter import _wrap_local_agent
         import json
+
+        from agentomatic.optimize.fitter import _wrap_local_agent
 
         class FakeAgent:
             def transform(self, input_data):
@@ -1570,9 +1571,8 @@ class TestPromptFitterLocalMode:
     async def test_fit_local_callable_baseline_and_propose(self, tmp_path, monkeypatch):
         """Full baseline-evaluate → propose → candidate-evaluate cycle using only a
         local callable, mocked LLM, and an in-memory dataset."""
-        import asyncio
 
-        from agentomatic.optimize.dataset import Dataset, DataPoint
+        from agentomatic.optimize.dataset import DataPoint, Dataset
         from agentomatic.optimize.fitter import PromptFitter
         from agentomatic.optimize.metrics import ExactMatchMetric
         from agentomatic.optimize.runner import AgentRunner
@@ -1598,16 +1598,25 @@ class TestPromptFitterLocalMode:
         class EchoOptimizer(BaseFitterOptimizer):
             name: str = "echo"
 
-            async def propose(self, current_config, eval_results, dataset_sample,
-                              search_space, iteration=0, context=None):
+            async def propose(
+                self,
+                current_config,
+                eval_results,
+                dataset_sample,
+                search_space,
+                iteration=0,
+                context=None,
+            ):
                 # Return one candidate that is identical to the baseline
-                return [PromptCandidate(
-                    name=f"echo_{iteration:03d}",
-                    config=PromptRuntimeConfig(
-                        system_prompt=current_config.system_prompt + " (echo)",
-                    ),
-                    source="echo",
-                )]
+                return [
+                    PromptCandidate(
+                        name=f"echo_{iteration:03d}",
+                        config=PromptRuntimeConfig(
+                            system_prompt=current_config.system_prompt + " (echo)",
+                        ),
+                        source="echo",
+                    )
+                ]
 
         fitter = PromptFitter(
             agent="test_agent",
@@ -1651,9 +1660,13 @@ class TestPromptFitterLocalMode:
         from agentomatic.optimize.llm_caller import LLMCaller
 
         configured: list[tuple] = []
-        monkeypatch.setattr(LLMCaller, "configure",
-                            classmethod(lambda cls, base_url=None, api_key=None:
-                                        configured.append((base_url, api_key))))
+        monkeypatch.setattr(
+            LLMCaller,
+            "configure",
+            classmethod(
+                lambda cls, base_url=None, api_key=None: configured.append((base_url, api_key))
+            ),
+        )
 
         fitter_mod.PromptFitter(
             agent="test",
@@ -1768,7 +1781,9 @@ class TestPromptFitterBridgeLocalMode:
 # Helpers used inside the test module
 # ---------------------------------------------------------------------------
 
+
 def dataclass_like_optimizer(cls):
     """Minimal decorator: makes a class behave like a dataclass for the optimizer tests."""
     from dataclasses import dataclass
+
     return dataclass(slots=True)(cls)
