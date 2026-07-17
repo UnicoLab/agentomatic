@@ -341,10 +341,12 @@ class TestFullTemplateEnrichments:
         files = get_template_files("full", "demo_agent")
         train = files["train.py"]
         assert "WeightedMetric" in train
-        assert "METRICS = [" in train
-        assert '"exact_response"' in train
-        assert '"contains_terms"' in train
-        assert '"has_output"' in train
+        # New template uses PromptFitterBridge + LocalJudgeMetric pattern
+        assert "PromptFitterBridge" in train
+        assert "LocalJudgeMetric" in train
+        assert "OptimizeMetricAdapter" in train
+        assert "MetricLoss" in train
+        assert "loss_metric = WeightedMetric" in train
 
     def test_full_eval_uses_weighted_metric(self) -> None:
         files = get_template_files("full", "demo_agent")

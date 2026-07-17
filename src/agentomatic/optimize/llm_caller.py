@@ -115,7 +115,36 @@ class LLMCaller:
     Accepts both **string model specs** (e.g. ``"ollama/mistral:7b"``) and
     **custom callables** (async functions, LangChain models, etc.) via the
     :data:`~agentomatic.optimize.llm_types.LLMSpec` union type.
+
+    Class-level defaults for OpenAI-compatible servers can be set via
+    :meth:`configure`, which is useful when running against a local
+    OpenAI-compatible endpoint (omlx, Ollama, vLLM, LM Studio) rather
+    than ``api.openai.com``.
     """
+
+    # Class-level defaults — applied to every ``openai/`` call when set.
+    _default_base_url: str | None = None
+    _default_api_key: str | None = None
+
+    @classmethod
+    def configure(
+        cls,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        """Set class-level defaults for OpenAI-compatible API calls.
+
+        These defaults are used by every subsequent ``LLMCaller.call()``
+        with an ``openai/`` model spec unless the call explicitly passes
+        its own ``base_url`` / ``api_key``.
+
+        Args:
+            base_url: Base URL of the OpenAI-compatible server, e.g.
+                ``"http://127.0.0.1:8000/v1"``.
+            api_key: API key (may be arbitrary for local servers).
+        """
+        cls._default_base_url = base_url
+        cls._default_api_key = api_key
 
     # -----------------------------------------------------------------
     # Core call
@@ -131,6 +160,8 @@ class LLMCaller:
         max_tokens: int = 2000,
         json_mode: bool = False,
         timeout: float = 120.0,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> str:
         """Send a single prompt to *model* and return the generated text.
 
@@ -152,6 +183,14 @@ class LLMCaller:
             (supported by OpenAI and Ollama ``format: json``).
         timeout:
             HTTP / client timeout in seconds.
+        base_url:
+            Override the OpenAI-compatible server URL (``openai/``
+            provider only).  Falls back to :attr:`LLMCaller._default_base_url`
+            then to the ``OPENAI_BASE_URL`` env var.
+        api_key:
+            Override the API key (``openai/`` provider only).  Falls back
+            to :attr:`LLMCaller._default_api_key` then to the
+            ``OPENAI_API_KEY`` env var.
 
         Returns
         -------
@@ -174,6 +213,9 @@ class LLMCaller:
 
         # ── String: route to provider backend ────────────────────
         provider, model_name = parse_model_spec(model)
+        # Resolve effective base_url / api_key for OpenAI calls
+        eff_base_url = base_url or LLMCaller._default_base_url
+        eff_api_key = api_key or LLMCaller._default_api_key
         try:
             if provider == "ollama":
                 return await _call_ollama(
@@ -194,6 +236,8 @@ class LLMCaller:
                     max_tokens=max_tokens,
                     json_mode=json_mode,
                     timeout=timeout,
+                    base_url=eff_base_url,
+                    api_key=eff_api_key,
                 )
             if provider == "litellm":
                 return await _call_litellm(
@@ -231,6 +275,8 @@ class LLMCaller:
         temperature: float = 0.3,
         max_retries: int = 2,
         timeout: float = 120.0,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """Call the LLM expecting a JSON object response.
 
@@ -254,6 +300,10 @@ class LLMCaller:
             How many extra attempts after the first parse failure.
         timeout:
             HTTP / client timeout in seconds.
+        base_url:
+            Override the OpenAI-compatible server URL (``openai/`` only).
+        api_key:
+            Override the API key (``openai/`` only).
 
         Returns
         -------
@@ -289,6 +339,8 @@ class LLMCaller:
                 temperature=temperature,
                 json_mode=True,
                 timeout=timeout,
+                base_url=base_url,
+                api_key=api_key,
             )
             if not raw:
                 last_error = "empty response from LLM"
@@ -354,8 +406,10 @@ async def _call_openai(
     max_tokens: int = 2000,
     json_mode: bool = False,
     timeout: float = 120.0,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> str:
-    """Call the OpenAI chat completions API (lazy import)."""
+    """Call the OpenAI chat completions API (or any compatible server)."""
     import openai
 
     messages: list[dict[str, str]] = []
@@ -372,7 +426,13 @@ async def _call_openai(
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
 
-    client = openai.AsyncOpenAI(timeout=timeout)
+    client_kwargs: dict[str, Any] = {"timeout": timeout}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    if api_key:
+        client_kwargs["api_key"] = api_key
+
+    client = openai.AsyncOpenAI(**client_kwargs)
     async with client as c:
         response = await c.chat.completions.create(**kwargs)
         choice = response.choices[0]

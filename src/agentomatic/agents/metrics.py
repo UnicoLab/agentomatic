@@ -269,12 +269,29 @@ class WeightedMetric:
 class OptimizeMetricAdapter:
     """Adapt an ``agentomatic.optimize.BaseMetric`` to the ``Metric`` protocol.
 
-    This bridges the existing optimization metrics to the new
-    class-agent evaluation system.
+    This bridges the existing optimization metrics (e.g. ``LocalJudgeMetric``,
+    ``LLMJudgeMetric``, ``CompositeMetric``) to the class-agent evaluation
+    system, which expects a synchronous ``score(example, prediction) -> float``
+    interface.
+
+    The adapter correctly:
+    - Extracts ``query`` / ``expected`` from the ``AgentExample``
+    - Serialises the ``prediction`` dict to a JSON string as ``response``
+    - Awaits the async ``.evaluate()`` call via ``asyncio.run()`` (with a
+      thread-pool fallback when running inside an existing event loop)
 
     Args:
         optimize_metric: An instance of ``optimize.BaseMetric``.
         name: Optional override name.
+
+    Example::
+
+        from agentomatic.agents import OptimizeMetricAdapter
+        from agentomatic.optimize import LocalJudgeMetric
+
+        judge = LocalJudgeMetric(model="openai/my-local-model", criteria="...")
+        adapter = OptimizeMetricAdapter(judge, name="judge")
+        score = adapter.score(example, prediction)   # float in [0, 1]
     """
 
     def __init__(
@@ -290,19 +307,52 @@ class OptimizeMetricAdapter:
         example: AgentExample,
         prediction: dict[str, Any],
     ) -> float:
-        """Score by bridging to the optimize metric's interface."""
-        # optimize.BaseMetric expects RunResult-like objects
-        try:
-            from agentomatic.optimize.runner import RunResult
+        """Score by calling the wrapped optimize metric synchronously.
 
-            run_result = RunResult(
-                query=example.input.get("query", ""),
-                response=prediction.get("response", str(prediction)),
-                expected=example.expected_output.get("response")
-                if example.expected_output
-                else None,
-            )
-            result = self._metric.evaluate(run_result)
-            return float(getattr(result, "score", result))
+        Converts ``AgentExample`` + ``prediction`` to the
+        ``(query, response, expected)`` string tuple expected by
+        ``optimize.BaseMetric.evaluate()``, awaits the async result,
+        and returns the ``score`` as a ``float``.
+        """
+        import asyncio
+        import json as _json
+
+        # --- extract query ---
+        inp = example.input
+        if hasattr(inp, "get"):
+            query = inp.get("query", inp.get("current_query", ""))
+        else:
+            query = str(inp)
+
+        # --- serialise prediction as response string ---
+        response = (
+            _json.dumps(prediction, ensure_ascii=False)
+            if isinstance(prediction, dict)
+            else str(prediction)
+        )
+
+        # --- serialise expected output ---
+        exp_out = getattr(example, "expected_output", None)
+        expected = (
+            _json.dumps(exp_out, ensure_ascii=False)
+            if isinstance(exp_out, dict)
+            else (str(exp_out) if exp_out is not None else None)
+        )
+
+        # --- run evaluate() synchronously ---
+        coro = self._metric.evaluate(query, response, expected)
+        try:
+            result = asyncio.run(coro)
+        except RuntimeError:
+            # Already inside a running event loop (e.g. notebook, FastAPI handler)
+            import concurrent.futures
+
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    result = pool.submit(asyncio.run, coro).result(timeout=60)
+            except Exception:
+                return 0.5  # judge unavailable — neutral, don't crash training
         except Exception:
-            return 0.0
+            return 0.5  # judge unavailable — neutral, don't crash training
+
+        return float(getattr(result, "score", 0.5))
