@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptFitter Report — </title>
+  <style>
+    :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #c9d1d9; --text-dim: #8b949e; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding: 2rem; max-width: 1200px; margin: 0 auto; line-height: 1.6; }
+    h1 { font-size: 1.8rem; color: #f0f6fc; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.3rem; color: #f0f6fc; margin: 2rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #1c2128; color: var(--text-dim); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+    td { color: var(--text); }
+    code { background: #1c2128; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    footer { text-align: center; margin-top: 3rem; padding: 1rem; color: var(--text-dim); font-size: 0.85rem; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <h1>⚡ PromptFitter Report</h1>
+  <p style="color: #8b949e;">Agent: <strong style="color: #58a6ff;"></strong> | Experiment: <code>9eab3338e3bf</code> | 2026-07-20 07:51 UTC</p>
+
+  
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 2rem 0;">
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Baseline Score</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #f0883e;">0.0000</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Best Score</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #3fb950;">0.0000</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Absolute Improvement</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #f85149;">+0.0000</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Relative Improvement</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #f85149;">+0.0%</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Total Trials</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #58a6ff;">1</div>
+      </div>
+      <div class="kpi-card">
+        <div style="color: #8b949e; font-size: 0.85rem;">Duration</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #d2a8ff;">0.0s</div>
+      </div>
+    </div>
+    
+  
+  
+        <h2>📊 Metric Deltas</h2>
+        <table>
+          <thead><tr><th>Dimension</th><th>Delta</th></tr></thead>
+          <tbody>
+        <tr>
+          <td>composite</td>
+          <td style="color: #3fb950;">+0.0000</td>
+        </tr></tbody>
+        </table>
+        
+  
+        <h2>🔍 Failure Clusters</h2>
+        
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;">
+          <strong style="color: #f0883e;">severe_failures</strong>
+          <span style="color: #8b949e;"> (1 cases)</span>
+          <p style="color: #c9d1d9; margin: 0.5rem 0;">Responses scoring below 0.3 (1 cases)</p>
+          <p style="color: #3fb950; font-style: italic;">💡 Major prompt revision needed for these query types.</p>
+        </div>
+        
+  
+        <h2>💡 Recommendations</h2>
+        <ol style="color: #c9d1d9; line-height: 1.8;"><li>No configuration changes improved over the baseline.</li></ol>
+        
+  
+        <h2>🚀 Deployment Recommendation</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0;">
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Version</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #58a6ff;">v2_fit_9eab3338e3bf</div>
+          </div>
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Confidence</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #f85149;">no_improvement</div>
+          </div>
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Rollout Strategy</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #d2a8ff;">hold @ 0%</div>
+          </div>
+          <div class="kpi-card">
+            <div style="color: #8b949e; font-size: 0.85rem;">Monitor</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #c9d1d9;">0h</div>
+          </div>
+        </div>
+        
+        
+  
+    <h2>📝 Prompt Diff</h2>
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap;">
+
+    </div>
+    
+  
+
+  <footer>Generated by Agentomatic PromptFitter — 2026-07-20 07:51 UTC</footer>
+</body>
+</html>
