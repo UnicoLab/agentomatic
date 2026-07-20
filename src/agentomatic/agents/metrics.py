@@ -340,14 +340,18 @@ class OptimizeMetricAdapter:
         )
 
         # --- run evaluate() synchronously ---
-        coro = self._metric.evaluate(query, response, expected)
+        # Wrap the entire call (including coro creation) so that metrics whose
+        # evaluate() raises synchronously (non-coroutine callables that throw)
+        # are also handled gracefully.
         try:
+            coro = self._metric.evaluate(query, response, expected)
             result = asyncio.run(coro)
         except RuntimeError:
             # Already inside a running event loop (e.g. notebook, FastAPI handler)
             import concurrent.futures
 
             try:
+                coro = self._metric.evaluate(query, response, expected)
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     result = pool.submit(asyncio.run, coro).result(timeout=60)
             except Exception:
