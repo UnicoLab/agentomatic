@@ -56,8 +56,9 @@ def _make_example(
     )
 
 
-def _make_fit_result(score_history: list[float] | None = None,
-                     trials: list[dict] | None = None) -> PromptFitResult:
+def _make_fit_result(
+    score_history: list[float] | None = None, trials: list[dict] | None = None
+) -> PromptFitResult:
     return PromptFitResult(
         best_config=PromptRuntimeConfig(system_prompt="best"),
         baseline_config=PromptRuntimeConfig(system_prompt="baseline"),
@@ -175,12 +176,14 @@ class TestBug2LLMCallerBaseUrl:
 
     def setup_method(self):
         from agentomatic.optimize.llm_caller import LLMCaller
+
         # Snapshot original class-level state and restore in teardown
         self._orig_url = LLMCaller._default_base_url
         self._orig_key = LLMCaller._default_api_key
 
     def teardown_method(self):
         from agentomatic.optimize.llm_caller import LLMCaller
+
         LLMCaller._default_base_url = self._orig_url
         LLMCaller._default_api_key = self._orig_key
 
@@ -207,15 +210,14 @@ class TestBug2LLMCallerBaseUrl:
 
         captured: list[dict] = []
 
-        async def fake_call_openai(model_name, prompt, *, base_url=None,
-                                   api_key=None, **kw):
-            captured.append({"base_url": base_url, "api_key": api_key,
-                              "model": model_name})
+        async def fake_call_openai(model_name, prompt, *, base_url=None, api_key=None, **kw):
+            captured.append({"base_url": base_url, "api_key": api_key, "model": model_name})
             return "mocked response"
 
         with patch.object(mod, "_call_openai", fake_call_openai):
             result = await LLMCaller.call(
-                "openai/my-model", "hello",
+                "openai/my-model",
+                "hello",
                 base_url="http://127.0.0.1:8000/v1",
                 api_key="mykey",
             )
@@ -236,8 +238,7 @@ class TestBug2LLMCallerBaseUrl:
 
         captured: list[dict] = []
 
-        async def fake_call_openai(model_name, prompt, *,
-                                   base_url=None, api_key=None, **kw):
+        async def fake_call_openai(model_name, prompt, *, base_url=None, api_key=None, **kw):
             captured.append({"base_url": base_url, "api_key": api_key})
             return "ok"
 
@@ -255,19 +256,19 @@ class TestBug2LLMCallerBaseUrl:
 
         captured: list[dict] = []
 
-        async def fake_call_openai(model_name, prompt, *,
-                                   base_url=None, api_key=None, **kw):
+        async def fake_call_openai(model_name, prompt, *, base_url=None, api_key=None, **kw):
             captured.append({"base_url": base_url, "api_key": api_key})
             return "ok"
 
         with patch.object(mod, "_call_openai", fake_call_openai):
             await LLMCaller.call(
-                "openai/my-model", "hello",
-                base_url="http://override/v1", api_key="override_key",
+                "openai/my-model",
+                "hello",
+                base_url="http://override/v1",
+                api_key="override_key",
             )
 
-        assert captured == [{"base_url": "http://override/v1",
-                              "api_key": "override_key"}]
+        assert captured == [{"base_url": "http://override/v1", "api_key": "override_key"}]
 
     @pytest.mark.asyncio
     async def test_non_openai_provider_not_affected(self):
@@ -282,6 +283,7 @@ class TestBug2LLMCallerBaseUrl:
 
         with patch.object(mod, "_call_ollama", fake_ollama):
             from agentomatic.optimize.llm_caller import LLMCaller
+
             result = await LLMCaller.call("ollama/qwen2.5:7b", "hi")
 
         assert result == "ollama-response"
@@ -312,7 +314,7 @@ class TestBug3PromptFitResultHistory:
             {"round": 2, "phase": "full_val", "score": 0.72},
         ]
         result = _make_fit_result(trials=trials)
-        assert result.score_history == []   # not populated
+        assert result.score_history == []  # not populated
         h = result.history
         assert len(h) == 2
         assert h[0] == pytest.approx(0.65)
@@ -334,7 +336,7 @@ class TestBug3PromptFitResultHistory:
     def test_history_does_not_mutate_score_history(self):
         result = _make_fit_result(score_history=[0.6, 0.7])
         _ = result.history
-        _ = result.history   # calling twice must be stable
+        _ = result.history  # calling twice must be stable
         assert result.score_history == [0.6, 0.7]
 
     def test_score_history_field_persists_through_to_dict(self):
@@ -350,8 +352,14 @@ class TestBug3PromptFitResultHistory:
         result = _make_fit_result(
             score_history=[0.6, 0.75],
             trials=[
-                {"round": 1, "name": "c1", "source": "rewrite",
-                 "phase": "full_val", "score": 0.75, "dimensions": {}},
+                {
+                    "round": 1,
+                    "name": "c1",
+                    "source": "rewrite",
+                    "phase": "full_val",
+                    "score": 0.75,
+                    "dimensions": {},
+                },
             ],
         )
         out = tmp_path / "report.html"
@@ -375,24 +383,34 @@ class TestBug3PromptFitResultHistory:
         class StaticOptimizer(BaseFitterOptimizer):
             name: str = "static"
 
-            async def propose(self, current_config, eval_results, dataset_sample,
-                              search_space, iteration=0, context=None):
-                return []   # no candidates → rounds each produce no improvement
+            async def propose(
+                self,
+                current_config,
+                eval_results,
+                dataset_sample,
+                search_space,
+                iteration=0,
+                context=None,
+            ):
+                return []  # no candidates → rounds each produce no improvement
 
         async def run():
             async def fn(query, *, prompt_override, context, invoke):
                 return query.upper()
 
             fitter = PromptFitter(
-                agent="test", max_trials=1,
+                agent="test",
+                max_trials=1,
                 optimizer=StaticOptimizer(),
                 experiment_dir=str(tmp_path),
                 auto_report=False,
             )
             fitter._runner = AgentRunner(agent="test", agent_callable=fn)
 
-            points = [DataPoint(query="hi", expected_answer="HI"),
-                      DataPoint(query="bye", expected_answer="BYE")]
+            points = [
+                DataPoint(query="hi", expected_answer="HI"),
+                DataPoint(query="bye", expected_answer="BYE"),
+            ]
             ds = Dataset(points=points)
 
             result = await fitter.fit(ds, ds, ExactMatchMetric())
@@ -420,16 +438,20 @@ class TestBug4CompositeMetricScore:
         )
 
     def test_composite_metric_has_score_method(self):
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
+            ]
+        )
         assert hasattr(metric, "score")
         assert callable(metric.score)
 
     def test_score_returns_float(self):
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
+            ]
+        )
         ex = self._make_example()
         result = metric.score(ex, {"response": "world"})
         assert isinstance(result, float)
@@ -437,26 +459,32 @@ class TestBug4CompositeMetricScore:
 
     def test_score_perfect_match(self):
         """Custom always-1.0 sub-metric → composite returns 1.0."""
+
         class AlwaysOne(ExactMatchMetric):
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="one", score=1.0, reason="")
 
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("one", AlwaysOne(), weight=1.0),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("one", AlwaysOne(), weight=1.0),
+            ]
+        )
         ex = self._make_example()
         result = metric.score(ex, {"response": "anything"})
         assert result == pytest.approx(1.0)
 
     def test_score_zero_on_mismatch(self):
         """Custom always-0.0 sub-metric → composite returns 0.0."""
+
         class AlwaysZero(ExactMatchMetric):
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="zero", score=0.0, reason="")
 
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("zero", AlwaysZero(), weight=1.0),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("zero", AlwaysZero(), weight=1.0),
+            ]
+        )
         ex = self._make_example()
         result = metric.score(ex, {"response": "anything"})
         assert result == pytest.approx(0.0)
@@ -470,9 +498,11 @@ class TestBug4CompositeMetricScore:
                 received_expected.append(expected)
                 return EvalResult(metric_name="cap", score=0.5, reason="")
 
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("cap", CaptureExpected(), weight=1.0),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("cap", CaptureExpected(), weight=1.0),
+            ]
+        )
         expected_dict = {"answer": "42"}
         ex = self._make_example(expected=expected_dict)
         metric.score(ex, {"response": "r"})
@@ -485,9 +515,11 @@ class TestBug4CompositeMetricScore:
             async def evaluate(self, query, response, expected=None, context=None):
                 raise RuntimeError("sub-metric exploded")
 
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("broken", BrokenMetric(), weight=1.0),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("broken", BrokenMetric(), weight=1.0),
+            ]
+        )
         ex = self._make_example()
         result = metric.score(ex, {"response": "anything"})
         assert isinstance(result, float)
@@ -495,6 +527,7 @@ class TestBug4CompositeMetricScore:
 
     def test_score_weighted_average(self):
         """Weighted composite score is a weighted average of sub-scores."""
+
         class AlwaysOneMetric(ExactMatchMetric):
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="one", score=1.0, reason="")
@@ -503,19 +536,23 @@ class TestBug4CompositeMetricScore:
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="zero", score=0.0, reason="")
 
-        metric = CompositeMetric(metrics=[
-            FitterWeightedMetric("one",  AlwaysOneMetric(),  weight=0.75),
-            FitterWeightedMetric("zero", AlwaysZeroMetric(), weight=0.25),
-        ])
+        metric = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("one", AlwaysOneMetric(), weight=0.75),
+                FitterWeightedMetric("zero", AlwaysZeroMetric(), weight=0.25),
+            ]
+        )
         ex = self._make_example()
         result = metric.score(ex, {"response": "x"})
         assert result == pytest.approx(0.75)
 
     def test_score_usable_in_agents_weighted_metric(self):
         """agents.WeightedMetric accepts CompositeMetric as a component."""
-        cm = CompositeMetric(metrics=[
-            FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
-        ])
+        cm = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
+            ]
+        )
         # agents.WeightedMetric validates .score() in __init__
         wm = WeightedMetric(
             [("composite", cm, 1.0)],
@@ -527,6 +564,7 @@ class TestBug4CompositeMetricScore:
 
     def test_score_usable_in_metric_loss(self):
         """MetricLoss(CompositeMetric) computes 1 − score correctly."""
+
         class FixedScore(ExactMatchMetric):
             def __init__(self, s):
                 self._s = s
@@ -535,25 +573,31 @@ class TestBug4CompositeMetricScore:
                 return EvalResult(metric_name="fixed", score=self._s, reason="")
 
         # score=1.0 → loss=0.0
-        cm_high = CompositeMetric(metrics=[
-            FitterWeightedMetric("h", FixedScore(1.0), weight=1.0),
-        ])
+        cm_high = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("h", FixedScore(1.0), weight=1.0),
+            ]
+        )
         loss_high = MetricLoss(cm_high)
         ex = AgentExample(id="e1", input={"query": "q"})
         assert loss_high.compute(ex, {"response": "x"}) == pytest.approx(0.0)
 
         # score=0.0 → loss=1.0
-        cm_low = CompositeMetric(metrics=[
-            FitterWeightedMetric("l", FixedScore(0.0), weight=1.0),
-        ])
+        cm_low = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("l", FixedScore(0.0), weight=1.0),
+            ]
+        )
         loss_low = MetricLoss(cm_low)
         assert loss_low.compute(ex, {"response": "x"}) == pytest.approx(1.0)
 
     def test_score_with_non_dict_input(self):
         """Non-dict example.input is stringified to query."""
-        cm = CompositeMetric(metrics=[
-            FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
-        ])
+        cm = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("exact", ExactMatchMetric(), weight=1.0),
+            ]
+        )
         ex = AgentExample(id="e1", input={"current_query": "hello"})
         result = cm.score(ex, {"response": "anything"})
         assert isinstance(result, float)
@@ -579,6 +623,7 @@ class TestBug5OptimizeMetricAdapter:
     def test_score_returns_float_not_coroutine(self):
         class SyncMetric:
             name = "sync"
+
             def evaluate(self, *a, **kw):
                 return EvalResult(metric_name="sync", score=0.8, reason="")
 
@@ -593,6 +638,7 @@ class TestBug5OptimizeMetricAdapter:
     def test_score_returns_float_for_async_metric(self):
         class AsyncMetric:
             name = "async_m"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="async_m", score=0.9, reason="")
 
@@ -609,6 +655,7 @@ class TestBug5OptimizeMetricAdapter:
 
         class InspectMetric:
             name = "inspect"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 received.append(query)
                 return EvalResult(metric_name="inspect", score=0.5, reason="")
@@ -623,6 +670,7 @@ class TestBug5OptimizeMetricAdapter:
 
         class InspectMetric:
             name = "inspect"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 received.append(query)
                 return EvalResult(metric_name="inspect", score=0.5, reason="")
@@ -637,6 +685,7 @@ class TestBug5OptimizeMetricAdapter:
 
         class InspectMetric:
             name = "inspect"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 received_response.append(response)
                 return EvalResult(metric_name="inspect", score=0.5, reason="")
@@ -653,6 +702,7 @@ class TestBug5OptimizeMetricAdapter:
 
         class InspectMetric:
             name = "inspect"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 received_expected.append(expected)
                 return EvalResult(metric_name="inspect", score=0.5, reason="")
@@ -669,6 +719,7 @@ class TestBug5OptimizeMetricAdapter:
 
         class InspectMetric:
             name = "inspect"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 received_expected.append(expected)
                 return EvalResult(metric_name="inspect", score=0.5, reason="")
@@ -683,17 +734,19 @@ class TestBug5OptimizeMetricAdapter:
     def test_score_returns_neutral_on_exception(self):
         class FailMetric:
             name = "fail"
+
             async def evaluate(self, *a, **kw):
                 raise ConnectionError("judge server down")
 
         adapter = OptimizeMetricAdapter(FailMetric())
         ex = self._make_example()
         result = adapter.score(ex, {"response": "r"})
-        assert result == pytest.approx(0.5)   # neutral, not 0.0 crash
+        assert result == pytest.approx(0.5)  # neutral, not 0.0 crash
 
     def test_score_returns_neutral_on_sync_exception(self):
         class SyncFail:
             name = "sync_fail"
+
             def evaluate(self, *a, **kw):
                 raise ValueError("bad input")
 
@@ -706,8 +759,10 @@ class TestBug5OptimizeMetricAdapter:
 
     def test_usable_in_agents_weighted_metric(self):
         """OptimizeMetricAdapter satisfies agents.WeightedMetric's .score() check."""
+
         class FakeMetric:
             name = "fake"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="fake", score=0.8, reason="")
 
@@ -722,8 +777,10 @@ class TestBug5OptimizeMetricAdapter:
 
     def test_usable_in_metric_loss(self):
         """MetricLoss(WeightedMetric(OptimizeMetricAdapter)) computes correctly."""
+
         class ScoreMetric:
             name = "s"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="s", score=0.7, reason="")
 
@@ -737,6 +794,7 @@ class TestBug5OptimizeMetricAdapter:
     def test_name_inherited_from_metric(self):
         class FakeMetric:
             name = "my_judge"
+
             async def evaluate(self, *a, **kw):
                 return EvalResult(metric_name="my_judge", score=0.5, reason="")
 
@@ -746,6 +804,7 @@ class TestBug5OptimizeMetricAdapter:
     def test_name_override(self):
         class FakeMetric:
             name = "original"
+
             async def evaluate(self, *a, **kw):
                 return EvalResult(metric_name="original", score=0.5, reason="")
 
@@ -755,6 +814,7 @@ class TestBug5OptimizeMetricAdapter:
     def test_correct_score_value_propagated(self):
         """The score from EvalResult must be the value returned — not 0.0."""
         for expected_score in (0.0, 0.25, 0.5, 0.75, 1.0):
+
             class FixedScore:
                 name = "fixed"
                 _score = expected_score
@@ -766,8 +826,9 @@ class TestBug5OptimizeMetricAdapter:
             adapter = OptimizeMetricAdapter(FixedScore())
             ex = self._make_example()
             result = adapter.score(ex, {"response": "r"})
-            assert result == pytest.approx(expected_score), \
+            assert result == pytest.approx(expected_score), (
                 f"Expected {expected_score}, got {result}"
+            )
 
 
 # ===========================================================================
@@ -887,8 +948,15 @@ class TestEndToEndLocalTraining:
         class NoopOptimizer(BaseFitterOptimizer):
             name: str = "noop"
 
-            async def propose(self, current_config, eval_results, dataset_sample,
-                              search_space, iteration=0, context=None):
+            async def propose(
+                self,
+                current_config,
+                eval_results,
+                dataset_sample,
+                search_space,
+                iteration=0,
+                context=None,
+            ):
                 return []
 
         async def echo_fn(query, *, prompt_override, context, invoke):
@@ -903,10 +971,12 @@ class TestEndToEndLocalTraining:
         )
         fitter._runner = AgentRunner(agent="e2e", agent_callable=echo_fn)
 
-        ds = Dataset(points=[
-            DataPoint(query="hello", expected_answer="HELLO"),
-            DataPoint(query="world", expected_answer="WORLD"),
-        ])
+        ds = Dataset(
+            points=[
+                DataPoint(query="hello", expected_answer="HELLO"),
+                DataPoint(query="world", expected_answer="WORLD"),
+            ]
+        )
 
         result = await fitter.fit(ds, ds, ExactMatchMetric())
 
@@ -972,14 +1042,16 @@ class TestEndToEndLocalTraining:
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="low", score=0.3, reason="")
 
-        cm = CompositeMetric(metrics=[
-            FitterWeightedMetric("high", HighMetric(), weight=0.6),
-            FitterWeightedMetric("low",  LowMetric(),  weight=0.4),
-        ])
+        cm = CompositeMetric(
+            metrics=[
+                FitterWeightedMetric("high", HighMetric(), weight=0.6),
+                FitterWeightedMetric("low", LowMetric(), weight=0.4),
+            ]
+        )
         loss = MetricLoss(cm)
         ex = AgentExample(id="e", input={"query": "q"})
 
         computed = loss.compute(ex, {"response": "r"})
-        expected_score = 0.9 * 0.6 + 0.3 * 0.4   # = 0.66
+        expected_score = 0.9 * 0.6 + 0.3 * 0.4  # = 0.66
         expected_loss = 1.0 - expected_score
         assert computed == pytest.approx(expected_loss, abs=1e-6)

@@ -265,8 +265,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
         )
         style = refine_style_for(self.model)
         logger.info(
-            "RewriteOptimizer: analysing {} results for iteration {} "
-            "(passes={}, style={})",
+            "RewriteOptimizer: analysing {} results for iteration {} (passes={}, style={})",
             len(eval_results),
             iteration,
             passes,
@@ -277,9 +276,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
         failures = scored[: self.max_failures]
         successes = scored[-max(3, self.max_failures) :]
 
-        limits = briefing_limits_for(
-            str(self.model) if isinstance(self.model, str) else ""
-        )
+        limits = briefing_limits_for(str(self.model) if isinstance(self.model, str) else "")
         briefing = build_full_optimization_briefing(
             current_config=current_config,
             eval_results=eval_results,

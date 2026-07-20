@@ -178,7 +178,7 @@ def _stream_lines(client, name: str, query: str = "hello") -> list[str]:
     resp = client.post(f"{BASE}/{name}/invoke/stream", json={"query": query})
     assert resp.status_code == 200, resp.text
     return [
-        line[len("data: "):].strip()
+        line[len("data: ") :].strip()
         for line in resp.text.splitlines()
         if line.startswith("data: ")
     ]
@@ -273,11 +273,14 @@ class TestInvokeSync:
         assert r.json()["response"] == "Class:ping"
 
     def test_extra_fields_passed_through(self, client):
-        r = client.post(f"{BASE}/echo/invoke", json={
-            "query": "hi",
-            "user_id": "tester",
-            "prompt_version": "v1",
-        })
+        r = client.post(
+            f"{BASE}/echo/invoke",
+            json={
+                "query": "hi",
+                "user_id": "tester",
+                "prompt_version": "v1",
+            },
+        )
         assert r.status_code == 200
 
     def test_query_alias_current_query(self, client):
@@ -369,20 +372,26 @@ class TestChat:
             assert f in data, f"missing field {f}"
 
     def test_chat_with_explicit_thread_id(self, client):
-        r = client.post(f"{BASE}/echo/chat", json={
-            "content": "msg",
-            "thread_id": "thread-abc",
-        })
+        r = client.post(
+            f"{BASE}/echo/chat",
+            json={
+                "content": "msg",
+                "thread_id": "thread-abc",
+            },
+        )
         assert r.status_code == 200
         assert r.json()["thread_id"] == "thread-abc"
 
     def test_chat_with_store_creates_thread(self, client):
-        r = client.post(f"{BASE}/echo/chat", json={
-            "content": "first message",
-            "thread_id": "test-thread-1",
-            "persist": True,
-            "include_history": True,
-        })
+        r = client.post(
+            f"{BASE}/echo/chat",
+            json={
+                "content": "first message",
+                "thread_id": "test-thread-1",
+                "persist": True,
+                "include_history": True,
+            },
+        )
         assert r.status_code == 200
 
     def test_class_agent_chat(self, client):
@@ -403,13 +412,16 @@ class TestChat:
         assert r.status_code == 200
 
     def test_chat_with_user_supplied_messages(self, client):
-        r = client.post(f"{BASE}/echo/chat", json={
-            "content": "current message",
-            "messages": [
-                {"role": "user", "content": "previous"},
-                {"role": "assistant", "content": "reply"},
-            ],
-        })
+        r = client.post(
+            f"{BASE}/echo/chat",
+            json={
+                "content": "current message",
+                "messages": [
+                    {"role": "user", "content": "previous"},
+                    {"role": "assistant", "content": "reply"},
+                ],
+            },
+        )
         assert r.status_code == 200
 
 
@@ -513,10 +525,13 @@ class TestAgentCard:
 
 class TestA2ATasks:
     def _submit(self, client, content="A2A query", name="echo") -> dict:
-        r = client.post(f"{BASE}/{name}/a2a/tasks", json={
-            "message": {"content": content},
-            "metadata": {},
-        })
+        r = client.post(
+            f"{BASE}/{name}/a2a/tasks",
+            json={
+                "message": {"content": content},
+                "metadata": {},
+            },
+        )
         assert r.status_code == 200, r.text
         return r.json()
 
@@ -570,10 +585,13 @@ class TestThreads:
         assert "threads" in data or isinstance(data, list)
 
     def test_create_thread(self, client):
-        r = client.post(f"{BASE}/echo/threads", json={
-            "user_id": "user1",
-            "title": "Test Thread",
-        })
+        r = client.post(
+            f"{BASE}/echo/threads",
+            json={
+                "user_id": "user1",
+                "title": "Test Thread",
+            },
+        )
         assert r.status_code == 200
         data = r.json()
         assert "thread_id" in data or "id" in data
@@ -640,11 +658,14 @@ class TestThreads:
     def test_full_thread_lifecycle(self, client):
         """Create → chat (persist) → get messages → clear → delete."""
         # 1. Chat to produce a turn
-        chat_r = client.post(f"{BASE}/echo/chat", json={
-            "content": "lifecycle test",
-            "thread_id": "lifecycle-001",
-            "persist": True,
-        })
+        chat_r = client.post(
+            f"{BASE}/echo/chat",
+            json={
+                "content": "lifecycle test",
+                "thread_id": "lifecycle-001",
+                "persist": True,
+            },
+        )
         assert chat_r.status_code == 200
 
         # 2. Get messages
@@ -667,12 +688,15 @@ class TestThreads:
 
 class TestOptimizeInvoke:
     def test_optimize_invoke_200(self, client):
-        r = client.post(f"{BASE}/echo/optimize/invoke", json={
-            "query": "optimize me",
-            "user_id": "optimizer",
-            "include_retrieval_context": True,
-            "include_steps": True,
-        })
+        r = client.post(
+            f"{BASE}/echo/optimize/invoke",
+            json={
+                "query": "optimize me",
+                "user_id": "optimizer",
+                "include_retrieval_context": True,
+                "include_steps": True,
+            },
+        )
         assert r.status_code == 200
 
     def test_optimize_invoke_response_fields(self, client):
@@ -684,16 +708,22 @@ class TestOptimizeInvoke:
         assert "steps_taken" in data
 
     def test_optimize_invoke_with_prompt_override(self, client):
-        r = client.post(f"{BASE}/echo/optimize/invoke", json={
-            "query": "q",
-            "system_prompt_override": "new system prompt",
-        })
+        r = client.post(
+            f"{BASE}/echo/optimize/invoke",
+            json={
+                "query": "q",
+                "system_prompt_override": "new system prompt",
+            },
+        )
         assert r.status_code == 200
 
     def test_class_agent_optimize_invoke(self, client):
-        r = client.post(f"{BASE}/class_echo/optimize/invoke", json={
-            "query": "class optimize",
-        })
+        r = client.post(
+            f"{BASE}/class_echo/optimize/invoke",
+            json={
+                "query": "class optimize",
+            },
+        )
         assert r.status_code == 200
         assert "response" in r.json()
 
@@ -705,32 +735,41 @@ class TestOptimizeInvoke:
 
 class TestFeedback:
     def test_submit_feedback_200(self, client):
-        r = client.post(f"{BASE}/echo/feedback", json={
-            "query": "what is agentomatic?",
-            "response": "It is a platform.",
-            "rating": 5,
-            "user_id": "test-user",
-        })
+        r = client.post(
+            f"{BASE}/echo/feedback",
+            json={
+                "query": "what is agentomatic?",
+                "response": "It is a platform.",
+                "rating": 5,
+                "user_id": "test-user",
+            },
+        )
         assert r.status_code == 200
 
     def test_submit_thumbs_up(self, client):
-        r = client.post(f"{BASE}/echo/feedback", json={
-            "query": "q",
-            "response": "r",
-            "rating": 1,
-        })
+        r = client.post(
+            f"{BASE}/echo/feedback",
+            json={
+                "query": "q",
+                "response": "r",
+                "rating": 1,
+            },
+        )
         assert r.status_code == 200
 
     def test_submit_thumbs_down_with_correction(self, client):
         # rating must be 1-5 (ge=1, le=5) per FeedbackRequest schema
-        r = client.post(f"{BASE}/echo/feedback", json={
-            "query": "q",
-            "response": "r",
-            "rating": 1,
-            "correction": "The correct answer is X",
-            "comment": "Response was wrong",
-            "feedback_type": "correction",
-        })
+        r = client.post(
+            f"{BASE}/echo/feedback",
+            json={
+                "query": "q",
+                "response": "r",
+                "rating": 1,
+                "correction": "The correct answer is X",
+                "comment": "Response was wrong",
+                "feedback_type": "correction",
+            },
+        )
         assert r.status_code == 200
 
     def test_list_feedback_200(self, client):
@@ -744,11 +783,14 @@ class TestFeedback:
         assert r.status_code == 200
 
     def test_class_agent_feedback(self, client):
-        r = client.post(f"{BASE}/class_echo/feedback", json={
-            "query": "q",
-            "response": "r",
-            "rating": 5,
-        })
+        r = client.post(
+            f"{BASE}/class_echo/feedback",
+            json={
+                "query": "q",
+                "response": "r",
+                "rating": 5,
+            },
+        )
         assert r.status_code == 200
 
 
@@ -830,12 +872,8 @@ class TestProgrammaticRegistration:
         async def agent_b(state):
             return {"response": "B"}
 
-        p.register_agent(
-            manifest=AgentManifest(name="agent_a", slug="agent-a"), node_fn=agent_a
-        )
-        p.register_agent(
-            manifest=AgentManifest(name="agent_b", slug="agent-b"), node_fn=agent_b
-        )
+        p.register_agent(manifest=AgentManifest(name="agent_a", slug="agent-a"), node_fn=agent_a)
+        p.register_agent(manifest=AgentManifest(name="agent_b", slug="agent-b"), node_fn=agent_b)
         app = p.build()
 
         with TestClient(app) as c:
@@ -854,9 +892,7 @@ class TestProgrammaticRegistration:
         async def fn(state):
             return {"response": "custom"}
 
-        p.register_agent(
-            manifest=AgentManifest(name="myagent", slug="myagent-slug"), node_fn=fn
-        )
+        p.register_agent(manifest=AgentManifest(name="myagent", slug="myagent-slug"), node_fn=fn)
         app = p.build()
         with TestClient(app) as c:
             r = c.post("/custom/v2/myagent/invoke", json={"query": "q"})
@@ -871,8 +907,13 @@ class TestProgrammaticRegistration:
 
 class TestResponseShape:
     CANONICAL_FIELDS = {
-        "response", "agent_type", "duration_ms", "metadata",
-        "suggestions", "citations", "steps_taken",
+        "response",
+        "agent_type",
+        "duration_ms",
+        "metadata",
+        "suggestions",
+        "citations",
+        "steps_taken",
     }
 
     def test_invoke_canonical_fields(self, client):
