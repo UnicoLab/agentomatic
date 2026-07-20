@@ -413,6 +413,7 @@ def test_resolve_env_deep(monkeypatch):
 
 
 async def test_database_connection_create_store_shares_engine():
+    pytest.importorskip("sqlalchemy")
     from agentomatic.connections.database import DatabaseConnection
 
     conn = DatabaseConnection(

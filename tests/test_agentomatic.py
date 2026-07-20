@@ -257,6 +257,7 @@ class TestLLMFactory:
     """Test LLM factory."""
 
     def test_dummy_provider(self):
+        pytest.importorskip("langchain_core")
         from agentomatic.providers.llm import get_llm, reset_llm
 
         reset_llm()
@@ -265,6 +266,7 @@ class TestLLMFactory:
         reset_llm()
 
     def test_singleton(self):
+        pytest.importorskip("langchain_core")
         from agentomatic.providers.llm import get_llm, reset_llm
 
         reset_llm()
@@ -382,6 +384,7 @@ class TestStateReducers:
         assert _last_value(1, None) == 1
 
     def test_add_messages(self):
+        pytest.importorskip("langchain_core")
         from langchain_core.messages import AIMessage, HumanMessage
 
         from agentomatic.core.state import add_messages

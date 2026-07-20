@@ -6,6 +6,8 @@ import time
 
 import pytest
 
+pytest.importorskip("sqlalchemy")
+
 from agentomatic.tasks import SQLAlchemyTaskStore
 from agentomatic.tasks.models import TargetType, TaskRecord, TaskStatus
 
