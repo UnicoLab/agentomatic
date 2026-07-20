@@ -2708,6 +2708,9 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
   adapt per model class. Knobs: <code>rewrite_passes</code>, <code>multipass</code>,
   <code>slm_multipass</code>, <code>llm_multipass</code>, <code>slm_default_passes</code>,
   <code>llm_default_passes</code>. See <a href="../guide/optimization/">Optimization</a>.</li>
+<li><strong><code>gemini/</code> optimize provider</strong>: <code>LLMCaller</code> routes
+  <code>gemini/gemini-…</code> via the Generative Language API (<code>GEMINI_API_KEY</code>).
+  Live suite: <code>tests/test_live_gemini_optimize.py</code>.</li>
 <li><strong>Thinking / reasoning LLMs</strong>: <code>message_text</code>, <code>message_thinking</code>,
   <code>strip_thinking_for_json</code>, <code>astream_with_thinking</code>, and
   <code>invoke_with_retry(strip_thinking=…)</code> normalize Qwen3 / tagged <code>&lt;think&gt;</code> /
