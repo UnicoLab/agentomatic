@@ -1,0 +1,92 @@
+{
+  "experiment_id": "63a30b48776f",
+  "agent": "",
+  "best_score": 0.0,
+  "baseline_score": 0.0,
+  "absolute_improvement": 0.0,
+  "score_history": [],
+  "metric_deltas": {
+    "composite": 0.0
+  },
+  "param_suggestions": {},
+  "best_config": {
+    "system_prompt": "You are a helpful AI assistant.",
+    "user_template": null,
+    "few_shot_examples": [],
+    "output_contract": null,
+    "model_params": {
+      "temperature": 0.0,
+      "top_p": 0.7,
+      "max_tokens": 800
+    },
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "baseline_config": {
+    "system_prompt": "You are a helpful AI assistant.",
+    "user_template": null,
+    "few_shot_examples": [],
+    "output_contract": null,
+    "model_params": {
+      "temperature": 0.0,
+      "top_p": 0.7,
+      "max_tokens": 800
+    },
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "failure_clusters": [
+    {
+      "label": "severe_failures",
+      "description": "Responses scoring below 0.3 (1 cases)",
+      "count": 1,
+      "suggested_fix": "Major prompt revision needed for these query types.",
+      "severity": 0.9
+    }
+  ],
+  "trials": [
+    {
+      "round": 1,
+      "name": "rewrite_000",
+      "source": "rewrite",
+      "phase": "minibatch",
+      "score": 0.0,
+      "dimensions": {},
+      "mutation_notes": "Full prompt rewrite at iteration 0. Analysed 1 failures (avg score 0.000) and 1 successes. Context: 0 rounds history, baseline=0.000, current=0.000."
+    }
+  ],
+  "suggestions": [
+    "No configuration changes improved over the baseline."
+  ],
+  "duration_seconds": 0.01,
+  "deployment_recommendation": {
+    "prompt_version": "v2_fit_63a30b48776f",
+    "confidence": "no_improvement",
+    "model_params": {
+      "temperature": 0.0,
+      "top_p": 0.7,
+      "max_tokens": 800
+    },
+    "deployment_recommendation": {
+      "rollout": "hold",
+      "weight": 0.0,
+      "monitoring_hours": 0
+    },
+    "monitoring": {
+      "metrics": [
+        "composite"
+      ],
+      "rollback_threshold": -0.03,
+      "rollback_instructions": "If 'composite' drops below baseline, rollback to You are a helpful AI assistant... (previous version)."
+    },
+    "expected_improvement": 0.0,
+    "baseline_score": 0.0,
+    "projected_score": 0.0
+  }
+}

@@ -1717,11 +1717,13 @@ load_environment(ROOT.parent / ".env")        # load .env one level up
 stacks = StackManager(ROOT / "stacks")
 stacks.load(STACK)
 apply_stack_defaults(stacks)
-entry  = stacks.get_llm_config("default")
-model  = _model_spec(entry)
+entry        = stacks.get_llm_config("default")
+rewrite_entry = stacks.get_llm_config_or_default("rewrite")  # falls back to default
+model         = _model_spec(entry)
+rewrite_model = _model_spec(rewrite_entry)
 REPORTS.mkdir(parents=True, exist_ok=True)
 
-print(f"stack={{STACK!r}}  model={{model}}  base_url={{entry.base_url!r}}")
+print(f"stack={{STACK!r}}  model={{model}}  rewrite_model={{rewrite_model}}")
 
 # ---------------------------------------------------------------------------
 # 1) Data
@@ -1781,7 +1783,7 @@ space = PromptSearchSpace(
 fitter = PromptFitterBridge(
     agent_name=AGENT,
     task_model=model,
-    rewrite_model=model,
+    rewrite_model=rewrite_model,          # dedicated SLM for prompt rewriting
     # local_agent is wired automatically from the live agent in optimize()
     llm_base_url=entry.base_url,          # routes openai/ specs to local server
     llm_api_key=entry.api_key or "local",

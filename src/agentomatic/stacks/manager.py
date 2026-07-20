@@ -292,8 +292,27 @@ class StackManager:
                 }
         return LLMStackEntry.model_validate(data)
 
+    def get_llm_config_or_default(self, name: str, default: str = "default") -> LLMStackEntry:
+        """Return *name* LLM config, falling back to *default* when not found.
+
+        Convenience wrapper for training scripts that optionally use a
+        dedicated rewrite/judge model but must not crash when the profile
+        is absent from the stack.
+
+        Args:
+            name: Preferred profile name (e.g. ``"rewrite"``, ``"judge"``).
+            default: Fallback profile name (default: ``"default"``).
+
+        Returns:
+            The LLM config for *name* if it exists, otherwise *default*.
+        """
+        try:
+            return self.get_llm_config(name)
+        except ValueError:
+            return self.get_llm_config(default)
+
     def get_settings(self) -> PlatformSettings:
-        """Construct a :class:`PlatformSettings` from the active stack.
+        """Construct a :class:`PlatformSettings`` from the active stack.
 
         Returns:
             A fully populated ``PlatformSettings`` instance.
