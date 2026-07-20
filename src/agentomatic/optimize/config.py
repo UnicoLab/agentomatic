@@ -424,6 +424,7 @@ class PromptFitResult:
             "best_score": self.best_score,
             "baseline_score": self.baseline_score,
             "absolute_improvement": self.absolute_improvement,
+            "score_history": self.score_history,
             "metric_deltas": self.metric_deltas,
             "param_suggestions": {k: asdict(v) for k, v in self.param_suggestions.items()},
             "best_config": self.best_config.to_dict(),
