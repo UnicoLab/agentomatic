@@ -6,7 +6,8 @@ synthesis, etc.  Instead of each module importing *httpx* and
 calling Ollama directly, every call goes through
 :class:`LLMCaller` which handles:
 
-* **Provider routing** — ``ollama/``, ``openai/``, ``litellm/`` prefixes.
+* **Provider routing** — ``ollama/``, ``openai/``, ``omlx/``, ``litellm/``
+  prefixes (``omlx/`` targets a local OpenAI-compatible server).
 * **Callable dispatch** — custom async/sync callables and LangChain
   models are transparently supported via :data:`LLMSpec`.
 * **Graceful degradation** — failures are logged and an empty string
@@ -27,6 +28,7 @@ Example
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -41,8 +43,9 @@ if TYPE_CHECKING:
 
 _OLLAMA_BASE_URL = "http://localhost:11434"
 _OLLAMA_GENERATE_ENDPOINT = f"{_OLLAMA_BASE_URL}/api/generate"
+_DEFAULT_OMLX_BASE_URL = "http://127.0.0.1:8000/v1"
 
-_SUPPORTED_PROVIDERS = ("ollama", "openai", "litellm")
+_SUPPORTED_PROVIDERS = ("ollama", "openai", "litellm", "omlx")
 
 # Regex for stripping markdown code fences (```json ... ``` or ``` ... ```)
 _CODE_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)```", re.DOTALL)
@@ -239,6 +242,19 @@ class LLMCaller:
                     base_url=eff_base_url,
                     api_key=eff_api_key,
                 )
+            if provider == "omlx":
+                return await _call_openai(
+                    model_name,
+                    prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    timeout=timeout,
+                    base_url=os.getenv("OMLX_BASE_URL", _DEFAULT_OMLX_BASE_URL),
+                    api_key=os.getenv("OMLX_API_KEY") or os.getenv("OPENAI_API_KEY") or "omlx",
+                    disable_thinking=True,
+                )
             if provider == "litellm":
                 return await _call_litellm(
                     model_name,
@@ -397,6 +413,26 @@ async def _call_ollama(
         return str(resp.json().get("response", "")).strip()
 
 
+def _normalize_llm_text(text: str) -> str:
+    """Strip thinking / reasoning preambles before returning optimize text."""
+    from agentomatic.providers.message_utils import strip_thinking_for_json
+
+    return strip_thinking_for_json(text or "").strip()
+
+
+def _is_openai_compatible_local(base_url: str | None) -> bool:
+    """Return True when *base_url* looks like a local OpenAI-compatible server."""
+    if not base_url:
+        return False
+    lowered = base_url.lower()
+    if "api.openai.com" in lowered:
+        return False
+    return any(
+        token in lowered
+        for token in ("127.0.0.1", "localhost", "0.0.0.0", ":8000", ":11434", ":1234")
+    )
+
+
 async def _call_openai(
     model_name: str,
     prompt: str,
@@ -408,8 +444,15 @@ async def _call_openai(
     timeout: float = 120.0,
     base_url: str | None = None,
     api_key: str | None = None,
+    disable_thinking: bool | None = None,
 ) -> str:
-    """Call the OpenAI chat completions API (or any compatible server)."""
+    """Call OpenAI or an OpenAI-compatible chat completions API.
+
+    Honours explicit *base_url* / *api_key*, then ``LLMCaller`` defaults /
+    env vars. For local compatible servers (oMLX, vLLM, …) thinking is
+    disabled via ``chat_template_kwargs`` and residual thinking preambles
+    are stripped from the returned text.
+    """
     import openai
 
     messages: list[dict[str, str]] = []
@@ -426,17 +469,34 @@ async def _call_openai(
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
 
+    resolved_base = base_url or os.getenv("OPENAI_BASE_URL") or None
     client_kwargs: dict[str, Any] = {"timeout": timeout}
-    if base_url:
-        client_kwargs["base_url"] = base_url
+    if resolved_base:
+        client_kwargs["base_url"] = resolved_base
     if api_key:
         client_kwargs["api_key"] = api_key
+
+    if disable_thinking is None:
+        disable_thinking = _is_openai_compatible_local(resolved_base)
+    if disable_thinking:
+        # oMLX / Qwen3.x: top-level chat_template_kwargs disables CoT leakage.
+        kwargs["extra_body"] = {
+            "chat_template_kwargs": {"enable_thinking": False},
+            "enable_thinking": False,
+        }
 
     client = openai.AsyncOpenAI(**client_kwargs)
     async with client as c:
         response = await c.chat.completions.create(**kwargs)
         choice = response.choices[0]
-        return (choice.message.content or "").strip()
+        message = choice.message
+        content = message.content or ""
+        reasoning = getattr(message, "reasoning_content", None) or ""
+        if content:
+            return _normalize_llm_text(content)
+        if reasoning:
+            return _normalize_llm_text(str(reasoning))
+        return ""
 
 
 async def _call_litellm(
@@ -463,4 +523,4 @@ async def _call_litellm(
         max_tokens=max_tokens,
         timeout=timeout,
     )
-    return (response.choices[0].message.content or "").strip()
+    return _normalize_llm_text(response.choices[0].message.content or "")

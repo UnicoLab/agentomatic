@@ -334,7 +334,7 @@ class AgentRunner:
                     context=point.get("context"),
                     invoke=invoke,
                 )
-                result.expected = point.get("expected_answer")
+                result.expected = point.get("expected_answer") or point.get("expected")
                 if not result.context:
                     result.context = point.get("context", [])
                 return result

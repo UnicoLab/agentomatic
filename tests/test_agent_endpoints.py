@@ -325,8 +325,11 @@ class TestInvokeStream:
         lines = _stream_lines(client, "class_echo", "streamed")
         assert "[DONE]" in lines
         frames = [ln for ln in lines if ln and ln != "[DONE]"]
-        first = json.loads(frames[0])
-        assert first["response"] == "Class:streamed"
+        # Class agents may emit per-node frames before the final payload.
+        payloads = [json.loads(ln) for ln in frames]
+        finals = [p for p in payloads if isinstance(p, dict) and "response" in p]
+        assert finals
+        assert finals[-1]["response"] == "Class:streamed"
 
     def test_failing_agent_stream_returns_error_frame(self, client):
         r = client.post(f"{BASE}/failer/invoke/stream", json={"query": "fail"})

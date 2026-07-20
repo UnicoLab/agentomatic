@@ -54,6 +54,45 @@ if TYPE_CHECKING:
     from agentomatic.optimize.llm_types import LLMSpec
 
 # =====================================================================
+# Sample normalization helpers
+# =====================================================================
+
+
+def _sample_as_dict(sample: Any) -> dict[str, Any]:
+    """Normalize a dataset sample (dict or DataPoint-like) to a plain dict."""
+    if isinstance(sample, dict):
+        return sample
+    if hasattr(sample, "to_dict") and callable(sample.to_dict):
+        data = sample.to_dict()
+        if isinstance(data, dict):
+            return data
+    return {
+        "query": getattr(sample, "query", getattr(sample, "input", "")),
+        "expected_answer": getattr(
+            sample,
+            "expected_answer",
+            getattr(sample, "expected", getattr(sample, "output", None)),
+        ),
+        "expected": getattr(
+            sample,
+            "expected",
+            getattr(sample, "expected_answer", getattr(sample, "output", None)),
+        ),
+        "context": getattr(sample, "context", None) or [],
+        "metadata": getattr(sample, "metadata", None) or {},
+    }
+
+
+def _sample_field(sample: Any, *keys: str, default: Any = "N/A") -> Any:
+    """Read the first present field from a dict or DataPoint-like sample."""
+    data = _sample_as_dict(sample)
+    for key in keys:
+        if key in data and data[key] is not None:
+            return data[key]
+    return default
+
+
+# =====================================================================
 # Perspectives used by MIPRO-like instruction generation
 # =====================================================================
 
@@ -744,8 +783,14 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             shown = samples[:3]
             sample_lines = []
             for s in shown:
-                query = s.get("query", s.get("input", "N/A"))
-                expected = s.get("expected", s.get("output", "N/A"))
+                query = _sample_field(s, "query", "input", default="N/A")
+                expected = _sample_field(
+                    s,
+                    "expected_answer",
+                    "expected",
+                    "output",
+                    default="N/A",
+                )
                 sample_lines.append(f"  Q: {str(query)[:200]}")
                 sample_lines.append(f"  A: {str(expected)[:200]}")
             sample_str = "\n".join(sample_lines)

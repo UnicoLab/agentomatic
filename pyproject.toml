@@ -177,6 +177,7 @@ asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow",
     "integration: integration tests",
+    "live: requires a reachable local LLM (oMLX / OpenAI-compatible)",
 ]
 
 # ---------------------------------------------------------------------------

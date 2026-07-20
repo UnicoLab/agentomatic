@@ -18,6 +18,7 @@ classes degrade gracefully when deepeval is not installed.
 from __future__ import annotations
 
 import difflib
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -27,6 +28,28 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from agentomatic.optimize.llm_types import LLMSpec
+
+
+def _prefer_raw_llm_judge(model: Any) -> bool:
+    """Return True when DeepEval should be skipped for *model*.
+
+    Local OpenAI-compatible servers (oMLX, vLLM, …) and explicit ``omlx/``
+    specs are not routable by DeepEval; attempting that path burns long
+    retries before the honest raw-LLM fallback runs.
+    """
+    if not isinstance(model, str):
+        return True
+    lowered = model.lower()
+    if lowered.startswith("omlx/"):
+        return True
+    if os.getenv("OMLX_BASE_URL") or os.getenv("OMLX_API_KEY"):
+        if lowered.startswith("openai/") or "/" not in model:
+            return True
+    base = (os.getenv("OPENAI_BASE_URL") or "").lower()
+    if base and "api.openai.com" not in base and lowered.startswith("openai/"):
+        return True
+    return False
+
 
 # =====================================================================
 # Result container
@@ -179,13 +202,21 @@ class LLMJudgeMetric(BaseMetric):
         expected: str | None = None,
         context: list[str] | None = None,
     ) -> EvalResult:
-        # Try deepeval first
+        # Skip deepeval for local OpenAI-compatible / oMLX specs — DeepEval
+        # cannot route those models and its retries burn minutes before
+        # falling through to the raw-LLM judge.
+        if _prefer_raw_llm_judge(self.model):
+            return await self._eval_llm(query, response, expected, context)
+
+        # Try deepeval first; any failure (missing key, bad model, …)
+        # falls through to the honest raw-LLM judge path.
         try:
             return await self._eval_deepeval(query, response, expected, context)
         except ImportError:
             pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("deepeval LLMJudge path failed, using raw LLM: {}", exc)
 
-        # Fallback: use raw LLM call
         return await self._eval_llm(query, response, expected, context)
 
     async def _eval_deepeval(
@@ -225,7 +256,7 @@ class LLMJudgeMetric(BaseMetric):
     ) -> EvalResult:
         """Fallback LLM-based evaluation without deepeval."""
         try:
-            from agentomatic.optimize.llm_types import call_llm
+            from agentomatic.optimize.llm_types import call_llm_json
 
             prompt = (
                 "You are an evaluation judge. Score the following "
@@ -236,30 +267,31 @@ class LLMJudgeMetric(BaseMetric):
             )
             if expected:
                 prompt += f"EXPECTED ANSWER: {expected}\n\n"
+            if context:
+                prompt += f"CONTEXT:\n{chr(10).join(context[:3])}\n\n"
             prompt += 'Reply with ONLY a JSON object: {"score": 0.X, "reason": "..."}\n'
 
-            text = await call_llm(self.model, prompt)
-
-            import json as json_mod
-
-            # Try to parse JSON from response
-            for line in text.split("\n"):
-                line = line.strip()
-                if line.startswith("{"):
-                    data = json_mod.loads(line)
-                    return EvalResult(
-                        metric_name=self.name,
-                        score=float(data.get("score", 0.0)),
-                        reason=data.get("reason", ""),
-                    )
+            data = await call_llm_json(self.model, prompt, temperature=0.1)
+            if not data or "score" not in data:
+                return EvalResult(
+                    metric_name=self.name,
+                    score=0.0,
+                    reason="LLM judge returned no parseable score",
+                    metadata={"evaluation_failed": True},
+                )
+            return EvalResult(
+                metric_name=self.name,
+                score=max(0.0, min(1.0, float(data.get("score", 0.0)))),
+                reason=str(data.get("reason", "")),
+            )
         except Exception as exc:
             logger.warning(f"LLM judge fallback failed: {exc}")
-
-        return EvalResult(
-            metric_name=self.name,
-            score=0.5,
-            reason="Could not evaluate — defaulting to 0.5",
-        )
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason=f"LLM judge evaluation failed: {exc}",
+                metadata={"evaluation_failed": True},
+            )
 
 
 class CustomMetric(BaseMetric):
@@ -341,6 +373,11 @@ class GEvalMetric(BaseMetric):
         expected: str | None = None,
         context: list[str] | None = None,
     ) -> EvalResult:
+        if _prefer_raw_llm_judge(self.model):
+            return await self._fallback_eval(query, response, expected)
+
+        # Try deepeval first; any failure (missing key, bad model, …)
+        # falls through to the honest raw-LLM judge path.
         try:
             from deepeval.metrics import GEval
             from deepeval.test_case import LLMTestCase, LLMTestCaseParams
@@ -374,7 +411,13 @@ class GEvalMetric(BaseMetric):
                 "deepeval not installed — falling back to raw LLM judge for GEvalMetric '%s'",
                 self.name,
             )
-            return await self._fallback_eval(query, response, expected)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "deepeval GEval path failed, using raw LLM: {}",
+                exc,
+            )
+
+        return await self._fallback_eval(query, response, expected)
 
     async def _fallback_eval(
         self,
@@ -382,9 +425,9 @@ class GEvalMetric(BaseMetric):
         response: str,
         expected: str | None,
     ) -> EvalResult:
-        """Raw Ollama call when deepeval is not available."""
+        """Raw LLM call when deepeval is not available."""
         try:
-            from agentomatic.optimize.llm_types import call_llm
+            from agentomatic.optimize.llm_types import call_llm_json
 
             steps_text = ""
             if self.evaluation_steps:
@@ -410,30 +453,27 @@ class GEvalMetric(BaseMetric):
                 '{"score": 0.X, "reason": "..."}\n'
             )
 
-            text = await call_llm(self.model, prompt)
-
-            import json as json_mod
-
-            for line in text.split("\n"):
-                line = line.strip()
-                if line.startswith("{"):
-                    data = json_mod.loads(line)
-                    return EvalResult(
-                        metric_name=self.name,
-                        score=max(
-                            0.0,
-                            min(1.0, float(data.get("score", 0.0))),
-                        ),
-                        reason=data.get("reason", ""),
-                    )
+            data = await call_llm_json(self.model, prompt, temperature=0.1)
+            if not data or "score" not in data:
+                return EvalResult(
+                    metric_name=self.name,
+                    score=0.0,
+                    reason="GEval evaluation failed — no parseable score",
+                    metadata={"evaluation_failed": True},
+                )
+            return EvalResult(
+                metric_name=self.name,
+                score=max(0.0, min(1.0, float(data["score"]))),
+                reason=str(data.get("reason", "")),
+            )
         except Exception as exc:
             logger.warning("GEvalMetric fallback failed: %s", exc)
-
-        return EvalResult(
-            metric_name=self.name,
-            score=0.5,
-            reason="Could not evaluate — defaulting to 0.5",
-        )
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason=f"GEval evaluation failed: {exc}",
+                metadata={"evaluation_failed": True},
+            )
 
 
 class DeepEvalMetric(BaseMetric):
@@ -744,10 +784,20 @@ def resolve_metrics(
 def _resolve_single(name: str, model: LLMSpec) -> BaseMetric:
     """Resolve a single metric name to a BaseMetric instance."""
 
-    # ── geval:criteria shorthand ─────────────────────────────────
+    # ── geval:criteria / llm_judge:criteria shorthand ────────────
     if name.startswith("geval:"):
         criteria = name[len("geval:") :].strip()
         return GEvalMetric(criteria=criteria, model=model)
+
+    if name.startswith("llm_judge:"):
+        criteria = name[len("llm_judge:") :].strip() or "Is the response correct and helpful?"
+        return LLMJudgeMetric(criteria=criteria, model=model)
+
+    if name == "llm_judge":
+        return LLMJudgeMetric(
+            criteria="Is the response correct, complete, and helpful?",
+            model=model,
+        )
 
     # ── red_team ──────────────────────────────────────────────────
     if name == "red_team":
@@ -765,7 +815,7 @@ def _resolve_single(name: str, model: LLMSpec) -> BaseMetric:
         f"Unknown metric: '{name}'. "
         f"Built-in: {list(_BUILTIN_METRICS.keys())}. "
         f"DeepEval: {sorted(_DEEPEVAL_METRICS.keys())}. "
-        f"Special: ['geval:<criteria>', 'red_team']. "
+        f"Special: ['geval:<criteria>', 'llm_judge', 'llm_judge:<criteria>', 'red_team']. "
         f"Or pass a BaseMetric / CustomMetric / DeepEvalMetric instance."
     )
 
@@ -860,6 +910,11 @@ class CompositeMetric(BaseMetric):
             raise ValueError("Total weight must be positive")
         self._total_weight = total_weight
 
+    @property
+    def metrics(self) -> list[WeightedMetric]:
+        """Weighted sub-metrics that make up this composite."""
+        return self._metrics
+
     async def evaluate(
         self,
         query: str,
@@ -877,21 +932,42 @@ class CompositeMetric(BaseMetric):
         dimensions: dict[str, float] = {}
         feedback_parts: list[str] = []
         weighted_sum = 0.0
+        active_weight = 0.0
+        failed_count = 0
 
         for wm in self._metrics:
             try:
                 result = await wm.metric.evaluate(query, response, expected, context)
+                if (result.metadata or {}).get("evaluation_failed"):
+                    failed_count += 1
+                    dimensions[wm.name] = 0.0
+                    if result.reason:
+                        feedback_parts.append(f"[{wm.name}] {result.reason}")
+                    continue
                 dimensions[wm.name] = result.score
                 weighted_sum += result.score * wm.weight
+                active_weight += wm.weight
                 if result.reason:
                     feedback_parts.append(f"[{wm.name}] {result.reason}")
             except Exception as exc:
                 logger.warning(f"CompositeMetric: sub-metric '{wm.name}' failed: {exc}")
                 dimensions[wm.name] = 0.0
+                failed_count += 1
 
-        composite_score = weighted_sum / self._total_weight
         feedback = " | ".join(feedback_parts)
+        if failed_count == len(self._metrics) or active_weight == 0:
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason=feedback or "All composite sub-metrics failed",
+                metadata={
+                    "dimensions": dimensions,
+                    "feedback": feedback,
+                    "evaluation_failed": True,
+                },
+            )
 
+        composite_score = weighted_sum / active_weight
         metric_result = MetricResult(
             score=composite_score,
             feedback=feedback,

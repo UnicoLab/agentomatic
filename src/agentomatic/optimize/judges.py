@@ -77,6 +77,7 @@ class LocalJudgeMetric(BaseMetric):
         the ``"metric_result"`` key.
         """
         metric_result = await self.evaluate_rich(query, response, expected, context)
+        failed = metric_result.feedback.startswith("Judge evaluation failed:")
         return EvalResult(
             metric_name=self.name,
             score=metric_result.score,
@@ -84,6 +85,7 @@ class LocalJudgeMetric(BaseMetric):
             metadata={
                 "dimensions": metric_result.dimensions,
                 "metric_result": metric_result,
+                "evaluation_failed": failed,
             },
         )
 
@@ -131,23 +133,30 @@ class LocalJudgeMetric(BaseMetric):
                 prompt=prompt,
                 temperature=self.temperature,
             )
+            if not data or "overall_score" not in data:
+                raise ValueError("Judge returned no overall_score")
 
-            overall = max(0.0, min(1.0, float(data.get("overall_score", 0.5))))
+            overall = max(0.0, min(1.0, float(data["overall_score"])))
             feedback = str(data.get("feedback", ""))
-            dims = {}
+            dims: dict[str, float] = {}
             raw_dims = data.get("dimensions", {})
             if isinstance(raw_dims, dict):
                 for d in self.dimensions:
-                    dims[d] = max(0.0, min(1.0, float(raw_dims.get(d, 0.5))))
+                    if d in raw_dims:
+                        dims[d] = max(0.0, min(1.0, float(raw_dims[d])))
+            # Missing dimensions inherit the overall score (not a fabricated 0.5).
+            for d in self.dimensions:
+                dims.setdefault(d, overall)
 
             return MetricResult(score=overall, feedback=feedback, dimensions=dims)
 
         except Exception as exc:
             logger.warning(f"LocalJudgeMetric '{self.name}' failed: {exc}")
+            # Honest failure — never fabricate a mid-scale score.
             return MetricResult(
-                score=0.5,
+                score=0.0,
                 feedback=f"Judge evaluation failed: {exc}",
-                dimensions={d: 0.5 for d in self.dimensions},
+                dimensions={d: 0.0 for d in self.dimensions},
             )
 
 
@@ -210,18 +219,40 @@ class MultiJudgePanel(BaseMetric):
         if not valid_results:
             return EvalResult(
                 metric_name=self.name,
-                score=0.5,
+                score=0.0,
                 reason="All judges failed",
+                metadata={"evaluation_failed": True},
             )
+
+        # LocalJudgeMetric soft-fails into MetricResult; treat those as failures
+        # so fitter/composite metrics can skip dishonest zero scores.
+        failed_flags = [
+            (r.feedback or "").startswith("Judge evaluation failed:") for r in valid_results
+        ]
+        if all(failed_flags):
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason="All judges failed",
+                metadata={
+                    "evaluation_failed": True,
+                    "individual_scores": [r.score for r in valid_results],
+                    "metric_result": valid_results[0],
+                },
+            )
+
+        usable = [r for r, failed in zip(valid_results, failed_flags) if not failed]
+        if not usable:
+            usable = valid_results
 
         # Aggregate
         if self._aggregation == "average":
-            aggregated = self._aggregate_average(valid_results)
+            aggregated = self._aggregate_average(usable)
         else:
-            aggregated = self._aggregate_average(valid_results)
+            aggregated = self._aggregate_average(usable)
 
         # Collect all feedback
-        feedback_parts = [r.feedback for r in valid_results if r.feedback]
+        feedback_parts = [r.feedback for r in usable if r.feedback]
         combined_feedback = " | ".join(feedback_parts)
 
         metric_result = MetricResult(
@@ -235,8 +266,9 @@ class MultiJudgePanel(BaseMetric):
             score=aggregated["score"],
             reason=combined_feedback,
             metadata={
-                "individual_scores": [r.score for r in valid_results],
+                "individual_scores": [r.score for r in usable],
                 "metric_result": metric_result,
+                "evaluation_failed": False,
             },
         )
 

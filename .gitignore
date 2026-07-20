@@ -38,6 +38,8 @@ coverage.xml
 
 # Testing
 .pytest_cache/
+.deepeval/
+.optimize/
 .mypy_cache/
 
 # Docs

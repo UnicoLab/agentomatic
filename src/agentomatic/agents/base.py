@@ -126,11 +126,92 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         self.stop_training: bool = False
         self._fit_optimize_options: dict[str, Any] | None = None
 
+        # Per-request system prompt override (set during transform / atransform /
+        # streaming so node methods can call ``resolve_system_prompt()``).
+        self._request_system_prompt: str | None = None
+
         # Evaluation
         self.evaluation_history: list[EvaluationReport] = []
 
         # Observability
         self._traces: list[list[TraceEvent]] = []
+
+    # ==================================================================
+    # Prompt resolution (optimize / fit / stacks)
+    # ==================================================================
+
+    @staticmethod
+    def _extract_prompt_override(input_data: dict[str, Any] | None) -> str | None:
+        """Pull ``system_prompt_override`` from request payload layers."""
+        if not input_data:
+            return None
+        candidates: list[Any] = [input_data.get("system_prompt_override")]
+        meta = input_data.get("metadata")
+        if isinstance(meta, dict):
+            candidates.append(meta.get("system_prompt_override"))
+        ctx = input_data.get("context")
+        if isinstance(ctx, dict):
+            candidates.append(ctx.get("system_prompt_override"))
+        for candidate in candidates:
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate
+        return None
+
+    def resolve_system_prompt(
+        self,
+        input_data: dict[str, Any] | None = None,
+        *,
+        version: str = "v1",
+        default: str = "You are a helpful assistant.",
+    ) -> str:
+        """Resolve the active system prompt for this agent.
+
+        Priority (first non-empty wins):
+
+        1. Per-request ``system_prompt_override`` (optimize / invoke)
+        2. Active request override stashed by ``transform`` / ``atransform``
+        3. ``compiled_config["system_prompt"]`` from a successful ``fit()``
+        4. Instance ``system_prompt`` attribute (if set)
+        5. ``prompt_manager.get_prompt(version)`` from ``prompts.json``
+        6. ``default``
+
+        Args:
+            input_data: Optional invoke payload (also checks nested
+                ``metadata`` / ``context``).
+            version: Prompt version key for the prompt manager.
+            default: Fallback when nothing else is configured.
+
+        Returns:
+            The resolved system prompt string.
+        """
+        override = self._extract_prompt_override(input_data)
+        if override is not None:
+            return override
+        if isinstance(self._request_system_prompt, str) and self._request_system_prompt.strip():
+            return self._request_system_prompt
+        compiled = self.compiled_config.get("system_prompt")
+        if isinstance(compiled, str) and compiled.strip():
+            return compiled
+        attr = getattr(self, "system_prompt", None)
+        if isinstance(attr, str) and attr.strip():
+            return attr
+        prompt_manager = getattr(self, "prompt_manager", None)
+        if prompt_manager is not None:
+            try:
+                prompt = prompt_manager.get_prompt(version, prompt_type="system")
+                if prompt:
+                    return str(prompt)
+            except Exception:  # noqa: BLE001
+                pass
+        return default
+
+    def _begin_request_prompt(self, input_data: dict[str, Any] | None) -> None:
+        """Stash per-request prompt override for the duration of a run."""
+        self._request_system_prompt = self._extract_prompt_override(input_data)
+
+    def _end_request_prompt(self) -> None:
+        """Clear the per-request prompt override."""
+        self._request_system_prompt = None
 
     # ==================================================================
     # Abstract methods (user implements)
@@ -355,23 +436,26 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             Output dictionary.
         """
         t0 = time.perf_counter()
+        self._begin_request_prompt(input_data)
+        try:
+            state = self.input_to_state(input_data)
+            final_state = self.invoke_graph(state)
+            output = self.state_to_output(final_state)
 
-        state = self.input_to_state(input_data)
-        final_state = self.invoke_graph(state)
-        output = self.state_to_output(final_state)
+            # Record trace
+            if hasattr(self, "_graph") and self._graph is not None:
+                trace = self._graph.last_trace
+                self._traces.append(trace)
 
-        # Record trace
-        if hasattr(self, "_graph") and self._graph is not None:
-            trace = self._graph.last_trace
-            self._traces.append(trace)
+            duration = (time.perf_counter() - t0) * 1000
+            logger.debug(
+                f"Transform completed in {duration:.1f}ms "
+                f"({len(self._graph.nodes) if self._graph else '?'} nodes)"
+            )
 
-        duration = (time.perf_counter() - t0) * 1000
-        logger.debug(
-            f"Transform completed in {duration:.1f}ms "
-            f"({len(self._graph.nodes) if self._graph else '?'} nodes)"
-        )
-
-        return output
+            return output
+        finally:
+            self._end_request_prompt()
 
     async def atransform(
         self,
@@ -386,19 +470,22 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             Output dictionary.
         """
         t0 = time.perf_counter()
+        self._begin_request_prompt(input_data)
+        try:
+            state = self.input_to_state(input_data)
+            final_state = await self.ainvoke_graph(state)
+            output = self.state_to_output(final_state)
 
-        state = self.input_to_state(input_data)
-        final_state = await self.ainvoke_graph(state)
-        output = self.state_to_output(final_state)
+            if hasattr(self, "_graph") and self._graph is not None:
+                trace = self._graph.last_trace
+                self._traces.append(trace)
 
-        if hasattr(self, "_graph") and self._graph is not None:
-            trace = self._graph.last_trace
-            self._traces.append(trace)
+            duration = (time.perf_counter() - t0) * 1000
+            logger.debug(f"Async transform completed in {duration:.1f}ms")
 
-        duration = (time.perf_counter() - t0) * 1000
-        logger.debug(f"Async transform completed in {duration:.1f}ms")
-
-        return output
+            return output
+        finally:
+            self._end_request_prompt()
 
     def invoke(
         self,
