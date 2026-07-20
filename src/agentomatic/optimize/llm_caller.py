@@ -220,7 +220,10 @@ class LLMCaller:
 
         # ── String: route to provider backend ────────────────────
         provider, model_name = parse_model_spec(model)
-        # Resolve effective base_url / api_key for OpenAI calls
+        # Resolve effective base_url / api_key for OpenAI calls.
+        # Track whether the base was set explicitly (call arg or configure)
+        # so cloud openai/* models are not hijacked by a local OPENAI_BASE_URL.
+        explicit_base = base_url is not None or LLMCaller._default_base_url is not None
         eff_base_url = base_url or LLMCaller._default_base_url
         eff_api_key = api_key or LLMCaller._default_api_key
         try:
@@ -245,6 +248,7 @@ class LLMCaller:
                     timeout=timeout,
                     base_url=eff_base_url,
                     api_key=eff_api_key,
+                    explicit_base=explicit_base,
                 )
             if provider == "omlx":
                 return await _call_openai(
@@ -258,6 +262,7 @@ class LLMCaller:
                     base_url=os.getenv("OMLX_BASE_URL", _DEFAULT_OMLX_BASE_URL),
                     api_key=os.getenv("OMLX_API_KEY") or os.getenv("OPENAI_API_KEY") or "omlx",
                     disable_thinking=True,
+                    explicit_base=True,
                 )
             if provider == "gemini":
                 return await _call_gemini(
@@ -448,6 +453,86 @@ def _is_openai_compatible_local(base_url: str | None) -> bool:
     )
 
 
+def _looks_like_openai_cloud_model(model_name: str) -> bool:
+    """Return True for first-party OpenAI chat / reasoning model ids."""
+    name = (model_name or "").strip().lower()
+    if not name:
+        return False
+    return bool(
+        re.match(
+            r"^(gpt-|o[1-9]|chatgpt-|text-embedding-|whisper-|tts-|omni-)",
+            name,
+        )
+    )
+
+
+def _openai_uses_max_completion_tokens(model_name: str) -> bool:
+    """Newer OpenAI models reject ``max_tokens`` in favour of max_completion_tokens."""
+    name = (model_name or "").strip().lower()
+    return name.startswith(("o1", "o3", "o4", "gpt-5"))
+
+
+def _openai_supports_temperature(model_name: str) -> bool:
+    """Reasoning models often only allow the default temperature."""
+    name = (model_name or "").strip().lower()
+    return not name.startswith(("o1", "o3", "o4"))
+
+
+def _resolve_openai_endpoint(
+    model_name: str,
+    *,
+    base_url: str | None,
+    api_key: str | None,
+    explicit_base: bool,
+) -> tuple[str | None, str | None]:
+    """Resolve OpenAI base URL + API key with safe cloud defaults.
+
+    Priority for base URL:
+    1. Explicit *base_url* from the call / ``LLMCaller.configure``
+    2. ``OPENAI_BASE_URL`` — **except** when it points at a local server and
+       *model_name* looks like a first-party OpenAI cloud model.  In that
+       case we ignore the local env hijack so ``openai/gpt-4o-mini`` still
+       hits ``api.openai.com`` while local work uses ``omlx/`` or an
+       explicit ``llm_base_url``.
+
+    Priority for API key:
+    1. Explicit *api_key*
+    2. ``OPENAI_API_KEY``
+    3. For local endpoints only: a placeholder ``"local"``
+    """
+    env_base = os.getenv("OPENAI_BASE_URL") or None
+    env_key = os.getenv("OPENAI_API_KEY") or None
+
+    resolved_base = base_url
+    if resolved_base is None and env_base:
+        if (
+            not explicit_base
+            and _is_openai_compatible_local(env_base)
+            and _looks_like_openai_cloud_model(model_name)
+        ):
+            logger.info(
+                "Ignoring local OPENAI_BASE_URL={} for cloud model openai/{} "
+                "(use omlx/… or LLMCaller.configure/llm_base_url for local)",
+                env_base,
+                model_name,
+            )
+            resolved_base = None
+        else:
+            resolved_base = env_base
+
+    resolved_key = api_key or env_key
+    is_local = _is_openai_compatible_local(resolved_base)
+    if not resolved_key:
+        if is_local:
+            resolved_key = "local"
+        elif _looks_like_openai_cloud_model(model_name) or resolved_base is None:
+            raise ValueError(
+                "OPENAI_API_KEY is required for openai/ cloud models "
+                f"(model={model_name!r}). Set the env var or pass api_key=…"
+            )
+    return resolved_base, resolved_key
+
+
 async def _call_openai(
     model_name: str,
     prompt: str,
@@ -460,13 +545,18 @@ async def _call_openai(
     base_url: str | None = None,
     api_key: str | None = None,
     disable_thinking: bool | None = None,
+    explicit_base: bool = False,
 ) -> str:
     """Call OpenAI or an OpenAI-compatible chat completions API.
 
     Honours explicit *base_url* / *api_key*, then ``LLMCaller`` defaults /
-    env vars. For local compatible servers (oMLX, vLLM, …) thinking is
-    disabled via ``chat_template_kwargs`` and residual thinking preambles
-    are stripped from the returned text.
+    env vars. Cloud model ids (``gpt-*``, ``o1``/``o3``/…) are not silently
+    redirected to a local ``OPENAI_BASE_URL`` unless the caller set an
+    explicit base (``LLMCaller.configure`` / per-call ``base_url`` /
+    ``PromptFitter(llm_base_url=…)``).
+
+    For local compatible servers (oMLX, vLLM, …) thinking is disabled via
+    ``chat_template_kwargs`` and residual thinking preambles are stripped.
     """
     import openai
 
@@ -475,21 +565,33 @@ async def _call_openai(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    # explicit_base=True when caller/configure supplied a base_url.
+    resolved_base, resolved_key = _resolve_openai_endpoint(
+        model_name,
+        base_url=base_url,
+        api_key=api_key,
+        explicit_base=explicit_base or bool(base_url),
+    )
+
     kwargs: dict[str, Any] = {
         "model": model_name,
         "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
     }
-    if json_mode:
+    if _openai_supports_temperature(model_name):
+        kwargs["temperature"] = temperature
+    if _openai_uses_max_completion_tokens(model_name):
+        kwargs["max_completion_tokens"] = max_tokens
+    else:
+        kwargs["max_tokens"] = max_tokens
+    if json_mode and _openai_supports_temperature(model_name):
+        # json_object mode is unreliable / unsupported on some reasoning models
         kwargs["response_format"] = {"type": "json_object"}
 
-    resolved_base = base_url or os.getenv("OPENAI_BASE_URL") or None
     client_kwargs: dict[str, Any] = {"timeout": timeout}
     if resolved_base:
         client_kwargs["base_url"] = resolved_base
-    if api_key:
-        client_kwargs["api_key"] = api_key
+    if resolved_key:
+        client_kwargs["api_key"] = resolved_key
 
     if disable_thinking is None:
         disable_thinking = _is_openai_compatible_local(resolved_base)
@@ -502,7 +604,25 @@ async def _call_openai(
 
     client = openai.AsyncOpenAI(**client_kwargs)
     async with client as c:
-        response = await c.chat.completions.create(**kwargs)
+        try:
+            response = await c.chat.completions.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            # Retry once without temperature / response_format for picky models.
+            msg = str(exc).lower()
+            retried = False
+            if "temperature" in msg and "temperature" in kwargs:
+                kwargs.pop("temperature", None)
+                retried = True
+            if "response_format" in msg and "response_format" in kwargs:
+                kwargs.pop("response_format", None)
+                retried = True
+            if "max_tokens" in msg and "max_tokens" in kwargs:
+                kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+                retried = True
+            if not retried:
+                raise
+            response = await c.chat.completions.create(**kwargs)
+
         choice = response.choices[0]
         message = choice.message
         content = message.content or ""
@@ -540,9 +660,7 @@ async def _call_gemini(
         or ""
     )
     if not key:
-        raise ValueError(
-            "GEMINI_API_KEY (or GOOGLE_API_KEY) is required for gemini/ models"
-        )
+        raise ValueError("GEMINI_API_KEY (or GOOGLE_API_KEY) is required for gemini/ models")
 
     # Allow bare ids or models/ prefix from env configs.
     model_id = model_name.removeprefix("models/")

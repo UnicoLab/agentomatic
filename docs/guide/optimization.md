@@ -577,6 +577,33 @@ fitter = PromptFitter(
 )
 ```
 
+!!! tip "OpenAI cloud vs local OpenAI-compatible"
+    Optimize model specs:
+
+    | Spec | Routes to | Credentials |
+    |---|---|---|
+    | `openai/gpt-4o-mini` | OpenAI cloud (`api.openai.com`) | `OPENAI_API_KEY=sk-…` |
+    | `omlx/Qwen3.5-9B-…` | Local oMLX / OpenAI-compatible | `OMLX_BASE_URL` + `OMLX_API_KEY` |
+    | `openai/local-model` + `llm_base_url=` | Explicit local server | `llm_api_key` / configure |
+
+    A local `OPENAI_BASE_URL=http://127.0.0.1:8000/v1` (common when developing
+    with oMLX) is **ignored** for first-party cloud ids (`gpt-*`, `o1`/`o3`/`o4`)
+    unless you pass an explicit `llm_base_url` / `LLMCaller.configure(...)`.
+    That way `openai/gpt-4o-mini` keeps working even with a local base URL in
+    your shell.
+
+```python
+# Cloud OpenAI rewrite (needs OPENAI_API_KEY=sk-…)
+fitter = PromptFitter(
+    agent="assistant",
+    task_model="openai/gpt-4o-mini",
+    rewrite_model="openai/gpt-4o-mini",
+    optimizer="rewrite",
+    local_agent=agent,
+    # do NOT set llm_base_url — hits api.openai.com
+)
+```
+
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `agent` | `str` | — | Agent name as defined in `agents.json` |
