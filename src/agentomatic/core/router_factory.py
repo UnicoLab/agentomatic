@@ -626,31 +626,33 @@ def create_default_router(
 
         from agentomatic.agents.base import BaseGraphAgent
 
-        instance = getattr(agent, "class_instance", None)
-        is_class_agent = isinstance(instance, BaseGraphAgent)
+        _raw_instance = getattr(agent, "class_instance", None)
+        class_agent: BaseGraphAgent | None = (
+            _raw_instance if isinstance(_raw_instance, BaseGraphAgent) else None
+        )
 
         async def event_stream():
             """Yield SSE frames from graph or node execution."""
             collected_response = ""
             try:
-                if is_class_agent:
+                if class_agent is not None:
                     # Stream per-node updates via AgentGraph.astream, then the
                     # final ``state_to_output`` payload. Never feed a raw dict
                     # into dataclass-typed nodes.
                     from agentomatic.core.agent_invoke import _input_from_state
 
                     input_data = _input_from_state(state)
-                    instance._begin_request_prompt(input_data)
+                    class_agent._begin_request_prompt(input_data)
                     try:
-                        state_obj = instance.input_to_state(input_data)
-                        graph = instance.graph
+                        state_obj = class_agent.input_to_state(input_data)
+                        graph = class_agent.graph
                         async for event in graph.astream(state_obj):
                             yield f"data: {json.dumps(event, default=str)}\n\n"
-                        result = instance.state_to_output(state_obj)
-                        if hasattr(instance, "_graph") and instance._graph is not None:
-                            instance._traces.append(instance._graph.last_trace)
+                        result = class_agent.state_to_output(state_obj)
+                        if hasattr(class_agent, "_graph") and class_agent._graph is not None:
+                            class_agent._traces.append(class_agent._graph.last_trace)
                     finally:
-                        instance._end_request_prompt()
+                        class_agent._end_request_prompt()
                     yield f"data: {json.dumps(result, default=str)}\n\n"
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")

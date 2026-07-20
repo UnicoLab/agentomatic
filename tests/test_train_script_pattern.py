@@ -159,9 +159,7 @@ def _opt_composite(
         for val in (exp_data.values() if isinstance(exp_data, dict) else [])
         if isinstance(val, str) and val.strip() and val.lower() not in {"true", "false"}
     ]
-    kw_score = (
-        sum(1 for t in terms if t.lower() in text) / len(terms) if terms else key_score
-    )
+    kw_score = sum(1 for t in terms if t.lower() in text) / len(terms) if terms else key_score
     return 0.5 * key_score + 0.5 * kw_score
 
 
@@ -298,7 +296,7 @@ class TestHelperFunctions:
         assert result == pytest.approx(1.0)  # key_score=1.0, kw_score falls back to 1.0
 
     def test_opt_composite_missing_keys(self):
-        response = json.dumps({"content": "hello"})   # missing next_action
+        response = json.dumps({"content": "hello"})  # missing next_action
         result = _opt_composite("q", response)
         assert result == pytest.approx(0.5 * 0.5 + 0.5 * 0.5)  # key_score=0.5, kw=0.5
 
@@ -323,6 +321,7 @@ class TestHelperFunctions:
 
     def test_model_spec_formats_correctly(self):
         from types import SimpleNamespace
+
         entry = SimpleNamespace(provider="openai", model="LFM2.5-8B")
         assert _model_spec(entry) == "openai/LFM2.5-8B"
 
@@ -364,7 +363,7 @@ class TestStackManagerGetLlmConfigOrDefault:
         assert result.provider == "ollama"
 
     def test_falls_back_to_default_when_missing(self):
-        sm = self._make_stack(["default"])   # no "rewrite"
+        sm = self._make_stack(["default"])  # no "rewrite"
         result = sm.get_llm_config_or_default("rewrite")
         assert result is not None
         assert result.provider == "ollama"
@@ -440,11 +439,11 @@ class TestMetricConstruction:
         # Should not raise
         loss_metric = WeightedMetric(
             [
-                ("judge",      judge_m,   0.30),
-                ("key_match",  key_m,     0.25),
-                ("f1",         f1_m,      0.25),
-                ("json_valid", json_m,    0.10),
-                ("keywords",   keyword_m, 0.10),
+                ("judge", judge_m, 0.30),
+                ("key_match", key_m, 0.25),
+                ("f1", f1_m, 0.25),
+                ("json_valid", json_m, 0.10),
+                ("keywords", keyword_m, 0.10),
             ],
             name="composite_loss",
         )
@@ -521,6 +520,7 @@ class TestPromptFitterBridgeConstruction:
 
     def test_llm_base_url_configures_llm_caller(self, tmp_path, monkeypatch):
         from agentomatic.optimize.llm_caller import LLMCaller
+
         monkeypatch.setattr(LLMCaller, "_default_base_url", None)
         monkeypatch.setattr(LLMCaller, "_default_api_key", None)
 
@@ -578,8 +578,7 @@ class TestBaseGraphAgentFitInterface:
                 return d
 
             def state_to_output(self, s):
-                return {"content": s.get("current_query", "").upper(),
-                        "next_action": "done"}
+                return {"content": s.get("current_query", "").upper(), "next_action": "done"}
 
         return _Agent()
 
@@ -590,9 +589,12 @@ class TestBaseGraphAgentFitInterface:
         loss = MetricLoss(wm)
 
         examples = [
-            AgentExample(id="e1", input={"current_query": "hi"},
-                         expected_output={"content": "HI", "next_action": "done"},
-                         split="train"),
+            AgentExample(
+                id="e1",
+                input={"current_query": "hi"},
+                expected_output={"content": "HI", "next_action": "done"},
+                split="train",
+            ),
         ]
         ds = AgentDataset(examples=examples, name="test")
         # Must not raise
@@ -604,9 +606,12 @@ class TestBaseGraphAgentFitInterface:
         key_m = ExactKeyMatchMetric(REQUIRED_KEYS)
 
         examples = [
-            AgentExample(id="e1", input={"current_query": "hi"},
-                         expected_output={"content": "HI", "next_action": "done"},
-                         split="train"),
+            AgentExample(
+                id="e1",
+                input={"current_query": "hi"},
+                expected_output={"content": "HI", "next_action": "done"},
+                split="train",
+            ),
         ]
         ds = AgentDataset(examples=examples, name="test")
         agent.compile(ds, metrics=[key_m])
@@ -633,9 +638,12 @@ class TestBaseGraphAgentFitInterface:
         agent = self._make_agent()
         key_m = ExactKeyMatchMetric(REQUIRED_KEYS)
         examples = [
-            AgentExample(id="e1", input={"current_query": "hi"},
-                         expected_output={"content": "HI", "next_action": "done"},
-                         split="train"),
+            AgentExample(
+                id="e1",
+                input={"current_query": "hi"},
+                expected_output={"content": "HI", "next_action": "done"},
+                split="train",
+            ),
         ]
         ds = AgentDataset(examples=examples, name="test")
         agent.compile(ds, metrics=[key_m])
@@ -723,32 +731,39 @@ class TestFullScriptPatternEndToEnd:
 
     def _build_metrics_and_loss(self):
         """Build the exact metric stack from the script."""
+
         # Use a fake judge that always returns 0.7 (no LLM needed)
         class FakeJudge:
             name = "pertinence"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 return EvalResult(metric_name="pertinence", score=0.7, reason="ok")
 
-        judge_metric     = OptimizeMetricAdapter(FakeJudge(), name="judge")
-        key_metric       = ExactKeyMatchMetric(REQUIRED_KEYS)
-        json_metric      = CallableMetric("json_valid",  _json_valid)
-        precision_metric = CallableMetric("precision",   _precision)
-        recall_metric    = CallableMetric("recall",      _recall)
-        f1_metric        = CallableMetric("f1",          _f1)
-        keyword_metric   = CallableMetric("keywords",    _keyword_score)
+        judge_metric = OptimizeMetricAdapter(FakeJudge(), name="judge")
+        key_metric = ExactKeyMatchMetric(REQUIRED_KEYS)
+        json_metric = CallableMetric("json_valid", _json_valid)
+        precision_metric = CallableMetric("precision", _precision)
+        recall_metric = CallableMetric("recall", _recall)
+        f1_metric = CallableMetric("f1", _f1)
+        keyword_metric = CallableMetric("keywords", _keyword_score)
 
         metrics = [
-            judge_metric, key_metric, json_metric,
-            precision_metric, recall_metric, f1_metric, keyword_metric,
+            judge_metric,
+            key_metric,
+            json_metric,
+            precision_metric,
+            recall_metric,
+            f1_metric,
+            keyword_metric,
         ]
 
         loss_metric = WeightedMetric(
             [
-                ("judge",      judge_metric,   0.30),
-                ("key_match",  key_metric,     0.25),
-                ("f1",         f1_metric,      0.25),
-                ("json_valid", json_metric,    0.10),
-                ("keywords",   keyword_metric, 0.10),
+                ("judge", judge_metric, 0.30),
+                ("key_match", key_metric, 0.25),
+                ("f1", f1_metric, 0.25),
+                ("json_valid", json_metric, 0.10),
+                ("keywords", keyword_metric, 0.10),
             ],
             name="composite_loss",
         )
@@ -843,21 +858,28 @@ class TestFullScriptPatternEndToEnd:
         @dc
         class Noop(BaseFitterOptimizer):
             name: str = "noop"
-            async def propose(self, *a, **kw): return []
+
+            async def propose(self, *a, **kw):
+                return []
 
         async def echo(query, *, prompt_override, context, invoke):
             return json.dumps({"content": query.upper(), "next_action": "done"})
 
         fitter = PromptFitter(
-            agent="test", optimizer=Noop(), max_trials=1,
-            experiment_dir=str(tmp_path / ".fit"), auto_report=False,
+            agent="test",
+            optimizer=Noop(),
+            max_trials=1,
+            experiment_dir=str(tmp_path / ".fit"),
+            auto_report=False,
         )
         fitter._runner = AgentRunner(agent="test", agent_callable=echo)
 
-        ds = Dataset(points=[
-            DataPoint(query="hello", expected_answer="HELLO"),
-            DataPoint(query="world", expected_answer="WORLD"),
-        ])
+        ds = Dataset(
+            points=[
+                DataPoint(query="hello", expected_answer="HELLO"),
+                DataPoint(query="world", expected_answer="WORLD"),
+            ]
+        )
         result = asyncio.run(fitter.fit(ds, ds, ExactMatchMetric()))
 
         # BUG-3: history must be accessible
@@ -877,6 +899,7 @@ class TestFullScriptPatternEndToEnd:
 
         class LoggingJudge:
             name = "judge"
+
             async def evaluate(self, query, response, expected=None, context=None):
                 call_log.append((query, response))
                 # Score 1.0 when response contains the expected keys
