@@ -2713,6 +2713,16 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Train / optimize mechanics</strong>: Fitted prompts and overrides apply during
+  evaluate/reevaluate; GridSearch/PromptFitterBridge persist
+  <code>system_prompt</code>; local in-process runner for <code>fit()</code>; honest LLM-as-judge
+  failures; class-agent <code>/invoke/stream</code> per-node frames.
+  <code>GEvalMetric</code> falls through on any deepeval failure; <code>MultiJudgePanel</code>
+  sets <code>evaluation_failed</code> when all judges soft-fail.</li>
+<li><strong>optimize / oMLX</strong>: <code>omlx/</code> provider routing; disable thinking on local
+  OpenAI-compatible servers; strip residual CoT from optimize LLM calls;
+  skip DeepEval for oMLX/local specs; MIPRO accepts <code>DataPoint</code> samples;
+  <code>_wrap_local_agent</code> injects top-level <code>system_prompt_override</code>.</li>
 <li><strong>Invoke context passthrough</strong>: <code>AgentInvokeRequest</code> / chat / Studio /
   async task dispatch use <code>extra="allow"</code> and
   <code>build_invoke_state()</code> so the <strong>entire</strong> client payload (rich <code>context</code> +
