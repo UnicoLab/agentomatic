@@ -12,6 +12,30 @@ import httpx
 from loguru import logger
 
 
+class _SimpleHandoffTool:
+    """Minimal LangChain-compatible tool wrapper.
+
+    Used when ``langchain_core`` is not installed.  Exposes ``.invoke()``,
+    ``.name``, and ``.description`` so callers don't need to branch on
+    whether the full LangChain tooling is present.
+    """
+
+    def __init__(self, func: Any, name: str, description: str) -> None:
+        self.func = func
+        self.name = name
+        self.description = description
+
+    def invoke(self, input: Any, **kwargs: Any) -> str:  # noqa: A002
+        query = input if isinstance(input, str) else str(input)
+        return self.func(query)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> str:
+        return self.func(*args, **kwargs)
+
+    def __repr__(self) -> str:
+        return f"_SimpleHandoffTool(name={self.name!r})"
+
+
 def create_agent_handoff(
     target_agent: str,
     *,
@@ -91,13 +115,17 @@ def _create_http_handoff(
             target_agent,
         )
 
-        def delegate_plain(query: str) -> str:
+        def _delegate_fn(query: str) -> str:
             """Delegate the given query to another agent via HTTP API."""
             return _invoke_http_delegation(target_agent, query, platform_url)
 
-        delegate_plain.__name__ = f"delegate_to_{target_agent}"
-        delegate_plain.__doc__ = tool_description
-        return delegate_plain
+        _delegate_fn.__name__ = f"delegate_to_{target_agent}"
+        _delegate_fn.__doc__ = tool_description
+        return _SimpleHandoffTool(
+            func=_delegate_fn,
+            name=f"delegate_to_{target_agent}",
+            description=tool_description,
+        )
 
 
 def _invoke_http_delegation(

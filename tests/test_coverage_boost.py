@@ -43,11 +43,13 @@ class TestStorageLazyImport:
     """Test storage __init__ __getattr__ for lazy imports."""
 
     def test_import_sqlalchemy_store(self):
+        pytest.importorskip("sqlalchemy")
         from agentomatic.storage import SQLAlchemyStore
 
         assert SQLAlchemyStore is not None
 
     def test_import_checkpointer(self):
+        pytest.importorskip("langchain_core")
         from agentomatic.storage import AgentomaticCheckpointer
 
         assert AgentomaticCheckpointer is not None
