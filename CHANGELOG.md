@@ -11,6 +11,9 @@
   ``slm_multipass`` / ``llm_multipass``.
 - **``gemini/`` optimize provider**: Generative Language API routing + live
   Gemini optimize tests (``GEMINI_API_KEY``).
+- **Hardened ``openai/`` optimize routing**: ignore local ``OPENAI_BASE_URL``
+  for cloud ``gpt-*``/reasoning models unless explicitly configured; proper
+  key errors; ``max_completion_tokens``; live OpenAI optimize suite.
 
 ### Fixes
 

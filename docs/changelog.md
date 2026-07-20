@@ -20,6 +20,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - **`gemini/` optimize provider**: `LLMCaller` routes
   `gemini/gemini-…` via the Generative Language API (`GEMINI_API_KEY`).
   Live suite: `tests/test_live_gemini_optimize.py`.
+- **Hardened `openai/` optimize routing**: cloud `gpt-*` / `o1`/`o3` models
+  are not hijacked by a local `OPENAI_BASE_URL`; clear `OPENAI_API_KEY`
+  errors; `max_completion_tokens` for reasoning models; live suite
+  `tests/test_live_openai_optimize.py`.
 - **Thinking / reasoning LLMs**: `message_text`, `message_thinking`,
   `strip_thinking_for_json`, `astream_with_thinking`, and
   `invoke_with_retry(strip_thinking=…)` normalize Qwen3 / tagged `<think>` /
