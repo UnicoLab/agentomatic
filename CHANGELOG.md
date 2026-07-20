@@ -1,26 +1,132 @@
 # CHANGELOG
 
 
-## Unreleased
+## v1.6.0 (2026-07-20)
 
-### Added
+### Bug Fixes
 
-- **Multi-pass optimize (SLM + LLM)**: full optimization briefing (config,
-  params, dataset, eval I/O, metrics) for rewrite/GEPA/MIPRO; auto multipass
-  3 for SLMs and 2 for frontier LLMs via ``rewrite_passes`` / ``multipass`` /
-  ``slm_multipass`` / ``llm_multipass``.
-- **``gemini/`` optimize provider**: Generative Language API routing + live
-  Gemini optimize tests (``GEMINI_API_KEY``).
-- **Hardened ``openai/`` optimize routing**: ignore local ``OPENAI_BASE_URL``
-  for cloud ``gpt-*``/reasoning models unless explicitly configured; proper
-  key errors; ``max_completion_tokens``; live OpenAI optimize suite.
+- Clear mypy errors and ruff format drift
+  ([`0e2c85d`](https://github.com/UnicoLab/agentomatic/commit/0e2c85d245d8438417461bfccf75d3d0050e1231))
 
-### Fixes
+Narrow class-agent streaming to a typed BaseGraphAgent binding so mypy passes, and reformat drifted
+  optimize/test files for CI format-check.
 
-- **optimize / oMLX**: ``omlx/`` provider routing; disable thinking on local
-  OpenAI-compatible servers; strip residual CoT from optimize LLM calls;
-  skip DeepEval for oMLX/local specs; ``MultiJudgePanel`` / ``GEvalMetric``
-  honest failure handling; MIPRO accepts ``DataPoint`` samples.
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+### Features
+
+- **optimize**: Add gemini/ provider and live Gemini fit tests
+  ([`955eb31`](https://github.com/UnicoLab/agentomatic/commit/955eb3111228a3817b349f9e9a8bb9dc7c7421d5))
+
+Route gemini/* through the Generative Language API, keep cloud models out of SLM multipass
+  heuristics, and cover rewrite/GEPA/judge with a live suite gated on GEMINI_API_KEY.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Harden openai/ cloud routing for reliable fit/rewrite
+  ([`a8302fc`](https://github.com/UnicoLab/agentomatic/commit/a8302fcd962bd8cee1e85983512abee77a39b61d))
+
+Keep gpt-*/o1/o3 models on api.openai.com even when OPENAI_BASE_URL points at a local server,
+  require a real API key for cloud calls, handle max_completion_tokens for reasoning models, and add
+  unit plus live suites.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Multi-pass rewrite with full briefing for SLMs and LLMs
+  ([`a07adc0`](https://github.com/UnicoLab/agentomatic/commit/a07adc0597a63e8fd02c185b52585cdfb396f03b))
+
+Give rewrite/GEPA/MIPRO the full fit context (prompt, params, dataset, eval I/O, metrics, history)
+  and auto-run draft→revise for frontier LLMs plus draft→critique→revise for SLMs, with docs and
+  tests.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+### Testing
+
+- Adding tests
+  ([`1b9c4ae`](https://github.com/UnicoLab/agentomatic/commit/1b9c4ae53197fe9eb8420627e4f204fd70f668a7))
+
+- **endpoints**: 93 comprehensive API endpoint tests
+  ([`38aac2d`](https://github.com/UnicoLab/agentomatic/commit/38aac2d50591f6ca217247db60d76052dabef01f))
+
+tests/test_agent_endpoints.py — covers every auto-generated route:
+
+POST /invoke sync invocation (fn agent + class agent) POST /invoke/stream SSE streaming: [DONE]
+  sentinel, error frame, content-type header, X-Agent header, data frames POST /chat session-aware
+  chat with/without store, thread_id, user-supplied messages, persist flag GET /health per-agent
+  health check GET /config agent configuration GET /prompts prompt versions GET /card A2A agent card
+  with capabilities + endpoint URLs POST /a2a/tasks A2A submission (sync fallback + cancel) GET
+  /a2a/tasks/{id} task status / 404 on unknown POST /threads create thread GET /threads list
+  (with/without store, user filter) GET /threads/{id} get thread / 404 PATCH /threads/{id} update
+  title DELETE /threads/{id} delete thread GET /threads/{id}/messages get messages (empty after
+  create) DELETE /threads/{id}/messages clear messages GET /threads/{id}/summary summary POST
+  /optimize/invoke full-context invocation (retrieval_context, steps) POST /feedback submit (thumbs
+  up, rating, correction) GET /feedback list GET /feedback/export export
+
+Platform-level: GET / root 200 GET /docs Swagger 200 GET /openapi.json schema with paths GET /health
+  aggregated health GET /readiness (200 or 404 if not mounted) GET /api/v1/agents listing (handles
+  dict-of-dicts response shape) GET /.well-known/agent.json A2A discovery
+
+Error contract: 404 on missing agent with detail 500 on agent failure 422 on bad JSON body
+
+Programmatic registration: Two isolated agents don't cross-talk Custom api_prefix routed correctly
+
+Response shape contract: All canonical fields present (response, agent_type, duration_ms, metadata,
+  suggestions, citations, steps_taken) All list fields are lists, metadata is dict
+
+Lifecycle hooks: register_before_node_hook / register_after_node_hook called on /invoke
+
+Studio: /studio/agents/{name}/runs/stream returns 200 + [DONE] class agent: no run_error; fn agent:
+  run_error expected (no graph_fn) /studio/agents/{name}/graph returns 200 or 404
+
+Full thread lifecycle: chat(persist=True) → get messages → clear → delete
+
+- **optimize**: 54 regression tests for all 6 confirmed bugs
+  ([`1660038`](https://github.com/UnicoLab/agentomatic/commit/1660038404be3dffabe1a53a4bead47a158aaa74))
+
+Also fixes two source bugs uncovered by the new tests:
+
+BUG-5 fix: OptimizeMetricAdapter.score() — wrap coro-creation inside the try block so sync-raising
+  evaluate() is caught and returns 0.5 neutral (instead of propagating the exception to the caller).
+
+BUG-3 fix: PromptFitResult.to_dict() — include score_history in the serialized dict so it
+  round-trips through JSON artefacts.
+
+New test file: tests/test_optimization_bugs.py TestBug1AgentRunnerLocalCallable (7 tests) - async
+  callable dispatched correctly - sync callable runs via asyncio.to_thread (verified with threading)
+  - dict response extracted via _response_text - errors captured, no crash - prompt_override /
+  context forwarded - without callable falls through to HTTP path
+
+TestBug2LLMCallerBaseUrl (5 tests) - configure() stores / resets class-level attrs -
+  LLMCaller.call() forwards base_url/api_key to _call_openai - per-call args override class-level
+  defaults - non-openai provider unaffected
+
+TestBug3PromptFitResultHistory (8 tests) - .history returns score_history list - derives from
+  full_val trials when score_history empty - fallback to all trial scores - empty list when no data
+  - stable across repeated calls - score_history in to_dict() - generate_fit_report does not crash -
+  fitter.fit() populates score_history on result
+
+TestBug4CompositeMetricScore (9 tests) - has .score() method - returns float in [0,1] - custom
+  always-1.0/0.0 sub-metrics - dict expected_output JSON-serialised and forwarded - sub-metric
+  failure → 0.0 contribution, no exception - weighted average computed correctly - usable in
+  agents.WeightedMetric (validates .score() on init) - usable in MetricLoss
+
+TestBug5OptimizeMetricAdapter (13 tests) - returns float not coroutine - correctly awaits async
+  metric - query extracted from input["query"] and ["current_query"] - prediction dict
+  JSON-serialised as response string - expected_output dict JSON-serialised - expected_output None
+  passed as None - neutral 0.5 on async exception (judge unavailable) - neutral 0.5 on sync
+  exception (evaluate() raises before await) - usable in agents.WeightedMetric - usable in
+  MetricLoss - name inherited from metric / overrideable - score value propagated correctly for all
+  values in [0,1]
+
+TestBug6PromptFitterBridgeLocalAgent (5 tests) - local_agent= param forwarded to PromptFitter - live
+  agent used as fallback when local_agent=None - explicit local_agent wins over live agent -
+  llm_base_url/api_key set on LLMCaller class defaults - injected fitter= returned as-is
+
+TestEndToEndLocalTraining (3 tests) - full PromptFitter.fit() with local callable: history,
+  score_history, best_score, summary() all accessible - OptimizeMetricAdapter → WeightedMetric →
+  MetricLoss end-to-end - CompositeMetric → MetricLoss with multiple sub-metrics
+
 
 ## v1.5.1 (2026-07-17)
 
