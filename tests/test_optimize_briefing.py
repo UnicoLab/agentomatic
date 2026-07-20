@@ -27,10 +27,13 @@ from agentomatic.optimize.search_space import PromptSearchSpace
         ("omlx/Qwen3.5-9B-MLX-4bit", True),
         ("ollama/qwen2.5:7b", True),
         ("openai/gpt-4.1", False),
+        ("openai/gpt-4.1-mini", False),  # cloud provider wins over "mini"
         ("anthropic/claude-sonnet-4", False),
+        ("gemini/gemini-3.1-flash-lite", False),  # must not match "mini" in gemini
         (lambda x: x, False),
         ("vllm/llama-3.2-3b", True),
         ("lmstudio/phi-3-mini", True),
+        ("ollama/phi-3-mini", True),
     ],
 )
 def test_looks_like_slm(model: object, expected: bool) -> None:

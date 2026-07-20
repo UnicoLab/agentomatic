@@ -24,9 +24,24 @@ if TYPE_CHECKING:
 
 # Heuristic: local / small models benefit from deeper multi-pass refine.
 _SLM_PROVIDER_PREFIXES = ("omlx/", "ollama/", "lmstudio/", "vllm/")
+# Cloud / frontier providers should never be classified as SLMs (also
+# avoids false positives like ``mini`` inside ``gemini``).
+_LLM_PROVIDER_PREFIXES = (
+    "gemini/",
+    "openai/",
+    "anthropic/",
+    "azure/",
+    "vertex/",
+    "google/",
+    "bedrock/",
+    "mistral/",
+    "cohere/",
+)
 _SLM_SIZE_RE = re.compile(
-    r"(?i)(?:^|[-_/])(?:[1-9]|1[0-4])\s*b(?:[-_/]|$)|"
-    r"(?:small|mini|tiny|mlx|qwen2\.5|qwen3\.5|mistral|phi|gemma|llama3\.2)"
+    r"(?i)"
+    r"(?:^|[-_/])(?:[1-9]|1[0-4])\s*b(?:[-_/]|$)|"
+    r"(?:^|[-_/])(?:small|mini|tiny|mlx|qwen2\.5|qwen3\.5|mistral|phi|"
+    r"gemma|llama3\.2)(?:[-_/]|$)"
 )
 
 RefineStyle = Literal["slm", "llm"]
@@ -37,11 +52,14 @@ def looks_like_slm(model: Any) -> bool:
 
     Callables are treated as unknown (not SLM).  String specs matching
     local providers (``omlx/``, ``ollama/``, …) or small-size tokens
-    (``7b``, ``9B``, ``mlx``, …) return True.
+    (``7b``, ``9B``, ``mlx``, …) return True. Cloud providers such as
+    ``gemini/`` / ``openai/`` always return False.
     """
     if not isinstance(model, str):
         return False
     lowered = model.lower().strip()
+    if any(lowered.startswith(p) for p in _LLM_PROVIDER_PREFIXES):
+        return False
     if any(lowered.startswith(p) for p in _SLM_PROVIDER_PREFIXES):
         return True
     return bool(_SLM_SIZE_RE.search(lowered))

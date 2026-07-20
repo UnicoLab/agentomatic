@@ -9,6 +9,8 @@
   params, dataset, eval I/O, metrics) for rewrite/GEPA/MIPRO; auto multipass
   3 for SLMs and 2 for frontier LLMs via ``rewrite_passes`` / ``multipass`` /
   ``slm_multipass`` / ``llm_multipass``.
+- **``gemini/`` optimize provider**: Generative Language API routing + live
+  Gemini optimize tests (``GEMINI_API_KEY``).
 
 ### Fixes
 
