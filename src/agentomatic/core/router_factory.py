@@ -634,11 +634,23 @@ def create_default_router(
             collected_response = ""
             try:
                 if is_class_agent:
-                    # Class agents use a dataclass state: convert dict → state
-                    # via input_to_state (atransform) and emit the final result
-                    # as a single frame instead of streaming a raw dict into the
-                    # graph (which would raise AttributeError).
-                    result = await invoke_registered_agent(agent, state)
+                    # Stream per-node updates via AgentGraph.astream, then the
+                    # final ``state_to_output`` payload. Never feed a raw dict
+                    # into dataclass-typed nodes.
+                    from agentomatic.core.agent_invoke import _input_from_state
+
+                    input_data = _input_from_state(state)
+                    instance._begin_request_prompt(input_data)
+                    try:
+                        state_obj = instance.input_to_state(input_data)
+                        graph = instance.graph
+                        async for event in graph.astream(state_obj):
+                            yield f"data: {json.dumps(event, default=str)}\n\n"
+                        result = instance.state_to_output(state_obj)
+                        if hasattr(instance, "_graph") and instance._graph is not None:
+                            instance._traces.append(instance._graph.last_trace)
+                    finally:
+                        instance._end_request_prompt()
                     yield f"data: {json.dumps(result, default=str)}\n\n"
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")
@@ -1218,8 +1230,11 @@ def create_default_router(
             "reasoning": "",
         }
 
-        # Inject prompt override
+        # Inject prompt override at top-level + metadata so class agents
+        # (``resolve_system_prompt`` / ``_input_from_state``) and folder
+        # agents that read metadata both see it.
         if request.system_prompt_override:
+            state["system_prompt_override"] = request.system_prompt_override
             state["metadata"]["system_prompt_override"] = request.system_prompt_override  # type: ignore[index]
 
         t0 = time.perf_counter()

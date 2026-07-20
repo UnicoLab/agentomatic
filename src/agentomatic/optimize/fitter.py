@@ -147,6 +147,8 @@ def _wrap_local_agent(agent: Any) -> Any:
             if isinstance(input_data["context"], dict):
                 input_data["context"]["documents"] = list(context)
         if prompt_override:
+            # Top-level + metadata so resolve_system_prompt / transform stash both see it.
+            input_data["system_prompt_override"] = prompt_override
             input_data.setdefault("metadata", {})
             if isinstance(input_data["metadata"], dict):
                 input_data["metadata"]["system_prompt_override"] = prompt_override
@@ -444,6 +446,8 @@ class PromptFitter:
             ),
         )
 
+        metric = self._augment_metric_with_local_judges(metric)
+
         # ── Step 1: Load baseline config ─────────────────────────────
         logger.info("📦 Step 1/10 — Loading baseline config")
         baseline_config = self._load_baseline_config()
@@ -541,7 +545,11 @@ class PromptFitter:
                 sum(len(str(p.get("query", ""))) for p in val_points) // max(len(val_points), 1)
             ),
             avg_expected_length=(
-                sum(len(str(p.get("expected", ""))) for p in val_points) // max(len(val_points), 1)
+                sum(
+                    len(str(p.get("expected_answer") or p.get("expected") or ""))
+                    for p in val_points
+                )
+                // max(len(val_points), 1)
             ),
         )
 
@@ -595,6 +603,17 @@ class PromptFitter:
                 "   💡 Step 4 — Proposing {} candidates",
                 _CANDIDATES_PER_ROUND,
             )
+            optimizer_name = getattr(self._optimizer, "name", "") or ""
+            if any(token in optimizer_name for token in ("rewrite", "gepa", "mipro")):
+                await self._callbacks.emit(
+                    OptimizationEvent.REWRITE_START,
+                    EventData(
+                        agent=self.agent,
+                        experiment_id=experiment_id,
+                        round_idx=round_idx,
+                        optimizer_name=optimizer_name,
+                    ),
+                )
             try:
                 candidates: list[PromptCandidate] = await self._optimizer.propose(
                     current_config=best_config,
@@ -759,6 +778,20 @@ class PromptFitter:
                                 improvement=(full_score - best_score),
                             ),
                         )
+                        if "rewrite" in (cand.source or ""):
+                            await self._callbacks.emit(
+                                OptimizationEvent.REWRITE_ACCEPTED,
+                                EventData(
+                                    agent=self.agent,
+                                    experiment_id=experiment_id,
+                                    round_idx=round_idx,
+                                    candidate_name=cand.name,
+                                    score=full_score,
+                                    best_score=best_score,
+                                    accept_reason=reason,
+                                    improvement=(full_score - best_score),
+                                ),
+                            )
                         best_config = cand.config
                         best_score = full_score
                         best_dims = dict(full_dims)
@@ -782,6 +815,19 @@ class PromptFitter:
                                 accept_reason=reason,
                             ),
                         )
+                        if "rewrite" in (cand.source or ""):
+                            await self._callbacks.emit(
+                                OptimizationEvent.REWRITE_REJECTED,
+                                EventData(
+                                    agent=self.agent,
+                                    experiment_id=experiment_id,
+                                    round_idx=round_idx,
+                                    candidate_name=cand.name,
+                                    score=full_score,
+                                    best_score=best_score,
+                                    accept_reason=reason,
+                                ),
+                            )
                         dim_table = self._dimension_analyzer.format_table(comparisons)
                         logger.debug(
                             "      Dimension table:\n{}",
@@ -978,6 +1024,53 @@ class PromptFitter:
     # Private helpers
     # ================================================================
 
+    def _augment_metric_with_local_judges(
+        self,
+        metric: CompositeMetric | BaseMetric,
+    ) -> CompositeMetric | BaseMetric:
+        """Fold configured ``local_judges`` into the evaluation metric.
+
+        When ``PromptFitter(..., local_judges=[...])`` is set, each model is
+        wrapped as a :class:`~agentomatic.optimize.judges.LocalJudgeMetric`
+        and mixed into a :class:`CompositeMetric` so LLM-as-judge feedback
+        participates in every reevaluation round.
+        """
+        if not self.local_judges:
+            return metric
+
+        from agentomatic.optimize.judges import LocalJudgeMetric, MultiJudgePanel
+        from agentomatic.optimize.metrics import WeightedMetric
+
+        judges = [
+            LocalJudgeMetric(
+                name=f"local_judge_{idx}",
+                model=model_name,
+                criteria="Evaluate correctness, completeness, and usefulness.",
+            )
+            for idx, model_name in enumerate(self.local_judges)
+        ]
+        panel: BaseMetric = judges[0] if len(judges) == 1 else MultiJudgePanel(judges=judges)
+
+        if isinstance(metric, CompositeMetric):
+            metric._metrics.append(  # noqa: SLF001 - intentional augmentation
+                WeightedMetric(name="local_judges", metric=panel, weight=0.35)
+            )
+            metric._total_weight = sum(wm.weight for wm in metric._metrics)  # noqa: SLF001
+            logger.info(
+                "Augmented composite metric with {} local judge(s)",
+                len(judges),
+            )
+            return metric
+
+        augmented = CompositeMetric(
+            metrics=[
+                WeightedMetric(name="base", metric=metric, weight=0.65),
+                WeightedMetric(name="local_judges", metric=panel, weight=0.35),
+            ]
+        )
+        logger.info("Wrapped metric with {} local judge(s)", len(judges))
+        return augmented
+
     async def _evaluate_config(
         self,
         config: PromptRuntimeConfig,
@@ -1016,6 +1109,7 @@ class PromptFitter:
         dim_accumulators: dict[str, list[float]] = {}
         eval_details: list[dict[str, Any]] = []
 
+        scored_count = 0
         for rr in run_results:
             if rr.error:
                 logger.debug("Skipping errored result for '{}'", rr.query[:50])
@@ -1029,7 +1123,6 @@ class PromptFitter:
                         "details": [],
                     }
                 )
-                scores.append(0.0)
                 continue
 
             try:
@@ -1039,8 +1132,29 @@ class PromptFitter:
                     expected=rr.expected,
                     context=rr.context or rr.retrieval_context,
                 )
+                # Honest eval: skip fabricated / failed judge scores from the
+                # average so a broken LLM-as-judge cannot invent mid-scale loss.
+                if (eval_result.metadata or {}).get("evaluation_failed"):
+                    logger.warning(
+                        "Skipping failed metric eval for '{}': {}",
+                        rr.query[:50],
+                        eval_result.reason,
+                    )
+                    eval_details.append(
+                        {
+                            "query": rr.query,
+                            "response": rr.response,
+                            "expected": rr.expected,
+                            "avg_score": 0.0,
+                            "error": eval_result.reason,
+                            "details": [],
+                        }
+                    )
+                    continue
+
                 point_score = eval_result.score
                 scores.append(point_score)
+                scored_count += 1
 
                 # Extract per-dimension scores from composite metrics
                 point_dims: dict[str, float] = {}
@@ -1068,7 +1182,6 @@ class PromptFitter:
                 )
             except Exception as exc:
                 logger.warning("Metric evaluation failed for '{}': {}", rr.query[:50], exc)
-                scores.append(0.0)
                 eval_details.append(
                     {
                         "query": rr.query,
@@ -1080,7 +1193,8 @@ class PromptFitter:
                     }
                 )
 
-        avg_score = sum(scores) / len(scores) if scores else 0.0
+        # If every point failed evaluation, report 0.0 (not a fabricated mid score).
+        avg_score = sum(scores) / scored_count if scored_count else 0.0
         per_dim: dict[str, float] = {
             dim: sum(vals) / len(vals) for dim, vals in dim_accumulators.items() if vals
         }

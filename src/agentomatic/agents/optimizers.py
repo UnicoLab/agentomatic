@@ -106,19 +106,19 @@ class GridSearchOptimizer:
         best_config: dict[str, Any] = {}
         best_score = -1.0
 
-        # Save original values so we can restore after search
+        # Save original attribute + compiled_config values so we can restore.
         originals: dict[str, Any] = {}
+        compiled_originals: dict[str, Any] = {}
+        compiled = getattr(agent, "compiled_config", None)
         for key in keys:
             if hasattr(agent, key):
                 originals[key] = getattr(agent, key)
+            if isinstance(compiled, dict) and key in compiled:
+                compiled_originals[key] = compiled[key]
 
         for combo in combinations:
             config = dict(zip(keys, combo))
-
-            # Apply config to agent
-            for key, value in config.items():
-                if hasattr(agent, key):
-                    setattr(agent, key, value)
+            self._apply_config(agent, config)
 
             # Evaluate
             total_score = 0.0
@@ -145,9 +145,30 @@ class GridSearchOptimizer:
         # Restore original values (fit() will apply best_config)
         for key, value in originals.items():
             setattr(agent, key, value)
+        if isinstance(compiled, dict):
+            for key in keys:
+                if key in compiled_originals:
+                    compiled[key] = compiled_originals[key]
+                else:
+                    compiled.pop(key, None)
 
         logger.info(f"Grid search best: {best_config} (score: {best_score:.3f})")
         return best_config
+
+    @staticmethod
+    def _apply_config(agent: Any, config: dict[str, Any]) -> None:
+        """Apply a candidate config so evaluation actually sees the change.
+
+        Attributes are set when present; otherwise values land in
+        ``compiled_config`` so :meth:`BaseGraphAgent.resolve_system_prompt`
+        (and similar) pick them up during ``transform``.
+        """
+        compiled = getattr(agent, "compiled_config", None)
+        for key, value in config.items():
+            if hasattr(agent, key):
+                setattr(agent, key, value)
+            if isinstance(compiled, dict):
+                compiled[key] = value
 
 
 # ---------------------------------------------------------------------------
@@ -378,14 +399,29 @@ class PromptFitterBridge:
 
     @classmethod
     def _extract_config(cls, agent: Any, result: Any) -> dict[str, Any]:
-        """Map the fit result's best config onto applicable agent attributes."""
+        """Map the fit result's best config onto ``compiled_config``.
+
+        Always returns applicable keys present on the best config so
+        ``fit()`` can store them in ``compiled_config`` (and
+        :meth:`~agentomatic.agents.base.BaseGraphAgent.resolve_system_prompt`
+        can pick them up). Attribute assignment is still gated by
+        ``hasattr`` inside ``BaseGraphAgent.fit``.
+        """
         best = getattr(result, "best_config", None)
         if best is None:
             return {}
         raw = best.to_dict() if hasattr(best, "to_dict") else dict(getattr(best, "__dict__", {}))
-        return {
-            key: raw[key] for key in cls._APPLICABLE_KEYS if key in raw and hasattr(agent, key)
-        }
+        config: dict[str, Any] = {}
+        for key in cls._APPLICABLE_KEYS:
+            if key not in raw:
+                continue
+            value = raw[key]
+            if value is None:
+                continue
+            if isinstance(value, str) and not value.strip():
+                continue
+            config[key] = value
+        return config
 
     @staticmethod
     def _run_async(coro: Any) -> Any:

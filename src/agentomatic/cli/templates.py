@@ -58,12 +58,11 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         self.prompt_manager = prompt_manager
 
     def _system_prompt(self) -> str:
-        if self.prompt_manager is not None:
-            try:
-                return self.prompt_manager.get_prompt("v1", prompt_type="system")
-            except Exception:  # noqa: BLE001
-                pass
-        return "You are a helpful RAG assistant. Ground answers in retrieved context."
+        # Honour optimize/fit overrides via resolve_system_prompt (compiled_config,
+        # system_prompt_override, prompt_manager) — required for train/optimize.
+        return self.resolve_system_prompt(
+            default="You are a helpful RAG assistant. Ground answers in retrieved context."
+        )
 
     def build_graph(self):
         g = self.new_graph()
@@ -143,12 +142,9 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         self.prompt_manager = prompt_manager
 
     def _system_prompt(self) -> str:
-        if self.prompt_manager is not None:
-            try:
-                return self.prompt_manager.get_prompt("v1", prompt_type="system")
-            except Exception:  # noqa: BLE001
-                pass
-        return "You are a friendly conversational assistant."
+        return self.resolve_system_prompt(
+            default="You are a friendly conversational assistant."
+        )
 
     def build_graph(self):
         g = self.new_graph()
@@ -227,12 +223,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         self.prompt_manager = prompt_manager
 
     def _system_prompt(self) -> str:
-        if self.prompt_manager is not None:
-            try:
-                return self.prompt_manager.get_prompt("v1", prompt_type="system")
-            except Exception:  # noqa: BLE001
-                pass
-        return "You are a helpful assistant."
+        return self.resolve_system_prompt(default="You are a helpful assistant.")
 
     def build_graph(self):
         g = self.new_graph()

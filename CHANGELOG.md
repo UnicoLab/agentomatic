@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Fixes
+
+- **optimize / oMLX**: ``omlx/`` provider routing; disable thinking on local
+  OpenAI-compatible servers; strip residual CoT from optimize LLM calls;
+  skip DeepEval for oMLX/local specs; ``MultiJudgePanel`` / ``GEvalMetric``
+  honest failure handling; MIPRO accepts ``DataPoint`` samples.
+
 ## v1.5.1 (2026-07-17)
 
 ### Bug Fixes

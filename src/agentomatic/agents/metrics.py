@@ -12,10 +12,64 @@ Example::
 
 from __future__ import annotations
 
+import difflib
 from collections.abc import Callable, Sequence
 from typing import Any
 
 from .types import AgentExample
+
+# ---------------------------------------------------------------------------
+# ResponseSimilarityMetric
+# ---------------------------------------------------------------------------
+
+
+class ResponseSimilarityMetric:
+    """Fuzzy-match ``prediction["response"]`` against expected output text.
+
+    Uses :class:`difflib.SequenceMatcher` ratio in ``[0, 1]``. Returns
+    ``0.0`` when ground truth is missing (honest — never fabricates a
+    mid-scale score).
+
+    Args:
+        name: Optional metric name.
+        fuzzy: When ``False``, require exact (case-insensitive) equality.
+    """
+
+    def __init__(self, name: str = "response_similarity", *, fuzzy: bool = True) -> None:
+        self.name = name
+        self.fuzzy = fuzzy
+
+    def score(
+        self,
+        example: AgentExample,
+        prediction: dict[str, Any],
+    ) -> float:
+        """Score response text against ``expected_output``."""
+        expected = self._expected_text(example)
+        if not expected:
+            return 0.0
+        actual = str(prediction.get("response", "") or "").strip()
+        if not actual:
+            return 0.0
+        if not self.fuzzy:
+            return 1.0 if actual.lower() == expected.lower() else 0.0
+        return difflib.SequenceMatcher(None, actual.lower(), expected.lower()).ratio()
+
+    @staticmethod
+    def _expected_text(example: AgentExample) -> str:
+        expected = example.expected_output
+        if expected is None:
+            return ""
+        if isinstance(expected, str):
+            return expected.strip()
+        if isinstance(expected, dict):
+            for key in ("response", "answer", "output", "text"):
+                val = expected.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+            return ""
+        return str(expected).strip()
+
 
 # ---------------------------------------------------------------------------
 # ExactKeyMatchMetric
@@ -325,11 +379,14 @@ class OptimizeMetricAdapter:
             query = str(inp)
 
         # --- serialise prediction as response string ---
-        response = (
-            _json.dumps(prediction, ensure_ascii=False)
-            if isinstance(prediction, dict)
-            else str(prediction)
-        )
+        if isinstance(prediction, dict):
+            response = str(
+                prediction.get("response")
+                or prediction.get("answer")
+                or _json.dumps(prediction, ensure_ascii=False)
+            )
+        else:
+            response = str(prediction)
 
         # --- serialise expected output ---
         exp_out = getattr(example, "expected_output", None)
@@ -359,4 +416,6 @@ class OptimizeMetricAdapter:
         except Exception:
             return 0.5  # judge unavailable — neutral, don't crash training
 
+        if (getattr(result, "metadata", None) or {}).get("evaluation_failed"):
+            return 0.0
         return float(getattr(result, "score", 0.5))

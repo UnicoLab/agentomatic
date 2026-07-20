@@ -59,6 +59,7 @@ from agentomatic.agents.metrics import (
     ContainsTermsMetric,
     ExactKeyMatchMetric,
     OptimizeMetricAdapter,
+    ResponseSimilarityMetric,
     WeightedMetric,
 )
 from agentomatic.agents.optimizers import (
@@ -104,6 +105,7 @@ __all__ = [
     "ContainsTermsMetric",
     "CallableMetric",
     "WeightedMetric",
+    "ResponseSimilarityMetric",
     "OptimizeMetricAdapter",
     # Optimizers
     "NoOpOptimizer",

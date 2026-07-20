@@ -153,15 +153,23 @@ class GraphAgentAdapter(StudioAdapter):
         # a dict and raise AttributeError (HTTP 500 / run_error in Studio).
         stream_state: Any = state
         instance = getattr(self._agent, "class_instance", None)
+        prompt_guard = False
         if instance is not None:
             from agentomatic.agents.base import BaseGraphAgent
             from agentomatic.core.agent_invoke import _input_from_state
 
             if isinstance(instance, BaseGraphAgent):
-                stream_state = instance.input_to_state(_input_from_state(state))
+                input_data = _input_from_state(state)
+                instance._begin_request_prompt(input_data)
+                prompt_guard = True
+                stream_state = instance.input_to_state(input_data)
 
-        async for evt_dict in graph.astream_studio_events(stream_state, run_id):
-            yield StudioRunEvent(**evt_dict)
+        try:
+            async for evt_dict in graph.astream_studio_events(stream_state, run_id):
+                yield StudioRunEvent(**evt_dict)
+        finally:
+            if prompt_guard and instance is not None:
+                instance._end_request_prompt()
 
     async def get_state(self, thread_id: str) -> StudioStateSnapshot | None:
         return None
