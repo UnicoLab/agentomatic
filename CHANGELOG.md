@@ -3,6 +3,13 @@
 
 ## Unreleased
 
+### Added
+
+- **Multi-pass optimize (SLM + LLM)**: full optimization briefing (config,
+  params, dataset, eval I/O, metrics) for rewrite/GEPA/MIPRO; auto multipass
+  3 for SLMs and 2 for frontier LLMs via ``rewrite_passes`` / ``multipass`` /
+  ``slm_multipass`` / ``llm_multipass``.
+
 ### Fixes
 
 - **optimize / oMLX**: ``omlx/`` provider routing; disable thinking on local

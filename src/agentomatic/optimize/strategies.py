@@ -61,17 +61,32 @@ class IterativeRewrite(OptimizationStrategy):
     """LLM rewrites the prompt based on failure analysis.
 
     Process:
-    1. Analyze low-scoring responses
-    2. Identify failure patterns
-    3. Ask LLM to rewrite prompt to address failures
-    4. Preserve successful behaviors
+    1. Build a full optimization briefing (I/O, expected, samples)
+    2. Run multi-pass refine (3 for SLMs, 2 for frontier LLMs by default)
+    3. Preserve successful behaviors while fixing failures
     """
 
     name = "iterative_rewrite"
 
-    def __init__(self, model: LLMSpec = "ollama/mistral:7b", max_failures: int = 5):
+    def __init__(
+        self,
+        model: LLMSpec = "ollama/mistral:7b",
+        max_failures: int = 5,
+        rewrite_passes: int | None = None,
+        multipass: bool = True,
+        slm_multipass: bool = True,
+        llm_multipass: bool = True,
+        slm_default_passes: int = 3,
+        llm_default_passes: int = 2,
+    ):
         self.model = model
         self.max_failures = max_failures
+        self.rewrite_passes = rewrite_passes
+        self.multipass = multipass
+        self.slm_multipass = slm_multipass
+        self.llm_multipass = llm_multipass
+        self.slm_default_passes = slm_default_passes
+        self.llm_default_passes = llm_default_passes
 
     async def step(
         self,
@@ -80,56 +95,53 @@ class IterativeRewrite(OptimizationStrategy):
         dataset_sample: list[dict[str, Any]],
         iteration: int,
     ) -> str:
-        # Sort by score ascending (worst first)
-        failures = sorted(eval_results, key=lambda r: r.get("avg_score", 0))[: self.max_failures]
-        successes = sorted(eval_results, key=lambda r: r.get("avg_score", 0), reverse=True)[:3]
-
-        failure_analysis = "\n".join(
-            f"- Query: {f.get('query', '')}\n"
-            f"  Response: {f.get('response', '')[:200]}\n"
-            f"  Expected: {f.get('expected', 'N/A')}\n"
-            f"  Score: {f.get('avg_score', 0):.2f}\n"
-            f"  Issues: {'; '.join(r.get('reason', '') for r in f.get('details', []))}"
-            for f in failures
+        from agentomatic.optimize.briefing import (
+            build_full_optimization_briefing,
+            multipass_refine_prompt,
+            refine_style_for,
+            resolve_rewrite_passes,
         )
+        from agentomatic.optimize.config import PromptRuntimeConfig
 
-        success_summary = "\n".join(
-            f"- Query: {s.get('query', '')} → Score: {s.get('avg_score', 0):.2f}"
-            for s in successes
+        # Normalize score key used by the loop vs fitter
+        normalized = []
+        for r in eval_results:
+            row = dict(r)
+            if "score" not in row and "avg_score" in row:
+                row["score"] = row["avg_score"]
+            normalized.append(row)
+
+        rewrite_model = str(self.model) if isinstance(self.model, str) else ""
+        briefing = build_full_optimization_briefing(
+            current_config=PromptRuntimeConfig(system_prompt=current_prompt),
+            eval_results=normalized,
+            dataset_sample=dataset_sample,
+            max_failures=self.max_failures,
+            rewrite_model=rewrite_model,
         )
-
-        rewrite_prompt = (
-            f"You are a prompt engineering expert. Your task is to improve a system prompt "
-            f"for an AI agent based on evaluation feedback.\n\n"
-            f"## Current Prompt (Iteration {iteration})\n"
-            f"```\n{current_prompt}\n```\n\n"
-            f"## Failure Analysis (Low-Scoring Responses)\n"
-            f"{failure_analysis}\n\n"
-            f"## Success Analysis (High-Scoring Responses)\n"
-            f"{success_summary}\n\n"
-            f"## Instructions\n"
-            f"1. Analyze the failure patterns above\n"
-            f"2. Identify what the prompt is missing or doing wrong\n"
-            f"3. Write an IMPROVED system prompt that addresses the failures\n"
-            f"4. PRESERVE behaviors that led to successful responses\n"
-            f"5. Be specific and actionable in your instructions\n\n"
-            f"Reply with ONLY the improved system prompt text, nothing else.\n"
-        )
-
-        return await self._call_llm(rewrite_prompt)
-
-    async def _call_llm(self, prompt: str) -> str:
-        """Call LLM for prompt rewriting."""
-        from agentomatic.optimize.llm_caller import LLMCaller
-
-        result = await LLMCaller.call(
+        briefing = f"{briefing}\n\n## Iteration\nOuter loop iteration: {iteration}\n"
+        passes = resolve_rewrite_passes(
             self.model,
-            prompt,
-            temperature=0.7,
+            rewrite_passes=self.rewrite_passes,
+            multipass=self.multipass,
+            slm_multipass=self.slm_multipass,
+            llm_multipass=self.llm_multipass,
+            slm_default_passes=self.slm_default_passes,
+            llm_default_passes=self.llm_default_passes,
         )
-        if not result:
-            return prompt + "\n\n(Optimization LLM unavailable — manual revision needed)"
-        return result
+        style = refine_style_for(self.model)
+        new_prompt, _notes = await multipass_refine_prompt(
+            model=self.model,
+            briefing=briefing,
+            current_prompt=current_prompt,
+            passes=passes,
+            temperature=0.45 if style == "llm" else 0.55,
+            max_tokens=3000 if style == "slm" else 4000,
+            style=style,
+        )
+        if not new_prompt.strip():
+            return current_prompt + "\n\n(Optimization LLM unavailable — manual revision needed)"
+        return new_prompt
 
 
 class FewShotBootstrap(OptimizationStrategy):

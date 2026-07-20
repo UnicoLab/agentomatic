@@ -91,6 +91,7 @@ class OptimizationContext:
         metric_names: Names of the metrics being evaluated.
         round_idx: Current round index.
         total_rounds: Total planned rounds.
+        agent_name: Name of the agent being optimised (for briefing).
     """
 
     # ── Scores ───────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ class OptimizationContext:
     # ── Progress ─────────────────────────────────────────────────────
     round_idx: int = 0
     total_rounds: int = 0
+    agent_name: str = ""
 
     # ── Formatting helpers ───────────────────────────────────────────
 
