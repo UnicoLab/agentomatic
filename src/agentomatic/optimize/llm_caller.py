@@ -6,8 +6,9 @@ synthesis, etc.  Instead of each module importing *httpx* and
 calling Ollama directly, every call goes through
 :class:`LLMCaller` which handles:
 
-* **Provider routing** — ``ollama/``, ``openai/``, ``omlx/``, ``litellm/``
-  prefixes (``omlx/`` targets a local OpenAI-compatible server).
+* **Provider routing** — ``ollama/``, ``openai/``, ``omlx/``, ``gemini/``,
+  ``litellm/`` prefixes (``omlx/`` targets a local OpenAI-compatible server;
+  ``gemini/`` uses the Google Generative Language API + ``GEMINI_API_KEY``).
 * **Callable dispatch** — custom async/sync callables and LangChain
   models are transparently supported via :data:`LLMSpec`.
 * **Graceful degradation** — failures are logged and an empty string
@@ -45,7 +46,8 @@ _OLLAMA_BASE_URL = "http://localhost:11434"
 _OLLAMA_GENERATE_ENDPOINT = f"{_OLLAMA_BASE_URL}/api/generate"
 _DEFAULT_OMLX_BASE_URL = "http://127.0.0.1:8000/v1"
 
-_SUPPORTED_PROVIDERS = ("ollama", "openai", "litellm", "omlx")
+_SUPPORTED_PROVIDERS = ("ollama", "openai", "litellm", "omlx", "gemini")
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 # Regex for stripping markdown code fences (```json ... ``` or ``` ... ```)
 _CODE_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)```", re.DOTALL)
@@ -72,6 +74,8 @@ def parse_model_spec(model: str) -> tuple[str, str]:
     ('ollama', 'mistral:7b')
     >>> parse_model_spec("litellm/anthropic/claude-3-haiku")
     ('litellm', 'anthropic/claude-3-haiku')
+    >>> parse_model_spec("gemini/gemini-3.1-flash-lite")
+    ('gemini', 'gemini-3.1-flash-lite')
     """
     for provider in _SUPPORTED_PROVIDERS:
         prefix = f"{provider}/"
@@ -254,6 +258,17 @@ class LLMCaller:
                     base_url=os.getenv("OMLX_BASE_URL", _DEFAULT_OMLX_BASE_URL),
                     api_key=os.getenv("OMLX_API_KEY") or os.getenv("OPENAI_API_KEY") or "omlx",
                     disable_thinking=True,
+                )
+            if provider == "gemini":
+                return await _call_gemini(
+                    model_name,
+                    prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    timeout=timeout,
+                    api_key=eff_api_key,
                 )
             if provider == "litellm":
                 return await _call_litellm(
@@ -497,6 +512,69 @@ async def _call_openai(
         if reasoning:
             return _normalize_llm_text(str(reasoning))
         return ""
+
+
+async def _call_gemini(
+    model_name: str,
+    prompt: str,
+    *,
+    system_prompt: str | None = None,
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+    json_mode: bool = False,
+    timeout: float = 120.0,
+    api_key: str | None = None,
+) -> str:
+    """Call Google Gemini via the Generative Language REST API.
+
+    Uses ``GEMINI_API_KEY`` (or *api_key* / ``GOOGLE_API_KEY``). Model specs
+    look like ``gemini/gemini-3.1-flash-lite`` → ``gemini-3.1-flash-lite``.
+    """
+    import httpx
+
+    key = (
+        api_key
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+        or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
+        or ""
+    )
+    if not key:
+        raise ValueError(
+            "GEMINI_API_KEY (or GOOGLE_API_KEY) is required for gemini/ models"
+        )
+
+    # Allow bare ids or models/ prefix from env configs.
+    model_id = model_name.removeprefix("models/")
+    url = f"{_GEMINI_BASE_URL}/models/{model_id}:generateContent"
+    generation_config: dict[str, Any] = {
+        "temperature": temperature,
+        "maxOutputTokens": max_tokens,
+    }
+    if json_mode:
+        generation_config["responseMimeType"] = "application/json"
+
+    payload: dict[str, Any] = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": generation_config,
+    }
+    if system_prompt:
+        payload["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(url, params={"key": key}, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+
+    candidates = data.get("candidates") or []
+    if not candidates:
+        # Surface block reasons instead of a silent empty string upstream.
+        feedback = data.get("promptFeedback") or {}
+        raise RuntimeError(f"Gemini returned no candidates: {feedback or data}")
+
+    parts = (((candidates[0] or {}).get("content") or {}).get("parts")) or []
+    texts = [str(p.get("text", "")) for p in parts if isinstance(p, dict)]
+    return _normalize_llm_text("\n".join(t for t in texts if t))
 
 
 async def _call_litellm(

@@ -40,7 +40,7 @@ def _prefer_raw_llm_judge(model: Any) -> bool:
     if not isinstance(model, str):
         return True
     lowered = model.lower()
-    if lowered.startswith("omlx/"):
+    if lowered.startswith(("omlx/", "gemini/")):
         return True
     if os.getenv("OMLX_BASE_URL") or os.getenv("OMLX_API_KEY"):
         if lowered.startswith("openai/") or "/" not in model:
