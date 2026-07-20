@@ -9,6 +9,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Multi-pass optimize (SLM + LLM)**: `optimize/briefing.py` builds a full
+  optimization briefing (runtime config, search space, dataset samples,
+  eval I/O, metrics, history) for rewrite / GEPA / MIPRO. Auto multi-pass:
+  **3** (draft→critique→revise) for SLMs / local providers, **2**
+  (draft→self-check) for frontier LLMs. Prompt style and briefing size
+  adapt per model class. Knobs: `rewrite_passes`, `multipass`,
+  `slm_multipass`, `llm_multipass`, `slm_default_passes`,
+  `llm_default_passes`. See [Optimization](guide/optimization.md).
 - **Thinking / reasoning LLMs**: `message_text`, `message_thinking`,
   `strip_thinking_for_json`, `astream_with_thinking`, and
   `invoke_with_retry(strip_thinking=…)` normalize Qwen3 / tagged `<think>` /

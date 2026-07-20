@@ -527,13 +527,54 @@ fitter = PromptFitter(
     local_agent=agent_instance,             # bypasses HTTP — calls transform() directly
     llm_base_url="http://127.0.0.1:8000/v1",  # routes openai/ specs to local server
     llm_api_key="local-key",               # arbitrary for local servers
-    optimizer="gepa_like",
+    optimizer="rewrite",                  # full briefing + multi-pass
+    rewrite_passes=None,                  # None = auto (3 SLM / 2 frontier LLM)
+    multipass=True,
+    slm_multipass=True,
+    llm_multipass=True,
     max_trials=8,
 )
 result = await fitter.fit(trainset, valset, metric)
 print(result.summary())
 print(result.history)   # list[float] — per-round best scores
 result.apply(version="v2_fit")
+```
+
+!!! tip "Multi-pass rewrite (SLM + LLM)"
+    Every rewrite / GEPA / MIPRO call receives a **full briefing**: system
+    prompt, model / RAG / tool params, search space, dataset samples, metrics,
+    history, and per-example input / expected / actual / scores / judge
+    feedback.
+
+    Auto multi-pass (when `rewrite_passes=None` and `multipass=True`):
+
+    | Rewrite model | Default passes | Loop |
+    |---|---|---|
+    | SLM / local (`omlx/`, `ollama/`, `7b`…) | **3** | draft → critique → revise |
+    | Frontier LLM (`openai/`, `anthropic/`…) | **2** | draft → self-check revise |
+
+    Prompt wording and briefing size adapt to the model class. Override with
+    `rewrite_passes=1` (single shot), `rewrite_passes=5` (extra rounds), or
+    disable with `multipass=False` / `llm_multipass=False` / `slm_multipass=False`.
+
+```python
+# Frontier rewrite model — draft + self-check by default
+fitter = PromptFitter(
+    agent="scope_agent",
+    task_model="openai/gpt-4.1-mini",
+    rewrite_model="openai/gpt-4.1",
+    optimizer="rewrite",
+    llm_multipass=True,          # default
+    llm_default_passes=2,        # draft → revise
+)
+
+# Force a deeper LLM critique loop
+fitter = PromptFitter(
+    agent="scope_agent",
+    rewrite_model="anthropic/claude-sonnet-4",
+    optimizer="rewrite",
+    rewrite_passes=3,            # draft → critique → revise
+)
 ```
 
 | Parameter | Type | Default | Description |
@@ -547,6 +588,12 @@ result.apply(version="v2_fit")
 | `min_absolute_improvement` | `float` | `0.02` | Early stop if best improvement is below this threshold |
 | `concurrency` | `int` | `3` | Number of parallel evaluation workers |
 | `local_agent` | `Any \| None` | `None` | Live agent instance — bypasses HTTP runner entirely |
+| `rewrite_passes` | `int \| None` | `None` | Multi-pass refine count (`None` = auto by model class) |
+| `multipass` | `bool` | `True` | Master switch for auto multi-pass refine |
+| `slm_multipass` | `bool` | `True` | Auto multi-pass when rewrite model looks like an SLM |
+| `llm_multipass` | `bool` | `True` | Auto multi-pass for frontier / cloud rewrite LLMs |
+| `slm_default_passes` | `int` | `3` | Passes used when SLM auto-detect fires |
+| `llm_default_passes` | `int` | `2` | Passes used when LLM auto-detect fires |
 | `llm_base_url` | `str \| None` | `None` | Base URL for the optimizer's OpenAI-compatible LLM server |
 | `llm_api_key` | `str \| None` | `None` | API key for the optimizer LLM server |
 

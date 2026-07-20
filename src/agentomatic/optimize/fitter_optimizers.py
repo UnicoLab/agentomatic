@@ -218,7 +218,17 @@ class RewriteOptimizer(BaseFitterOptimizer):
 
     name: str = "rewrite"
     model: LLMSpec = "ollama/qwen2.5:7b"
-    max_failures: int = 5
+    max_failures: int = 6
+    rewrite_passes: int | None = None
+    """Explicit multi-pass count. ``None`` = auto (3 SLM / 2 LLM)."""
+    multipass: bool = True
+    """Master switch for auto multi-pass refine."""
+    slm_multipass: bool = True
+    """When True, auto-bump passes for local/small models (omlx, ollama, …)."""
+    llm_multipass: bool = True
+    """When True, auto multi-pass for frontier / cloud rewrite LLMs."""
+    slm_default_passes: int = 3
+    llm_default_passes: int = 2
 
     async def propose(
         self,
@@ -229,159 +239,77 @@ class RewriteOptimizer(BaseFitterOptimizer):
         iteration: int = 0,
         context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
-        """Rewrite the system prompt based on failure/success analysis.
+        """Rewrite the system prompt from a full optimization briefing.
 
-        Workflow:
-        1. Sort results by score (ascending) to surface failures.
-        2. Build a detailed failure analysis string with pipeline context.
-        3. Identify success patterns from top-scoring results.
-        4. Include score history and dimensional trends (if available).
-        5. Ask the LLM to reason step-by-step then produce an improved
-           prompt.
-        6. Return a single ``PromptCandidate``.
-
-        Returns
-        -------
-        list[PromptCandidate]
-            Always exactly one candidate with the rewritten system prompt.
+        Builds a rich briefing (config, params, dataset samples, eval I/O,
+        metrics, history) and runs one or more refine passes. SLMs default
+        to draft→critique→revise (3); frontier LLMs default to draft→revise
+        (2).
         """
-        logger.info(
-            "RewriteOptimizer: analysing {} results for iteration {}",
-            len(eval_results),
-            iteration,
+        from agentomatic.optimize.briefing import (
+            briefing_limits_for,
+            build_full_optimization_briefing,
+            multipass_refine_prompt,
+            refine_style_for,
+            resolve_rewrite_passes,
         )
 
-        # -- sort by score to find failures and successes ----------------
+        passes = resolve_rewrite_passes(
+            self.model,
+            rewrite_passes=self.rewrite_passes,
+            multipass=self.multipass,
+            slm_multipass=self.slm_multipass,
+            llm_multipass=self.llm_multipass,
+            slm_default_passes=self.slm_default_passes,
+            llm_default_passes=self.llm_default_passes,
+        )
+        style = refine_style_for(self.model)
+        logger.info(
+            "RewriteOptimizer: analysing {} results for iteration {} "
+            "(passes={}, style={})",
+            len(eval_results),
+            iteration,
+            passes,
+            style,
+        )
+
         scored = sorted(eval_results, key=lambda r: r.get("score", 0.0))
         failures = scored[: self.max_failures]
         successes = scored[-max(3, self.max_failures) :]
 
-        # -- build failure analysis with pipeline context ----------------
-        failure_lines: list[str] = []
-        for idx, fail in enumerate(failures, 1):
-            failure_lines.append(f"### Failure {idx}")
-            failure_lines.append(f"- Query: {fail.get('query', 'N/A')}")
-            failure_lines.append(f"- Response: {fail.get('response', 'N/A')[:300]}")
-            failure_lines.append(f"- Expected: {str(fail.get('expected', 'N/A'))[:300]}")
-            failure_lines.append(f"- Score: {fail.get('score', 0.0):.3f}")
-            issues = fail.get("feedback") or fail.get("reason") or fail.get("details", "")
-            if issues:
-                failure_lines.append(f"- Issues: {issues}")
-            # Dimensional scores
-            dims = fail.get("dimensions", {})
-            if dims:
-                dim_str = ", ".join(f"{k}={v:.3f}" for k, v in dims.items())
-                failure_lines.append(f"- Dimensions: {dim_str}")
-            # Retrieval context
-            ret_ctx = fail.get("retrieval_context", [])
-            if ret_ctx:
-                docs = "; ".join(str(d)[:100] for d in ret_ctx[:3])
-                failure_lines.append(f"- Retrieved docs: {docs}")
-            # Tool calls
-            tool_calls = fail.get("tool_calls", [])
-            if tool_calls:
-                tools = ", ".join(str(t.get("name", t)) for t in tool_calls[:3])
-                failure_lines.append(f"- Tool calls: {tools}")
-            # Reasoning
-            reasoning = fail.get("reasoning", "")
-            if reasoning:
-                failure_lines.append(f"- Agent reasoning: {str(reasoning)[:200]}")
-            failure_lines.append("")
-        failure_analysis = "\n".join(failure_lines) if failure_lines else "No failures identified."
-
-        # -- build success patterns --------------------------------------
-        success_lines: list[str] = []
-        for idx, suc in enumerate(successes, 1):
-            success_lines.append(f"### Success {idx}")
-            success_lines.append(f"- Query: {suc.get('query', 'N/A')}")
-            success_lines.append(f"- Score: {suc.get('score', 0.0):.3f}")
-            success_lines.append(f"- Response snippet: {suc.get('response', '')[:200]}")
-            success_lines.append("")
-        success_patterns = "\n".join(success_lines) if success_lines else "No strong successes."
-
-        # -- build context sections (score history, dims, clusters) ------
-        context_sections = ""
-        if context is not None:
-            parts: list[str] = []
-            # Score history / trends
-            history = context.format_score_history(max_rounds=5)
-            if history and history != "No previous rounds.":
-                parts.append(f"## Score History (recent rounds)\n{history}")
-                parts.append(f"Trend: {context.format_score_sparkline()}")
-            # Dimensional breakdown
-            dim_table = context.format_dimension_table()
-            if dim_table and "No per-dimension" not in dim_table:
-                parts.append(f"## Per-Dimension Scores\n{dim_table}")
-            # Failure clusters
-            clusters = context.format_failure_clusters()
-            if clusters and "No failure clusters" not in clusters:
-                parts.append(f"## Failure Clusters\n{clusters}")
-            if parts:
-                context_sections = "\n\n".join(parts) + "\n\n"
-
-        # -- build the rewrite prompt with chain-of-thought --------------
-        prompt = (
-            "You are an expert prompt engineer. Your task is to REWRITE a "
-            "system prompt to improve its performance.\n\n"
-            f"## Current System Prompt\n```\n"
-            f"{current_config.system_prompt}\n```\n\n"
+        limits = briefing_limits_for(
+            str(self.model) if isinstance(self.model, str) else ""
         )
-        if context_sections:
-            prompt += context_sections
-        prompt += (
-            f"## Failure Analysis (lowest-scoring results)\n"
-            f"{failure_analysis}\n\n"
-            f"## Success Patterns (highest-scoring results)\n"
-            f"{success_patterns}\n\n"
-            "## Instructions\n"
-            "First, THINK step-by-step in a <thinking> block:\n"
-            "1. What are the ROOT CAUSES of each failure type?\n"
-            "2. What patterns do the successful cases share?\n"
-            "3. What specific instructions are missing or "
-            "ambiguous?\n"
-            "4. How do the score trends inform what to change?\n"
-            "5. What concrete changes will address each failure "
-            "while preserving successes?\n\n"
-            "Then write the IMPROVED system prompt that:\n"
-            "- Addresses the root causes of each failure type\n"
-            "- Preserves the patterns that lead to high scores\n"
-            "- Adds explicit instructions for edge cases\n"
-            "- Is clear, specific, and actionable\n"
-            "- Keeps the core task/role the same\n\n"
-            "Reply with your <thinking> analysis followed by the "
-            "new system prompt after a '---' separator.\n"
+        briefing = build_full_optimization_briefing(
+            current_config=current_config,
+            eval_results=eval_results,
+            dataset_sample=dataset_sample,
+            search_space=search_space,
+            context=context,
+            max_failures=max(self.max_failures, limits["max_failures"]),
+            max_successes=max(3, limits["max_successes"]),
+            max_samples=limits["max_samples"],
+            rewrite_model=str(self.model) if isinstance(self.model, str) else "",
+            agent_name=(context.agent_name if context is not None else ""),
         )
 
-        raw_response = await LLMCaller.call(
-            self.model,
-            prompt,
-            temperature=0.7,
-            max_tokens=3000,
+        new_prompt, pass_notes = await multipass_refine_prompt(
+            model=self.model,
+            briefing=briefing,
+            current_prompt=current_config.system_prompt,
+            passes=passes,
+            temperature=0.45 if style == "llm" else 0.55,
+            max_tokens=3000 if style == "slm" else 4000,
+            style=style,
         )
-
-        # Extract the prompt after the separator (or use full response)
-        new_prompt = raw_response.strip()
-        if "---" in new_prompt:
-            parts_split = new_prompt.split("---", 1)
-            new_prompt = parts_split[-1].strip()
-        # Strip any remaining <thinking> tags
-        if "<thinking>" in new_prompt:
-            # Take content after closing tag
-            if "</thinking>" in new_prompt:
-                new_prompt = new_prompt.split("</thinking>", 1)[-1].strip()
-        # Strip markdown fences
-        if new_prompt.startswith("```"):
-            lines = new_prompt.split("\n")
-            end = -1 if lines[-1].strip() == "```" else len(lines)
-            new_prompt = "\n".join(lines[1:end]).strip()
 
         if not new_prompt.strip():
             logger.warning("RewriteOptimizer: LLM returned empty rewrite — keeping current config")
             new_prompt = current_config.system_prompt
 
-        # -- determine mutation notes ------------------------------------
         mutation_notes = (
-            f"Full prompt rewrite at iteration {iteration}. "
+            f"Full prompt rewrite at iteration {iteration} "
+            f"({passes} pass(es): {', '.join(pass_notes)}). "
             f"Analysed {len(failures)} failures (avg score "
             f"{sum(f.get('score', 0) for f in failures) / max(len(failures), 1):.3f}) "
             f"and {len(successes)} successes."
@@ -629,6 +557,11 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
         list[PromptCandidate]
             Up to 15 combined candidates.
         """
+        from agentomatic.optimize.briefing import (
+            build_full_optimization_briefing,
+            extract_prompt_text,
+        )
+
         logger.info(
             "MIPROLikeOptimizer: iter={}, generating {} instructions × {} few-shot",
             iteration,
@@ -636,8 +569,17 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             self.n_few_shot_candidates,
         )
 
-        # -- 1. Build failure summary for the LLM -----------------------
+        # -- 1. Build failure summary + full briefing --------------------
         failure_summary = _build_failure_summary(eval_results, max_items=5)
+        briefing = build_full_optimization_briefing(
+            current_config=current_config,
+            eval_results=eval_results,
+            dataset_sample=dataset_sample,
+            search_space=search_space,
+            context=context,
+            rewrite_model=str(self.model) if isinstance(self.model, str) else "",
+            agent_name=(context.agent_name if context is not None else ""),
+        )
 
         # -- 2. Generate instruction variants in parallel ----------------
         instruction_tasks = [
@@ -647,6 +589,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
                 samples=dataset_sample,
                 variant_idx=i,
                 iteration=iteration,
+                briefing=briefing,
             )
             for i in range(self.n_instruction_candidates)
         ]
@@ -657,7 +600,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             if isinstance(result, Exception):
                 logger.warning("MIPROLikeOptimizer: instruction variant {} failed: {}", i, result)
                 continue
-            text = str(result).strip()
+            text = extract_prompt_text(str(result), fallback="")
             if text:
                 instructions.append(text)
         if not instructions:
@@ -678,6 +621,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             dataset_sample=dataset_sample,
             search_space=search_space,
             iteration=iteration,
+            context=context,
         )
         for fc in fs_candidates[: self.n_few_shot_candidates]:
             few_shot_subsets.append(fc.config.few_shot_examples)
@@ -698,6 +642,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             fused = await self._fuse_instructions(
                 instructions[: self.fuse_top_k],
                 current_config.system_prompt,
+                briefing=briefing,
             )
             if fused:
                 instructions.insert(0, fused)
@@ -751,33 +696,14 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
         samples: list[dict[str, Any]],
         variant_idx: int,
         iteration: int,
+        briefing: str = "",
     ) -> str:
-        """Generate a single instruction variant from a specific perspective.
+        """Generate a single instruction variant from a specific perspective."""
+        from agentomatic.optimize.briefing import extract_prompt_text
 
-        Each variant is generated with a different prompt-engineering
-        perspective from ``_MIPRO_PERSPECTIVES`` to maximise diversity.
-
-        Parameters
-        ----------
-        current_prompt:
-            The system prompt to improve.
-        failure_summary:
-            Formatted summary of evaluation failures.
-        samples:
-            Example dataset entries for context.
-        variant_idx:
-            Index selecting the perspective.
-        iteration:
-            Outer loop iteration number.
-
-        Returns
-        -------
-        str
-            The generated instruction text.
-        """
         perspective = _MIPRO_PERSPECTIVES[variant_idx % len(_MIPRO_PERSPECTIVES)]
 
-        # Include a few dataset samples for grounding
+        # Include a few dataset samples for grounding (briefing has more)
         sample_str = ""
         if samples:
             shown = samples[:3]
@@ -795,9 +721,11 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
                 sample_lines.append(f"  A: {str(expected)[:200]}")
             sample_str = "\n".join(sample_lines)
 
+        briefing_block = f"{briefing}\n\n" if briefing else ""
         prompt = (
             "You are a prompt engineering expert. Generate a VARIATION of "
-            "the system prompt below.\n\n"
+            "the system prompt. Use the FULL briefing (config, params, I/O).\n\n"
+            f"{briefing_block}"
             f"## Perspective\n{perspective}\n\n"
             f"## Current Prompt\n```\n{current_prompt}\n```\n\n"
             f"## Known Failure Patterns\n{failure_summary}\n\n"
@@ -807,56 +735,47 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
         prompt += (
             "## Rules\n"
             "- Create a DIFFERENT approach to the same task\n"
-            "- Address the failure patterns identified above\n"
+            "- Address the failure patterns and Expected answers above\n"
+            "- Reflect relevant model/RAG/tool params when useful\n"
             "- Keep the core purpose and task intact\n"
             "- Be creative but practical\n"
             f"- This is variant {variant_idx} of iteration {iteration}\n\n"
-            "Reply with ONLY the new system prompt text.\n"
+            "Reply with ONLY the new system prompt after a '---' line.\n"
         )
 
-        return await LLMCaller.call(
+        raw = await LLMCaller.call(
             self.model,
             prompt,
             temperature=0.8,
             max_tokens=2000,
         )
+        return extract_prompt_text(raw, fallback=current_prompt)
 
     async def _fuse_instructions(
         self,
         instructions: list[str],
         original: str,
+        briefing: str = "",
     ) -> str:
-        """Fuse multiple instruction candidates into a single merged variant.
+        """Fuse multiple instruction candidates into a single merged variant."""
+        from agentomatic.optimize.briefing import extract_prompt_text
 
-        Asks the LLM to combine the best elements of several candidate
-        instructions into one coherent, improved prompt.
-
-        Parameters
-        ----------
-        instructions:
-            The top-K instruction variants to merge.
-        original:
-            The original baseline prompt for reference.
-
-        Returns
-        -------
-        str
-            The fused instruction text, or empty string on failure.
-        """
         numbered = "\n\n".join(
             f"### Variant {i + 1}\n```\n{instr}\n```" for i, instr in enumerate(instructions)
         )
+        briefing_block = f"{briefing}\n\n" if briefing else ""
         prompt = (
             "You are a prompt engineering expert. Below are several "
             "candidate system prompts that each take a different approach "
-            "to the same task.\n\n"
+            "to the same task. Use the briefing to keep grounded in I/O.\n\n"
+            f"{briefing_block}"
             f"## Original Prompt\n```\n{original}\n```\n\n"
             f"## Candidate Variants\n{numbered}\n\n"
             "## Task\n"
             "Merge the BEST elements of all variants into a single, "
             "coherent, improved system prompt. Combine complementary "
             "strengths and eliminate redundant or conflicting instructions.\n\n"
-            "Reply with ONLY the fused system prompt text.\n"
+            "Reply with ONLY the fused system prompt after a '---' line.\n"
         )
 
         result = await LLMCaller.call(
@@ -865,7 +784,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             temperature=0.5,
             max_tokens=2000,
         )
-        return result.strip()
+        return extract_prompt_text(result, fallback="")
 
 
 # =====================================================================
@@ -942,6 +861,8 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
         list[PromptCandidate]
             One candidate per mutation, each with detailed ``mutation_notes``.
         """
+        from agentomatic.optimize.briefing import build_full_optimization_briefing
+
         logger.info(
             "GEPALikeOptimizer: iter={}, generating {} mutations",
             iteration,
@@ -962,8 +883,17 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
                     }
                 )
 
-        # -- 2. Build feedback summary -----------------------------------
+        # -- 2. Build feedback summary + full briefing -------------------
         feedback_summary = self._build_categorised_feedback(feedback_items)
+        briefing = build_full_optimization_briefing(
+            current_config=current_config,
+            eval_results=eval_results,
+            dataset_sample=dataset_sample,
+            search_space=search_space,
+            context=context,
+            rewrite_model=str(self.rewrite_model) if isinstance(self.rewrite_model, str) else "",
+            agent_name=(context.agent_name if context is not None else ""),
+        )
 
         # -- 3. Select mutation aspects ----------------------------------
         aspects = self._select_mutation_aspects(feedback_items)
@@ -976,6 +906,7 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
                 aspect=aspects[i % len(aspects)],
                 mutation_idx=i,
                 iteration=iteration,
+                briefing=briefing,
             )
             for i in range(self.n_mutations)
         ]
@@ -1137,30 +1068,16 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
         aspect: str,
         mutation_idx: int,
         iteration: int,
+        briefing: str = "",
     ) -> str:
-        """Generate a single prompt mutation targeting a specific aspect.
+        """Generate a single prompt mutation targeting a specific aspect."""
+        from agentomatic.optimize.briefing import extract_prompt_text
 
-        Parameters
-        ----------
-        current_prompt:
-            The baseline system prompt to mutate.
-        feedback_summary:
-            Categorised feedback summary.
-        aspect:
-            The specific aspect this mutation should address.
-        mutation_idx:
-            Index of this mutation (for logging).
-        iteration:
-            Outer loop iteration number.
-
-        Returns
-        -------
-        str
-            The mutated system prompt text.
-        """
+        briefing_block = f"{briefing}\n\n" if briefing else ""
         prompt = (
             "You are an expert prompt engineer performing targeted prompt "
-            "mutation.\n\n"
+            "mutation. Use the FULL briefing (config, params, dataset, I/O).\n\n"
+            f"{briefing_block}"
             f"## Current System Prompt\n```\n{current_prompt}\n```\n\n"
             f"## Evaluation Feedback Summary\n{feedback_summary}\n\n"
             f"## Mutation Target\n"
@@ -1169,19 +1086,20 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
             f"1. Analyse the current prompt for weaknesses related to: {aspect}\n"
             "2. Make TARGETED changes that specifically address this aspect\n"
             "3. Preserve all other instructions that are working well\n"
-            "4. Add explicit guidance or constraints related to the target aspect\n"
-            "5. The mutation should be a clear, focused improvement — not a "
-            "complete rewrite\n\n"
+            "4. Ground changes in the Expected answers / failure I/O above\n"
+            "5. Reflect relevant model/RAG/tool params in instructions when useful\n"
+            "6. Focused improvement — not an unrelated rewrite\n\n"
             f"This is mutation {mutation_idx} of iteration {iteration}.\n\n"
-            "Reply with ONLY the mutated system prompt text.\n"
+            "Reply with ONLY the mutated system prompt after a '---' line.\n"
         )
 
-        return await LLMCaller.call(
+        raw = await LLMCaller.call(
             self.rewrite_model,
             prompt,
             temperature=0.7,
             max_tokens=2000,
         )
+        return extract_prompt_text(raw, fallback=current_prompt)
 
 
 # =====================================================================
@@ -1577,9 +1495,24 @@ def resolve_fitter_optimizer(
 
     cls = lookup[normalised]
 
+    # Rewrite multipass knobs only apply to RewriteOptimizer.
+    rewrite_only = {
+        k: kwargs.pop(k)
+        for k in (
+            "rewrite_passes",
+            "multipass",
+            "slm_multipass",
+            "llm_multipass",
+            "slm_default_passes",
+            "llm_default_passes",
+            "max_failures",
+        )
+        if k in kwargs
+    }
+
     # -- build kwargs per optimizer type ---------------------------------
     if cls is RewriteOptimizer:
-        return RewriteOptimizer(model=model, **kwargs)
+        return RewriteOptimizer(model=model, **rewrite_only, **kwargs)
 
     if cls is FewShotBootstrapOptimizer:
         return FewShotBootstrapOptimizer(**kwargs)

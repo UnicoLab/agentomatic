@@ -32,6 +32,16 @@ Synthetic data::
 
 from __future__ import annotations
 
+from agentomatic.optimize.briefing import (
+    briefing_limits_for,
+    build_full_optimization_briefing,
+    extract_prompt_text,
+    looks_like_slm,
+    multipass_refine_prompt,
+    refine_style_for,
+    resolve_rewrite_passes,
+)
+
 # ── PromptFitter API (ML-like prompt/config optimisation) ────────────
 from agentomatic.optimize.config import (
     ParamDelta,
@@ -172,6 +182,14 @@ __all__ = [
     "ParamDelta",
     "PromptSearchSpace",
     "load_search_space",
+    # Multi-pass briefing (SLM + LLM)
+    "looks_like_slm",
+    "refine_style_for",
+    "briefing_limits_for",
+    "resolve_rewrite_passes",
+    "build_full_optimization_briefing",
+    "multipass_refine_prompt",
+    "extract_prompt_text",
     # PromptFitter metrics
     "MetricResult",
     "CompositeMetric",

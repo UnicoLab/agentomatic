@@ -256,6 +256,21 @@ class PromptFitter:
     llm_api_key : str | None
         API key for the optimizer LLM server (may be arbitrary for local
         servers, e.g. ``"any-key"``).
+    rewrite_passes : int | None
+        Multi-pass refine count for :class:`RewriteOptimizer`. ``None`` =
+        auto (3 for SLMs / local providers, 2 for frontier LLMs).
+    multipass : bool
+        Master switch for auto multi-pass refine (default True).
+    slm_multipass : bool
+        When True (default), auto multi-pass for small/local rewrite models
+        (``omlx/``, ``ollama/``, ``7b``, …).
+    llm_multipass : bool
+        When True (default), auto multi-pass for frontier / cloud rewrite
+        LLMs (``openai/``, ``anthropic/``, …).
+    slm_default_passes : int
+        Pass count when SLM auto-detect fires (default 3).
+    llm_default_passes : int
+        Pass count when LLM auto-detect fires (default 2).
 
     Examples
     --------
@@ -263,7 +278,8 @@ class PromptFitter:
     ...     agent="scope_agent",
     ...     task_model="ollama/qwen2.5:7b",
     ...     rewrite_model="openai/gpt-4.1",
-    ...     optimizer="gepa_like",
+    ...     optimizer="rewrite",
+    ...     # frontier rewrite LLM → draft + self-check (2 passes)
     ... )
     >>> result = await fitter.fit(trainset, valset, metric)
     >>> print(result.summary())
@@ -277,6 +293,8 @@ class PromptFitter:
     ...     local_agent=my_agent_instance,
     ...     llm_base_url="http://127.0.0.1:8000/v1",
     ...     llm_api_key="any-key",
+    ...     optimizer="rewrite",
+    ...     # SLMs get draft→critique→revise automatically
     ... )
     """
 
@@ -301,6 +319,12 @@ class PromptFitter:
         local_agent: Any | None = None,
         llm_base_url: str | None = None,
         llm_api_key: str | None = None,
+        rewrite_passes: int | None = None,
+        multipass: bool = True,
+        slm_multipass: bool = True,
+        llm_multipass: bool = True,
+        slm_default_passes: int = 3,
+        llm_default_passes: int = 2,
     ) -> None:
         # Public configuration
         self.agent = agent
@@ -313,6 +337,12 @@ class PromptFitter:
         self.concurrency = concurrency
         self.experiment_dir = experiment_dir
         self.auto_report = auto_report
+        self.rewrite_passes = rewrite_passes
+        self.multipass = multipass
+        self.slm_multipass = slm_multipass
+        self.llm_multipass = llm_multipass
+        self.slm_default_passes = slm_default_passes
+        self.llm_default_passes = llm_default_passes
 
         # Configure LLMCaller for OpenAI-compatible local servers if requested.
         # This propagates base_url/api_key to all optimizer LLM calls automatically.
@@ -343,6 +373,12 @@ class PromptFitter:
             optimizer,
             model=task_model,
             rewrite_model=self.rewrite_model,
+            rewrite_passes=rewrite_passes,
+            multipass=multipass,
+            slm_multipass=slm_multipass,
+            llm_multipass=llm_multipass,
+            slm_default_passes=slm_default_passes,
+            llm_default_passes=llm_default_passes,
         )
 
         # Failure analysis
@@ -596,6 +632,7 @@ class PromptFitter:
                 ),
                 round_idx=round_idx,
                 total_rounds=max_rounds,
+                agent_name=self.agent,
             )
 
             # ── Step 4: Generate candidates ──────────────────────
