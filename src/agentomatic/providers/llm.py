@@ -435,9 +435,25 @@ def _wrap_with_fallbacks(
 
     from agentomatic.providers.fallback import FallbackLLM, model_label
 
+    def _endpoint_key(prov: str, kwargs: dict[str, Any]) -> tuple[str, str, str]:
+        base = str(kwargs.get("base_url") or kwargs.get("api_base") or "").rstrip("/")
+        return (str(prov or ""), str(kwargs.get("model") or ""), base)
+
+    primary_key = _endpoint_key(provider, primary_kwargs)
+    seen: set[tuple[str, str, str]] = {primary_key}
+
     fallback_models: list[Any] = []
     labels = [model_label(provider, primary_kwargs.get("model"))]
     for label, fb_kwargs in _normalize_fallback_specs(fallbacks, primary_kwargs):
+        fb_key = _endpoint_key(str(fb_kwargs.get("provider") or ""), fb_kwargs)
+        if fb_key in seen:
+            logger.info(
+                "Skipping duplicate LLM fallback {} (same provider/model/base_url "
+                "as an earlier chain step — avoids waiting a full timeout twice)",
+                label,
+            )
+            continue
+        seen.add(fb_key)
         try:
             build_kwargs = {k: v for k, v in fb_kwargs.items() if k != "provider"}
             fallback_models.append(_build_llm(fb_kwargs["provider"], **build_kwargs))

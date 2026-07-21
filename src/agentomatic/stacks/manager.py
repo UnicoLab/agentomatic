@@ -77,13 +77,24 @@ class LLMStackEntry(BaseModel):
     max_tokens: int = Field(4096, ge=1)
     api_key: str = Field("", description="API key (supports ${ENV_VAR} interpolation)")
     base_url: str = Field("", description="Custom base URL for the provider")
+    timeout: float | None = Field(
+        None,
+        gt=0,
+        description="Optional HTTP/request timeout (seconds) for the chat client",
+    )
+    max_retries: int | None = Field(
+        None,
+        ge=0,
+        description="Optional chat-client retries (0 = fail fast; prefer stack fallbacks)",
+    )
     extra: dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "Provider-specific params forwarded to the LLM factory. For OpenAI-"
             "compatible servers (oMLX / vLLM) common keys include: "
             "enable_thinking, chat_template_kwargs, response_format, "
-            "extra_body, model_kwargs, default_headers."
+            "extra_body, model_kwargs, default_headers. Also accepts timeout / "
+            "max_retries when not set as first-class fields."
         ),
     )
     fallbacks: list[str | LLMFallbackSpec] = Field(
@@ -236,6 +247,11 @@ def _stack_entry_to_build_kwargs(
         kwargs["api_key"] = entry.api_key
     if entry.base_url:
         kwargs["base_url"] = entry.base_url
+    # First-class timeout / max_retries when present on the entry (newer stacks).
+    for key in ("timeout", "max_retries"):
+        value = getattr(entry, key, None)
+        if value is not None:
+            kwargs[key] = value
     kwargs.update(entry.extra)
     if include_fallbacks:
         if entry.fallbacks:
