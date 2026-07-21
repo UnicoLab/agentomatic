@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from agentomatic.security.claims import extract_roles, extract_scopes
 from agentomatic.security.policy import AgentSecurityPolicy
 
 if TYPE_CHECKING:
@@ -84,7 +85,8 @@ class ZeroTrustEnforcer:
 
         # --- 1. Authentication required? ---
         auth_required = self._require_auth_globally or policy.require_auth
-        claims: dict[str, Any] = getattr(request.state, "jwt_claims", None) or {}
+        raw_claims = getattr(request.state, "jwt_claims", None)
+        claims: dict[str, Any] = raw_claims if isinstance(raw_claims, dict) else {}
 
         if auth_required and not claims:
             self.audit_log(
@@ -94,9 +96,21 @@ class ZeroTrustEnforcer:
             )
             return False, "Authentication is required but no valid JWT claims found"
 
+        # Prefer middleware-normalized lists; fall back to claim extraction so
+        # Keycloak-style realm_access / scope strings are honoured.
+        state_roles = getattr(request.state, "roles", None)
+        token_roles: list[str] = (
+            list(state_roles) if isinstance(state_roles, list) else extract_roles(claims)
+        )
+        state_scopes = getattr(request.state, "scopes", None)
+        token_scopes: list[str] = (
+            list(state_scopes)
+            if isinstance(state_scopes, list)
+            else extract_scopes(claims)
+        )
+
         # --- 2. Role check ---
         if policy.allowed_roles and claims:
-            token_roles: list[str] = claims.get("roles", [])
             if not any(policy.is_role_allowed(r) for r in token_roles):
                 self.audit_log(
                     "request_denied",
@@ -110,7 +124,6 @@ class ZeroTrustEnforcer:
 
         # --- 3. Scope check ---
         if policy.allowed_scopes and claims:
-            token_scopes: list[str] = claims.get("scopes", [])
             if not any(policy.is_scope_allowed(s) for s in token_scopes):
                 self.audit_log(
                     "request_denied",

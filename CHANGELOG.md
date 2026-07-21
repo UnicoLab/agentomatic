@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- **security**: OIDC claim normalization (`extract_roles` / `extract_scopes`)
+  for Keycloak-style `realm_access`, `resource_access`, `scope`, and `scp`.
+- **security**: Optional DPoP (RFC 9449) validation on `JWTAuthMiddleware`
+  (`JWTConfig.require_dpop`, `DPoP` header, `cnf.jkt` binding, `jti` replay
+  cache). In-memory replay cache — use a shared store for multi-replica HA.
+- **security**: `ZeroTrustEnforcer` uses normalized roles/scopes from request
+  state or claim extraction (not only flat `roles` / `scopes` arrays).
+
 ## v1.6.0 (2026-07-20)
 
 ### Bug Fixes
@@ -13,7 +25,7 @@ Narrow class-agent streaming to a typed BaseGraphAgent binding so mypy passes, a
 
 Co-authored-by: Cursor <cursoragent@cursor.com>
 
-### Features
+### Features (prior)
 
 - **optimize**: Add gemini/ provider and live Gemini fit tests
   ([`955eb31`](https://github.com/UnicoLab/agentomatic/commit/955eb3111228a3817b349f9e9a8bb9dc7c7421d5))
