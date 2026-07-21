@@ -104,9 +104,7 @@ class ZeroTrustEnforcer:
         )
         state_scopes = getattr(request.state, "scopes", None)
         token_scopes: list[str] = (
-            list(state_scopes)
-            if isinstance(state_scopes, list)
-            else extract_scopes(claims)
+            list(state_scopes) if isinstance(state_scopes, list) else extract_scopes(claims)
         )
 
         # --- 2. Role check ---

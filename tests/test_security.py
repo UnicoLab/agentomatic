@@ -368,9 +368,7 @@ class TestVerifyRequest:
                 allowed_roles=["metier"],
             ),
         )
-        request = _mock_request(
-            claims={"sub": "u1", "realm_access": {"roles": ["metier"]}}
-        )
+        request = _mock_request(claims={"sub": "u1", "realm_access": {"roles": ["metier"]}})
 
         ok, _ = enforcer.verify_request(request, "agent")
         assert ok is True
@@ -541,7 +539,9 @@ class TestJWTMiddlewareSafety:
 
         app.add_middleware(
             JWTAuthMiddleware,
-            config=JWTConfig(enabled=True, jwks_url="https://example/jwks", require_signature=True),
+            config=JWTConfig(
+                enabled=True, jwks_url="https://example/jwks", require_signature=True
+            ),
         )
         # Avoid JWKS fetch on OPTIONS — middleware must short-circuit first.
         client = TestClient(app)
