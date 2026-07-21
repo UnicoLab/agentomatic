@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.8.1 (2026-07-21)
+
+### Bug Fixes
+
+- **llm**: Trigger 1.8.1 after conventional-commit subject pollution
+  ([`e66547b`](https://github.com/UnicoLab/agentomatic/commit/e66547b0d1cce030a25e616db5cfa0fe253815fc))
+
+Prior fix commits included ANSI color codes in subjects (bat aliased as cat), so semantic-release
+  skipped the patch. Clean subject to publish timeout and duplicate-fallback fixes already on main.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+
 ## v1.8.0 (2026-07-21)
 
 ### Features
