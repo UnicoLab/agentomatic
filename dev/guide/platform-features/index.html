@@ -3702,18 +3702,25 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 </blockquote>
 <hr />
 <h2 id="6-llm-failover-fallbacks">🛡️ 6. LLM Failover &amp; Fallbacks<a class="headerlink" href="#6-llm-failover-fallbacks" title="Permanent link">&para;</a></h2>
-<p>LLM APIs can suffer from outages, rate limiting (HTTP 429), or transient network errors. To ensure high availability, Agentomatic lets you define chainable fallback providers.</p>
+<p>LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
+transient network errors. Agentomatic lets you define an <strong>ordered</strong> fallback
+chain of models/providers.</p>
 <h3 id="configuration_1">Configuration<a class="headerlink" href="#configuration_1" title="Permanent link">&para;</a></h3>
-<p>Pass a list of provider slugs in the <code>fallbacks</code> parameter of <code>get_llm()</code>:</p>
+<p><strong>Python</strong> — pass specs to <code>get_llm()</code> / <code>get_named_llm()</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
 </span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;ollama&quot;</span><span class="p">]</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">)</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;provider&quot;</span><span class="p">:</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;mistral:7b&quot;</span><span class="p">}],</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">fallback_on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;timeout&quot;</span><span class="p">,</span> <span class="s2">&quot;connection&quot;</span><span class="p">,</span> <span class="s2">&quot;rate_limit&quot;</span><span class="p">,</span> <span class="s2">&quot;empty_response&quot;</span><span class="p">],</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">)</span>
 </span></code></pre></div>
-<p>If the primary provider (<code>openai</code>) raises an exception during execution, LangChain's fallback mechanism automatically routes the request to the next available backup in the list (<code>azure</code>, then <code>ollama</code>), shielding clients from upstream downtime.</p>
+<p><strong>Stack YAML</strong> — set <code>fallbacks</code> / <code>fallback_on</code> on any LLM profile (see
+<a href="../stacks/">Stacks</a> and <a href="../llm-providers/">LLM Providers</a>). Profiles without
+<code>fallbacks</code> keep single-model behaviour.</p>
+<p>If the primary model fails for a configured trigger, the next backup is tried.
+<code>record_failover</code> logs each hop; a success log names the model that answered.</p>
 <hr />
 <h2 id="7-state-level-hook-middleware-interceptors">🔌 7. State-Level Hook Middleware (Interceptors)<a class="headerlink" href="#7-state-level-hook-middleware-interceptors" title="Permanent link">&para;</a></h2>
 <p>For custom telemetry, audit logging, or real-time security scanning, you can register <strong>state-level node hooks</strong>. These are run instantly before and after every agent node invocation.</p>
