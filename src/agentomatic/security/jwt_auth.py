@@ -214,6 +214,12 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 decode_kwargs["issuer"] = self._config.issuer
             if self._config.audience:
                 decode_kwargs["audience"] = self._config.audience
+            else:
+                # Empty audience → do not enforce ``aud`` (Keycloak often
+                # issues ``aud=account`` unless a mapper is configured).
+                opts = dict(decode_kwargs.get("options") or {})
+                opts["verify_aud"] = False
+                decode_kwargs["options"] = opts
 
             claims: dict[str, Any] = _jwt_lib.decode(token, **decode_kwargs)  # type: ignore[union-attr]
         except ExpiredSignatureError:
