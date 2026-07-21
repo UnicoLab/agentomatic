@@ -294,11 +294,13 @@ To measure the performance and quality of different prompt variants:
 
 ## 🛡️ 6. LLM Failover & Fallbacks
 
-LLM APIs can suffer from outages, rate limiting (HTTP 429), or transient network errors. To ensure high availability, Agentomatic lets you define chainable fallback providers.
+LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
+transient network errors. Agentomatic lets you define an **ordered** fallback
+chain of models/providers.
 
 ### Configuration
 
-Pass a list of provider slugs in the `fallbacks` parameter of `get_llm()`:
+**Python** — pass specs to `get_llm()` / `get_named_llm()`:
 
 ```python
 from agentomatic.providers.llm import get_llm
@@ -306,11 +308,17 @@ from agentomatic.providers.llm import get_llm
 llm = get_llm(
     provider="openai",
     model="gpt-4",
-    fallbacks=["azure", "ollama"]
+    fallbacks=["azure", {"provider": "ollama", "model": "mistral:7b"}],
+    fallback_on=["timeout", "connection", "rate_limit", "empty_response"],
 )
 ```
 
-If the primary provider (`openai`) raises an exception during execution, LangChain's fallback mechanism automatically routes the request to the next available backup in the list (`azure`, then `ollama`), shielding clients from upstream downtime.
+**Stack YAML** — set `fallbacks` / `fallback_on` on any LLM profile (see
+[Stacks](stacks.md) and [LLM Providers](llm-providers.md)). Profiles without
+`fallbacks` keep single-model behaviour.
+
+If the primary model fails for a configured trigger, the next backup is tried.
+`record_failover` logs each hop; a success log names the model that answered.
 
 ---
 

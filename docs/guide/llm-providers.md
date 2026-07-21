@@ -145,9 +145,11 @@ graph LR
 
 ## Failover Chain Configuration
 
-`get_llm` accepts a `fallbacks` list so you can build an automatic failover
-chain. If the primary provider fails, LangChain transparently routes to the
-next provider in the list.
+Configure an **ordered** fallback chain so that if the primary model times
+out, disconnects, rate-limits, or returns an empty response, Agentomatic
+retries the next model and logs which one succeeded.
+
+### Python API
 
 ```python
 from agentomatic.providers import get_llm
@@ -155,27 +157,70 @@ from agentomatic.providers import get_llm
 llm = get_llm(
     provider="openai",
     model="gpt-4o",
-    fallbacks=["ollama", "vertex"],   # tried in order on failure
+    fallbacks=[
+        "ollama",                                      # provider slug (inherits kwargs)
+        "openai/gpt-4o-mini",                          # provider/model shorthand
+        {"provider": "vertex", "model": "gemini-2.0-flash"},  # full inline spec
+    ],
+    fallback_on=["timeout", "connection", "rate_limit", "empty_response"],
     temperature=0.3,
 )
 ```
 
-Under the hood Agentomatic calls LangChain's
-`.with_fallbacks(fallback_models, exceptions_to_handle=(Exception,))`,
-catching **all** exceptions so that transient errors, rate-limits, and
-network issues all trigger a failover.
+### Stack YAML
+
+```yaml
+llm:
+  default:
+    provider: openai
+    model: gpt-4o
+    api_key: ${OPENAI_API_KEY}
+    fallbacks:
+      - fast                                          # named profile in this stack
+      - provider: ollama
+        model: mistral:7b
+        base_url: http://localhost:11434
+    fallback_on:
+      - timeout
+      - connection
+      - rate_limit
+      - empty_response
+  fast:
+    provider: openai
+    model: gpt-4o-mini
+    api_key: ${OPENAI_API_KEY}
+```
+
+Omitting `fallbacks` keeps the previous single-model behaviour unchanged.
+
+Under the hood Agentomatic wraps the chain in `FallbackLLM`.
+Each step failure calls `record_failover(primary, next, error)`; when a
+fallback answers, a log line records which model succeeded.
+
+| Trigger | Default | Matches |
+|---------|---------|---------|
+| `timeout` | ✅ | `TimeoutError`, messages containing timeout/deadline |
+| `connection` | ✅ | `ConnectionError` / `OSError`, connection refused, DNS failures |
+| `rate_limit` | ✅ | 429 / rate-limit style errors |
+| `empty_response` | ✅ | Blank / whitespace-only content |
+| `any_error` | ❌ | Every exception (opt-in) |
+
+!!! tip "Settings default"
+    Platform setting `llm.fallback_on` (env nested key `LLM__FALLBACK_ON`)
+    documents the same trigger list. Per-profile `fallback_on` in stack YAML
+    overrides when present; otherwise the library defaults above apply.
 
 !!! warning "Last-resort dummy"
-    If the primary provider **and** every fallback fail to build, the
-    framework silently falls back to a `FakeListChatModel` (dummy) so that
-    your process never crashes at import time. Check logs for
-    `record_failover` warnings in production.
+    If the primary provider **fails to build** at construction time, the
+    factory still falls back to a `FakeListChatModel` (dummy) so import /
+    startup does not crash. Runtime invoke failures use the configured
+    fallback chain instead.
 
 ```mermaid
 graph LR
-    P["Primary: openai"] -->|Exception| F1["Fallback 1: ollama"]
-    F1 -->|Exception| F2["Fallback 2: vertex"]
-    F2 -->|Exception| D["Dummy LLM"]
+    P["Primary: openai/gpt-4o"] -->|timeout / 429 / empty| F1["Fallback: openai/gpt-4o-mini"]
+    F1 -->|failure| F2["Fallback: ollama/mistral"]
+    F2 -->|failure| E["Raise last error"]
 ```
 
 ---

@@ -60,11 +60,22 @@ llm:
     model: "gpt-4o"
     temperature: 0.2
     api_key: "${OPENAI_API_KEY}"
+    # Optional ordered failover (omit entirely for single-model stacks)
+    fallbacks:
+      - fast
+      - provider: ollama
+        model: mistral:7b
+        base_url: "http://internal-ollama:11434"
+    fallback_on:
+      - timeout
+      - connection
+      - rate_limit
+      - empty_response
 
   fast:
-    provider: "ollama"
-    model: "llama3"
-    base_url: "http://internal-ollama:11434"
+    provider: "openai"
+    model: "gpt-4o-mini"
+    api_key: "${OPENAI_API_KEY}"
 
 agent_overrides:
   coder_agent:
