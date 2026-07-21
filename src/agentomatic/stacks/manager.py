@@ -19,6 +19,37 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
+class LLMFallbackSpec(BaseModel):
+    """Inline fallback model specification (no nested fallbacks).
+
+    Attributes:
+        provider: LLM provider identifier.
+        model: Model name / identifier.
+        temperature: Sampling temperature.
+        max_tokens: Maximum tokens for generation.
+        api_key: API key; supports ``${ENV_VAR}`` interpolation.
+        base_url: Custom base URL for the provider endpoint.
+        extra: Arbitrary provider-specific parameters.
+    """
+
+    provider: str = Field(..., description="LLM provider identifier")
+    model: str = Field(..., description="Model identifier")
+    temperature: float | None = Field(
+        None,
+        ge=0.0,
+        le=2.0,
+        description="Optional temperature override; inherits primary when omitted",
+    )
+    max_tokens: int | None = Field(
+        None,
+        ge=1,
+        description="Optional max_tokens override; inherits primary when omitted",
+    )
+    api_key: str = Field("", description="API key (supports ${ENV_VAR} interpolation)")
+    base_url: str = Field("", description="Custom base URL for the provider")
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
 class LLMStackEntry(BaseModel):
     """Single LLM provider entry within a stack.
 
@@ -30,6 +61,11 @@ class LLMStackEntry(BaseModel):
         api_key: API key; supports ``${ENV_VAR}`` interpolation.
         base_url: Custom base URL for the provider endpoint.
         extra: Arbitrary provider-specific parameters.
+        fallbacks: Ordered fallbacks — profile names (``str``) or inline
+            :class:`LLMFallbackSpec` / dicts.
+        fallback_on: Conditions that advance to the next fallback
+            (``timeout``, ``connection``, ``rate_limit``, ``empty_response``,
+            ``any_error``). Empty list uses library defaults when building.
     """
 
     provider: str = Field(
@@ -48,6 +84,20 @@ class LLMStackEntry(BaseModel):
             "compatible servers (oMLX / vLLM) common keys include: "
             "enable_thinking, chat_template_kwargs, response_format, "
             "extra_body, model_kwargs, default_headers."
+        ),
+    )
+    fallbacks: list[str | LLMFallbackSpec] = Field(
+        default_factory=list,
+        description=(
+            "Ordered fallback models. Each item is a named stack profile "
+            "(e.g. ``fast``) or an inline provider/model spec."
+        ),
+    )
+    fallback_on: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Triggers that advance the fallback chain: timeout, connection, "
+            "rate_limit, empty_response, any_error. Empty = library defaults."
         ),
     )
 
@@ -159,6 +209,43 @@ class StackConfig(BaseModel):
         default_factory=dict,
         description="Per-agent LLM overrides",
     )
+
+
+def _stack_entry_to_build_kwargs(
+    entry: LLMStackEntry,
+    *,
+    include_fallbacks: bool = True,
+) -> dict[str, Any]:
+    """Convert an :class:`LLMStackEntry` into LLM factory kwargs.
+
+    Args:
+        entry: Stack LLM profile.
+        include_fallbacks: When ``True``, include ``fallbacks`` / ``fallback_on``
+            keys for the factory wrapper.
+
+    Returns:
+        Kwargs suitable for :func:`agentomatic.providers.llm.get_named_llm`.
+    """
+    kwargs: dict[str, Any] = {
+        "provider": entry.provider,
+        "model": entry.model,
+        "temperature": entry.temperature,
+        "max_tokens": entry.max_tokens,
+    }
+    if entry.api_key:
+        kwargs["api_key"] = entry.api_key
+    if entry.base_url:
+        kwargs["base_url"] = entry.base_url
+    kwargs.update(entry.extra)
+    if include_fallbacks:
+        if entry.fallbacks:
+            kwargs["fallbacks"] = [
+                fb.model_dump() if isinstance(fb, LLMFallbackSpec) else fb
+                for fb in entry.fallbacks
+            ]
+        if entry.fallback_on:
+            kwargs["fallback_on"] = list(entry.fallback_on)
+    return kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +377,90 @@ class StackManager:
                     k: self.interpolate_env(v) if isinstance(v, str) else v
                     for k, v in value.items()
                 }
+            elif key == "fallbacks" and isinstance(value, list):
+                data[key] = [self._interpolate_fallback_item(item) for item in value]
         return LLMStackEntry.model_validate(data)
+
+    def _interpolate_fallback_item(self, item: Any) -> Any:
+        """Interpolate env vars inside a single fallback list item."""
+        if isinstance(item, str):
+            return self.interpolate_env(item)
+        if isinstance(item, dict):
+            out: dict[str, Any] = {}
+            for key, value in item.items():
+                if isinstance(value, str):
+                    out[key] = self.interpolate_env(value)
+                elif isinstance(value, dict):
+                    out[key] = {
+                        k: self.interpolate_env(v) if isinstance(v, str) else v
+                        for k, v in value.items()
+                    }
+                else:
+                    out[key] = value
+            return out
+        return item
+
+    def resolve_fallbacks(self, entry: LLMStackEntry) -> list[dict[str, Any]]:
+        """Resolve an entry's ``fallbacks`` into concrete build kwargs dicts.
+
+        Profile-name strings are looked up in the active stack (without
+        recursively expanding that profile's own fallbacks). Inline specs
+        inherit unset ``temperature`` / ``max_tokens`` from *entry*.
+
+        Args:
+            entry: Primary LLM stack entry.
+
+        Returns:
+            Ordered list of kwargs suitable for :func:`get_named_llm` /
+            :func:`_build_llm` (each includes ``provider``).
+
+        Raises:
+            ValueError: If a referenced profile name is missing.
+        """
+        resolved: list[dict[str, Any]] = []
+        for item in entry.fallbacks:
+            if isinstance(item, str):
+                profile = item.strip()
+                if not profile:
+                    continue
+                # provider/model shorthand — not a stack profile
+                if "/" in profile and profile not in (
+                    self._active_stack.llm if self._active_stack else {}
+                ):
+                    provider, model = profile.split("/", 1)
+                    resolved.append(
+                        {
+                            "provider": provider,
+                            "model": model,
+                            "temperature": entry.temperature,
+                            "max_tokens": entry.max_tokens,
+                            "api_key": entry.api_key,
+                            "base_url": entry.base_url,
+                            **dict(entry.extra),
+                        }
+                    )
+                    continue
+                fb_entry = self.get_llm_config(profile)
+                resolved.append(_stack_entry_to_build_kwargs(fb_entry, include_fallbacks=False))
+                continue
+
+            spec = (
+                item if isinstance(item, LLMFallbackSpec) else LLMFallbackSpec.model_validate(item)
+            )
+            kwargs: dict[str, Any] = {
+                "provider": spec.provider,
+                "model": spec.model,
+                "temperature": (
+                    entry.temperature if spec.temperature is None else spec.temperature
+                ),
+                "max_tokens": entry.max_tokens if spec.max_tokens is None else spec.max_tokens,
+                "api_key": spec.api_key or entry.api_key,
+                "base_url": spec.base_url or entry.base_url,
+            }
+            kwargs.update(entry.extra)
+            kwargs.update(spec.extra)
+            resolved.append(kwargs)
+        return resolved
 
     def get_llm_config_or_default(self, name: str, default: str = "default") -> LLMStackEntry:
         """Return *name* LLM config, falling back to *default* when not found.

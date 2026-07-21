@@ -9,6 +9,15 @@ from .embeddings import (
     registered_embedding_providers,
     reset_embeddings,
 )
+from .fallback import (
+    DEFAULT_FALLBACK_ON,
+    EmptyLLMResponseError,
+    FallbackLLM,
+    is_empty_llm_response,
+    model_label,
+    normalize_fallback_on,
+    should_fallback,
+)
 from .llm import (
     StructuredOutputFallbackWrapper,
     apply_stack_defaults,
@@ -35,6 +44,9 @@ from .message_utils import (
 )
 
 __all__ = [
+    "DEFAULT_FALLBACK_ON",
+    "EmptyLLMResponseError",
+    "FallbackLLM",
     "HashEmbedder",
     "SplitMessage",
     "StructuredOutputFallbackWrapper",
@@ -48,15 +60,19 @@ __all__ = [
     "get_named_llm",
     "get_structured_llm",
     "invoke_with_retry",
+    "is_empty_llm_response",
     "llm_result_metadata",
     "message_text",
     "message_thinking",
+    "model_label",
+    "normalize_fallback_on",
     "record_failover",
     "register_embedding_provider",
     "registered_embedding_providers",
     "reset_embeddings",
     "reset_llm",
     "set_llm",
+    "should_fallback",
     "split_llm_message",
     "split_thinking_text",
     "strip_thinking_for_json",
