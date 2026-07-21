@@ -173,7 +173,11 @@ def test_fallback_llm_any_error_retries() -> None:
 
 
 def test_get_llm_builds_fallback_chain() -> None:
-    llm = get_llm(provider="dummy", fallbacks=["dummy"])
+    llm = get_llm(
+        provider="dummy",
+        model="primary",
+        fallbacks=[{"provider": "dummy", "model": "backup"}],
+    )
     assert isinstance(llm, FallbackLLM)
     assert len(llm.fallbacks) == 1
 
@@ -310,3 +314,56 @@ def test_single_model_stack_unchanged(tmp_path, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr("agentomatic.providers.llm._build_llm", fake_build)
     instance = apply_stack_defaults(mgr)
     assert not isinstance(instance, FallbackLLM)
+
+
+def test_duplicate_endpoint_fallback_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Identical provider/model/base_url fallbacks must not double a full timeout."""
+    built: list[str] = []
+
+    def fake_build(provider: str, **kwargs):  # noqa: ANN003
+        built.append(kwargs.get("model", provider))
+        return _FailThenSucceed(failures=0, content="ok")
+
+    monkeypatch.setattr("agentomatic.providers.llm._build_llm", fake_build)
+    llm = get_named_llm(
+        "dup-skip",
+        "openai",
+        model="same-model",
+        base_url="http://host.docker.internal:8000/v1",
+        api_key="k",
+        fallbacks=[
+            {
+                "provider": "openai",
+                "model": "same-model",
+                "base_url": "http://host.docker.internal:8000/v1",
+            }
+        ],
+        fallback_on=["timeout"],
+    )
+    assert built == ["same-model"]
+    assert not isinstance(llm, FallbackLLM)
+
+
+def test_stack_entry_timeout_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """First-class and extra timeout/max_retries reach the LLM factory."""
+    captured: dict[str, object] = {}
+
+    def fake_build(provider: str, **kwargs):  # noqa: ANN003
+        captured.update(kwargs)
+        return _FailThenSucceed(failures=0, content="ok")
+
+    monkeypatch.setattr("agentomatic.providers.llm._build_llm", fake_build)
+    entry = LLMStackEntry(
+        provider="openai",
+        model="m",
+        timeout=12.5,
+        max_retries=0,
+        extra={"enable_thinking": False},
+    )
+    from agentomatic.stacks.manager import _stack_entry_to_build_kwargs
+
+    kwargs = _stack_entry_to_build_kwargs(entry, include_fallbacks=False)
+    get_named_llm("timeout-fwd", **kwargs)
+    assert captured.get("timeout") == 12.5
+    assert captured.get("max_retries") == 0
+    assert captured.get("enable_thinking") is False

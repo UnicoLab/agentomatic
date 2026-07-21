@@ -213,9 +213,21 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
             ctor_kwargs["base_url"] = base_url
         if kwargs.get("max_tokens") is not None:
             ctor_kwargs["max_tokens"] = kwargs["max_tokens"]
-        for key in ("timeout", "max_retries", "default_headers", "default_query"):
+        for key in ("max_retries", "default_headers", "default_query"):
             if kwargs.get(key) is not None:
                 ctor_kwargs[key] = kwargs[key]
+        # Prefer an explicit httpx.Timeout so connect/read/write all abort.
+        # A bare float is accepted by ChatOpenAI but some OpenAI-compatible
+        # servers (slow token streams) can keep the socket alive past intent.
+        if kwargs.get("timeout") is not None:
+            import httpx
+
+            raw_timeout = kwargs["timeout"]
+            ctor_kwargs["timeout"] = (
+                raw_timeout
+                if isinstance(raw_timeout, httpx.Timeout)
+                else httpx.Timeout(float(raw_timeout))
+            )
 
         # Stack ``extra:`` + flat kwargs → model_kwargs / extra_body (oMLX, vLLM, …)
         openai_bits = _openai_compat_kwargs(kwargs)
