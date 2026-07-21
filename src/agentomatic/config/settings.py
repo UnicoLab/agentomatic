@@ -17,7 +17,7 @@ class LLMSettings(BaseModel):
     provider: str = Field("ollama", description="LLM provider: ollama|azure|openai|vertex|dummy")
     model: str = Field("mistral:7b", description="Model name")
     temperature: float = Field(0.1, ge=0.0, le=2.0)
-    max_tokens: int = Field(4096, ge=1)
+    max_tokens: int = Field(8192, ge=1)
     ollama_base_url: str = Field("http://localhost:11434")
     azure_api_key: str = Field("", description="Azure OpenAI API key")
     azure_api_base: str = Field("")

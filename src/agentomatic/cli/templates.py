@@ -313,7 +313,7 @@ llm_config = AgentLLMConfig()
 
 def _config_py(name: str) -> str:
     title = name.replace("_", " ").title()
-    return f'''"""Configuration for {title} agent."""\nfrom __future__ import annotations\n\nfrom pydantic import BaseModel, Field\n\n\nclass {title.replace(" ", "")}Config(BaseModel):\n    """Agent-specific configuration."""\n\n    prompt_version: str = Field("v1", description="Active prompt version")\n    temperature: float = Field(0.1, ge=0.0, le=2.0)\n    max_tokens: int = Field(2048, ge=1)\n    enable_memory: bool = Field(True, description="Enable conversation memory")\n'''
+    return f'''"""Configuration for {title} agent."""\nfrom __future__ import annotations\n\nfrom pydantic import BaseModel, Field\n\n\nclass {title.replace(" ", "")}Config(BaseModel):\n    """Agent-specific configuration."""\n\n    prompt_version: str = Field("v1", description="Active prompt version")\n    temperature: float = Field(0.1, ge=0.0, le=2.0)\n    max_tokens: int = Field(8192, ge=1)\n    enable_memory: bool = Field(True, description="Enable conversation memory")\n'''
 
 
 def _schemas_py(name: str) -> str:
