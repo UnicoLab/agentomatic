@@ -51,6 +51,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self._skip_paths = skip_paths if skip_paths is not None else _SKIP_PATHS
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if path_is_skipped(request.url.path, self._skip_paths):
             response: Response = await call_next(request)
             return response

@@ -161,6 +161,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         if not self._config.enabled:
             return await call_next(request)
 
+        # CORS preflight must reach CORSMiddleware (no Authorization on OPTIONS).
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # 1. Skip configured paths (exact or prefix).
         if path_is_skipped(request.url.path, self._config.skip_paths):
             return await call_next(request)

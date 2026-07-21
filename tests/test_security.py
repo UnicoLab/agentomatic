@@ -526,6 +526,34 @@ class TestJWTMiddlewareSafety:
         assert resp.status_code == 401
         assert "expired" in resp.json()["detail"].lower()
 
+    def test_options_preflight_bypasses_jwt(self) -> None:
+        """CORS preflight must not require Authorization."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from agentomatic.security.jwt_auth import JWTAuthMiddleware
+
+        app = FastAPI()
+
+        @app.get("/api/v1/agents")
+        async def _list() -> dict[str, list]:
+            return {"agents": []}
+
+        app.add_middleware(
+            JWTAuthMiddleware,
+            config=JWTConfig(enabled=True, jwks_url="https://example/jwks", require_signature=True),
+        )
+        # Avoid JWKS fetch on OPTIONS — middleware must short-circuit first.
+        client = TestClient(app)
+        resp = client.options(
+            "/api/v1/agents",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp.status_code != 401
+
 
 # =========================================================================
 # 11. ZeroTrustEnforcer — audit_log (smoke test)
