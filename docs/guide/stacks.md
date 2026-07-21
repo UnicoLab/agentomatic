@@ -60,7 +60,9 @@ llm:
     model: "gpt-4o"
     temperature: 0.2
     api_key: "${OPENAI_API_KEY}"
-    # Optional ordered failover (omit entirely for single-model stacks)
+    # Optional ordered failover (omit entirely for single-model stacks).
+    # Triggers (default): timeout | connection | rate_limit | empty_response
+    # Opt-in: any_error. Requires agentomatic >= 1.8.0.
     fallbacks:
       - fast
       - provider: ollama

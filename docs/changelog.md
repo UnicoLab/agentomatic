@@ -7,12 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Targeting **v1.8.0** (PyPI may still show 1.7.0 until the release job
+publishes). Install from git / an editable checkout until then.
+
 ### Added
 
-- **Ordered LLM model fallbacks**: Configure `fallbacks` / `fallback_on` on
-  stack LLM profiles or via `get_llm(..., fallbacks=..., fallback_on=...)`.
-  On timeout, connection error, rate limit, or empty response the next model
-  is tried; `record_failover` and a success log identify which model answered.
+- **Ordered LLM model fallbacks** (ships in **1.8.0**): Configure
+  `fallbacks` / `fallback_on` on stack LLM profiles or via
+  `get_llm(..., fallbacks=..., fallback_on=...)`. On timeout, connection
+  error, rate limit, or empty response the next model is tried;
+  `record_failover` and a success log identify which model answered.
   Single-model stacks are unchanged when `fallbacks` is omitted. See
   [LLM Providers](guide/llm-providers.md) and [Stacks](guide/stacks.md).
 - **Multi-pass optimize (SLM + LLM)**: `optimize/briefing.py` builds a full

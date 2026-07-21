@@ -296,7 +296,7 @@ To measure the performance and quality of different prompt variants:
 
 LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
 transient network errors. Agentomatic lets you define an **ordered** fallback
-chain of models/providers.
+chain of models/providers (requires **agentomatic >= 1.8.0**).
 
 ### Configuration
 
@@ -316,6 +316,9 @@ llm = get_llm(
 **Stack YAML** — set `fallbacks` / `fallback_on` on any LLM profile (see
 [Stacks](stacks.md) and [LLM Providers](llm-providers.md)). Profiles without
 `fallbacks` keep single-model behaviour.
+
+Default triggers: `timeout`, `connection`, `rate_limit`, `empty_response`.
+Opt in to `any_error` when every exception should advance the chain.
 
 If the primary model fails for a configured trigger, the next backup is tried.
 `record_failover` logs each hop; a success log names the model that answered.
@@ -456,7 +459,9 @@ print(get_failover_count())  # 1
 reset_llm()  # Also resets failover counter
 ```
 
-The failover chain now also passes `exceptions_to_handle=(Exception,)` to `with_fallbacks()`, ensuring **any** exception triggers the fallback chain, not just specific ones.
+By default the chain advances only on configured triggers (`timeout`,
+`connection`, `rate_limit`, `empty_response`). Add `any_error` to
+`fallback_on` when every exception should advance the chain.
 
 ---
 
