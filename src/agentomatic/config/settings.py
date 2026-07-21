@@ -26,7 +26,18 @@ class LLMSettings(BaseModel):
     openai_api_key: str = Field("")
     vertex_project: str = Field("")
     vertex_location: str = Field("us-central1")
-
+    fallback_on: list[str] = Field(
+        default_factory=lambda: [
+            "timeout",
+            "connection",
+            "rate_limit",
+            "empty_response",
+        ],
+        description=(
+            "Conditions that advance the LLM fallback chain: timeout, connection, "
+            "rate_limit, empty_response, any_error"
+        ),
+    )
 
 class EmbeddingSettings(BaseModel):
     """Embedding provider configuration."""

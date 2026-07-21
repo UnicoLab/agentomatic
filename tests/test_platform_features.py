@@ -872,7 +872,8 @@ def test_failover_telemetry_counter():
 
 
 def test_failover_chain_configuration():
-    """Verify LLM failover chain is properly configured with exceptions_to_handle."""
+    """Verify LLM failover chain is wrapped with ordered fallbacks."""
+    from agentomatic.providers.fallback import FallbackLLM
     from agentomatic.providers.llm import get_llm, reset_llm
 
     reset_llm()
@@ -880,9 +881,10 @@ def test_failover_chain_configuration():
     # Build chain with dummy primary and dummy fallback
     llm = get_llm(provider="dummy", fallbacks=["dummy"])
 
-    # Should be a RunnableWithFallbacks
-    assert llm.__class__.__name__ == "RunnableWithFallbacks"
+    assert isinstance(llm, FallbackLLM)
+    assert llm.__class__.__name__ in {"FallbackLLM", "RunnableWithFallbacks"}
     assert len(llm.fallbacks) == 1
+    assert "empty_response" in llm.fallback_on
 
     reset_llm()
 

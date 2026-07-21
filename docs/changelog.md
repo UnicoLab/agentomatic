@@ -9,6 +9,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Ordered LLM model fallbacks**: Configure `fallbacks` / `fallback_on` on
+  stack LLM profiles or via `get_llm(..., fallbacks=..., fallback_on=...)`.
+  On timeout, connection error, rate limit, or empty response the next model
+  is tried; `record_failover` and a success log identify which model answered.
+  Single-model stacks are unchanged when `fallbacks` is omitted. See
+  [LLM Providers](guide/llm-providers.md) and [Stacks](guide/stacks.md).
 - **Multi-pass optimize (SLM + LLM)**: `optimize/briefing.py` builds a full
   optimization briefing (runtime config, search space, dataset samples,
   eval I/O, metrics, history) for rewrite / GEPA / MIPRO. Auto multi-pass:
