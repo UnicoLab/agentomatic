@@ -34,7 +34,7 @@ class TestLLMStackEntry:
         assert entry.provider == "openai"
         assert entry.model == "gpt-4o"
         assert entry.temperature == 0.1
-        assert entry.max_tokens == 4096
+        assert entry.max_tokens == 8192
         assert entry.api_key == ""
         assert entry.base_url == ""
         assert entry.extra == {}

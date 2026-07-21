@@ -74,7 +74,7 @@ class LLMStackEntry(BaseModel):
     )
     model: str = Field(..., description="Model identifier")
     temperature: float = Field(0.1, ge=0.0, le=2.0)
-    max_tokens: int = Field(4096, ge=1)
+    max_tokens: int = Field(8192, ge=1)
     api_key: str = Field("", description="API key (supports ${ENV_VAR} interpolation)")
     base_url: str = Field("", description="Custom base URL for the provider")
     timeout: float | None = Field(

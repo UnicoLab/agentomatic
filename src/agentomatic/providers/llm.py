@@ -766,42 +766,109 @@ async def invoke_with_retry(
         The model result (optionally normalized).
     """
     import asyncio
+    import time
 
-    from agentomatic.providers.message_utils import attach_thinking_metadata
+    from agentomatic.observability.metrics import (
+        extract_token_usage,
+        record_llm_call,
+    )
+    from agentomatic.providers.message_utils import (
+        attach_thinking_metadata,
+        message_thinking,
+    )
 
     last_exc = None
+    retries_used = 0
+    t0 = time.perf_counter()
+    outcome = "success"
 
     for attempt in range(max_retries + 1):
         try:
             result = await llm.ainvoke(messages)
             if not strip_thinking:
-                return result
-            normalized = attach_thinking_metadata(result, strip_content=True)
-            if not keep_thinking_metadata:
-                additional = dict(getattr(normalized, "additional_kwargs", None) or {})
-                additional.pop("thinking", None)
-                additional.pop("reasoning_content", None)
-                if hasattr(normalized, "model_copy"):
-                    try:
-                        return normalized.model_copy(update={"additional_kwargs": additional})
-                    except Exception:  # noqa: BLE001
-                        pass
-                from types import SimpleNamespace
+                normalized = result
+            else:
+                normalized = attach_thinking_metadata(result, strip_content=True)
+                if not keep_thinking_metadata:
+                    additional = dict(getattr(normalized, "additional_kwargs", None) or {})
+                    additional.pop("thinking", None)
+                    additional.pop("reasoning_content", None)
+                    if hasattr(normalized, "model_copy"):
+                        try:
+                            normalized = normalized.model_copy(
+                                update={"additional_kwargs": additional}
+                            )
+                        except Exception:  # noqa: BLE001
+                            from types import SimpleNamespace
 
-                return SimpleNamespace(
-                    content=getattr(normalized, "content", ""),
-                    additional_kwargs=additional,
-                    response_metadata=getattr(normalized, "response_metadata", {}),
-                    raw=result,
-                )
+                            normalized = SimpleNamespace(
+                                content=getattr(normalized, "content", ""),
+                                additional_kwargs=additional,
+                                response_metadata=getattr(
+                                    normalized, "response_metadata", {}
+                                ),
+                                raw=result,
+                            )
+                    else:
+                        from types import SimpleNamespace
+
+                        normalized = SimpleNamespace(
+                            content=getattr(normalized, "content", ""),
+                            additional_kwargs=additional,
+                            response_metadata=getattr(normalized, "response_metadata", {}),
+                            raw=result,
+                        )
+
+            duration = time.perf_counter() - t0
+            prompt_t, completion_t, _total, thinking_t = extract_token_usage(normalized)
+            thinking_text = ""
+            try:
+                thinking_text = message_thinking(normalized) or ""
+            except Exception:  # noqa: BLE001
+                thinking_text = ""
+            # Heuristic thinking duration when provider does not split phases.
+            thinking_s = 0.0
+            if thinking_text and duration > 0:
+                ratio = min(0.85, len(thinking_text) / max(1, len(thinking_text) + 200))
+                thinking_s = duration * ratio
+            record_llm_call(
+                llm=llm,
+                outcome=outcome,
+                stream=False,
+                duration_s=duration,
+                ttft_s=duration if not thinking_text else max(0.01, duration - thinking_s),
+                thinking_s=thinking_s if thinking_s > 0 else None,
+                prompt_tokens=prompt_t,
+                completion_tokens=completion_t,
+                thinking_tokens=thinking_t or (len(thinking_text.split()) if thinking_text else 0),
+                retries=retries_used,
+                retry_reason="invoke",
+            )
             return normalized
         except Exception as exc:
             last_exc = exc
             if attempt < max_retries:
+                retries_used += 1
                 delay = retry_delay * (2**attempt)
                 logger.warning(f"LLM attempt {attempt + 1} failed: {exc}. Retrying in {delay}s...")
                 await asyncio.sleep(delay)
 
+    duration = time.perf_counter() - t0
+    err_name = type(last_exc).__name__ if last_exc else "error"
+    if "timeout" in err_name.lower() or "timeout" in str(last_exc).lower():
+        outcome = "timeout"
+    elif "http" in err_name.lower() or "status" in str(last_exc).lower():
+        outcome = "http_error"
+    else:
+        outcome = "error"
+    record_llm_call(
+        llm=llm,
+        outcome=outcome,
+        stream=False,
+        duration_s=duration,
+        retries=retries_used,
+        retry_reason="invoke",
+    )
     raise last_exc  # type: ignore[misc]
 
 
@@ -821,12 +888,26 @@ async def astream_with_thinking(
     chunks are classified as ``thinking``. Tagged ``<think>`` spans that arrive
     inline are buffered until the closing tag when possible.
     """
+    import time
+
+    from agentomatic.observability.metrics import record_llm_call
     from agentomatic.providers.message_utils import (
         THINK_TAG_RE,
         message_text,
         message_thinking,
         split_thinking_text,
     )
+
+    t0 = time.perf_counter()
+    ttft_s: float | None = None
+    thinking_started: float | None = None
+    thinking_ended: float | None = None
+    first_answer_at: float | None = None
+
+    def _mark_first() -> None:
+        nonlocal ttft_s
+        if ttft_s is None:
+            ttft_s = time.perf_counter() - t0
 
     if not hasattr(llm, "astream"):
         result = await invoke_with_retry(llm, messages, max_retries=0)
@@ -851,6 +932,10 @@ async def astream_with_thinking(
             if piece:
                 text = str(piece)
                 thinking_buf.append(text)
+                _mark_first()
+                if thinking_started is None:
+                    thinking_started = time.perf_counter()
+                thinking_ended = time.perf_counter()
                 if emit_thinking:
                     yield {"type": "thinking", "text": text, "thinking": "".join(thinking_buf)}
 
@@ -860,6 +945,10 @@ async def astream_with_thinking(
                 if additional.get(key):
                     text = str(additional[key])
                     thinking_buf.append(text)
+                    _mark_first()
+                    if thinking_started is None:
+                        thinking_started = time.perf_counter()
+                    thinking_ended = time.perf_counter()
                     if emit_thinking:
                         yield {
                             "type": "thinking",
@@ -880,6 +969,10 @@ async def astream_with_thinking(
                     text = str(block.get("thinking") or block.get("text") or "")
                     if text:
                         thinking_buf.append(text)
+                        _mark_first()
+                        if thinking_started is None:
+                            thinking_started = time.perf_counter()
+                        thinking_ended = time.perf_counter()
                         if emit_thinking:
                             yield {
                                 "type": "thinking",
@@ -904,6 +997,10 @@ async def astream_with_thinking(
             if not match:
                 break
             thinking_buf.append(match.group(1).strip())
+            _mark_first()
+            if thinking_started is None:
+                thinking_started = time.perf_counter()
+            thinking_ended = time.perf_counter()
             if emit_thinking and match.group(1).strip():
                 yield {
                     "type": "thinking",
@@ -920,6 +1017,9 @@ async def astream_with_thinking(
             in_think_tag = True
             if leading:
                 answer_buf.append(leading)
+                _mark_first()
+                if first_answer_at is None:
+                    first_answer_at = time.perf_counter()
                 yield {
                     "type": "answer",
                     "text": leading,
@@ -932,6 +1032,9 @@ async def astream_with_thinking(
 
         if inline_buf:
             answer_buf.append(inline_buf)
+            _mark_first()
+            if first_answer_at is None:
+                first_answer_at = time.perf_counter()
             yield {
                 "type": "answer",
                 "text": inline_buf,
@@ -957,6 +1060,25 @@ async def astream_with_thinking(
                 "text": split.answer,
                 "thinking": "\n\n".join(thinking_buf),
             }
+
+    duration = time.perf_counter() - t0
+    thinking_s = None
+    if thinking_started is not None and thinking_ended is not None:
+        thinking_s = max(0.0, thinking_ended - thinking_started)
+    generation_s = None
+    if first_answer_at is not None:
+        generation_s = max(0.0, time.perf_counter() - first_answer_at)
+    record_llm_call(
+        llm=llm,
+        outcome="success",
+        stream=True,
+        duration_s=duration,
+        ttft_s=ttft_s,
+        thinking_s=thinking_s,
+        generation_s=generation_s,
+        completion_tokens=len("".join(answer_buf).split()),
+        thinking_tokens=len("\n\n".join(thinking_buf).split()) if thinking_buf else 0,
+    )
 
     yield {
         "type": "done",
@@ -1010,6 +1132,12 @@ class StructuredOutputFallbackWrapper:
                         f"Raw content (first 200 chars): "
                         f"{content[:200]!r}"
                     )
+                    try:
+                        from agentomatic.observability.metrics import record_structure_error
+
+                        record_structure_error(llm=self.llm, agent="structured_output")
+                    except Exception:  # noqa: BLE001
+                        pass
                 fields = {}
                 for name, field in self.response_model.model_fields.items():
                     if field.default is not PydanticUndefined:
