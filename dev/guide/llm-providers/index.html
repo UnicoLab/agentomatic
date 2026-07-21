@@ -2951,7 +2951,9 @@ underlying OpenAI model id.</p>
 <h2 id="failover-chain-configuration">Failover Chain Configuration<a class="headerlink" href="#failover-chain-configuration" title="Permanent link">&para;</a></h2>
 <p>Configure an <strong>ordered</strong> fallback chain so that if the primary model times
 out, disconnects, rate-limits, or returns an empty response, Agentomatic
-retries the next model and logs which one succeeded.</p>
+retries the next model and logs which one succeeded. Available in
+<strong>agentomatic &gt;= 1.8.0</strong> (install from git / editable checkout until PyPI
+publishes that release).</p>
 <h3 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>

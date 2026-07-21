@@ -3704,7 +3704,7 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 <h2 id="6-llm-failover-fallbacks">🛡️ 6. LLM Failover &amp; Fallbacks<a class="headerlink" href="#6-llm-failover-fallbacks" title="Permanent link">&para;</a></h2>
 <p>LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
 transient network errors. Agentomatic lets you define an <strong>ordered</strong> fallback
-chain of models/providers.</p>
+chain of models/providers (requires <strong>agentomatic &gt;= 1.8.0</strong>).</p>
 <h3 id="configuration_1">Configuration<a class="headerlink" href="#configuration_1" title="Permanent link">&para;</a></h3>
 <p><strong>Python</strong> — pass specs to <code>get_llm()</code> / <code>get_named_llm()</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
@@ -3719,6 +3719,8 @@ chain of models/providers.</p>
 <p><strong>Stack YAML</strong> — set <code>fallbacks</code> / <code>fallback_on</code> on any LLM profile (see
 <a href="../stacks/">Stacks</a> and <a href="../llm-providers/">LLM Providers</a>). Profiles without
 <code>fallbacks</code> keep single-model behaviour.</p>
+<p>Default triggers: <code>timeout</code>, <code>connection</code>, <code>rate_limit</code>, <code>empty_response</code>.
+Opt in to <code>any_error</code> when every exception should advance the chain.</p>
 <p>If the primary model fails for a configured trigger, the next backup is tried.
 <code>record_failover</code> logs each hop; a success log names the model that answered.</p>
 <hr />
@@ -3833,7 +3835,9 @@ chain of models/providers.</p>
 </span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="c1"># Reset (typically in tests)</span>
 </span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="n">reset_llm</span><span class="p">()</span>  <span class="c1"># Also resets failover counter</span>
 </span></code></pre></div>
-<p>The failover chain now also passes <code>exceptions_to_handle=(Exception,)</code> to <code>with_fallbacks()</code>, ensuring <strong>any</strong> exception triggers the fallback chain, not just specific ones.</p>
+<p>By default the chain advances only on configured triggers (<code>timeout</code>,
+<code>connection</code>, <code>rate_limit</code>, <code>empty_response</code>). Add <code>any_error</code> to
+<code>fallback_on</code> when every exception should advance the chain.</p>
 <hr />
 <h2 id="12-conversation-memory-session-management">🧠 12. Conversation Memory &amp; Session Management<a class="headerlink" href="#12-conversation-memory-session-management" title="Permanent link">&para;</a></h2>
 <p>Agentomatic provides <strong>automatic conversation memory</strong> for all deployed agents. When a thread store is configured, every <code>/chat</code> and <code>/invoke</code> call automatically:</p>

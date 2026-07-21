@@ -2698,12 +2698,15 @@
 This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</p>
 <hr />
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<p>Targeting <strong>v1.8.0</strong> (PyPI may still show 1.7.0 until the release job
+publishes). Install from git / an editable checkout until then.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Ordered LLM model fallbacks</strong>: Configure <code>fallbacks</code> / <code>fallback_on</code> on
-  stack LLM profiles or via <code>get_llm(..., fallbacks=..., fallback_on=...)</code>.
-  On timeout, connection error, rate limit, or empty response the next model
-  is tried; <code>record_failover</code> and a success log identify which model answered.
+<li><strong>Ordered LLM model fallbacks</strong> (ships in <strong>1.8.0</strong>): Configure
+  <code>fallbacks</code> / <code>fallback_on</code> on stack LLM profiles or via
+  <code>get_llm(..., fallbacks=..., fallback_on=...)</code>. On timeout, connection
+  error, rate limit, or empty response the next model is tried;
+  <code>record_failover</code> and a success log identify which model answered.
   Single-model stacks are unchanged when <code>fallbacks</code> is omitted. See
   <a href="../guide/llm-providers/">LLM Providers</a> and <a href="../guide/stacks/">Stacks</a>.</li>
 <li><strong>Multi-pass optimize (SLM + LLM)</strong>: <code>optimize/briefing.py</code> builds a full
