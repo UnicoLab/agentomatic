@@ -173,6 +173,7 @@ known-first-party = ["agentomatic"]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["src"]
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow",

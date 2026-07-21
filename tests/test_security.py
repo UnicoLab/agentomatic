@@ -358,6 +358,37 @@ class TestVerifyRequest:
         ok, _ = enforcer.verify_request(request, "agent")
         assert ok is True
 
+    def test_role_check_keycloak_realm_access(self) -> None:
+        """Roles nested under realm_access must satisfy allowed_roles."""
+        enforcer = ZeroTrustEnforcer()
+        enforcer.register_policy(
+            "agent",
+            AgentSecurityPolicy(
+                require_auth=True,
+                allowed_roles=["metier"],
+            ),
+        )
+        request = _mock_request(
+            claims={"sub": "u1", "realm_access": {"roles": ["metier"]}}
+        )
+
+        ok, _ = enforcer.verify_request(request, "agent")
+        assert ok is True
+
+    def test_scope_check_from_space_delimited_scope(self) -> None:
+        enforcer = ZeroTrustEnforcer()
+        enforcer.register_policy(
+            "agent",
+            AgentSecurityPolicy(
+                require_auth=True,
+                allowed_scopes=["openid"],
+            ),
+        )
+        request = _mock_request(claims={"sub": "u1", "scope": "openid profile"})
+
+        ok, _ = enforcer.verify_request(request, "agent")
+        assert ok is True
+
     def test_role_check_denied(self) -> None:
         enforcer = ZeroTrustEnforcer()
         enforcer.register_policy(
