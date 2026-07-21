@@ -39,9 +39,8 @@ def record_failover(
 
 def get_llm(
     provider: str = "ollama",
-    fallbacks: list[Any] | None = None,
+    fallbacks: list[str] | None = None,
     *,
-    fallback_on: list[str] | None = None,
     instance: Any | None = None,
     **kwargs: Any,
 ) -> Any:
@@ -62,26 +61,14 @@ def get_llm(
         # Use a custom pre-built model
         get_llm(instance=ChatOpenAI(model="gpt-4o"))
 
-        # Ordered failover: primary openai → ollama → inline model dict
-        get_llm(
-            provider="openai",
-            model="gpt-4o",
-            fallbacks=["ollama", {"provider": "openai", "model": "gpt-4o-mini"}],
-            fallback_on=["timeout", "connection", "rate_limit", "empty_response"],
-        )
-
     Args:
         provider: Provider identifier when building from factory.
-        fallbacks: Optional ordered fallbacks — provider slugs, ``provider/model``
-            strings, or dict / stack-entry specs with their own provider/model.
-        fallback_on: Conditions that advance the chain (``timeout``,
-            ``connection``, ``rate_limit``, ``empty_response``, ``any_error``).
-            ``None`` uses library defaults.
+        fallbacks: Optional fallback provider identifiers.
         instance: Pre-built LLM instance to use directly.
         **kwargs: Provider-specific parameters for the factory.
 
     Returns:
-        An LLM instance (possibly wrapped in :class:`FallbackLLM`).
+        An LLM instance.
     """
     global _llm_instance
 
@@ -103,13 +90,20 @@ def get_llm(
 
         try:
             primary = _build_llm(provider, **kwargs)
-            _llm_instance = _wrap_with_fallbacks(
-                primary,
-                provider=provider,
-                primary_kwargs=kwargs,
-                fallbacks=fallbacks,
-                fallback_on=fallback_on,
-            )
+            if fallbacks:
+                fallback_models = []
+                for fb in fallbacks:
+                    try:
+                        fallback_models.append(_build_llm(fb, **kwargs))
+                    except Exception as exc:
+                        logger.warning(f"Failed to build fallback LLM {fb}: {exc}")
+                if fallback_models:
+                    primary = primary.with_fallbacks(
+                        fallback_models,
+                        exceptions_to_handle=(Exception,),
+                    )
+                    logger.info(f"🛡️ LLM failover chain configured: {provider} -> {fallbacks}")
+            _llm_instance = primary
         except Exception as exc:
             logger.warning(f"Failed to build {provider} LLM: {exc}. Falling back to dummy.")
             _llm_instance = _build_dummy_llm()
@@ -304,7 +298,6 @@ def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         "default_query",
         "extra",
         "fallbacks",
-        "fallback_on",
         "instance",
         "name",
     }
@@ -344,123 +337,6 @@ def _build_dummy_llm() -> Any:
     )
 
 
-def _normalize_fallback_specs(
-    fallbacks: list[Any],
-    primary_kwargs: dict[str, Any],
-) -> list[tuple[str, dict[str, Any]]]:
-    """Normalize fallback specs into ``(label, build_kwargs)`` pairs.
-
-    Accepted forms per item:
-
-    * ``"ollama"`` — provider slug; inherits primary kwargs
-    * ``"openai/gpt-4o-mini"`` — provider/model shorthand
-    * ``{"provider": "...", "model": "...", ...}`` — full inline spec
-    * objects with ``provider`` / ``model`` attributes (stack entries)
-
-    Args:
-        fallbacks: Raw fallback list from callers / stack YAML.
-        primary_kwargs: Kwargs used for the primary model (inherited defaults).
-
-    Returns:
-        Ordered ``(label, kwargs)`` pairs for :func:`_build_llm`.
-    """
-    from agentomatic.providers.fallback import model_label
-
-    base = {
-        k: v
-        for k, v in primary_kwargs.items()
-        if k not in {"fallbacks", "fallback_on", "instance", "name"}
-    }
-    specs: list[tuple[str, dict[str, Any]]] = []
-    for item in fallbacks:
-        if item is None:
-            continue
-        if isinstance(item, str):
-            token = item.strip()
-            if not token:
-                continue
-            if "/" in token:
-                provider, model = token.split("/", 1)
-                kwargs = {**base, "provider": provider, "model": model}
-            else:
-                kwargs = {**base, "provider": token}
-            specs.append((model_label(kwargs["provider"], kwargs.get("model")), kwargs))
-            continue
-
-        if hasattr(item, "model_dump") and hasattr(item, "provider"):
-            data = item.model_dump()
-        elif isinstance(item, dict):
-            data = dict(item)
-        else:
-            logger.warning("Ignoring unsupported fallback spec: {!r}", item)
-            continue
-
-        provider = str(data.pop("provider", base.get("provider", "ollama")))
-        model = data.pop("model", base.get("model"))
-        data.pop("fallbacks", None)
-        data.pop("fallback_on", None)
-        kwargs = {**base, **data, "provider": provider}
-        if model is not None:
-            kwargs["model"] = model
-        # Prefer explicit empty api_key/base_url from fallback only when set
-        for key in ("api_key", "base_url"):
-            if key in data and data[key] in ("", None) and base.get(key):
-                kwargs[key] = base[key]
-        specs.append((model_label(provider, kwargs.get("model")), kwargs))
-    return specs
-
-
-def _wrap_with_fallbacks(
-    primary: Any,
-    *,
-    provider: str,
-    primary_kwargs: dict[str, Any],
-    fallbacks: list[Any] | None,
-    fallback_on: list[str] | None,
-) -> Any:
-    """Attach an ordered :class:`FallbackLLM` chain when fallbacks are configured.
-
-    Args:
-        primary: Already-built primary model.
-        provider: Primary provider id (for labels).
-        primary_kwargs: Primary build kwargs.
-        fallbacks: Optional fallback specs.
-        fallback_on: Optional trigger list.
-
-    Returns:
-        *primary* unchanged, or a :class:`FallbackLLM` wrapper.
-    """
-    if not fallbacks:
-        return primary
-
-    from agentomatic.providers.fallback import FallbackLLM, model_label
-
-    fallback_models: list[Any] = []
-    labels = [model_label(provider, primary_kwargs.get("model"))]
-    for label, fb_kwargs in _normalize_fallback_specs(fallbacks, primary_kwargs):
-        try:
-            build_kwargs = {k: v for k, v in fb_kwargs.items() if k != "provider"}
-            fallback_models.append(_build_llm(fb_kwargs["provider"], **build_kwargs))
-            labels.append(label)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to build fallback LLM {}: {}", label, exc)
-
-    if not fallback_models:
-        return primary
-
-    logger.info(
-        "LLM failover chain configured: {} -> {}",
-        labels[0],
-        labels[1:],
-    )
-    return FallbackLLM(
-        primary,
-        fallback_models,
-        labels=labels,
-        fallback_on=fallback_on,
-    )
-
-
 def reset_llm() -> None:
     """Reset the LLM singleton and all named instances."""
     global _llm_instance, _failover_count, _named_instances
@@ -475,8 +351,6 @@ def get_named_llm(
     provider: str = "ollama",
     *,
     instance: Any | None = None,
-    fallbacks: list[Any] | None = None,
-    fallback_on: list[str] | None = None,
     **kwargs: Any,
 ) -> Any:
     """Get or create a named LLM instance.
@@ -492,8 +366,6 @@ def get_named_llm(
         name: Unique name for this LLM instance.
         provider: Provider identifier (``"ollama"``, ``"openai"``, etc.).
         instance: Pre-built LLM instance to store directly.
-        fallbacks: Optional ordered fallback specs (same forms as :func:`get_llm`).
-        fallback_on: Optional fallback trigger conditions.
         **kwargs: Provider-specific parameters.
 
     Returns:
@@ -513,13 +385,6 @@ def get_named_llm(
             return _named_instances[name]
         try:
             built = _build_llm(provider, **kwargs)
-            built = _wrap_with_fallbacks(
-                built,
-                provider=provider,
-                primary_kwargs=kwargs,
-                fallbacks=fallbacks,
-                fallback_on=fallback_on,
-            )
             _named_instances[name] = built
             logger.debug(f"Created named LLM instance '{name}' ({provider})")
         except Exception as exc:
@@ -566,29 +431,12 @@ def apply_stack_defaults(stack_manager: StackManager | None) -> Any:
         kwargs["base_url"] = entry.base_url
     kwargs.update(entry.extra)
 
-    fallbacks: list[Any] | None = None
-    fallback_on: list[str] | None = list(entry.fallback_on) if entry.fallback_on else None
-    if entry.fallbacks:
-        try:
-            fallbacks = stack_manager.resolve_fallbacks(entry)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to resolve stack LLM fallbacks: {}", exc)
-            fallbacks = [
-                fb.model_dump() if hasattr(fb, "model_dump") else fb for fb in entry.fallbacks
-            ]
-
     try:
-        instance = get_named_llm(
-            name="default",
-            fallbacks=fallbacks,
-            fallback_on=fallback_on,
-            **kwargs,
-        )
+        instance = get_named_llm(name="default", **kwargs)
         set_llm(instance)
         logger.info(
             f"🧠 Global LLM initialised from active stack "
-            f"(provider={entry.provider}, model={entry.model}"
-            f"{f', fallbacks={len(fallbacks)}' if fallbacks else ''})"
+            f"(provider={entry.provider}, model={entry.model})"
         )
         return instance
     except Exception as exc:  # noqa: BLE001
@@ -635,22 +483,6 @@ def get_llm_for_agent(
             return get_llm()
 
     instance_name = f"{agent_name}:{role}"
-    fallbacks: list[Any] | None = None
-    fallback_on: list[str] | None = list(entry.fallback_on) if entry.fallback_on else None
-    if entry.fallbacks:
-        try:
-            fallbacks = stack_manager.resolve_fallbacks(entry)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Failed to resolve fallbacks for agent={} role={}: {}",
-                agent_name,
-                role,
-                exc,
-            )
-            fallbacks = [
-                fb.model_dump() if hasattr(fb, "model_dump") else fb for fb in entry.fallbacks
-            ]
-
     return get_named_llm(
         name=instance_name,
         provider=entry.provider,
@@ -659,8 +491,6 @@ def get_llm_for_agent(
         max_tokens=entry.max_tokens,
         api_key=entry.api_key,
         base_url=entry.base_url,
-        fallbacks=fallbacks,
-        fallback_on=fallback_on,
         **entry.extra,
     )
 
