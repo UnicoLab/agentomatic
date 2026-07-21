@@ -50,8 +50,12 @@ class MaintenanceMiddleware(BaseHTTPMiddleware):
         """Gate the request based on control-plane state."""
         path = request.url.path
 
-        # Never block the control API itself or platform probes.
-        if f"{self._api_prefix}/control" in path or path in ("/health", "/readiness"):
+        # Never block the control API itself, Studio debug API/UI, or probes.
+        if (
+            f"{self._api_prefix}/control" in path
+            or path.startswith("/studio")
+            or path in ("/health", "/healthz", "/ready", "/readiness", "/metrics")
+        ):
             return await call_next(request)
 
         if self._state.maintenance_mode:

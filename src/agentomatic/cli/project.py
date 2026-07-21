@@ -107,7 +107,8 @@ def create_platform() -> AgentPlatform:
         enable_jwt_auth=_env_bool("AGENTOMATIC_ENABLE_JWT", require_auth),
         enable_zero_trust=_env_bool("AGENTOMATIC_ENABLE_ZERO_TRUST", require_auth),
         require_auth_globally=require_auth,
-        enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", False),
+        # On with Studio so Control / Endpoints / Connections tabs work out of the box.
+        enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", True),
         control_token=os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
         enable_rate_limit=_env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
     )

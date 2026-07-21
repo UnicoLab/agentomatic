@@ -90,16 +90,25 @@ def create_control_router(
             connection_scopes=len(all_managers()),
         )
 
+    async def _agent_health(agent: Any, *, timeout: float = 2.0) -> dict[str, Any]:
+        """Run agent health_check with a hard timeout so control APIs stay snappy."""
+        import asyncio
+
+        try:
+            result = await asyncio.wait_for(agent.health_check(), timeout=timeout)
+            return result if isinstance(result, dict) else {"status": "healthy"}
+        except TimeoutError:
+            return {"status": "timeout", "error": "health_check timed out"}
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "error", "error": str(exc)}
+
     @router.get("/agents", response_model=list[ControlAgentInfo], summary="List agents")
     async def list_agents() -> list[ControlAgentInfo]:
         """List all agents with operational metadata."""
         infos: list[ControlAgentInfo] = []
         for name, agent in platform._registry.all().items():
             requires_auth, roles, scopes = _agent_policy(agent)
-            try:
-                health = await agent.health_check()
-            except Exception as exc:  # noqa: BLE001
-                health = {"status": "error", "error": str(exc)}
+            health = await _agent_health(agent)
             infos.append(
                 ControlAgentInfo(
                     name=name,
@@ -128,10 +137,7 @@ def create_control_router(
         if agent is None:
             raise HTTPException(404, f"Agent '{name}' not found")
         requires_auth, roles, scopes = _agent_policy(agent)
-        try:
-            health = await agent.health_check()
-        except Exception as exc:  # noqa: BLE001
-            health = {"status": "error", "error": str(exc)}
+        health = await _agent_health(agent)
         return ControlAgentInfo(
             name=name,
             slug=agent.slug,

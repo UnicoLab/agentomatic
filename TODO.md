@@ -1,22 +1,30 @@
+# Agentomatic + Studio — SCOOPER Gemini validation
 
-Fix thee problems:
-- swagger is not working on /docs with Fetch error (Internal Server Error /openapi.json)
-- studio is not displaying any errors when trying the chatbto interface or debug interface for a selected agent ... on the terminal I get 404 but the display is not showing anything ecept thinking ... also logs parsing should probabaly be adjusted to extract correct information form the backend etc 
-- when agents are initialized they shoudl be able to handle stack for llm choice etc ... so let's make sure we have it well implemented in the templates etc ... so we configure everything in the stacks or local configs without having to change the code etc ...
-- I have initialized a connection but I should be able to handle existing folders so we can add connection to an existing agent without any overwrite etc 
-- ingestion that I have initialized using the template is now well detected nor in the status not anywhere else etc ...
-- agents registration and cards are not well initialized dans init ... 
-- maybe I shoudl ahve some kind of agentomatic init command that will setup are generic files ... cause when just initializing agents per agent from templates I can't see their agent cards anywhere nor AgentPlatform config anywhere ... so hard to know how to change anything or modify it etc ...and where to put it
-- so I am missing agent manifests dands inits when using templates ...!!!
-- also all agents in templates shoudl be initialized with prompt manager in the init, llm from stacks config etc ... so it's modular and dynamic and not hardcoded etc ... and clear for the user !
-- for RAG DBs my client will have to use Azure Cosmos DB so make sure our connectors and for RAg and embeddings are well generic and can handle this use-case perfectly for ingest and search etc ...
-- would be nice to have a dedicated package / deploy command that will generate multi stage secure systemless docker containers for our platform and agents etc ...
-- let's imrpove the debuggin frontend interface to adapt to the backend functionality etc !
-- when defining a pipeline I would need to be able to define a step like ingestion that will call on a specific document several subagents in parallel and get all results progressively etc ... like I need to extract some data from the document to fill in some forms ... I am wondering if it's better to have a dedicated extraction agent to which we will send specific scope and run let's say 10 scopes extraction in parallel or a big deep_agent that will delegate this task someho etc ... User uploads a document ... this document is now processee by markdown ingestion pipeline that will return a markdown file and save it ... not based on this file we would need to extract specifit informations in a scalable parallel way with retry, queues etc ... status updates checkpoints etc ... so I need a flexible and scalable way of doing so ! So we need to be able to scalable in in an intelligent way handle data ingestion and data extraction agents somehow ... The idea was that each agent or ingestion is doing one thing but well and then we can flexibly chain them using pipelines in a smart way etc !!!
-- we should be able to use any DB for any momory, persistance or other parts ... and we need to make sure this is well interfaces with connections, authentification and more and we cave a consistent way of doint such things !!! 
-- we need to be sure that agentomatic will be able with dedicated commands to provide production ready containers for the platform ! And in this config we shoudl also be able to produce it for a given stack or export .env or something that will setup everything correctly in a secure way or fetch config from the server etc !
-- make sure that set_llm and get_llm are well aware of stacks or other configs and that we can provide custom urls etc ...
-- make sure that fit allow user to configure is we will optimize prompt only or parameters and define parameters space etc like we have for optimzie etc 
-- make sure that when deploying for production we will correctly define all the params and stacks and defaults and that the user can easily configure it for his own needs etc
-- make sure that all apis can be calles using https calls and that we cant protect them, require auth etc ... or token etc ...
-- make sure that all templates have all required files, for example train and eval can use more metrics with custom weights criterias and provide better default settings etc ... 
+## Goal
+Use the SCOOPER Gemini stack (`:18765`) to extensively test Agentomatic Studio
+(debug, logs, chat, control plane, pipelines, plugins).
+
+## Status (in progress)
+- [x] Studio defaults to same-origin when embedded under `/studio/ui`
+- [x] Remove obsolete bare `/agents` fallbacks → `/studio/agents` + `/api/v1/agents`
+- [x] Client request timeouts (avoid infinite "Checking server connectivity…")
+- [x] Normalize thread/message API envelopes (`{threads}`, `{messages}`, `thread_id`)
+- [x] Timed `/health` probes + `/ready` alias in agentomatic
+- [x] Control plane skips `/studio` + probes; SCOOPER enables control plane by default
+- [ ] Rebuild Studio UI into `agentomatic/studio/static` (`./scripts/build_studio.sh`)
+- [ ] Restart Docker Desktop / `ai_platform` (daemon was returning 500 / hang)
+- [ ] E2E verify: connect, graph, chat/stream, threads, control, pipelines, plugins
+- [ ] Commit + push `agentomatic` and `agentomatic-studio` with clean conventional messages
+- [ ] History rewrite for polluted commit subjects — **needs explicit force-push approval**
+
+## Local verify
+```bash
+# After Docker Desktop is healthy:
+cd SCOOPER_NEW && docker compose up -d --force-recreate ai_platform
+curl -sS http://127.0.0.1:18765/readiness
+curl -sS http://127.0.0.1:18765/studio/info
+curl -sS http://127.0.0.1:18765/api/v1/control
+
+# Bundle latest Studio into agentomatic:
+cd agentomatic && ./scripts/build_studio.sh ../agentomatic-studio
+```
