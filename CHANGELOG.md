@@ -1,100 +1,99 @@
 # CHANGELOG
 
 
+## v1.8.0 (2026-07-21)
+
+### Features
+
+- **providers**: Add configurable ordered LLM model fallbacks
+  ([`2f8cc49`](https://github.com/UnicoLab/agentomatic/commit/2f8cc49b888243cdee6b6f0f1b0ac664353d6bf6))
+
+Retry the next configured model on timeout, connection errors, rate limits, or empty responses via
+  stack YAML / get_llm, without changing single-model stacks that omit fallbacks.
+
+- **providers**: Add configurable ordered LLM model fallbacks
+  ([`8df1ab8`](https://github.com/UnicoLab/agentomatic/commit/8df1ab868d2970b5365b01a48f556ed6ef9bb8de))
+
+Retry the next configured model on timeout, connection errors, rate limits, or empty responses via
+  stack YAML / get_llm, without changing single-model stacks that omit fallbacks.
+
+
 ## v1.7.0 (2026-07-21)
 
 ### Bug Fixes
 
 - **security**: Skip JWT audience check when audience is empty
-  ([`267978c`](https://github.com/UnicoLab/agentomatic/commit/267978c21b3b5bcc60792d457239341973c13107))
+  ([`1952df2`](https://github.com/UnicoLab/agentomatic/commit/1952df24fd0e35e8d94148b8b5e52a87a6128df2))
 
 Keycloak often issues aud=account unless a mapper is configured; empty JWTConfig.audience must not
   enable verify_aud.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **security**: Skip OPTIONS in JWT and API-key auth
-  ([`950358b`](https://github.com/UnicoLab/agentomatic/commit/950358bfe8c8017b64f9378efec5bc6f4456c3a8))
+  ([`a68aaf3`](https://github.com/UnicoLab/agentomatic/commit/a68aaf3000798b391c1800ee308b676076c17013))
 
 CORS preflight has no Authorization header; blocking it with 401 broke browser calls from the Vite
   SPA to JWT-protected ai_platform APIs.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Code Style
 
 - **security**: Apply ruff format for CI
-  ([`fbc4cfb`](https://github.com/UnicoLab/agentomatic/commit/fbc4cfb19bf7292ef404c898d3f3db63e46d29d3))
-
-Co-authored-by: Cursor <cursoragent@cursor.com>
+  ([`b951fbc`](https://github.com/UnicoLab/agentomatic/commit/b951fbc9fe2e2110228881cb4201cbd5b632cc8e))
 
 ### Features
 
 - **security**: Add OIDC claim normalization and optional DPoP
-  ([`11c8343`](https://github.com/UnicoLab/agentomatic/commit/11c83433e3f64de77252210d9c04b40b9de01e2d))
+  ([`03dedf5`](https://github.com/UnicoLab/agentomatic/commit/03dedf50777dee36eb477341ad91d6613a65016d))
 
 Align JWT middleware with Keycloak/AXA-style tokens (realm_access, scope, resource_access) and
   validate DPoP proofs when required or when tokens are cnf.jkt-bound, so platforms can enforce full
   OIDC resource-server semantics.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
 
-
-## v1.6.0 (2026-07-21)
+## v1.6.0 (2026-07-20)
 
 ### Bug Fixes
 
 - Clear mypy errors and ruff format drift
-  ([`799bb84`](https://github.com/UnicoLab/agentomatic/commit/799bb840e5c2134a63b121be62f6aa01ebabb9ff))
+  ([`c1455fc`](https://github.com/UnicoLab/agentomatic/commit/c1455fc35943bbf374b532655989d464fcd6edb1))
 
 Narrow class-agent streaming to a typed BaseGraphAgent binding so mypy passes, and reformat drifted
   optimize/test files for CI format-check.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **optimize**: Make prompt fit/train mechanics work with oMLX
-  ([`80772a9`](https://github.com/UnicoLab/agentomatic/commit/80772a99281b4842c6cc36561fc990a23e9d981a))
+  ([`eb1c585`](https://github.com/UnicoLab/agentomatic/commit/eb1c5852efd455709b1ba340b65a5147368d9f47))
 
 Ensure fitted prompts and overrides actually apply, keep LLM-as-judge failures honest, add
   oMLX-friendly caller routing, and cover the pipeline with extensive unit plus live oMLX tests.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Features
 
 - **optimize**: Add gemini/ provider and live Gemini fit tests
-  ([`abc1ab5`](https://github.com/UnicoLab/agentomatic/commit/abc1ab50e5ede29518db27d786425e633f5a857a))
+  ([`c68dc3b`](https://github.com/UnicoLab/agentomatic/commit/c68dc3b5e1d2faa1fb04e882d3cdde36e4f98a14))
 
 Route gemini/* through the Generative Language API, keep cloud models out of SLM multipass
   heuristics, and cover rewrite/GEPA/judge with a live suite gated on GEMINI_API_KEY.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **optimize**: Harden openai/ cloud routing for reliable fit/rewrite
-  ([`3b48d57`](https://github.com/UnicoLab/agentomatic/commit/3b48d5704bf7e75e3c54d443492fe4bdb087df09))
+  ([`fdc0e7d`](https://github.com/UnicoLab/agentomatic/commit/fdc0e7dcd1f2ebea903b6ae803ca89fb5dd3b4db))
 
 Keep gpt-*/o1/o3 models on api.openai.com even when OPENAI_BASE_URL points at a local server,
   require a real API key for cloud calls, handle max_completion_tokens for reasoning models, and add
   unit plus live suites.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **optimize**: Multi-pass rewrite with full briefing for SLMs and LLMs
-  ([`56b2c71`](https://github.com/UnicoLab/agentomatic/commit/56b2c7192ebcf68c6b176f888ec3a400376fc809))
+  ([`b8402c8`](https://github.com/UnicoLab/agentomatic/commit/b8402c8b75a5fff26156a85e164499b19c10ff62))
 
 Give rewrite/GEPA/MIPRO the full fit context (prompt, params, dataset, eval I/O, metrics, history)
   and auto-run draft→revise for frontier LLMs plus draft→critique→revise for SLMs, with docs and
   tests.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Testing
 
 - Adding tests
-  ([`8a891c3`](https://github.com/UnicoLab/agentomatic/commit/8a891c312a608c06e2622baf75978c493f464f77))
+  ([`dce9abb`](https://github.com/UnicoLab/agentomatic/commit/dce9abb0950841e1823115ca39bb9e518d0dffea))
 
 - **endpoints**: 93 comprehensive API endpoint tests
-  ([`39d99a7`](https://github.com/UnicoLab/agentomatic/commit/39d99a754ba7d0664c5757f01c101ab9ed67afc6))
+  ([`a960b18`](https://github.com/UnicoLab/agentomatic/commit/a960b18b8fa8799031fc6c0a4592487f6e349d1a))
 
 tests/test_agent_endpoints.py — covers every auto-generated route:
 
@@ -129,7 +128,7 @@ Studio: /studio/agents/{name}/runs/stream returns 200 + [DONE] class agent: no r
 Full thread lifecycle: chat(persist=True) → get messages → clear → delete
 
 - **optimize**: 54 regression tests for all 6 confirmed bugs
-  ([`29d7cab`](https://github.com/UnicoLab/agentomatic/commit/29d7caba2611a27532ba14217684f0fe27bdff11))
+  ([`1f91ffa`](https://github.com/UnicoLab/agentomatic/commit/1f91ffa5010e3784d7b7f6a99e9e74f2c17923cb))
 
 Also fixes two source bugs uncovered by the new tests:
 
@@ -175,12 +174,12 @@ TestEndToEndLocalTraining (3 tests) - full PromptFitter.fit() with local callabl
   MetricLoss end-to-end - CompositeMetric → MetricLoss with multiple sub-metrics
 
 
-## v1.5.1 (2026-07-21)
+## v1.5.1 (2026-07-17)
 
 ### Bug Fixes
 
 - **lint+types+docs**: Ruff clean, mypy clean, docs improved
-  ([`461b783`](https://github.com/UnicoLab/agentomatic/commit/461b78332ebf2cdaab184373d39a215b243830d3))
+  ([`94e7b05`](https://github.com/UnicoLab/agentomatic/commit/94e7b05b6ae1a97f889670116adbdaa6d01dae1d))
 
 lint: remove unused json import from runner.py (F401/F811) sort imports in test_fitter.py (I001)
   ruff format runner.py (1 file reformatted)
@@ -199,7 +198,7 @@ docs(optimization): add comprehensive 'Local-mode Training' guide section - full
   result.history documented with list[float] example
 
 - **optimize**: Local-mode training — 6 confirmed bugs fixed
-  ([`4815d80`](https://github.com/UnicoLab/agentomatic/commit/4815d80ee073fb8c63e0ce291b695560a100c1b9))
+  ([`22b1b35`](https://github.com/UnicoLab/agentomatic/commit/22b1b35bd68c5da021d1f6155c769ddc10c2ab04))
 
 BUG-1: AgentRunner.agent_callable — local callable bypasses HTTP - Add agent_callable param to
   AgentRunner.__init__ - Add _run_local() dispatching async/sync callables via asyncio.to_thread -
@@ -239,100 +238,84 @@ feat(tests): 19 new tests for local-mode (AgentRunner, _wrap_local_agent, Prompt
 docs: local-mode examples in optimization.md and class-agents.md
 
 
-## v1.5.0 (2026-07-21)
+## v1.5.0 (2026-07-16)
 
 ### Bug Fixes
 
 - **deploy**: Use absolute compose paths for out-of-tree --out
-  ([`a7c890a`](https://github.com/UnicoLab/agentomatic/commit/a7c890a5bf24cce5ce95521143007a8e1387bfb6))
+  ([`3108c0d`](https://github.com/UnicoLab/agentomatic/commit/3108c0d0a9418ae9ef1552607d630474c9c19458))
 
 When deploy artefacts are written outside the project, relative dockerfile paths escaped the Docker
   build context and broke compose builds. Fall back to absolute context/dockerfile/volume paths
   instead.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **invoke**: Expose structured agent output on AgentInvokeResponse
-  ([`3c67b0b`](https://github.com/UnicoLab/agentomatic/commit/3c67b0b542894bca996ddc5e563a3dcfe35741d5))
+  ([`2810397`](https://github.com/UnicoLab/agentomatic/commit/2810397843a0df20982f74ee769c825108e7b0e9))
 
 Class-agent state_to_output dicts were stringified into response via str(result), breaking frontend
   parsers. Add an output field and coerce payloads so sync/chat/A2A paths return JSON-friendly
   structured data.
 
 - **pipelines**: Discover flat YAML when scanning pipelines/ itself
-  ([`4767a3f`](https://github.com/UnicoLab/agentomatic/commit/4767a3f6feb54085cb6a2b594f4fbc8a13543e0d))
+  ([`64252b7`](https://github.com/UnicoLab/agentomatic/commit/64252b7534cee448afdb916c309a115ca3b50112))
 
 AgentPlatform.build passes the pipelines/ directory into discover_pipelines, which previously only
   loaded pipelines/pipelines/*.yaml or pipeline.yaml.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **platform**: Restore OpenAPI schema and class-agent async invoke path
-  ([`5be8f1c`](https://github.com/UnicoLab/agentomatic/commit/5be8f1cf5c8f33581157764a7857bcd945866939))
+  ([`8a33296`](https://github.com/UnicoLab/agentomatic/commit/8a33296a67458284517e61ae8c0e5e582e3351ca))
 
 Move StudioResumeRequest to module scope so /openapi.json stays complete; route async tasks through
   invoke_registered_agent; prefer main:app on run; flatten invoke context for input_to_state;
   document correct /api/v1 paths.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Continuous Integration
 
 - Fix lint, typing, and commit message display
-  ([`2e8a90a`](https://github.com/UnicoLab/agentomatic/commit/2e8a90a41a89cbc0dac63001aa766a408c241404))
+  ([`5cb0dcd`](https://github.com/UnicoLab/agentomatic/commit/5cb0dcdc428327b9ca31c70f54b921e9217ade25))
 
 Reformat files that failed ruff format check; narrow OptimizeInvokeResponse field types for mypy.
   Add a commit-msg hook that strips ANSI/bat line numbers when cat is aliased to bat, and document
   using /bin/cat in HEREDOCs.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Documentation
 
-- **cursor**: Add Agentomatic agent primer skill
-  ([`96bde0d`](https://github.com/UnicoLab/agentomatic/commit/96bde0d66685d749e585b1c53b8eb4bd867660ba))
+- Add Agentomatic agent primer skill
+  ([`fd0ffd7`](https://github.com/UnicoLab/agentomatic/commit/fd0ffd78b965122d47ab9d1b9afa98f270c0b56e))
 
 Ship the generated Cursor skill so agents working in this repo have install/dev/deploy guidance for
   the Agentomatic platform.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Features
 
 - **plugins**: Add reload API and full invoke context passthrough
-  ([`656c3d4`](https://github.com/UnicoLab/agentomatic/commit/656c3d4df0ec7149cc611e2ef5d60f89d9a92a99))
+  ([`cd43ba6`](https://github.com/UnicoLab/agentomatic/commit/cd43ba66c463db3ec7a2e5b72cc9ce7ab5eb8ac5))
 
 Expose POST /api/v1/plugins[/name]/reload so platforms can refresh in-memory weights after artifact
   promotion, and preserve the entire client payload (rich context + top-level extras) through to
   input_to_state.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **providers**: Support thinking/reasoning on modern OpenAI-compatible LLMs
-  ([`13fe5ca`](https://github.com/UnicoLab/agentomatic/commit/13fe5ca467a71101f414e09a91ec477707f5e111))
+  ([`5612c85`](https://github.com/UnicoLab/agentomatic/commit/5612c851f8e734427fdc011349acc09a02ac4c6a))
 
 Normalize Qwen/Gemma-style thinking tags and reasoning fields so agents get answer-only content by
   default, while stack extra: knobs (enable_thinking, chat_template_kwargs, response_format) pass
   through to oMLX without breaking other providers.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **stack**: Make stacks drive fit/eval and async graph invoke
-  ([`6d33df4`](https://github.com/UnicoLab/agentomatic/commit/6d33df41637be52aeb81d62ca82dcc06803b2e73))
+  ([`7500360`](https://github.com/UnicoLab/agentomatic/commit/750036010819efc1ff4d7f2866d1987904607d94))
 
 Load .env by default from stacks, resolve agent llm_config roles, forward metadata.invoke in
   AgentRunner, prefer data-level splits in PromptFitterBridge, and await async nodes in sync invoke
   so compile/fit/evaluate work with class agents.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
 
-
-## v1.4.0 (2026-07-21)
+## v1.4.0 (2026-07-16)
 
 ### Features
 
 - **connections**: Support arbitrary custom DB/vector clients + docs
-  ([`ede1460`](https://github.com/UnicoLab/agentomatic/commit/ede1460977bf5efbca04d66e8b23fd57af49372a))
+  ([`3a79444`](https://github.com/UnicoLab/agentomatic/commit/3a7944415787fb4bf9d742734e3deffbb0d00b92))
 
 Make the connection abstraction robustly accept ANY custom Python client (async or sync SDK,
   graph/time-series DB, in-house package) with correct lifecycle, and document the setup end-to-end.
@@ -365,15 +348,13 @@ Docs: new guide docs/guide/custom-connections.md (3-layer model; async, sync, an
 Part of the unreleased 1.3.0 (no version bump). Provider-agnostic: no first-party vendor connectors
   added.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
 
-
-## v1.3.0 (2026-07-21)
+## v1.3.0 (2026-07-15)
 
 ### Bug Fixes
 
 - **deploy**: Make scaffolded main.py app fully-featured for uvicorn parity with agentomatic run
-  ([`8eba7c0`](https://github.com/UnicoLab/agentomatic/commit/8eba7c03c62a38d231bc92044dda20e2b442aa7a))
+  ([`77b640a`](https://github.com/UnicoLab/agentomatic/commit/77b640a828e6b2d6754afae165844a3d2b050e18))
 
 - main.py now builds an env-driven, fully-featured module-level `app` so a deployed container
   (`uvicorn main:app`) serves the same surface as `agentomatic run`: discovers all component dirs
@@ -386,11 +367,9 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
   /readiness, /docs, /openapi.json, /, /studio); env flags drive features (studio toggle + title)
   ruff/format/mypy/pytest(1187)/mkdocs --strict/uv build all green.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **platform**: Wire class agents through input_to_state on REST + Studio; harden deploy, auth, and
   run --reload for 1.2.1
-  ([`8bdef79`](https://github.com/UnicoLab/agentomatic/commit/8bdef79f8b81e2eb7a48a8f235df2c75877a328d))
+  ([`6977de7`](https://github.com/UnicoLab/agentomatic/commit/6977de76958f372822ccbb10fcc18a515b6e87c3))
 
 - Class agents work on every server path (REST invoke/chat/invoke/stream/ optimize/A2A/approve +
   Studio streaming): route through invoke_registered_agent / input_to_state instead of
@@ -406,10 +385,8 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
   (class agent server paths, deploy CLI, run --reload factory, allow-list, scaffold, and more)
   mypy/ruff/pytest(1183)/mkdocs/build all green.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **security**: Disable CORS credentials with wildcard origins; correct deploy docstring
-  ([`8a3324f`](https://github.com/UnicoLab/agentomatic/commit/8a3324f8d4f216074f7183cd8e9d39cd113a73a7))
+  ([`03b7e55`](https://github.com/UnicoLab/agentomatic/commit/03b7e55a673b495531ce32735eb2968de1f75ab3))
 
 - CORS: when cors_origins == ["*"], set allow_credentials=False (with a one-time warning) so the
   platform no longer reflects credentialed cross-origin requests from any site. Explicit
@@ -419,12 +396,10 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
   changelog bullet for the CORS hardening (docs/changelog.md + CHANGELOG.md); add tests asserting
   wildcard -> credentials disabled and explicit origins -> credentials enabled.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 ### Features
 
 - **cli**: Add agents-guide command; agent knowledge + docs + 1.3.0 release prep
-  ([`a37482c`](https://github.com/UnicoLab/agentomatic/commit/a37482cee2abacbb55222a3e9eb253b83c0c303c))
+  ([`240902b`](https://github.com/UnicoLab/agentomatic/commit/240902b88e84b1d62fca0c597ec7097d9682b130))
 
 - add `agentomatic agents-guide` command: prints an Agentomatic primer or writes it into a project
   via `--write AGENTS.md|CLAUDE.md|.cursor/skills/agentomatic/SKILL.md` (refuses to overwrite
@@ -443,10 +418,8 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
   ruff/format/mypy/pytest(1210)/mkdocs --strict/uv build(1.3.0 wheel w/ py.typed + studio static +
   templates) all green.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **deploy**: Add full/minimal deploy profiles (swagger always on)
-  ([`a4964a5`](https://github.com/UnicoLab/agentomatic/commit/a4964a59235a00fcd5b6063910f441d5d4ac528f))
+  ([`e55b810`](https://github.com/UnicoLab/agentomatic/commit/e55b810a02cff3e89f9e02f658d24e13faab036e))
 
 - `agentomatic deploy --profile full|minimal` (+ `--minimal` shorthand). full (default) runs
   everything; minimal is production-lean: disables the Studio debug UI and quiets logging while
@@ -464,10 +437,8 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
   settings exposes /api/v1/<agent>/invoke + Swagger, no /studio ruff/format/mypy/pytest(1200)/mkdocs
   --strict/uv build all green.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 - **deploy**: Production deploy profiles, uvicorn parity, and agents-guide (1.3.0)
-  ([`6f77046`](https://github.com/UnicoLab/agentomatic/commit/6f77046a62d2ca9233dd3dfaf8c21cbaf138d62a))
+  ([`d0e2026`](https://github.com/UnicoLab/agentomatic/commit/d0e20267236da7075d742fe4dceb438f9cd87ae3))
 
 This is the 1.3.0 release-driving commit. It carries a Conventional Commit subject that Python
   Semantic Release can parse; the preceding commits in v1.2.0..HEAD were committed with
@@ -486,15 +457,13 @@ Features shipped in 1.3.0 (already present in the tree): - env-driven scaffolded
 
 Also finalizes the 1.3.0 release-notes wording in CHANGELOG.md.
 
-Co-authored-by: Cursor <cursoragent@cursor.com>
-
 
 ## v1.2.0 (2026-07-14)
 
 ### Features
 
 - Production execution modes, task board, status, ingestion and Keras lifecycle
-  ([`86496e9`](https://github.com/UnicoLab/agentomatic/commit/86496e984ae0d1ff9916b46de1786aa7740670f4))
+  ([`a5bad3c`](https://github.com/UnicoLab/agentomatic/commit/a5bad3c8a5b8345e3f02a306c80dd9bded7b4d09))
 
 Add a unified task/execution subsystem so every agent, plugin, pipeline, endpoint, and ingestor is
   callable sync, async, batch, streaming, or as a tracked background task with progress, SSE events,
@@ -513,8 +482,6 @@ Add a unified task/execution subsystem so every agent, plugin, pipeline, endpoin
 Docs: new tasks/status/ingestion guides; README plus index, concepts, deployment, storage,
   observability, api-reference, and frontend guide updated. mkdocs --strict clean; full test suite
   green.
-
-Co-authored-by: Cursor <cursoragent@cursor.com>
 
 
 ## v1.1.0 (2026-07-09)
