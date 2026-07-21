@@ -1219,15 +1219,35 @@ class AgentPlatform:
         # Platform-level endpoints
         # ------------------------------------------------------------------
 
+        async def _timed_health(
+            label: str,
+            coro: Any,
+            *,
+            timeout: float = 2.0,
+        ) -> dict[str, Any]:
+            """Run a health_check coroutine with a hard timeout.
+
+            Unbounded per-component probes previously wedged ``/health`` (and
+            thus Studio connectivity checks) whenever an upstream hung.
+            """
+            import asyncio
+
+            try:
+                result = await asyncio.wait_for(coro, timeout=timeout)
+                if isinstance(result, dict):
+                    return result
+                return {"status": "healthy", "detail": result}
+            except TimeoutError:
+                return {"status": "timeout", "error": f"{label} health_check timed out"}
+            except Exception as exc:  # noqa: BLE001
+                return {"status": "error", "error": str(exc)}
+
         @app.get("/health", tags=["Platform"])
         async def health() -> dict[str, Any]:
             """Aggregate health across all resources + storage."""
             agents: dict[str, Any] = {}
             for name, agent in self._registry.all().items():
-                try:
-                    agents[name] = await agent.health_check()
-                except Exception as exc:  # noqa: BLE001
-                    agents[name] = {"status": "error", "error": str(exc)}
+                agents[name] = await _timed_health(name, agent.health_check())
 
             # Plugin health
             plugins: dict[str, Any] = {}
@@ -1240,26 +1260,21 @@ class AgentPlatform:
             # Custom endpoint health
             endpoints: dict[str, Any] = {}
             for name, endpoint in self._endpoint_registry.list_endpoints().items():
-                try:
-                    endpoints[name] = await endpoint.health_check()
-                except Exception as exc:  # noqa: BLE001
-                    endpoints[name] = {"status": "error", "error": str(exc)}
+                endpoints[name] = await _timed_health(
+                    f"endpoint:{name}", endpoint.health_check()
+                )
 
             # Ingestor health
             ingestors: dict[str, Any] = {}
             for name, ingestor in self._ingestion_registry.list_ingestors().items():
-                try:
-                    ingestors[name] = await ingestor.health_check()
-                except Exception as exc:  # noqa: BLE001
-                    ingestors[name] = {"status": "error", "error": str(exc)}
+                ingestors[name] = await _timed_health(
+                    f"ingestor:{name}", ingestor.health_check()
+                )
 
             # Storage health
             storage_health: dict[str, Any] = {"status": "not_configured"}
             if self._store:
-                try:
-                    storage_health = await self._store.health_check()
-                except Exception as exc:  # noqa: BLE001
-                    storage_health = {"status": "unhealthy", "error": str(exc)}
+                storage_health = await _timed_health("storage", self._store.health_check())
 
             def _all_ok(section: dict[str, Any], *, ok: tuple[str, ...]) -> bool:
                 return all(v.get("status") in ok for v in section.values())
@@ -1287,8 +1302,9 @@ class AgentPlatform:
             }
 
         @app.get("/readiness", tags=["Platform"])
+        @app.get("/ready", tags=["Platform"], include_in_schema=False)
         async def readiness() -> dict[str, Any]:
-            """Kubernetes-style readiness probe."""
+            """Kubernetes-style readiness probe (also aliased as ``/ready``)."""
             return {"status": "ready", "agents": self._registry.count}
 
         # Unified status endpoint (JSON) + HTML dashboard at /status
