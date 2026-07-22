@@ -71,8 +71,9 @@ agentomatic deploy --stack remote --distroless          # full profile
 agentomatic deploy --profile minimal --stack remote     # production-lean
 ```
 
-Prefer `train_and_report(TrainConfig(...))` / `evaluate_and_report(EvalConfig(...))`
-plus `print_train_result` over hand-wiring `PromptFitterBridge`. Knobs:
+Prefer flat scripts: `TrainCliSettings` / `EvalCliSettings` (env + CLI) →
+`train_and_report` / `evaluate_and_report` → `print_train_result` /
+`print_eval_result` over hand-wiring `PromptFitterBridge`. Knobs:
 `epochs`, `trials`, `patience`, `optimizer`, `augment`/`n_examples`/`persist`,
 `apply`, judge metrics, HolySheet reports, `persist_fit_store`/`DATABASE_URL`,
 and platform `logs_history` / `allow_logsllm_analysis`. See the optimization guide.

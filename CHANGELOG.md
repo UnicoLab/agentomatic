@@ -5,6 +5,11 @@
 
 ### Features
 
+- **optimize**: `TrainCliSettings` / `EvalCliSettings` — Pydantic BaseSettings
+  for flat train/eval scripts (env `AGENTOMATIC_*` + kebab-case CLI via
+  `.parse()` → `.to_train_config()` / `.to_eval_config()`). Scaffold templates
+  and docs use the settings style; `print_eval_result` mirrors
+  `print_train_result`.
 - **logs**: Multi-resource `logs_history` — persist full I/O + metadata for
   agents, plugins, pipelines, ingestion, and custom endpoints (same
   SQLAlchemyStore / MemoryStore backends). Cross-resource REST:

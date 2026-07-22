@@ -523,41 +523,33 @@ agents/analyzer/
     {"id": "analyzer_003", "split": "test", "input": {"request": "Analyze the risks"}, "expected_output": {"response": "Risks identified: ..."}, "metadata": {"domain": "general", "difficulty": "hard"}}
     ```
 
-??? example "Generated `train.py` (thin `train_and_report`)"
+??? example "Generated `train.py` (flat `TrainCliSettings`)"
 
-    Scaffolded class agents use a thin script that delegates to
+    Scaffolded class agents use a flat script: settings → agent →
     [`train_and_report`](optimization.md). Key surface:
 
     ```python
-    from agentomatic.optimize import TrainConfig, print_train_result, train_and_report
+    from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
     from agents.analyzer.agent import AnalyzerAgent
 
+    cli = TrainCliSettings.parse()  # AGENTOMATIC_* env + --help CLI flags
     result = train_and_report(
         agent,
-        config=TrainConfig(
+        config=cli.to_train_config(
             agent_name="analyzer",
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
             env_path=ROOT / ".env",
-            stack=args.stack,
-            epochs=args.epochs,
-            max_trials=args.trials,
-            patience=args.patience,
-            optimizer=args.optimizer,
             required_keys=["response"],
             judge_dimensions=["relevance", "accuracy", "structure"],
-            augment=args.augment,
-            n_examples=args.n_examples,
-            persist=args.persist,
-            apply=args.apply,
-            persist_fit_store=args.persist_fit_store,
         ),
     )
     print_train_result(result)
     ```
 
-    Matching `eval.py` calls `evaluate_and_report(EvalConfig(...))`. See
-    [Prompt Optimization](optimization.md) for the full knob table.
+    Matching `eval.py` uses `EvalCliSettings` → `evaluate_and_report` →
+    `print_eval_result`. See [Prompt Optimization](optimization.md) for the
+    full knob table.
 
 !!! info "No LangGraph Required"
     Class agents use the built-in `AgentGraph` runtime. Wire your graph in `build_graph()` using `new_graph()` — no need for `langgraph` or `StateGraph`.

@@ -7,11 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Docs and scaffolds track shipped **1.8.3–1.8.9** train/eval/logs APIs.
+Docs and scaffolds track shipped **1.8.3–1.8.10** train/eval/logs APIs.
 Install from git / an editable checkout until PyPI catches up.
 
 ### Added
 
+- **`TrainCliSettings` / `EvalCliSettings`** (1.8.10): Pydantic settings
+  (env `AGENTOMATIC_*` + kebab-case CLI) with `.parse()` /
+  `.to_train_config()` / `.to_eval_config()` so scaffolded `train.py` /
+  `eval.py` stay flat. Also `print_eval_result` mirroring
+  `print_train_result`. Docs + `_train_py` / `_eval_py` updated.
 - **Multi-resource `logs_history`** (1.8.9): Persist full I/O for plugins,
   pipelines, ingestion, and custom endpoints (not only agents). Cross-resource
   REST: `GET /api/v1/logs?resource=…&name=…`, `GET /api/v1/logs/{id}`,

@@ -303,31 +303,30 @@ def test_train_api_aliases() -> None:
 
 
 def test_train_template_uses_run_train() -> None:
-    """Scaffold train.py template is the thin train_and_report pattern."""
+    """Scaffold train.py template is the flat TrainCliSettings pattern."""
     from agentomatic.cli.templates import _train_py
 
     src = _train_py("assistant")
-    assert "TrainConfig" in src
+    assert "TrainCliSettings" in src
+    assert "to_train_config" in src
     assert "train_and_report" in src
     assert "print_train_result" in src
-    assert "augment" in src
-    assert "n_examples" in src
-    assert "persist" in src
-    assert "persist_fit_store" in src
+    assert "import argparse" not in src
     assert "from agents.assistant.agent import" in src
     assert "PromptFitterBridge" not in src
     assert "generate_fit_report" not in src
 
 
 def test_eval_template_uses_evaluate_and_report() -> None:
-    """Scaffold eval.py template is the thin evaluate_and_report pattern."""
+    """Scaffold eval.py template is the flat EvalCliSettings pattern."""
     from agentomatic.cli.templates import _eval_py
 
     src = _eval_py("assistant")
-    assert "EvalConfig" in src
+    assert "EvalCliSettings" in src
+    assert "to_eval_config" in src
     assert "evaluate_and_report" in src
-    assert "prefer_augmented" in src
-    assert "report_path" in src
+    assert "print_eval_result" in src
+    assert "import argparse" not in src
     assert "from agents.assistant.agent import" in src
     assert "PromptFitterBridge" not in src
 

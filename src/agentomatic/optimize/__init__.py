@@ -41,6 +41,7 @@ from agentomatic.optimize.briefing import (
     refine_style_for,
     resolve_rewrite_passes,
 )
+from agentomatic.optimize.cli_settings import EvalCliSettings, TrainCliSettings
 
 # ── PromptFitter API (ML-like prompt/config optimisation) ────────────
 from agentomatic.optimize.config import (
@@ -61,6 +62,7 @@ from agentomatic.optimize.eval_api import (
     EvalConfig,
     EvaluateResult,
     evaluate_and_report,
+    print_eval_result,
     resolve_eval_dataset_path,
     run_eval,
     run_evaluate,
@@ -222,10 +224,14 @@ __all__ = [
     "EvalConfig",
     "EvaluateResult",
     "evaluate_and_report",
+    "print_eval_result",
     "run_eval",
     "run_evaluate",
     "select_examples",
     "resolve_eval_dataset_path",
+    # CLI/env settings for flat train/eval scripts
+    "TrainCliSettings",
+    "EvalCliSettings",
     # ── PromptFitter API ──────────────────────────────────────────
     "PromptFitter",
     "PromptRuntimeConfig",

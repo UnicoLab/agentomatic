@@ -294,11 +294,10 @@ class TestTemplateContract:
     def test_full_train_py_uses_local_prompt_fitter(self) -> None:
         files = get_template_files("full", "demo_agent")
         train = files["train.py"]
-        assert "TrainConfig" in train
+        assert "TrainCliSettings" in train
+        assert "to_train_config" in train
         assert "train_and_report" in train
-        assert "augment" in train
-        assert "n_examples" in train
-        assert "argparse" in train
+        assert "import argparse" not in train
         assert "optimizer" in train
 
     def test_agent_templates_use_resolve_system_prompt(self) -> None:
