@@ -77,6 +77,8 @@ class TestInvocationLogRecorder:
         )
         assert entry is not None
         assert entry["agent_name"] == "echo"
+        assert entry["resource_type"] == "agent"
+        assert entry["resource_name"] == "echo"
         assert entry["endpoint"] == "invoke"
         assert entry["input"]["query"] == "hi"
         assert entry["output"]["response"] == "hello"

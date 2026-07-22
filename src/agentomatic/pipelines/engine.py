@@ -214,29 +214,38 @@ class PipelineEngine:
 
         logger.info(f"🚀 Pipeline '{self.config.name}' starting ({len(self.config.steps)} steps)")
 
-        # Input-schema enforcement (advisory unless strict_schema=True)
-        input_errors = validate_against_schema(
-            merged_input, self.config.input_schema, label="input"
-        )
-        if input_errors:
-            if self.config.strict_schema:
-                pipeline_result.status = PipelineStatus.FAILED
-                pipeline_result.error = "; ".join(input_errors)
-                pipeline_result.duration_ms = (time.perf_counter() - t0) * 1000
-                logger.error(f"❌ Pipeline '{self.config.name}' input invalid: {input_errors}")
-                return pipeline_result
-            for err in input_errors:
-                logger.warning(f"  ⚠️ schema: {err}")
+        # Tag in-process step logs with the parent pipeline name.
+        from agentomatic.logs.runtime import bind_pipeline_log_name, reset_pipeline_log_name
 
+        pipe_token = bind_pipeline_log_name(self.config.name)
         try:
-            await asyncio.wait_for(
-                self._execute_steps(ctx, pipeline_result),
-                timeout=self.config.timeout,
+            # Input-schema enforcement (advisory unless strict_schema=True)
+            input_errors = validate_against_schema(
+                merged_input, self.config.input_schema, label="input"
             )
-        except TimeoutError:
-            pipeline_result.status = PipelineStatus.FAILED
-            pipeline_result.error = f"Pipeline timed out after {self.config.timeout}s"
-            logger.error(pipeline_result.error)
+            if input_errors:
+                if self.config.strict_schema:
+                    pipeline_result.status = PipelineStatus.FAILED
+                    pipeline_result.error = "; ".join(input_errors)
+                    pipeline_result.duration_ms = (time.perf_counter() - t0) * 1000
+                    logger.error(
+                        f"❌ Pipeline '{self.config.name}' input invalid: {input_errors}"
+                    )
+                    return pipeline_result
+                for err in input_errors:
+                    logger.warning(f"  ⚠️ schema: {err}")
+
+            try:
+                await asyncio.wait_for(
+                    self._execute_steps(ctx, pipeline_result),
+                    timeout=self.config.timeout,
+                )
+            except TimeoutError:
+                pipeline_result.status = PipelineStatus.FAILED
+                pipeline_result.error = f"Pipeline timed out after {self.config.timeout}s"
+                logger.error(pipeline_result.error)
+        finally:
+            reset_pipeline_log_name(pipe_token)
 
         # Calculate final output
         duration = (time.perf_counter() - t0) * 1000

@@ -18,7 +18,7 @@ Historical bugs that motivated the redesign (now addressed):
 - Connection errors after async fit → persistent event loop + drain_seconds
 
 
-# Plugins / audit / logs — DONE (v1.8.8)
+# Plugins / audit / logs — DONE (v1.8.8–1.8.9)
 
 Shipped:
 - Auditable retrain history via `OptimizationRunStore` + `fit_store`
@@ -28,8 +28,10 @@ Shipped:
 - `logs_history` / `allow_logsllm_analysis` (+ env
   `AGENTOMATIC_LOGS_HISTORY` / `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`) with
   REST `/logs` + `/logs/analyze`
+- **1.8.9**: Multi-resource logs (plugin/pipeline/ingestion/endpoint) +
+  global `/api/v1/logs?resource=&name=` + in-process pipeline step logging
 - Train UX: `print_train_result` / `TrainResult.print_summary()`
-Covered by `test_logs_history` (incl. SQLite restart survival).
+Covered by `test_logs_history` + `test_logs_history_resources`.
 
 
 # Docs / templates for train-eval APIs — DONE

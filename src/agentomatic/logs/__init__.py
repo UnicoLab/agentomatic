@@ -1,4 +1,4 @@
-"""Per-agent invocation log history and optional LLM log analysis.
+"""Invocation log history and optional LLM log analysis.
 
 Enable via platform flags / env::
 
@@ -18,6 +18,10 @@ Or::
 When a DB URL / MEMORY connection is available the platform auto-derives
 ``SQLAlchemyStore`` (Postgres, SQLite, …). MemoryStore is only a last-resort
 fallback when no DB is configured.
+
+Logs cover agents, plugins, pipelines, ingestion, and custom endpoints.
+Cross-resource REST: ``GET /api/v1/logs?resource=plugin&name=…``.
+Per-agent routes ``/{agent}/logs`` remain for backward compatibility.
 """
 
 from __future__ import annotations
@@ -25,11 +29,19 @@ from __future__ import annotations
 from agentomatic.logs.analyser import LogAnalyser, LogAnalysisResult
 from agentomatic.logs.optimization_store import OptimizationRunStore
 from agentomatic.logs.recorder import InvocationLogRecorder, truncate_for_storage
+from agentomatic.logs.runtime import (
+    RESOURCE_TYPES,
+    get_invocation_log_recorder,
+    set_invocation_log_recorder,
+)
 
 __all__ = [
+    "RESOURCE_TYPES",
     "InvocationLogRecorder",
     "LogAnalyser",
     "LogAnalysisResult",
     "OptimizationRunStore",
+    "get_invocation_log_recorder",
+    "set_invocation_log_recorder",
     "truncate_for_storage",
 ]

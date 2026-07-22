@@ -7,11 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Docs and scaffolds track shipped **1.8.3–1.8.8** train/eval/logs APIs.
+Docs and scaffolds track shipped **1.8.3–1.8.9** train/eval/logs APIs.
 Install from git / an editable checkout until PyPI catches up.
 
 ### Added
 
+- **Multi-resource `logs_history`** (1.8.9): Persist full I/O for plugins,
+  pipelines, ingestion, and custom endpoints (not only agents). Cross-resource
+  REST at `/api/v1/logs?resource=…&name=…` + `/logs/analyze`; per-agent
+  `/{agent}/logs` kept for BC. In-process pipeline steps log with
+  `endpoint=pipeline_step` and `metadata.pipeline`.
 - **Docs + CLI templates for thin train/eval** (1.8.8 docs):
   [Prompt Optimization](guide/optimization.md) documents
   `TrainConfig` / `train_and_report` / `print_train_result` and

@@ -198,7 +198,7 @@ class CheckpointModel(Base):
 
 
 class AgentInvocationLogModel(Base):
-    """Per-agent invoke/chat/stream call history for audit and analysis."""
+    """Invocation call history for agents/plugins/pipelines/etc."""
 
     __tablename__ = "agent_invocation_logs"
 
@@ -207,7 +207,13 @@ class AgentInvocationLogModel(Base):
         primary_key=True,
         default=lambda: f"invlog_{uuid.uuid4().hex[:16]}",
     )
+    # resource_name lives in agent_name for backward compatibility.
     agent_name: Mapped[str] = mapped_column(String(128), index=True)
+    resource_type: Mapped[str] = mapped_column(
+        String(32),
+        default="agent",
+        index=True,
+    )  # agent|plugin|pipeline|ingestion|endpoint
     thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     timestamp: Mapped[datetime] = mapped_column(
@@ -215,7 +221,9 @@ class AgentInvocationLogModel(Base):
         default=lambda: datetime.now(UTC),
         index=True,
     )
-    endpoint: Mapped[str] = mapped_column(String(32), default="invoke")  # invoke|chat|stream
+    endpoint: Mapped[str] = mapped_column(
+        String(64), default="invoke"
+    )  # invoke|chat|stream|predict|run|pipeline_step|…
     input_json: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     output_json: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
@@ -224,9 +232,12 @@ class AgentInvocationLogModel(Base):
     status: Mapped[str] = mapped_column(String(32), default="ok", index=True)  # ok|error|suspended
 
     def to_dict(self) -> dict[str, Any]:
+        rtype = self.resource_type or "agent"
         return {
             "id": self.id,
-            "agent_name": self.agent_name,
+            "resource_type": rtype,
+            "resource_name": self.agent_name,
+            "agent_name": self.agent_name,  # BC alias
             "thread_id": self.thread_id,
             "run_id": self.run_id,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
@@ -241,7 +252,7 @@ class AgentInvocationLogModel(Base):
 
 
 class LogAnalysisModel(Base):
-    """LLM-produced analysis of recent agent invocation logs."""
+    """LLM-produced analysis of recent invocation logs."""
 
     __tablename__ = "log_analyses"
 
@@ -251,6 +262,11 @@ class LogAnalysisModel(Base):
         default=lambda: f"logan_{uuid.uuid4().hex[:16]}",
     )
     agent_name: Mapped[str] = mapped_column(String(128), index=True)
+    resource_type: Mapped[str] = mapped_column(
+        String(32),
+        default="agent",
+        index=True,
+    )
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     summary: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(64), default="unknown")
@@ -263,8 +279,11 @@ class LogAnalysisModel(Base):
     )
 
     def to_dict(self) -> dict[str, Any]:
+        rtype = self.resource_type or "agent"
         return {
             "id": self.id,
+            "resource_type": rtype,
+            "resource_name": self.agent_name,
             "agent_name": self.agent_name,
             "score": self.score,
             "summary": self.summary,

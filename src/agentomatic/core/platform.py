@@ -257,8 +257,9 @@ class AgentPlatform:
             enable_connections_context: Attach the routed agent's connection
                 manager to ``request.state.connections`` on every request
                 (default ``True``).
-            logs_history: When ``True``, persist full per-agent invoke/chat/
-                stream history (input, output, metadata) into ``store``.
+            logs_history: When ``True``, persist full invoke I/O history for
+                agents, plugins, pipelines, ingestion, and custom endpoints
+                into ``store``.
             allow_logsllm_analysis: When ``True``, expose LLM log-analysis
                 endpoints that score recent logs and return recommendations.
         """
@@ -975,6 +976,13 @@ class AgentPlatform:
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Fit store registration skipped: {}", exc)
 
+            # Bind process-wide recorder for in-process pipeline steps / flow DSL
+            if platform._logs_history and platform._store is not None:
+                from agentomatic.logs.recorder import InvocationLogRecorder
+                from agentomatic.logs.runtime import set_invocation_log_recorder
+
+                set_invocation_log_recorder(InvocationLogRecorder(platform._store))
+
             # Run startup hooks
             for hook in platform._on_startup:
                 result = hook()
@@ -985,6 +993,12 @@ class AgentPlatform:
             yield
 
             # --- Shutdown ---
+            try:
+                from agentomatic.logs.runtime import set_invocation_log_recorder
+
+                set_invocation_log_recorder(None)
+            except Exception:  # noqa: BLE001
+                pass
             try:
                 from agentomatic.optimize.fit_store import set_fit_store
 
@@ -1219,10 +1233,25 @@ class AgentPlatform:
             if agent.router and agent.manifest.is_subagent:
                 _mount_agent_router(app, agent, name, self.api_prefix)
 
+        log_recorder = None
         if self._logs_history:
+            from agentomatic.logs.recorder import InvocationLogRecorder
+
+            log_recorder = InvocationLogRecorder(_LazyStoreProxy(self))
             logger.info(
-                "📜 Invocation log history enabled"
+                "📜 Invocation log history enabled (agents/plugins/pipelines/"
+                "ingestion/endpoints)"
                 + (" (LLM analysis allowed)" if self._allow_logsllm_analysis else "")
+            )
+            from agentomatic.logs.router import create_logs_router
+
+            app.include_router(
+                create_logs_router(
+                    store=_LazyStoreProxy(self),
+                    logs_history=self._logs_history,
+                    allow_logsllm_analysis=self._allow_logsllm_analysis,
+                ),
+                prefix=self.api_prefix + "/logs",
             )
 
         # ------------------------------------------------------------------
@@ -1250,6 +1279,7 @@ class AgentPlatform:
                 plugin,
                 task_manager=self._task_manager,
                 api_prefix=self.api_prefix,
+                log_recorder=log_recorder,
             )
             plugins_router.include_router(
                 plugin_router,
@@ -1273,6 +1303,7 @@ class AgentPlatform:
                 endpoint,
                 task_manager=self._task_manager,
                 api_prefix=self.api_prefix,
+                log_recorder=log_recorder,
             )
             endpoints_router.include_router(
                 endpoint_router,
@@ -1289,6 +1320,7 @@ class AgentPlatform:
                 self._ingestion_registry,
                 task_manager=self._task_manager,
                 api_prefix=self.api_prefix,
+                log_recorder=log_recorder,
             )
             app.include_router(
                 ingestion_router,
@@ -1329,6 +1361,7 @@ class AgentPlatform:
                     plugins=self._plugin_registry,
                     task_manager=self._task_manager,
                     api_prefix=self.api_prefix,
+                    log_recorder=log_recorder,
                 )
                 app.include_router(
                     pipeline_router,

@@ -90,6 +90,16 @@ async def execute_agent_step(
         if agent.schema_validator and agent.schema_validator.has_response_schema:
             agent.schema_validator.validate_output(output)
 
+        await _record_step_invocation(
+            resource_type="agent",
+            resource_name=agent_name,
+            step_name=config.name,
+            input_data=state,
+            output_data=output,
+            duration_ms=duration,
+            status="ok",
+        )
+
         return StepResult(
             name=config.name,
             status=StepStatus.SUCCESS,
@@ -100,6 +110,15 @@ async def execute_agent_step(
 
     except TimeoutError:
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="agent",
+            resource_name=agent_name,
+            step_name=config.name,
+            input_data=None,
+            error=f"Agent '{agent_name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -110,6 +129,15 @@ async def execute_agent_step(
     except Exception as exc:
         duration = (time.perf_counter() - t0) * 1000
         logger.error(f"Agent step '{config.name}' failed: {exc}")
+        await _record_step_invocation(
+            resource_type="agent",
+            resource_name=agent_name,
+            step_name=config.name,
+            input_data=None,
+            error=str(exc),
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -117,6 +145,33 @@ async def execute_agent_step(
             duration_ms=duration,
             agent_used=agent_name,
         )
+
+
+async def _record_step_invocation(
+    *,
+    resource_type: str,
+    resource_name: str,
+    step_name: str,
+    input_data: Any = None,
+    output_data: Any = None,
+    error: str | None = None,
+    duration_ms: float | None = None,
+    status: str = "ok",
+) -> None:
+    """Persist an in-process pipeline step invocation when logs_history is on."""
+    from agentomatic.logs.helpers import record_invocation
+
+    await record_invocation(
+        resource_type=resource_type,
+        resource_name=resource_name,
+        endpoint="pipeline_step",
+        input_data=input_data,
+        output_data=output_data,
+        metadata={"pipeline_step": step_name},
+        error=error,
+        duration_ms=round(duration_ms, 2) if duration_ms is not None else None,
+        status=status,
+    )
 
 
 def _build_agent_state(config: AgentStepConfig, ctx: PipelineContext) -> dict[str, Any]:
@@ -219,6 +274,15 @@ async def execute_endpoint_step(
         )
         output = _normalize_output(result)
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="endpoint",
+            resource_name=name,
+            step_name=config.name,
+            input_data=payload,
+            output_data=output,
+            duration_ms=duration,
+            status="ok",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.SUCCESS,
@@ -228,6 +292,14 @@ async def execute_endpoint_step(
         )
     except TimeoutError:
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="endpoint",
+            resource_name=name,
+            step_name=config.name,
+            error=f"Endpoint '{name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -237,6 +309,14 @@ async def execute_endpoint_step(
     except Exception as exc:  # noqa: BLE001
         duration = (time.perf_counter() - t0) * 1000
         logger.error(f"Endpoint step '{config.name}' failed: {exc}")
+        await _record_step_invocation(
+            resource_type="endpoint",
+            resource_name=name,
+            step_name=config.name,
+            error=str(exc),
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -307,6 +387,15 @@ async def execute_plugin_step(
         )
         output = _normalize_output(result)
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="plugin",
+            resource_name=name,
+            step_name=config.name,
+            input_data=payload,
+            output_data=output,
+            duration_ms=duration,
+            status="ok",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.SUCCESS,
@@ -316,6 +405,14 @@ async def execute_plugin_step(
         )
     except TimeoutError:
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="plugin",
+            resource_name=name,
+            step_name=config.name,
+            error=f"Plugin '{name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -325,6 +422,14 @@ async def execute_plugin_step(
     except Exception as exc:  # noqa: BLE001
         duration = (time.perf_counter() - t0) * 1000
         logger.error(f"Plugin step '{config.name}' failed: {exc}")
+        await _record_step_invocation(
+            resource_type="plugin",
+            resource_name=name,
+            step_name=config.name,
+            error=str(exc),
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -388,6 +493,15 @@ async def execute_ingestion_step(
         )
         output = _normalize_output(result)
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="ingestion",
+            resource_name=name,
+            step_name=config.name,
+            input_data=payload,
+            output_data=output,
+            duration_ms=duration,
+            status="ok",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.SUCCESS,
@@ -397,6 +511,14 @@ async def execute_ingestion_step(
         )
     except TimeoutError:
         duration = (time.perf_counter() - t0) * 1000
+        await _record_step_invocation(
+            resource_type="ingestion",
+            resource_name=name,
+            step_name=config.name,
+            error=f"Ingestor '{name}' timed out after {config.timeout}s",
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,
@@ -406,6 +528,14 @@ async def execute_ingestion_step(
     except Exception as exc:  # noqa: BLE001
         duration = (time.perf_counter() - t0) * 1000
         logger.error(f"Ingestion step '{config.name}' failed: {exc}")
+        await _record_step_invocation(
+            resource_type="ingestion",
+            resource_name=name,
+            step_name=config.name,
+            error=str(exc),
+            duration_ms=duration,
+            status="error",
+        )
         return StepResult(
             name=config.name,
             status=StepStatus.FAILED,

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import inspect
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
 from agentomatic.endpoints.base import BaseEndpoint
+
+if TYPE_CHECKING:
+    from agentomatic.logs.recorder import InvocationLogRecorder
 
 
 def _observe_endpoint(name: str, status: str, elapsed: float) -> None:
@@ -31,6 +34,7 @@ def create_endpoint_router(
     *,
     task_manager: Any | None = None,
     api_prefix: str = "/api/v1",
+    log_recorder: InvocationLogRecorder | None = None,
 ) -> APIRouter:
     """Create a FastAPI router for a specific custom endpoint.
 
@@ -45,6 +49,7 @@ def create_endpoint_router(
         endpoint: The endpoint instance to expose.
         task_manager: Optional task manager enabling async/batch modes.
         api_prefix: API prefix used to build task links.
+        log_recorder: Optional invocation log recorder when logs_history is on.
 
     Returns:
         A configured :class:`~fastapi.APIRouter`.
@@ -78,13 +83,55 @@ def create_endpoint_router(
             logger.debug(
                 f"Endpoint '{endpoint.endpoint_name}' handled request in {duration:.2f}ms"
             )
+            if log_recorder is not None:
+                from agentomatic.logs.helpers import record_invocation
+
+                await record_invocation(
+                    resource_type="endpoint",
+                    resource_name=endpoint.endpoint_name,
+                    endpoint="handle",
+                    input_data=request,
+                    output_data=result,
+                    metadata={"path": endpoint.path, "methods": list(endpoint.methods)},
+                    duration_ms=round(duration, 2),
+                    status="ok",
+                    recorder=log_recorder,
+                )
             return result
-        except HTTPException:
+        except HTTPException as exc:
             status = "error"
+            if log_recorder is not None:
+                from agentomatic.logs.helpers import record_invocation
+
+                await record_invocation(
+                    resource_type="endpoint",
+                    resource_name=endpoint.endpoint_name,
+                    endpoint="handle",
+                    input_data=request,
+                    error=str(exc.detail),
+                    metadata={"path": endpoint.path, "methods": list(endpoint.methods)},
+                    duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                    status="error",
+                    recorder=log_recorder,
+                )
             raise
         except Exception as exc:  # noqa: BLE001
             status = "error"
             logger.error(f"Endpoint '{endpoint.endpoint_name}' failed: {exc}")
+            if log_recorder is not None:
+                from agentomatic.logs.helpers import record_invocation
+
+                await record_invocation(
+                    resource_type="endpoint",
+                    resource_name=endpoint.endpoint_name,
+                    endpoint="handle",
+                    input_data=request,
+                    error=str(exc),
+                    metadata={"path": endpoint.path, "methods": list(endpoint.methods)},
+                    duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                    status="error",
+                    recorder=log_recorder,
+                )
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         finally:
             _observe_endpoint(endpoint.endpoint_name, status, time.perf_counter() - t0)

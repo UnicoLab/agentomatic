@@ -1,4 +1,4 @@
-"""Optional LLM-based analyser for per-agent invocation logs."""
+"""Optional LLM-based analyser for invocation logs across resource types."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from agentomatic.logs.recorder import truncate_for_storage
+from agentomatic.logs.runtime import normalize_resource_type
 
 if TYPE_CHECKING:
     from agentomatic.optimize.llm_types import LLMSpec
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 _DEFAULT_SAMPLE_LIMIT = 20
 _DEFAULT_PAYLOAD_CHARS = 1_200
 _ANALYSER_SYSTEM = (
-    "You are an expert AI operations analyst reviewing agent invocation logs. "
+    "You are an expert AI operations analyst reviewing invocation logs. "
     "Return ONLY valid JSON with keys: score (0-1 float), summary (string), "
     "status (one of: healthy, degraded, failing, unknown), "
     "recommendations (array of short actionable strings)."
@@ -35,7 +36,9 @@ class LogAnalysisResult:
         recommendations: Actionable improvement suggestions.
         metadata: Extra fields (sample size, model, etc.).
         analysis_id: Persistence id when saved.
-        agent_name: Agent that was analysed.
+        agent_name: Resource name that was analysed (BC alias).
+        resource_type: Resource kind (agent/plugin/…).
+        resource_name: Resource identifier.
     """
 
     score: float | None = None
@@ -45,12 +48,17 @@ class LogAnalysisResult:
     metadata: dict[str, Any] = field(default_factory=dict)
     analysis_id: str | None = None
     agent_name: str = ""
+    resource_type: str = "agent"
+    resource_name: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-friendly dict."""
+        name = self.resource_name or self.agent_name
         return {
             "id": self.analysis_id,
-            "agent_name": self.agent_name,
+            "resource_type": self.resource_type or "agent",
+            "resource_name": name,
+            "agent_name": name,
             "score": self.score,
             "summary": self.summary,
             "status": self.status,
@@ -89,14 +97,19 @@ class LogAnalyser:
 
     async def analyse(
         self,
-        agent_name: str,
+        agent_name: str | None = None,
         *,
+        resource_type: str = "agent",
+        resource_name: str | None = None,
         persist: bool = True,
     ) -> LogAnalysisResult:
-        """Analyse recent logs for ``agent_name``.
+        """Analyse recent logs for a resource.
 
         Args:
-            agent_name: Agent whose logs should be reviewed.
+            agent_name: Backward-compatible resource name.
+            resource_type: ``agent`` | ``plugin`` | ``pipeline`` |
+                ``ingestion`` | ``endpoint``.
+            resource_name: Preferred resource identifier.
             persist: When ``True``, save the result via the store.
 
         Returns:
@@ -108,14 +121,22 @@ class LogAnalyser:
         if self._store is None:
             raise RuntimeError("Log analysis requires a configured store")
 
+        name = resource_name or agent_name
+        if not name:
+            raise ValueError("resource_name / agent_name is required")
+        rtype = normalize_resource_type(resource_type)
+
         logs = await self._store.list_invocation_logs(
-            agent_name=agent_name,
+            agent_name=name,
+            resource_type=rtype,
             limit=self._sample_limit,
             offset=0,
         )
         if not logs:
             result = LogAnalysisResult(
-                agent_name=agent_name,
+                agent_name=name,
+                resource_name=name,
+                resource_type=rtype,
                 score=None,
                 summary="No invocation logs available for analysis.",
                 status="unknown",
@@ -124,7 +145,8 @@ class LogAnalyser:
             )
             if persist:
                 saved = await self._store.save_log_analysis(
-                    agent_name=agent_name,
+                    agent_name=name,
+                    resource_type=rtype,
                     score=result.score,
                     summary=result.summary,
                     status=result.status,
@@ -135,12 +157,18 @@ class LogAnalyser:
             return result
 
         prompt_logs = [self._compact_log(entry) for entry in logs]
-        llm_result = await self._call_llm(agent_name, prompt_logs)
-        result = self._normalize_result(agent_name, llm_result, sample_size=len(logs))
+        llm_result = await self._call_llm(rtype, name, prompt_logs)
+        result = self._normalize_result(
+            name,
+            llm_result,
+            sample_size=len(logs),
+            resource_type=rtype,
+        )
 
         if persist:
             saved = await self._store.save_log_analysis(
-                agent_name=agent_name,
+                agent_name=name,
+                resource_type=rtype,
                 score=result.score,
                 summary=result.summary,
                 status=result.status,
@@ -154,6 +182,7 @@ class LogAnalyser:
         """Shrink a log entry for the analyser prompt."""
         return {
             "id": entry.get("id"),
+            "resource_type": entry.get("resource_type") or "agent",
             "timestamp": entry.get("timestamp"),
             "endpoint": entry.get("endpoint"),
             "status": entry.get("status"),
@@ -179,14 +208,15 @@ class LogAnalyser:
 
     async def _call_llm(
         self,
-        agent_name: str,
+        resource_type: str,
+        resource_name: str,
         compact_logs: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Invoke the LLM and return a parsed JSON dict (or heuristic fallback)."""
         user_prompt = (
             f"Analyse the following {len(compact_logs)} recent invocation logs "
-            f"for agent '{agent_name}'. Focus on errors, latency, input/output "
-            f"quality, and recurring failure patterns.\n\n"
+            f"for {resource_type} '{resource_name}'. Focus on errors, latency, "
+            f"input/output quality, and recurring failure patterns.\n\n"
             f"LOGS_JSON:\n{json.dumps(compact_logs, default=str)}"
         )
 
@@ -258,10 +288,11 @@ class LogAnalyser:
 
     @staticmethod
     def _normalize_result(
-        agent_name: str,
+        resource_name: str,
         raw: dict[str, Any],
         *,
         sample_size: int,
+        resource_type: str = "agent",
     ) -> LogAnalysisResult:
         """Coerce LLM/heuristic output into :class:`LogAnalysisResult`."""
         score_raw = raw.get("score")
@@ -293,7 +324,9 @@ class LogAnalyser:
                 metadata[key] = raw[key]
 
         return LogAnalysisResult(
-            agent_name=agent_name,
+            agent_name=resource_name,
+            resource_name=resource_name,
+            resource_type=resource_type,
             score=score,
             summary=str(raw.get("summary") or ""),
             status=status,

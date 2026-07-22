@@ -46,6 +46,33 @@ from .models import (
 )
 
 
+def _ensure_logs_resource_type_columns(sync_conn: Any) -> None:
+    """Best-effort ADD COLUMN for DBs created before resource_type existed.
+
+    ``create_all`` does not alter existing tables, so older SQLite/Postgres
+    files need an explicit column add. Failures are ignored when the column
+    is already present.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(sync_conn)
+    upgrades = (
+        ("agent_invocation_logs", "resource_type", "VARCHAR(32) DEFAULT 'agent'"),
+        ("log_analyses", "resource_type", "VARCHAR(32) DEFAULT 'agent'"),
+    )
+    for table, column, col_type in upgrades:
+        if table not in inspector.get_table_names():
+            continue
+        existing = {c["name"] for c in inspector.get_columns(table)}
+        if column in existing:
+            continue
+        try:
+            sync_conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+            logger.info("Added {}.{} for multi-resource logs", table, column)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Skipping {}.{} migration: {}", table, column, exc)
+
+
 class SQLAlchemyStore(BaseStore):
     """Production async storage with connection pooling.
 
@@ -108,9 +135,10 @@ class SQLAlchemyStore(BaseStore):
     # ------------------------------------------------------------------
 
     async def initialize(self) -> None:
-        """Create all database tables."""
+        """Create all database tables and ensure newer columns exist."""
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_ensure_logs_resource_type_columns)
         logger.info("🗄️ Database tables created/verified")
 
     async def close(self) -> None:
@@ -633,6 +661,7 @@ class SQLAlchemyStore(BaseStore):
         self,
         *,
         agent_name: str,
+        resource_type: str = "agent",
         thread_id: str | None = None,
         run_id: str | None = None,
         endpoint: str = "invoke",
@@ -644,10 +673,11 @@ class SQLAlchemyStore(BaseStore):
         status: str = "ok",
         log_id: str | None = None,
     ) -> dict[str, Any]:
-        """Persist a per-agent invocation log entry."""
+        """Persist an invocation log entry for any resource type."""
         async with self._session() as session:
             kwargs: dict[str, Any] = {
                 "agent_name": agent_name,
+                "resource_type": resource_type or "agent",
                 "thread_id": thread_id,
                 "run_id": run_id,
                 "endpoint": endpoint,
@@ -679,6 +709,7 @@ class SQLAlchemyStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
@@ -687,6 +718,8 @@ class SQLAlchemyStore(BaseStore):
         clauses: list[Any] = []
         if agent_name:
             clauses.append(AgentInvocationLogModel.agent_name == agent_name)
+        if resource_type:
+            clauses.append(AgentInvocationLogModel.resource_type == resource_type)
         if thread_id:
             clauses.append(AgentInvocationLogModel.thread_id == thread_id)
         if status:
@@ -699,6 +732,7 @@ class SQLAlchemyStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
@@ -710,6 +744,7 @@ class SQLAlchemyStore(BaseStore):
             stmt = select(AgentInvocationLogModel)
             for clause in self._invocation_log_filters(
                 agent_name=agent_name,
+                resource_type=resource_type,
                 thread_id=thread_id,
                 status=status,
                 endpoint=endpoint,
@@ -725,6 +760,7 @@ class SQLAlchemyStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
@@ -734,6 +770,7 @@ class SQLAlchemyStore(BaseStore):
             stmt = select(func.count(AgentInvocationLogModel.id))
             for clause in self._invocation_log_filters(
                 agent_name=agent_name,
+                resource_type=resource_type,
                 thread_id=thread_id,
                 status=status,
                 endpoint=endpoint,
@@ -746,6 +783,7 @@ class SQLAlchemyStore(BaseStore):
         self,
         *,
         agent_name: str,
+        resource_type: str = "agent",
         score: float | None,
         summary: str,
         status: str,
@@ -757,6 +795,7 @@ class SQLAlchemyStore(BaseStore):
         async with self._session() as session:
             kwargs: dict[str, Any] = {
                 "agent_name": agent_name,
+                "resource_type": resource_type or "agent",
                 "score": score,
                 "summary": summary,
                 "status": status,
@@ -771,12 +810,18 @@ class SQLAlchemyStore(BaseStore):
             await session.refresh(row)
             return row.to_dict()
 
-    async def get_latest_log_analysis(self, agent_name: str) -> dict[str, Any] | None:
-        """Return the most recent log analysis for an agent."""
+    async def get_latest_log_analysis(
+        self,
+        agent_name: str,
+        *,
+        resource_type: str = "agent",
+    ) -> dict[str, Any] | None:
+        """Return the most recent log analysis for a resource."""
         async with self._session() as session:
             stmt = (
                 select(LogAnalysisModel)
                 .where(LogAnalysisModel.agent_name == agent_name)
+                .where(LogAnalysisModel.resource_type == (resource_type or "agent"))
                 .order_by(LogAnalysisModel.created_at.desc())
                 .limit(1)
             )
@@ -788,6 +833,7 @@ class SQLAlchemyStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
@@ -796,6 +842,8 @@ class SQLAlchemyStore(BaseStore):
             stmt = select(LogAnalysisModel)
             if agent_name:
                 stmt = stmt.where(LogAnalysisModel.agent_name == agent_name)
+            if resource_type:
+                stmt = stmt.where(LogAnalysisModel.resource_type == resource_type)
             stmt = stmt.order_by(LogAnalysisModel.created_at.desc()).offset(offset).limit(limit)
             result = await session.execute(stmt)
             return [row.to_dict() for row in result.scalars().all()]

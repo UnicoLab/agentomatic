@@ -1126,12 +1126,16 @@ async def cleanup_old_threads(agent: str, user_id: str, keep_latest: int = 10):
 
 ## Invocation log history & LLM analysis
 
-Persist every invoke/chat/stream I/O per agent for auditability and live
-recommendations. When `logs_history` is on, the platform derives a durable
-`SQLAlchemyStore` from `AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack
-`database.url` (Postgres, SQLite, …) — it does **not** eagerly install
-`MemoryStore` (that would preempt DB auto-derive). If a DB URL is set but
-init fails, MemoryStore fallback is refused.
+Persist full I/O + metadata for **agents, plugins, pipelines, ingestion, and
+custom endpoints** when `logs_history` is on. Pipeline agent/plugin/endpoint/
+ingestion steps that run in-process (bypassing HTTP) are also recorded with
+`endpoint=pipeline_step` and `metadata.pipeline` set.
+
+When `logs_history` is on, the platform derives a durable `SQLAlchemyStore`
+from `AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack `database.url` (Postgres,
+SQLite, …) — it does **not** eagerly install `MemoryStore` (that would
+preempt DB auto-derive). If a DB URL is set but init fails, MemoryStore
+fallback is refused.
 
 ```python
 from agentomatic import AgentPlatform
@@ -1149,17 +1153,30 @@ Env equivalents: `AGENTOMATIC_LOGS_HISTORY=1`,
 `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1`, plus `DATABASE_URL` /
 `AGENTOMATIC_DB_URL` for multi-backend persistence.
 
-Endpoints (per agent):
+Cross-resource endpoints:
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/{agent}/logs` | List invocation logs |
+| GET | `/api/v1/logs?resource=plugin&name=…` | List logs (filter by type/name) |
+| GET | `/api/v1/logs/{id}` | Fetch one log |
+| POST | `/api/v1/logs/analyze` | LLM/heuristic analysis (`resource` + `name` in body) |
+| GET | `/api/v1/logs/analysis?resource=…&name=…` | Latest analysis |
+
+`resource` is one of: `agent` | `plugin` | `pipeline` | `ingestion` | `endpoint`.
+
+Per-agent routes remain for backward compatibility:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/{agent}/logs` | List agent logs |
 | GET | `/api/v1/{agent}/logs/{id}` | Fetch one log |
 | POST | `/api/v1/{agent}/logs/analyze` | LLM/heuristic analysis |
 | GET | `/api/v1/{agent}/logs/analysis` | Latest analysis |
 
-Analysis returns `score`, `summary`, `status`, and `recommendations`.
-Offline train can also audit retrain runs with
+Each log entry includes `resource_type`, `resource_name` (and BC
+`agent_name`), `endpoint`, `input`, `output`, `metadata`, `duration_ms`,
+`status`. Analysis returns `score`, `summary`, `status`, and
+`recommendations`. Offline train can also audit retrain runs with
 `TrainConfig.persist_fit_store` / `fit_store_url` →
 `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` (`OptimizationRunStore`).
 See [Prompt Optimization](optimization.md).
