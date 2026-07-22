@@ -55,6 +55,50 @@ class TestTrainConfigDefaults:
         assert cfg.optimizer == "rewrite"
         assert cfg.apply is False
         assert cfg.min_absolute_improvement == 0.001
+        assert cfg.persist_fit_store is False
+
+
+class TestPrintTrainResult:
+    def test_print_summary_is_callable(self, tmp_path: Path) -> None:
+        from io import StringIO
+
+        from rich.console import Console
+
+        from agentomatic.optimize.train_api import TrainResult, print_train_result
+
+        class _Hist:
+            history = {"loss": [0.5], "val_loss": [0.4]}
+
+        result = TrainResult(
+            history=_Hist(),
+            fit_result=PromptFitResult(
+                best_config=PromptRuntimeConfig(system_prompt="best"),
+                baseline_config=PromptRuntimeConfig(system_prompt="base"),
+                best_score=0.9,
+                baseline_score=0.5,
+                score_history=[0.5, 0.9],
+                prompt_history=[{"accepted": True, "score": 0.9, "candidate_name": "c1"}],
+            ),
+            eval_scores={"composite": 0.9},
+            report_path=tmp_path / "train_a.html",
+            optimize_status="ok",
+            applied_version=None,
+            dataset_sizes={"train": 2, "validation": 1, "test": 0, "all": 3},
+            stack="gemini",
+            model="gemini/x",
+            rewrite_model="gemini/x",
+            optimizer="rewrite",
+            agent_name="assistant",
+        )
+        (tmp_path / "train_a.html").write_text("<html></html>", encoding="utf-8")
+        buf = StringIO()
+        console = Console(file=buf, force_terminal=False, width=120)
+        print_train_result(result, console=console)
+        result.print_summary(console=console)
+        text = buf.getvalue()
+        assert "assistant" in text
+        assert "gemini" in text
+        assert "Report:" in text
 
 
 class TestFitHolySheetReport:

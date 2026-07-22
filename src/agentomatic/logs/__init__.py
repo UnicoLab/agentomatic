@@ -4,7 +4,7 @@ Enable via platform flags / env::
 
     AgentPlatform.from_folder(
         "agents/",
-        store=SQLAlchemyStore(...),
+        store=SQLAlchemyStore("postgresql+asyncpg://…"),  # or sqlite+aiosqlite
         logs_history=True,
         allow_logsllm_analysis=True,
     )
@@ -13,6 +13,11 @@ Or::
 
     AGENTOMATIC_LOGS_HISTORY=1
     AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1
+    DATABASE_URL=sqlite+aiosqlite:///./agentomatic.db   # any SQLAlchemy async URL
+
+When a DB URL / MEMORY connection is available the platform auto-derives
+``SQLAlchemyStore`` (Postgres, SQLite, …). MemoryStore is only a last-resort
+fallback when no DB is configured.
 """
 
 from __future__ import annotations

@@ -10,7 +10,7 @@ resolution-markers = [
 
 [[package]]
 name = "agentomatic"
-version = "1.8.7"
+version = "1.8.8"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

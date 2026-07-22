@@ -18,12 +18,20 @@ Historical bugs that motivated the redesign (now addressed):
 - Connection errors after async fit → persistent event loop + drain_seconds
 
 
-# Plugins etc — still open
+# Plugins / audit / logs — DONE (v1.8.8)
 
--> it woudl be nice to keep retrain history and everything so it's well auditable somehow
--> make sure the artefacts and all the models are correctly stored in the DB and not in memory so we have persistance !
+Shipped:
+- Auditable retrain history via `OptimizationRunStore` + `fit_store`
+  (`retrain_history.jsonl` always; SQLAlchemy DB when store bound)
+- Artefacts/models persist through `SQLAlchemyStore` (Postgres / SQLite /
+  any SQLAlchemy async URL) — not MemoryStore when a DB is configured
+- `logs_history` / `allow_logsllm_analysis` (+ env
+  `AGENTOMATIC_LOGS_HISTORY` / `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`) with
+  REST `/logs` + `/logs/analyze`
+- Train UX: `print_train_result` / `TrainResult.print_summary()`
+Covered by `test_logs_history` (incl. SQLite restart survival).
 
 
 # Remaining product ideas
 
-- We should have main parameter like logs-hisyory=true and allow-logsllm-analysis=true that will automystore entire per agent history a with all inputs and outputs and metadata - everything. ! If activated .. we can then have a analyser agent providing recommendations based on the logs per agent with scoring, summary « , status, etc !!  So we have a real live LLM based analysis based on all logs etc !
+(none from the previous logs/DB/train-UX backlog — see studio schema UX above)
