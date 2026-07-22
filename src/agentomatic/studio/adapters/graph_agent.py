@@ -43,11 +43,31 @@ class GraphAgentAdapter(StudioAdapter):
         return ["graph", "streaming", "traces"]
 
     async def get_graph(self) -> StudioGraphTopology:
-        """Extract the true graph topology from AgentGraph."""
+        """Extract the true graph topology from AgentGraph.
+
+        ``graph_fn`` is sync and may touch imports/connections — run it in a
+        worker thread with a timeout so Studio Connect never wedges the loop.
+        """
+        import asyncio
+
         if not self._agent.graph_fn:
             return StudioGraphTopology(agent_name=self.agent_name)
 
-        graph: AgentGraph = self._agent.graph_fn()
+        try:
+            graph: AgentGraph = await asyncio.wait_for(
+                asyncio.to_thread(self._agent.graph_fn),
+                timeout=5.0,
+            )
+        except TimeoutError:
+            return StudioGraphTopology(
+                agent_name=self.agent_name,
+                metadata={"error": "graph_fn timed out"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            return StudioGraphTopology(
+                agent_name=self.agent_name,
+                metadata={"error": f"graph_fn failed: {exc}"},
+            )
 
         nodes: list[StudioGraphNode] = []
         # AgentGraph uses END sentinel

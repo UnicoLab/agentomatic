@@ -143,7 +143,12 @@ def register_vector_provider(name: str, builder: Callable[[VectorConnectionConfi
             client instance.  It may raise :class:`ImportError` with an
             install hint when the backing library is missing.
     """
-    _VECTOR_PROVIDERS[name.lower()] = builder
+    key = str(name or "").strip().lower()
+    if not key:
+        raise ValueError("vector provider name must be a non-empty string")
+    if builder is None:
+        raise ValueError(f"vector provider builder for '{key}' must not be None")
+    _VECTOR_PROVIDERS[key] = builder
 
 
 def register_vector_store_adapter(
@@ -158,7 +163,12 @@ def register_vector_store_adapter(
             wraps the provider's native client into the provider-agnostic
             :class:`VectorStore` surface.
     """
-    _VECTOR_STORE_ADAPTERS[name.lower()] = adapter
+    key = str(name or "").strip().lower()
+    if not key:
+        raise ValueError("vector store adapter name must be a non-empty string")
+    if adapter is None:
+        raise ValueError(f"vector store adapter for '{key}' must not be None")
+    _VECTOR_STORE_ADAPTERS[key] = adapter
 
 
 def registered_vector_providers() -> list[str]:
@@ -202,7 +212,22 @@ class VectorConnection:
         return self._client
 
     def _build_client(self) -> Any:
-        builder = _VECTOR_PROVIDERS.get(self.config.provider.lower())
+        provider_key = str(self.config.provider or "").strip().lower()
+        builder = _VECTOR_PROVIDERS.get(provider_key)
+        if builder is None:
+            # Dual-import guard: custom providers may have registered on a
+            # sibling module copy when PYTHONPATH + site-packages both ship
+            # agentomatic. Merge any sibling registries before failing.
+            import sys
+
+            for mod in list(sys.modules.values()):
+                if getattr(mod, "__name__", "").endswith("agentomatic.connections.vector"):
+                    sibling = getattr(mod, "_VECTOR_PROVIDERS", None)
+                    if isinstance(sibling, dict) and provider_key in sibling:
+                        builder = sibling.get(provider_key)
+                        if builder is not None:
+                            _VECTOR_PROVIDERS[provider_key] = builder
+                            break
         if builder is None:
             raise ValueError(
                 f"Unknown vector provider '{self.config.provider}' for connection "
@@ -225,7 +250,7 @@ class VectorConnection:
             return self._store
         if self._client is None:
             self._client = self._build_client()
-        adapter = _VECTOR_STORE_ADAPTERS.get(self.config.provider.lower())
+        adapter = _VECTOR_STORE_ADAPTERS.get(str(self.config.provider or "").strip().lower())
         if adapter is not None:
             self._store = adapter(self.config, self._client)
         else:
