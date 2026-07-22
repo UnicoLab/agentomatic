@@ -354,6 +354,19 @@ class PromptFitterBridge:
         # Resolve local agent: explicit arg wins, otherwise use the live agent.
         local_agent = self.local_agent if self.local_agent is not None else agent
 
+        # Carry the best prompt found so far (from a previous epoch) as the
+        # baseline so each epoch compounds improvement instead of restarting
+        # from the original prompts.json every time.
+        baseline_prompt: str | None = None
+        compiled_cfg = getattr(agent, "compiled_config", None)
+        if isinstance(compiled_cfg, dict):
+            baseline_prompt = compiled_cfg.get("system_prompt") or None
+        if baseline_prompt:
+            logger.info(
+                "PromptFitterBridge: using compiled system_prompt as baseline ({} chars)",
+                len(baseline_prompt),
+            )
+
         return PromptFitter(
             agent=name,
             task_model=kwargs.pop("task_model", self.task_model),
@@ -362,6 +375,7 @@ class PromptFitterBridge:
             local_agent=local_agent,
             llm_base_url=kwargs.pop("llm_base_url", self.llm_base_url),
             llm_api_key=kwargs.pop("llm_api_key", self.llm_api_key),
+            baseline_system_prompt=baseline_prompt,
             **kwargs,
         )
 

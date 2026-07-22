@@ -325,6 +325,7 @@ class PromptFitter:
         llm_multipass: bool = True,
         slm_default_passes: int = 3,
         llm_default_passes: int = 2,
+        baseline_system_prompt: str | None = None,
     ) -> None:
         # Public configuration
         self.agent = agent
@@ -343,6 +344,9 @@ class PromptFitter:
         self.llm_multipass = llm_multipass
         self.slm_default_passes = slm_default_passes
         self.llm_default_passes = llm_default_passes
+        # Optional pre-set baseline: overrides prompts.json on first step.
+        # Used by PromptFitterBridge to compound improvements across epochs.
+        self._baseline_system_prompt: str | None = baseline_system_prompt
 
         # Configure LLMCaller for OpenAI-compatible local servers if requested.
         # This propagates base_url/api_key to all optimizer LLM calls automatically.
@@ -1251,17 +1255,24 @@ class PromptFitter:
     def _load_baseline_config(self) -> PromptRuntimeConfig:
         """Load baseline config from the agent's ``prompts.json``.
 
+        When ``baseline_system_prompt`` was provided at construction (e.g. by
+        :class:`PromptFitterBridge` carrying the best prompt from a previous
+        epoch), that value takes precedence over anything in ``prompts.json``
+        so that successive ``fit()`` calls compound improvement rather than
+        restarting from the file each time.
+
         Searches for ``prompts.json`` in standard locations
         (``agents/<agent>/``, ``<agent>/``, cwd).  Falls back to a
         generic system prompt if no file is found.
-
-        Returns
-        -------
-        PromptRuntimeConfig
-            Baseline configuration with system prompt and default
-            model parameters from the search space.
         """
-        system_prompt = self._load_prompt_text()
+        if self._baseline_system_prompt:
+            logger.info(
+                "📌 Using caller-supplied baseline prompt ({} chars) — compounding from previous epoch",
+                len(self._baseline_system_prompt),
+            )
+            system_prompt = self._baseline_system_prompt
+        else:
+            system_prompt = self._load_prompt_text()
 
         # Build default model_params from search space (first value of each)
         model_params: dict[str, Any] = {}

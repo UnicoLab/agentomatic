@@ -171,38 +171,83 @@ class AgentExample:
 
         Returns:
             A ``DataPoint`` compatible with ``agentomatic.optimize``.
+
+        Query priority (first non-empty wins):
+        - ``input["question"]``  — actual question text, preferred for LLM judges
+        - ``input["query"]``     — caller-supplied label / meta-tag
+        - ``input["current_query"]`` — agentomatic convention field
+        - ``input["request"]``   — REST-style alias
+        - ``json.dumps(input)``  — last-resort serialisation
+
+        Context: ``input["context"]`` (dict or list) is serialised as a JSON
+        string and passed as the retrieval context so LLM-as-judge metrics can
+        evaluate groundedness against the project snapshot.
+
+        Expected answer: boolean-flag outputs (``{"content": true, "name": true}``)
+        are converted to a human-readable description so judge LLMs can compare
+        quality instead of receiving useless ``true``/``false`` JSON.
         """
         from agentomatic.optimize.dataset import DataPoint
 
-        # Extract query from input — try common keys (including current_query
-        # used by agents that follow the agentomatic convention).
+        # ── query: prefer the actual question text over meta-labels ──────
         query = (
-            self.input.get("query")
-            or self.input.get("current_query")
+            self.input.get("question")      # actual question (e.g. French text)
+            or self.input.get("query")      # caller meta-label
+            or self.input.get("current_query")  # agentomatic convention
             or self.input.get("request")
-            or self.input.get("question")
             or json.dumps(self.input)
         )
-        expected = None
+
+        # ── expected answer: convert boolean flags → human-readable text ─
+        expected: str | None = None
         if self.expected_output:
-            expected = (
-                self.expected_output.get("response")
-                or self.expected_output.get("answer")
-                or json.dumps(self.expected_output)
-            )
+            exp = self.expected_output
+            # Detect boolean-flag pattern: {key: True} means "output should include key/value"
+            is_flag_only = all(isinstance(v, bool) for v in exp.values()) if exp else False
+            if is_flag_only:
+                # Convert to readable description: True → include key, False → exclude key
+                include = [k for k, v in exp.items() if v is True]
+                exclude = [k for k, v in exp.items() if v is False]
+                parts = []
+                if include:
+                    parts.append("Response must include: " + ", ".join(f"'{k}'" for k in include))
+                if exclude:
+                    parts.append("Response must NOT include: " + ", ".join(f"'{k}'" for k in exclude))
+                expected = "; ".join(parts) if parts else None
+            else:
+                # Mixed or rich output: prefer known text fields, else serialise
+                expected = (
+                    exp.get("response")
+                    or exp.get("answer")
+                    or exp.get("content")
+                    or json.dumps(exp, ensure_ascii=False)
+                )
+
+        # ── context: extract project snapshot for judge groundedness eval ─
+        raw_ctx = self.input.get("context") or (self.metadata.get("invoke") or {}).get("context")
+        context_list: list[str] = []
+        if isinstance(raw_ctx, dict) and raw_ctx:
+            context_list = [json.dumps(raw_ctx, ensure_ascii=False)]
+        elif isinstance(raw_ctx, list):
+            context_list = [str(c) for c in raw_ctx if c]
+
+        # ── metadata / invoke ─────────────────────────────────────────────
         meta = dict(self.metadata or {})
         if self.split and "split" not in meta:
             meta["split"] = self.split
         # Ensure invoke payload carries agent inputs when not already set.
         if "invoke" not in meta and self.input:
             invoke = {
-                k: v for k, v in self.input.items() if k not in {"query", "request", "question"}
+                k: v for k, v in self.input.items()
+                if k not in {"query", "request", "question", "current_query"}
             }
             if invoke:
                 meta["invoke"] = invoke
+
         return DataPoint(
             query=str(query),
             expected_answer=expected,
+            context=context_list,
             metadata=meta,
         )
 
