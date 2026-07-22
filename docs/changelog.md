@@ -14,9 +14,12 @@ Install from git / an editable checkout until PyPI catches up.
 
 - **Multi-resource `logs_history`** (1.8.9): Persist full I/O for plugins,
   pipelines, ingestion, and custom endpoints (not only agents). Cross-resource
-  REST at `/api/v1/logs?resource=…&name=…` + `/logs/analyze`; per-agent
+  REST: `GET /api/v1/logs?resource=…&name=…`, `GET /api/v1/logs/{id}`,
+  `POST /api/v1/logs/analyze`, `GET /api/v1/logs/analysis`; per-agent
   `/{agent}/logs` kept for BC. In-process pipeline steps log with
-  `endpoint=pipeline_step` and `metadata.pipeline`.
+  `endpoint=pipeline_step` and `metadata.pipeline`. Gaps (documented): async
+  task invocations are not written to invocation logs; there are no
+  per-plugin/pipeline/ingestion/endpoint convenience `/logs` routes.
 - **Docs + CLI templates for thin train/eval** (1.8.8 docs):
   [Prompt Optimization](guide/optimization.md) documents
   `TrainConfig` / `train_and_report` / `print_train_result` and
@@ -44,15 +47,16 @@ Install from git / an editable checkout until PyPI catches up.
   forwards snapshot `context` + rich expected references to judges.
 - **`TrainConfig` / `train_and_report`** (1.8.5): Thin train scripts with
   HolySheet fit dashboards, augment/persist knobs, and apply guards.
-- **Per-agent invocation log history + optional LLM analysis**: Opt-in
-  flags `logs_history` / `AGENTOMATIC_LOGS_HISTORY` and
-  `allow_logsllm_analysis` / `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` persist
-  full invoke/chat/stream payloads into the platform store
-  (`AgentInvocationLog`). REST endpoints: `GET /logs`, `GET /logs/{id}`,
-  `POST /logs/analyze`, `GET /logs/analysis`. Analyser samples/truncates
-  logs for API budget safety and falls back to a heuristic when no LLM
-  is configured. Related: `OptimizationRunStore` + `optimize/fit_store`
-  for auditable retrain artefacts.
+- **Invocation log history + optional LLM analysis** (extended in **1.8.9**
+  to multi-resource): Opt-in flags `logs_history` /
+  `AGENTOMATIC_LOGS_HISTORY` and `allow_logsllm_analysis` /
+  `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` persist full sync invoke/chat/stream
+  payloads into the platform store (`AgentInvocationLog`). REST:
+  `GET /api/v1/logs`, `GET /api/v1/logs/{id}`, `POST /api/v1/logs/analyze`,
+  `GET /api/v1/logs/analysis` (plus agent-scoped `/{agent}/logs` BC).
+  Analyser samples/truncates logs for API budget safety and falls back to a
+  heuristic when no LLM is configured. Related: `OptimizationRunStore` +
+  `optimize/fit_store` for auditable retrain artefacts.
 - **Ordered LLM model fallbacks** (ships in **1.8.0**): Configure
   `fallbacks` / `fallback_on` on stack LLM profiles or via
   `get_llm(..., fallbacks=..., fallback_on=...)`. On timeout, connection

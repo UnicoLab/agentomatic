@@ -1180,3 +1180,13 @@ Each log entry includes `resource_type`, `resource_name` (and BC
 `TrainConfig.persist_fit_store` / `fit_store_url` →
 `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` (`OptimizationRunStore`).
 See [Prompt Optimization](optimization.md).
+
+!!! note "Current gaps"
+    - **Async tasks are not recorded** in invocation logs. Synchronous
+      `invoke` / `chat` / `invoke/stream` (and the equivalent sync plugin /
+      pipeline / ingestion / endpoint routes) are logged; work submitted via
+      `/invoke/async`, `/invoke/batch`, or the task board is not.
+    - **No per-plugin (or per-pipeline / ingestion / endpoint) convenience
+      routes** like `/{plugin}/logs`. Query the cross-resource API with
+      `?resource=` + `name=` (or use the agent-scoped `/{agent}/logs` routes
+      for agents only).

@@ -511,6 +511,20 @@ Besides the per-agent endpoints above, the platform exposes cross-cutting
 surfaces a frontend can consume. These power the **Agentomatic Studio** views
 (Control, Endpoints, Connections, Pipelines, Plugins).
 
+### Invocation logs (multi-resource)
+
+When `logs_history` is enabled, use the cross-resource logs API (filter by
+`resource` + `name`). Agent-scoped `/{agent}/logs` remains for BC. There are
+no per-plugin convenience `/logs` routes; async task runs are not persisted
+here — see [Platform Features](guide/platform-features.md#invocation-log-history-llm-analysis).
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/api/v1/logs?resource=plugin&name=…` | List logs (`resource`: agent\|plugin\|pipeline\|ingestion\|endpoint) |
+| `GET` | `/api/v1/logs/{id}` | Fetch one log |
+| `POST` | `/api/v1/logs/analyze` | LLM/heuristic analysis (`resource` + `name` in body) |
+| `GET` | `/api/v1/logs/analysis?resource=…&name=…` | Latest analysis |
+
 ### Control Plane
 
 Mounted at `{api_prefix}/control` when `enable_control_plane=True`. Mutating
