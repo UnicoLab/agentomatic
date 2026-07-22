@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import difflib
 import html
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -777,6 +778,195 @@ footer { text-align: center; margin-top: 3rem; padding: 1rem;
 # =====================================================================
 # PromptFitter-specific report
 # =====================================================================
+
+
+def generate_eval_report(
+    report: Any,  # EvaluationReport
+    output_path: str | Path | None = None,
+    *,
+    stack_name: str | None = None,
+    model_name: str | None = None,
+    split: str | None = None,
+    dataset_sizes: dict[str, int] | None = None,
+) -> str:
+    """Generate an interactive HTML report for an ``EvaluationReport``.
+
+    Prefers HolySheet (KPI cards + per-example table). Falls back to a
+    compact static HTML page when HolySheet is unavailable.
+
+    Args:
+        report: ``EvaluationReport`` from ``agent.evaluate()``.
+        output_path: Path to write the HTML file.
+        stack_name: Stack name for the header.
+        model_name: Task model label for the header.
+        split: Dataset split label (``test``, ``eval``, …).
+        dataset_sizes: Optional ``{{train, validation, test, all}}`` counts.
+
+    Returns:
+        Path to the generated report file.
+    """
+    agent = str(getattr(report, "agent_name", "") or "agent")
+    if output_path is None:
+        stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        output_path = Path(f".optimize/{agent}/eval_report_{stamp}.html")
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        path = _generate_eval_holysheet_report(
+            report,
+            output_path,
+            stack_name=stack_name or "",
+            model_name=model_name or "",
+            split=split or "",
+            dataset_sizes=dataset_sizes or {},
+        )
+        logger.info("📊 Eval report (holysheet) generated: {}", path)
+        return path
+    except ImportError:
+        logger.debug("holysheet not installed — falling back to built-in eval HTML")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("holysheet eval report failed ({}), using fallback HTML", exc)
+
+    html_content = _build_eval_report_html(
+        report,
+        stack_name=stack_name or "",
+        model_name=model_name or "",
+        split=split or "",
+        dataset_sizes=dataset_sizes or {},
+    )
+    output_path.write_text(html_content, encoding="utf-8")
+    logger.info("📊 Eval report generated: {}", output_path)
+    return str(output_path)
+
+
+def _generate_eval_holysheet_report(
+    report: Any,
+    output_path: Path,
+    *,
+    stack_name: str,
+    model_name: str,
+    split: str,
+    dataset_sizes: dict[str, int],
+) -> str:
+    """Interactive HolySheet dashboard for an EvaluationReport."""
+    from holysheet import KPI, DataTable, Markdown, Report, Section
+
+    scores = dict(getattr(report, "scores", {}) or {})
+    examples = list(getattr(report, "example_results", []) or [])
+    n = len(examples)
+    errors = sum(1 for er in examples if getattr(er, "error", None))
+    pass_rate = float(getattr(report, "pass_rate", 0.0) or 0.0)
+    agent = str(getattr(report, "agent_name", "") or "agent")
+
+    meta_bits = [f"agent=`{agent}`"]
+    if stack_name:
+        meta_bits.append(f"stack=`{stack_name}`")
+    if model_name:
+        meta_bits.append(f"model=`{model_name}`")
+    if split:
+        meta_bits.append(f"split=`{split}`")
+    if dataset_sizes:
+        meta_bits.append(
+            "data="
+            + "/".join(
+                f"{k}={dataset_sizes.get(k, 0)}"
+                for k in ("train", "validation", "test", "all")
+                if k in dataset_sizes
+            )
+        )
+
+    hs = Report(
+        title="Agent Evaluation Report",
+        subtitle=" · ".join(meta_bits),
+        theme="light",
+        author="agentomatic",
+    )
+    hs.add(Section(title="Summary"))
+    hs.add(KPI(label="Examples", value=n))
+    hs.add(KPI(label="Pass rate", value=round(pass_rate, 3)))
+    hs.add(KPI(label="Errors", value=errors, status="negative" if errors else "neutral"))
+    for name, score in sorted(scores.items()):
+        hs.add(KPI(label=str(name), value=round(float(score), 4)))
+
+    hs.add(Markdown(content=f"## `{agent}`\n\nEvaluated **{n}** examples."))
+    rows = []
+    for er in examples:
+        er_scores = getattr(er, "scores", {}) or {}
+        rows.append(
+            {
+                "id": getattr(er, "example_id", ""),
+                "passed": bool(getattr(er, "passed", False)),
+                "scores": json.dumps(
+                    {k: round(float(v), 3) for k, v in er_scores.items()},
+                    ensure_ascii=False,
+                )[:120],
+                "error": (getattr(er, "error", None) or "")[:80],
+                "ms": round(float(getattr(er, "duration_ms", 0) or 0), 1),
+            }
+        )
+    if rows:
+        hs.add(Section(title="Per-example"))
+        hs.add(
+            DataTable(
+                title="Results",
+                data=rows,
+                columns=["id", "passed", "scores", "error", "ms"],
+            )
+        )
+    hs.export_html(str(output_path))
+    return str(output_path)
+
+
+def _build_eval_report_html(
+    report: Any,
+    *,
+    stack_name: str,
+    model_name: str,
+    split: str,
+    dataset_sizes: dict[str, int],
+) -> str:
+    """Static HTML fallback for evaluation reports."""
+    scores = dict(getattr(report, "scores", {}) or {})
+    examples = list(getattr(report, "example_results", []) or [])
+    agent = html.escape(str(getattr(report, "agent_name", "") or "agent"))
+    kpi_html = "".join(
+        f'<div class="card"><div class="card-label">{html.escape(k)}</div>'
+        f'<div class="card-value">{float(v):.3f}</div></div>'
+        for k, v in sorted(scores.items())
+    )
+    rows_html = []
+    for er in examples:
+        er_scores = getattr(er, "scores", {}) or {}
+        rows_html.append(
+            "<tr>"
+            f"<td>{html.escape(str(getattr(er, 'example_id', '')))}</td>"
+            f"<td>{html.escape(json.dumps({k: round(float(v), 3) for k, v in er_scores.items()}))}</td>"
+            f"<td>{html.escape(str(getattr(er, 'error', '') or ''))}</td>"
+            f"<td>{float(getattr(er, 'duration_ms', 0) or 0):.0f}</td>"
+            "</tr>"
+        )
+    meta = " · ".join(
+        p
+        for p in (
+            f"stack={stack_name}" if stack_name else "",
+            f"model={model_name}" if model_name else "",
+            f"split={split}" if split else "",
+            f"sizes={dataset_sizes}" if dataset_sizes else "",
+        )
+        if p
+    )
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Eval — {agent}</title>
+<style>{_CSS}</style>
+</head><body><div class="container">
+<header><h1>Evaluation — {agent}</h1>
+<p class="meta"><span class="badge">{html.escape(meta)}</span></p></header>
+<div class="cards">{kpi_html}</div>
+<h2>Per-example</h2>
+<table><thead><tr><th>id</th><th>scores</th><th>error</th><th>ms</th></tr></thead>
+<tbody>{"".join(rows_html)}</tbody></table>
+</div></body></html>"""
 
 
 def generate_fit_report(

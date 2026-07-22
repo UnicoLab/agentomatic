@@ -12,6 +12,12 @@ publishes). Install from git / an editable checkout until then.
 
 ### Added
 
+- **`EvalConfig` / `evaluate_and_report`** (1.8.6): Thin eval scripts
+  mirroring `train_and_report` — stack load, structured + LLM-judge
+  metrics, split selection, optional augmented dataset reuse, and
+  HolySheet `generate_eval_report`. Scaffold `agents/*/eval.py` updated.
+  `OptimizeMetricAdapter` now prefers `question` over meta-`query` and
+  forwards snapshot `context` + rich expected references to judges.
 - **Per-agent invocation log history + optional LLM analysis**: Opt-in
   flags `logs_history` / `AGENTOMATIC_LOGS_HISTORY` and
   `allow_logsllm_analysis` / `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` persist

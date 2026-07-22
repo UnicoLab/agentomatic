@@ -1713,124 +1713,113 @@ if __name__ == "__main__":
 
 def _eval_py(name: str) -> str:
     title = name.replace("_", " ").title().replace(" ", "")
-    return f'''"""Evaluate script for {name} — detailed quality reporting.
+    return f'''#!/usr/bin/env python3
+"""Evaluate **{name}** via Agentomatic ``evaluate_and_report``.
 
-Usage::
+Thin entrypoint — stack / metrics / LLM-judge / HolySheet report live in
+``agentomatic.optimize``. Mirrors ``train.py`` / ``train_and_report``.
 
-    python -m agents.{name}.eval
-    python -m agents.{name}.eval --compiled compiled/{name}
+Usage (from project root)::
+
+    uv run python agents/{name}/eval.py
+    AGENTOMATIC_STACK=gemini uv run python agents/{name}/eval.py \\
+        --split test --prefer-augmented
 """
 from __future__ import annotations
 
 import argparse
-import json
+import os
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]   # project root
+os.chdir(ROOT)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from agentomatic.config.settings import load_environment
+from agentomatic.optimize import EvalConfig, evaluate_and_report
+from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
+from agentomatic.stacks.manager import StackManager
+from rich.console import Console
 
 from .agent import {title}Agent
 
-from agentomatic.agents import AgentDataset
-from agentomatic.agents.metrics import (
-    CallableMetric,
-    ContainsTermsMetric,
-    ExactKeyMatchMetric,
-    WeightedMetric,
-)
-
-DATA_DIR = Path(__file__).parent
+AGENT = "{name}"
+HERE = Path(__file__).resolve().parent
+console = Console()
 
 
-# Multi-criteria evaluation config — mirrors train.py so train + eval agree.
-# Each row: (name, metric_instance, weight). Weights are auto-normalised.
-METRICS = [
-    ("exact_response", ExactKeyMatchMetric(["response"]), 0.5),
-    ("contains_terms", ContainsTermsMetric(["Result"]), 0.3),
-    (
-        "has_output",
-        CallableMetric(
-            "has_output",
-            lambda example, pred: 1.0 if pred.get("response") else 0.0,
-        ),
-        0.2,
-    ),
-]
-
-
-def build_metrics() -> list:
-    """Return metrics for evaluation (individual + weighted composite)."""
-    individual = [m for _, m, _ in METRICS]
-    composite = WeightedMetric(METRICS, name="composite")
-    return [*individual, composite]
-
-
-def main() -> None:
-    """Evaluate the agent and print a detailed report."""
-    parser = argparse.ArgumentParser(description="Evaluate {name}")
-    parser.add_argument(
-        "--compiled", type=str, default=None,
-        help="Path to compiled agent directory (loads saved config)"
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry for {name} evaluation."""
+    p = argparse.ArgumentParser(description=f"Evaluate {{AGENT}} (Agentomatic)")
+    p.add_argument("--stack", default=os.getenv("AGENTOMATIC_STACK", "local"))
+    p.add_argument("--dataset", type=Path, default=None)
+    p.add_argument(
+        "--split",
+        choices=["test", "validation", "train", "eval", "all"],
+        default="test",
     )
-    parser.add_argument(
-        "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
-        help="Path to evaluation dataset (JSONL)"
+    p.add_argument("--limit", type=int, default=None)
+    p.add_argument("--no-judge", action="store_true", help="Skip LLM-as-judge")
+    p.add_argument(
+        "--prefer-augmented",
+        action="store_true",
+        help="Use datasets/all.augmented.jsonl when present",
     )
-    parser.add_argument(
-        "--split", choices=["test", "train", "all"], default="test",
-        help="Dataset split to evaluate on"
-    )
-    args = parser.parse_args()
+    p.add_argument("--json-out", type=Path, default=None)
+    p.add_argument("--compiled", type=str, default=None, help="Load compiled agent dir")
+    args = p.parse_args(argv)
 
-    # 1. Create agent
-    agent = {title}Agent(llm=None)
+    load_environment(ROOT.parent / ".env")
+    stacks = StackManager(ROOT / "stacks")
+    stacks.load(args.stack)
+    apply_stack_defaults(stacks)
 
-    # Load compiled state if provided
+    llm = None if args.no_judge else get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
+    agent = {title}Agent(llm=llm)
     if args.compiled:
         agent.load_compiled(args.compiled)
-        print(f"Loaded compiled config from {{args.compiled}}")
+        console.print(f"Loaded compiled config from {{args.compiled}}")
 
-    # 2. Load dataset
-    dataset = AgentDataset.from_jsonl(args.dataset)
-    if args.split == "test":
-        examples = dataset.test
-    elif args.split == "train":
-        examples = dataset.train
-    else:
-        examples = dataset.examples
-    print(f"Evaluating on {{len(examples)}} examples (split={{args.split}})")
+    result = evaluate_and_report(
+        agent,
+        config=EvalConfig(
+            agent_name=AGENT,
+            agent_dir=HERE,
+            stacks_dir=ROOT / "stacks",
+            env_path=ROOT.parent / ".env",
+            stack=args.stack,
+            dataset_path=args.dataset,
+            split=args.split,
+            limit=args.limit,
+            required_keys=["response"],
+            judge_criteria=(
+                "Evaluate whether the response is relevant to the query, "
+                "accurate, well-structured, and actionable. Provide graded "
+                "0–1 scores with clear motivation."
+            ),
+            judge_dimensions=["relevance", "accuracy", "structure"],
+            use_judge=not args.no_judge,
+            prefer_augmented=args.prefer_augmented,
+            json_out=args.json_out,
+        ),
+    )
 
-    # 3. Build metrics (weighted composite + individual components)
-    metrics = build_metrics()
-
-    # 4. Evaluate
-    report = agent.evaluate(examples, metrics)
-
-    # 5. Print report
-    print()
-    print(report.summary())
-    print()
-
-    # 6. Show per-example details
-    for result in report.example_results:
-        status = "PASS" if result.passed else "FAIL"
-        print(f"  [{{status}}] {{result.example_id}} "
-              f"({{result.duration_ms:.0f}}ms) — {{result.scores}}")
-        if result.error:
-            print(f"         ERROR: {{result.error}}")
-
-    # 7. Save report as JSON
-    report_path = DATA_DIR / "eval_report.json"
-    report_data = {{
-        "agent": report.agent_name,
-        "dataset": report.dataset_name,
-        "pass_rate": report.pass_rate,
-        "num_examples": report.num_examples,
-        "scores": report.scores,
-    }}
-    report_path.write_text(json.dumps(report_data, indent=2))
-    print(f"\\nReport saved to {{report_path}}")
+    console.print(
+        f"[bold]{{AGENT}}[/bold] stack={{result.stack!r}} model={{result.model}} "
+        f"split={{result.split!r}} n={{result.n_examples}}"
+    )
+    console.print(f"dataset={{result.dataset_path}} sizes={{result.dataset_sizes}}")
+    console.print(f"scores={{result.scores}}")
+    console.print(f"[green]Report:[/green] {{result.report_path}}")
+    if result.json_out:
+        console.print(f"json={{result.json_out}}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
 '''
 
 
