@@ -570,7 +570,7 @@ class TestLocalJudgeMetric:
         assert judge.criteria == "Evaluate completeness."
         assert judge.dimensions == ["completeness", "specificity"]
         assert judge.weight == 0.5
-        assert judge.temperature == 0.1
+        assert judge.temperature == 0.0  # deterministic default for stable epochs
 
     async def test_evaluate_mocked(self, monkeypatch):
         async def mock_call_json(*args, **kwargs):
@@ -916,7 +916,8 @@ class TestPromptFitter:
         assert fitter.task_model == "ollama/qwen2.5:7b"
         assert fitter.max_trials == 30
         assert fitter.min_absolute_improvement == 0.05
-        assert fitter.concurrency == 5
+        assert fitter.concurrency == 1  # sequential default (local-SLM safe)
+        assert fitter.sequential is True
         assert fitter._search_space is not None
         assert fitter._optimizer is not None
 

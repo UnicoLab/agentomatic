@@ -12,6 +12,15 @@ publishes). Install from git / an editable checkout until then.
 
 ### Added
 
+- **Per-agent invocation log history + optional LLM analysis**: Opt-in
+  flags `logs_history` / `AGENTOMATIC_LOGS_HISTORY` and
+  `allow_logsllm_analysis` / `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` persist
+  full invoke/chat/stream payloads into the platform store
+  (`AgentInvocationLog`). REST endpoints: `GET /logs`, `GET /logs/{id}`,
+  `POST /logs/analyze`, `GET /logs/analysis`. Analyser samples/truncates
+  logs for API budget safety and falls back to a heuristic when no LLM
+  is configured. Related: `OptimizationRunStore` + `optimize/fit_store`
+  for auditable retrain artefacts.
 - **Ordered LLM model fallbacks** (ships in **1.8.0**): Configure
   `fallbacks` / `fallback_on` on stack LLM profiles or via
   `get_llm(..., fallbacks=..., fallback_on=...)`. On timeout, connection

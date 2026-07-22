@@ -1467,10 +1467,16 @@ def resolve_fitter_optimizer(
         existing = ParamSearchOptimizer()
         assert resolve_fitter_optimizer(existing) is existing
     """
-    # -- pass-through for existing instances -----------------------------
+    # -- pass-through for existing instances / duck-typed proposers ------
     if isinstance(name, BaseFitterOptimizer):
         logger.debug("resolve_fitter_optimizer: got existing instance ({})", name.name)
         return name
+    if not isinstance(name, str) and callable(getattr(name, "propose", None)):
+        logger.debug(
+            "resolve_fitter_optimizer: got duck-typed optimizer ({})",
+            getattr(name, "name", type(name).__name__),
+        )
+        return name  # type: ignore[return-value]
 
     # -- string resolution -----------------------------------------------
     lookup: dict[str, type[BaseFitterOptimizer]] = {
@@ -1483,6 +1489,12 @@ def resolve_fitter_optimizer(
         "gepa": GEPALikeOptimizer,
         "param_search": ParamSearchOptimizer,
     }
+
+    if not isinstance(name, str):
+        raise TypeError(
+            f"Unknown fitter optimizer type {type(name)!r}; "
+            "pass a string name or an object with async propose()."
+        )
 
     normalised = name.strip().lower()
     if normalised not in lookup:

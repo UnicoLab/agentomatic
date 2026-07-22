@@ -111,6 +111,9 @@ def create_platform() -> AgentPlatform:
         enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", True),
         control_token=os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
         enable_rate_limit=_env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
+        # Opt-in per-agent invocation history + optional LLM log analysis.
+        logs_history=_env_bool("AGENTOMATIC_LOGS_HISTORY", False),
+        allow_logsllm_analysis=_env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),
     )
 
 
@@ -193,6 +196,8 @@ def _env_example() -> str:
 # AGENTOMATIC_REQUIRE_AUTH=0           # implies JWT + zero-trust; needs auth wired
 # AGENTOMATIC_ENABLE_CONTROL_PLANE=0   # needs AGENTOMATIC_CONTROL_TOKEN
 # AGENTOMATIC_ENABLE_RATE_LIMIT=0
+# AGENTOMATIC_LOGS_HISTORY=0            # persist invoke/chat/stream history
+# AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=0  # LLM analysis over those logs
 # AGENTOMATIC_API_KEY=
 # AGENTOMATIC_CONTROL_TOKEN=
 

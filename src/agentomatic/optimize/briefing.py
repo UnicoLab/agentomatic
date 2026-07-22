@@ -335,6 +335,15 @@ def build_full_optimization_briefing(
         clusters = context.format_failure_clusters()
         if clusters and "No failure clusters" not in clusters:
             sections += ["## Failure clusters", clusters]
+        learnings = context.format_learnings_history(max_epochs=8)
+        if learnings and "No epoch learnings" not in learnings:
+            sections += [
+                "## Prompt evolution & epoch learnings",
+                "Use prior epoch learnings to progressively improve. Prefer "
+                "generalizable rules over memorising training examples "
+                "(avoid overfitting).",
+                learnings,
+            ]
 
     if metrics:
         sections += ["## Metrics", ", ".join(metrics)]

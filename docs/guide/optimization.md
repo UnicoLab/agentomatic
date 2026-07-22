@@ -180,6 +180,62 @@ dataset = await generate_from_docs(
 
 ---
 
+## 🧠 PromptFitter: learnings, generalization, apply guards
+
+`PromptFitter.fit()` now keeps an auditable **epoch learning trail** and an
+always-on **generalization safety net** so prompt rewrites improve without
+overfitting to the evaluation examples.
+
+### What is recorded each epoch
+
+- Prompt snapshot (system prompt at end of the round)
+- Score + per-dimension scores
+- What worked / what failed (from eval + judge motivation)
+- Next-focus guidance for the following rewrite
+- Optional holdout score and train/holdout gap
+
+Access via `result.prompt_history` (list of dicts) and the Keras-style
+`result.history` score curve. Artefacts are written under
+`.optimize/<agent>/fit_result_*.json` plus append-only
+`retrain_history.jsonl`.
+
+### Generalization safety net
+
+When no explicit `testset` is provided, the fitter auto-splits a holdout
+slice from the validation set. Candidates that beat val but overfit the
+holdout (`fit − holdout > max_generalization_gap`, default `0.15`) are
+**rejected**.
+
+```python
+fitter = PromptFitter(
+    agent="assistant",
+    max_generalization_gap=0.15,
+    holdout_fraction=0.2,
+    sequential=True,       # default: concurrency=1 (local-SLM safe)
+    drain_seconds=1.5,     # cool-down after the async loop
+)
+result = await fitter.fit(train, val, metric, testset=test)
+print(result.summary())    # includes holdout, gap, score curve
+```
+
+### apply() refuses zero-improvement
+
+```python
+# Refuses when absolute_improvement <= 0 or generalization gap is too large
+written = result.apply(version="v2_fit", agent_dir="agents/assistant")
+if written is None:
+    print("Kept baseline — no safe improvement")
+
+# Override only when you intentionally want to write anyway
+result.apply(version="v2_fit", agent_dir="agents/assistant", force=True)
+```
+
+Judge metrics (`LocalJudgeMetric`) default to `temperature=0.0` for stable
+scoring and return extensive `motivation` / `what_worked` / `what_failed` /
+`improvement_hints` so rewriters have real signal across epochs.
+
+---
+
 ## 🛡️ Red Teaming (Adversarial Testing)
 
 Run red-team evaluations to test your agents against adversarial inputs, prompt injections, and toxic prompts:

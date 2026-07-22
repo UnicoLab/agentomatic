@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- **optimize**: Production-ready PromptFitter with epoch learnings, always-on
+  generalization holdout, sequential/default concurrency=1, post-fit drain,
+  richer SLM judge motivation, and `apply()` guards that refuse zero-improvement
+  / overfit prompts (force=True to override). Auditable `prompt_history` +
+  `retrain_history.jsonl` / optional DB `OptimizationRunStore`.
+- **studio**: Schema-driven invoke forms (SchemaForm) from agent input/output
+  JSON schemas — LangGraph-Studio-like debugging of required fields.
+- **logs**: `logs_history` / `allow_logsllm_analysis` platform flags (+ env)
+  persist full per-agent I/O and expose LLM/heuristic log analysis endpoints.
+
+### Bug Fixes
+
+- **optimize**: Boolean-flag `expected_output` now expands to a quality contract
+  (not useless `Response must include: 'key'`). Judge temperature defaults to
+  0.0 for stable scoring across epochs.
+- **optimize**: `LLMJudgeMetric` / `GEvalMetric` fallbacks now use
+  `temperature=0.0` (was `0.1`). Fit evaluation injects `model_params` with
+  default `temperature=0.0` into agent invokes for deterministic scoring.
+- **optimize**: Always-on holdout works on tiny valsets (`min_size=1`) and
+  borrows from train when val has fewer than 2 points. PromptFitterBridge
+  includes `test`-split examples in the val pool for holdout coverage.
+
+
 ## v1.8.2 (2026-07-22)
 
 ### Bug Fixes

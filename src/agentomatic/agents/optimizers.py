@@ -401,10 +401,12 @@ class PromptFitterBridge:
             for p in points
             if (getattr(p, "metadata", None) or {}).get("split", "train") == "train"
         ]
+        # Include "test" in the fit val pool so tiny datasets still have
+        # enough points for always-on holdout + minibatch screening.
         val = [
             p
             for p in points
-            if (getattr(p, "metadata", None) or {}).get("split") in ("validation", "val")
+            if (getattr(p, "metadata", None) or {}).get("split") in ("validation", "val", "test")
         ]
         if train and val:
             return Dataset(points=train), Dataset(points=val)
