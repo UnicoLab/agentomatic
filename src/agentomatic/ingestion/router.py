@@ -18,6 +18,7 @@ from .context import NullIngestionContext
 from .registry import IngestionRegistry
 
 if TYPE_CHECKING:
+    from agentomatic.logs.recorder import InvocationLogRecorder
     from agentomatic.tasks.manager import TaskManager
 
 _TAG = "Ingestion"
@@ -28,6 +29,7 @@ def create_ingestion_router(
     *,
     task_manager: TaskManager | None = None,
     api_prefix: str = "/api/v1",
+    log_recorder: InvocationLogRecorder | None = None,
 ) -> APIRouter:
     """Build the ingestion router bound to ``registry``."""
     router = APIRouter(tags=[_TAG])
@@ -38,7 +40,7 @@ def create_ingestion_router(
         return [ing.info() for ing in registry.list_ingestors().values()]
 
     for name, ingestor in registry.list_ingestors().items():
-        _mount_ingestor(router, name, ingestor, task_manager, api_prefix)
+        _mount_ingestor(router, name, ingestor, task_manager, api_prefix, log_recorder)
 
     return router
 
@@ -49,6 +51,7 @@ def _mount_ingestor(
     ingestor: Any,
     task_manager: TaskManager | None,
     api_prefix: str,
+    log_recorder: InvocationLogRecorder | None,
 ) -> None:
     """Mount the per-ingestor routes (info, health, run, run/async)."""
     input_schema = ingestor.get_input_schema()
@@ -69,12 +72,39 @@ def _mount_ingestor(
         try:
             result = await _ingestor.run(request, NullIngestionContext())
         except Exception as exc:  # noqa: BLE001
+            duration = (time.perf_counter() - t0) * 1000
             logger.error(f"Ingestor '{_ingestor.ingestor_name}' failed: {exc}")
+            if log_recorder is not None:
+                from agentomatic.logs.helpers import record_invocation
+
+                await record_invocation(
+                    resource_type="ingestion",
+                    resource_name=_ingestor.ingestor_name,
+                    endpoint="run",
+                    input_data=request,
+                    error=str(exc),
+                    duration_ms=round(duration, 2),
+                    status="error",
+                    recorder=log_recorder,
+                )
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+        duration = (time.perf_counter() - t0) * 1000
         logger.debug(
-            f"Ingestor '{_ingestor.ingestor_name}' ran in "
-            f"{(time.perf_counter() - t0) * 1000:.1f}ms"
+            f"Ingestor '{_ingestor.ingestor_name}' ran in {duration:.1f}ms"
         )
+        if log_recorder is not None:
+            from agentomatic.logs.helpers import record_invocation
+
+            await record_invocation(
+                resource_type="ingestion",
+                resource_name=_ingestor.ingestor_name,
+                endpoint="run",
+                input_data=request,
+                output_data=result,
+                duration_ms=round(duration, 2),
+                status="ok",
+                recorder=log_recorder,
+            )
         return result
 
     sig = inspect.signature(run_endpoint)

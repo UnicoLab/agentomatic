@@ -406,6 +406,7 @@ class MemoryStore(BaseStore):
         self,
         *,
         agent_name: str,
+        resource_type: str = "agent",
         thread_id: str | None = None,
         run_id: str | None = None,
         endpoint: str = "invoke",
@@ -420,8 +421,11 @@ class MemoryStore(BaseStore):
         import uuid
 
         lid = log_id or f"invlog_{uuid.uuid4().hex[:16]}"
+        rtype = resource_type or "agent"
         entry = {
             "id": lid,
+            "resource_type": rtype,
+            "resource_name": agent_name,
             "agent_name": agent_name,
             "thread_id": thread_id,
             "run_id": run_id,
@@ -444,6 +448,7 @@ class MemoryStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
@@ -453,6 +458,10 @@ class MemoryStore(BaseStore):
         items = list(self._invocation_logs.values())
         if agent_name:
             items = [i for i in items if i.get("agent_name") == agent_name]
+        if resource_type:
+            items = [
+                i for i in items if (i.get("resource_type") or "agent") == resource_type
+            ]
         if thread_id:
             items = [i for i in items if i.get("thread_id") == thread_id]
         if status:
@@ -466,12 +475,14 @@ class MemoryStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
     ) -> int:
         items = await self.list_invocation_logs(
             agent_name=agent_name,
+            resource_type=resource_type,
             thread_id=thread_id,
             status=status,
             endpoint=endpoint,
@@ -484,6 +495,7 @@ class MemoryStore(BaseStore):
         self,
         *,
         agent_name: str,
+        resource_type: str = "agent",
         score: float | None,
         summary: str,
         status: str,
@@ -494,8 +506,11 @@ class MemoryStore(BaseStore):
         import uuid
 
         aid = analysis_id or f"logan_{uuid.uuid4().hex[:16]}"
+        rtype = resource_type or "agent"
         entry = {
             "id": aid,
+            "resource_type": rtype,
+            "resource_name": agent_name,
             "agent_name": agent_name,
             "score": score,
             "summary": summary,
@@ -507,8 +522,18 @@ class MemoryStore(BaseStore):
         self._log_analyses[aid] = entry
         return entry
 
-    async def get_latest_log_analysis(self, agent_name: str) -> dict[str, Any] | None:
-        items = [a for a in self._log_analyses.values() if a.get("agent_name") == agent_name]
+    async def get_latest_log_analysis(
+        self,
+        agent_name: str,
+        *,
+        resource_type: str = "agent",
+    ) -> dict[str, Any] | None:
+        items = [
+            a
+            for a in self._log_analyses.values()
+            if a.get("agent_name") == agent_name
+            and (a.get("resource_type") or "agent") == (resource_type or "agent")
+        ]
         if not items:
             return None
         items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
@@ -518,12 +543,17 @@ class MemoryStore(BaseStore):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         items = list(self._log_analyses.values())
         if agent_name:
             items = [a for a in items if a.get("agent_name") == agent_name]
+        if resource_type:
+            items = [
+                a for a in items if (a.get("resource_type") or "agent") == resource_type
+            ]
         items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return items[offset : offset + limit]
 

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
     from agentomatic.endpoints.registry import EndpointRegistry
     from agentomatic.ingestion.registry import IngestionRegistry
+    from agentomatic.logs.recorder import InvocationLogRecorder
     from agentomatic.plugins.registry import PluginRegistry
 
     from .engine import PipelineEngine
@@ -85,6 +86,7 @@ def create_pipeline_router(
     plugins: PluginRegistry | None = None,
     task_manager: Any | None = None,
     api_prefix: str = "/api/v1",
+    log_recorder: InvocationLogRecorder | None = None,
 ) -> APIRouter:
     """Create REST endpoints for all discovered pipelines.
 
@@ -165,6 +167,32 @@ def create_pipeline_router(
 
         logger.info(f"🔁 Pipeline API: running '{name}'")
         result = await engine.run(request.input)
+
+        if log_recorder is not None:
+            from agentomatic.logs.helpers import record_invocation
+
+            status_value = str(result.status.value).lower()
+            status = (
+                "error"
+                if result.error or status_value in {"failed", "error", "cancelled"}
+                else "ok"
+            )
+            await record_invocation(
+                resource_type="pipeline",
+                resource_name=result.pipeline_name,
+                endpoint="run",
+                input_data=request.input,
+                output_data={
+                    "output": result.output,
+                    "steps": {k: v.model_dump() for k, v in result.steps.items()},
+                    "status": result.status.value,
+                },
+                metadata=request.metadata or {},
+                error=result.error,
+                duration_ms=round(result.duration_ms, 2),
+                status=status,
+                recorder=log_recorder,
+            )
 
         return PipelineRunResponse(
             pipeline_name=result.pipeline_name,

@@ -5,6 +5,12 @@
 
 ### Features
 
+- **logs**: Multi-resource `logs_history` — persist full I/O + metadata for
+  agents, plugins, pipelines, ingestion, and custom endpoints (same
+  SQLAlchemyStore / MemoryStore backends). Cross-resource REST:
+  `GET /api/v1/logs?resource=plugin&name=…`, `POST /logs/analyze`, plus
+  per-agent `/{agent}/logs` BC. In-process pipeline steps record with
+  `endpoint=pipeline_step` and `metadata.pipeline`.
 - **optimize**: Thin train UX — `TrainConfig` + `train_and_report` / `run_train`
   / `run_training` package stack load, metrics, PromptFitterBridge, evaluate,
   and HolySheet fit reports so project `train.py` scripts stay declarative.

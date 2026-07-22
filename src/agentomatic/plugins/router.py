@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
 from .ml import BaseMLPlugin
+
+if TYPE_CHECKING:
+    from agentomatic.logs.recorder import InvocationLogRecorder
 
 
 def create_plugin_router(
@@ -16,6 +19,7 @@ def create_plugin_router(
     *,
     task_manager: Any | None = None,
     api_prefix: str = "/api/v1",
+    log_recorder: InvocationLogRecorder | None = None,
 ) -> APIRouter:
     """Create a FastAPI router for a specific ML plugin."""
     router = APIRouter(tags=[f"Plugin: {plugin.plugin_name}"])
@@ -62,17 +66,41 @@ def create_plugin_router(
 
         start_time = time.perf_counter()
         try:
-            if hasattr(plugin.predict, "__code__") and plugin.predict.__code__.co_flags & 0x80:
-                result = await plugin.predict(request)
-            else:
-                result = await plugin.predict(request)
+            result = await plugin.predict(request)
 
             duration = (time.perf_counter() - start_time) * 1000
             logger.debug(f"Plugin '{plugin.plugin_name}' inference completed in {duration:.2f}ms")
+            if log_recorder is not None:
+                from agentomatic.logs.helpers import record_invocation
+
+                await record_invocation(
+                    resource_type="plugin",
+                    resource_name=plugin.plugin_name,
+                    endpoint="predict",
+                    input_data=request,
+                    output_data=result,
+                    duration_ms=round(duration, 2),
+                    status="ok",
+                    recorder=log_recorder,
+                )
             return result
 
         except Exception as e:
+            duration = (time.perf_counter() - start_time) * 1000
             logger.error(f"Error during inference for plugin '{plugin.plugin_name}': {e}")
+            if log_recorder is not None:
+                from agentomatic.logs.helpers import record_invocation
+
+                await record_invocation(
+                    resource_type="plugin",
+                    resource_name=plugin.plugin_name,
+                    endpoint="predict",
+                    input_data=request,
+                    error=str(e),
+                    duration_ms=round(duration, 2),
+                    status="error",
+                    recorder=log_recorder,
+                )
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     # Dynamically adjust the signature so FastAPI extracts the correct Pydantic schemas

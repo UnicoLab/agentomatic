@@ -138,16 +138,53 @@ class AgentHandle:
 
         state = self._build_state(input_data)
 
-        from agentomatic.core.agent_invoke import invoke_registered_agent
+        import time
 
+        from agentomatic.core.agent_invoke import invoke_registered_agent
+        from agentomatic.logs.helpers import record_invocation
+
+        t0 = time.perf_counter()
         try:
             result = await invoke_registered_agent(agent, state)
         except RuntimeError as exc:
+            await record_invocation(
+                resource_type="agent",
+                resource_name=self.name,
+                endpoint="pipeline_step",
+                input_data=state,
+                error=str(exc),
+                duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                status="error",
+                metadata={"flow": True},
+            )
             raise RuntimeError(
                 f"Agent {self.name!r} has neither class_instance, graph_fn, "
                 "nor node_fn — cannot invoke."
             ) from exc
-        return self._normalise_output(result)
+        except Exception as exc:
+            await record_invocation(
+                resource_type="agent",
+                resource_name=self.name,
+                endpoint="pipeline_step",
+                input_data=state,
+                error=str(exc),
+                duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                status="error",
+                metadata={"flow": True},
+            )
+            raise
+        output = self._normalise_output(result)
+        await record_invocation(
+            resource_type="agent",
+            resource_name=self.name,
+            endpoint="pipeline_step",
+            input_data=state,
+            output_data=output,
+            duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+            status="ok",
+            metadata={"flow": True},
+        )
+        return output
 
     # -- helpers ----------------------------------------------------------
 

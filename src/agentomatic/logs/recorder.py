@@ -1,4 +1,4 @@
-"""Record per-agent invocation history into the platform store."""
+"""Record invocation history for agents, plugins, pipelines, and more."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+
+from agentomatic.logs.runtime import get_pipeline_log_name, normalize_resource_type
 
 if TYPE_CHECKING:
     from agentomatic.storage.base import BaseStore
@@ -134,7 +136,7 @@ class InvocationLogRecorder:
     """Write invocation logs when ``logs_history`` is enabled.
 
     Nil-checks the store and never raises into the request path — logging
-    failures are swallowed after a warning so agent behaviour is unchanged.
+    failures are swallowed after a warning so request behaviour is unchanged.
     """
 
     def __init__(self, store: BaseStore | None) -> None:
@@ -153,7 +155,9 @@ class InvocationLogRecorder:
     async def record(
         self,
         *,
-        agent_name: str,
+        resource_type: str = "agent",
+        resource_name: str | None = None,
+        agent_name: str | None = None,
         endpoint: str,
         input_data: Any = None,
         output_data: Any = None,
@@ -167,11 +171,16 @@ class InvocationLogRecorder:
         """Persist one invocation log entry.
 
         Args:
-            agent_name: Agent identifier.
-            endpoint: ``invoke``, ``chat``, or ``stream``.
+            resource_type: ``agent`` | ``plugin`` | ``pipeline`` |
+                ``ingestion`` | ``endpoint``.
+            resource_name: Resource identifier (preferred).
+            agent_name: Backward-compatible alias for ``resource_name``
+                (used by existing agent routes).
+            endpoint: Operation label (``invoke``, ``predict``, ``run``,
+                ``pipeline_step``, …).
             input_data: Request payload (truncated before storage).
             output_data: Response payload (truncated before storage).
-            metadata: Extra metadata (prompt version, etc.).
+            metadata: Extra metadata (prompt version, pipeline step, etc.).
             thread_id: Optional conversation thread.
             run_id: Optional run/correlation id (auto-generated if omitted).
             error: Error message when ``status`` is not ``ok``.
@@ -184,15 +193,32 @@ class InvocationLogRecorder:
         if self._store is None:
             return None
 
+        name = resource_name or agent_name
+        if not name:
+            logger.warning("Invocation log skipped: missing resource_name/agent_name")
+            return None
+
+        try:
+            rtype = normalize_resource_type(resource_type)
+        except ValueError as exc:
+            logger.warning("{}", exc)
+            return None
+
+        meta = dict(metadata or {})
+        pipeline_name = get_pipeline_log_name()
+        if pipeline_name and "pipeline" not in meta:
+            meta["pipeline"] = pipeline_name
+
         try:
             entry = await self._store.create_invocation_log(
-                agent_name=agent_name,
+                agent_name=name,
+                resource_type=rtype,
                 thread_id=thread_id,
                 run_id=run_id or f"run_{uuid.uuid4().hex[:12]}",
                 endpoint=endpoint,
                 input_data=truncate_for_storage(_safe_dump(input_data)),
                 output_data=truncate_for_storage(_safe_dump(output_data)),
-                metadata=truncate_for_storage(metadata or {}),
+                metadata=truncate_for_storage(meta),
                 error=error,
                 duration_ms=duration_ms,
                 status=status,
@@ -200,8 +226,9 @@ class InvocationLogRecorder:
             return entry
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "Failed to persist invocation log for '{}': {}",
-                agent_name,
+                "Failed to persist invocation log for '{}:{}': {}",
+                rtype,
+                name,
                 exc,
             )
             return None

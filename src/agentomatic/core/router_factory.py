@@ -1479,6 +1479,7 @@ def create_default_router(
         offset = max(0, offset)
         logs = await thread_store.list_invocation_logs(
             agent_name=agent_name,
+            resource_type="agent",
             thread_id=thread_id,
             status=status,
             endpoint=endpoint,
@@ -1487,12 +1488,15 @@ def create_default_router(
         )
         total = await thread_store.count_invocation_logs(
             agent_name=agent_name,
+            resource_type="agent",
             thread_id=thread_id,
             status=status,
             endpoint=endpoint,
         )
         return {
             "agent": agent_name,
+            "resource": "agent",
+            "name": agent_name,
             "logs": logs,
             "count": len(logs),
             "total": total,
@@ -1515,12 +1519,14 @@ def create_default_router(
             )
         if thread_store is None:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
-        analysis = await thread_store.get_latest_log_analysis(agent_name)
+        analysis = await thread_store.get_latest_log_analysis(
+            agent_name, resource_type="agent"
+        )
         if not analysis:
             raise HTTPException(
                 404, detail={"error": f"No log analysis found for agent '{agent_name}'"}
             )
-        return {"agent": agent_name, "analysis": analysis}
+        return {"agent": agent_name, "resource": "agent", "name": agent_name, "analysis": analysis}
 
     # ── POST /logs/analyze ────────────────────────────────────────
     @router.post("/logs/analyze")
@@ -1553,11 +1559,20 @@ def create_default_router(
             sample_limit=opts.sample_limit,
         )
         try:
-            result = await analyser.analyse(agent_name, persist=opts.persist)
+            result = await analyser.analyse(
+                agent_name,
+                resource_type="agent",
+                persist=opts.persist,
+            )
         except Exception as exc:  # noqa: BLE001
             logger.error("Log analysis failed for '{}': {}", agent_name, exc)
             raise HTTPException(500, detail={"error": f"Log analysis failed: {exc}"}) from exc
-        return {"agent": agent_name, "analysis": result.to_dict()}
+        return {
+            "agent": agent_name,
+            "resource": "agent",
+            "name": agent_name,
+            "analysis": result.to_dict(),
+        }
 
     # ── GET /logs/{log_id} ────────────────────────────────────────
     @router.get("/logs/{log_id}")
@@ -1574,7 +1589,11 @@ def create_default_router(
         if thread_store is None:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         entry = await thread_store.get_invocation_log(log_id)
-        if not entry or entry.get("agent_name") != agent_name:
+        if (
+            not entry
+            or entry.get("agent_name") != agent_name
+            or (entry.get("resource_type") or "agent") != "agent"
+        ):
             raise HTTPException(404, detail={"error": f"Log '{log_id}' not found"})
         return entry
 

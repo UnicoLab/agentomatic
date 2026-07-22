@@ -307,6 +307,7 @@ class BaseStore(ABC):
         self,
         *,
         agent_name: str,
+        resource_type: str = "agent",
         thread_id: str | None = None,
         run_id: str | None = None,
         endpoint: str = "invoke",
@@ -318,12 +319,17 @@ class BaseStore(ABC):
         status: str = "ok",
         log_id: str | None = None,
     ) -> dict[str, Any]:
-        """Persist a per-agent invocation log entry.
+        """Persist an invocation log entry for any resource type.
+
+        ``agent_name`` is the resource name (kept for backward compatibility).
 
         Default implementation is a no-op stub. Override for persistence.
         """
+        rtype = resource_type or "agent"
         return {
             "id": log_id or "",
+            "resource_type": rtype,
+            "resource_name": agent_name,
             "agent_name": agent_name,
             "thread_id": thread_id,
             "run_id": run_id,
@@ -345,6 +351,7 @@ class BaseStore(ABC):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
@@ -358,6 +365,7 @@ class BaseStore(ABC):
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         thread_id: str | None = None,
         status: str | None = None,
         endpoint: str | None = None,
@@ -369,6 +377,7 @@ class BaseStore(ABC):
         self,
         *,
         agent_name: str,
+        resource_type: str = "agent",
         score: float | None,
         summary: str,
         status: str,
@@ -377,8 +386,11 @@ class BaseStore(ABC):
         analysis_id: str | None = None,
     ) -> dict[str, Any]:
         """Persist an LLM log-analysis result."""
+        rtype = resource_type or "agent"
         return {
             "id": analysis_id or "",
+            "resource_type": rtype,
+            "resource_name": agent_name,
             "agent_name": agent_name,
             "score": score,
             "summary": summary,
@@ -388,14 +400,20 @@ class BaseStore(ABC):
             "created_at": None,
         }
 
-    async def get_latest_log_analysis(self, agent_name: str) -> dict[str, Any] | None:
-        """Return the most recent log analysis for an agent."""
+    async def get_latest_log_analysis(
+        self,
+        agent_name: str,
+        *,
+        resource_type: str = "agent",
+    ) -> dict[str, Any] | None:
+        """Return the most recent log analysis for a resource."""
         return None
 
     async def list_log_analyses(
         self,
         *,
         agent_name: str | None = None,
+        resource_type: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
