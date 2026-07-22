@@ -99,6 +99,15 @@ _TOP_K_CANDIDATES: int = 3
 _EARLY_STOP_PATIENCE: int = 3
 """Stop if no improvement for this many consecutive rounds."""
 
+_SATURATION_SCORE: float = 0.995
+"""Baseline at/above this is treated as a saturated (non-informative) metric."""
+
+_MIN_RELIABLE_TRAIN: int = 4
+"""Below this train size, emit an honest tiny-data warning."""
+
+_MIN_RELIABLE_VAL: int = 2
+"""Below this fit-val size, emit an honest tiny-data warning."""
+
 _CANDIDATES_PER_ROUND: int = 4
 """Number of candidates proposed per optimisation round."""
 
@@ -599,6 +608,27 @@ class PromptFitter:
         if baseline_dims:
             for dim, val in baseline_dims.items():
                 logger.debug("   {}: {:.4f}", dim, val)
+
+        saturation_warning = ""
+        if baseline_score >= _SATURATION_SCORE:
+            saturation_warning = (
+                f"Baseline already saturated at {baseline_score:.4f}. "
+                "The fit metric is too easy (or the dataset is trivial) — "
+                "prompt candidates cannot show improvement. Harden the metric "
+                "(content overlap / must_include / judge rubric) and expand demos."
+            )
+            logger.warning("⚠️  {}", saturation_warning)
+
+        tiny_data_warning = ""
+        if len(trainset) < _MIN_RELIABLE_TRAIN or len(fit_valset) < _MIN_RELIABLE_VAL:
+            tiny_data_warning = (
+                f"Dataset too small for reliable prompt learning "
+                f"(train={len(trainset)}, fit_val={len(fit_valset)}; "
+                f"recommend ≥{_MIN_RELIABLE_TRAIN} train / ≥{_MIN_RELIABLE_VAL} val). "
+                "Scores may look flat even when the rewrite path works."
+            )
+            logger.warning("⚠️  {}", tiny_data_warning)
+
         await self._callbacks.emit(
             OptimizationEvent.BASELINE_EVALUATED,
             EventData(
@@ -719,6 +749,63 @@ class PromptFitter:
         # rounds but default patience=3 would never fire).
         effective_patience = min(_EARLY_STOP_PATIENCE, max(1, max_rounds))
 
+        # Seed curve with baseline so reports always show a trajectory start.
+        score_history.append(
+            RoundStats(
+                round_idx=-1,
+                score=baseline_score,
+                dims=dict(baseline_dims),
+                accepted=False,
+                n_candidates=0,
+                elapsed_seconds=0.0,
+            )
+        )
+
+        def _record_round(
+            *,
+            round_idx: int,
+            round_t0: float,
+            round_improved: bool,
+            accepted_name: str,
+            n_candidates: int,
+        ) -> None:
+            """Always append score + prompt history for Keras-style curves."""
+            nonlocal eval_results
+            round_elapsed = time.perf_counter() - round_t0
+            logger.info(
+                "   ⏱️  Round {} completed in {:.1f}s",
+                round_idx + 1,
+                round_elapsed,
+            )
+            score_history.append(
+                RoundStats(
+                    round_idx=round_idx,
+                    score=best_score,
+                    dims=dict(best_dims),
+                    accepted=round_improved,
+                    n_candidates=n_candidates,
+                    elapsed_seconds=round_elapsed,
+                )
+            )
+            epoch_learning = synthesize_epoch_learning(
+                round_idx=round_idx,
+                prompt_snapshot=best_config.system_prompt,
+                score=best_score,
+                dims=dict(best_dims),
+                eval_details=eval_results,
+                accepted=round_improved,
+                candidate_name=accepted_name,
+                train_score=best_score,
+                holdout_score=best_holdout_score,
+            )
+            learnings_history.append(epoch_learning)
+            logger.info(
+                "   🧠 Epoch learnings: {} worked / {} failed / focus={}",
+                len(epoch_learning.what_worked),
+                len(epoch_learning.what_failed),
+                "; ".join(epoch_learning.next_focus[:2]) or "n/a",
+            )
+
         for round_idx in range(max_rounds):
             round_t0 = time.perf_counter()
             round_num = round_idx + 1
@@ -773,8 +860,9 @@ class PromptFitter:
                         optimizer_name=optimizer_name,
                     ),
                 )
+            candidates: list[PromptCandidate] = []
             try:
-                candidates: list[PromptCandidate] = await self._optimizer.propose(
+                candidates = await self._optimizer.propose(
                     current_config=best_config,
                     eval_results=eval_results,
                     dataset_sample=train_points[:20],
@@ -785,6 +873,13 @@ class PromptFitter:
             except Exception as exc:
                 logger.error("   Candidate proposal failed: {}", exc)
                 no_improvement_rounds += 1
+                _record_round(
+                    round_idx=round_idx,
+                    round_t0=round_t0,
+                    round_improved=False,
+                    accepted_name="",
+                    n_candidates=0,
+                )
                 if no_improvement_rounds >= effective_patience:
                     logger.warning(
                         "   ⏹️  Early stop: {} rounds without improvement", effective_patience
@@ -795,6 +890,13 @@ class PromptFitter:
             if not candidates:
                 logger.warning("   No candidates produced — skipping round")
                 no_improvement_rounds += 1
+                _record_round(
+                    round_idx=round_idx,
+                    round_t0=round_t0,
+                    round_improved=False,
+                    accepted_name="",
+                    n_candidates=0,
+                )
                 if no_improvement_rounds >= effective_patience:
                     break
                 continue
@@ -856,6 +958,13 @@ class PromptFitter:
             if not candidate_scores:
                 logger.warning("   All candidates failed — skipping round")
                 no_improvement_rounds += 1
+                _record_round(
+                    round_idx=round_idx,
+                    round_t0=round_t0,
+                    round_improved=False,
+                    accepted_name="",
+                    n_candidates=len(candidates),
+                )
                 if no_improvement_rounds >= effective_patience:
                     break
                 continue
@@ -869,10 +978,26 @@ class PromptFitter:
             if not promotable:
                 logger.info("   No candidates beat current best ({:.4f})", best_score)
                 no_improvement_rounds += 1
+                _record_round(
+                    round_idx=round_idx,
+                    round_t0=round_t0,
+                    round_improved=False,
+                    accepted_name="",
+                    n_candidates=len(candidates),
+                )
                 if no_improvement_rounds >= effective_patience:
                     logger.warning(
                         "   ⏹️  Early stop: {} rounds without improvement",
                         effective_patience,
+                    )
+                    await self._callbacks.emit(
+                        OptimizationEvent.EARLY_STOP,
+                        EventData(
+                            agent=self.agent,
+                            experiment_id=experiment_id,
+                            round_idx=round_idx,
+                            best_score=best_score,
+                        ),
                     )
                     break
                 continue
@@ -1042,56 +1167,13 @@ class PromptFitter:
                 )
             else:
                 no_improvement_rounds += 1
-                if no_improvement_rounds >= effective_patience:
-                    logger.warning(
-                        "   ⏹️  Early stop: {} rounds without improvement",
-                        effective_patience,
-                    )
-                    await self._callbacks.emit(
-                        OptimizationEvent.EARLY_STOP,
-                        EventData(
-                            agent=self.agent,
-                            experiment_id=experiment_id,
-                            round_idx=round_idx,
-                            best_score=best_score,
-                        ),
-                    )
-                    break
 
-            round_elapsed = time.perf_counter() - round_t0
-            logger.info(
-                "   ⏱️  Round {} completed in {:.1f}s",
-                round_num,
-                round_elapsed,
-            )
-            score_history.append(
-                RoundStats(
-                    round_idx=round_idx,
-                    score=best_score,
-                    dims=dict(best_dims),
-                    accepted=round_improved,
-                    n_candidates=len(candidates) if candidates else 0,
-                    elapsed_seconds=round_elapsed,
-                )
-            )
-            # Progressive epoch learnings (auditable prompt evolution)
-            epoch_learning = synthesize_epoch_learning(
+            _record_round(
                 round_idx=round_idx,
-                prompt_snapshot=best_config.system_prompt,
-                score=best_score,
-                dims=dict(best_dims),
-                eval_details=eval_results,
-                accepted=round_improved,
-                candidate_name=accepted_name,
-                train_score=best_score,
-                holdout_score=best_holdout_score,
-            )
-            learnings_history.append(epoch_learning)
-            logger.info(
-                "   🧠 Epoch learnings: {} worked / {} failed / focus={}",
-                len(epoch_learning.what_worked),
-                len(epoch_learning.what_failed),
-                "; ".join(epoch_learning.next_focus[:2]) or "n/a",
+                round_t0=round_t0,
+                round_improved=round_improved,
+                accepted_name=accepted_name,
+                n_candidates=len(candidates) if candidates else 0,
             )
             await self._callbacks.emit(
                 OptimizationEvent.ROUND_END,
@@ -1103,10 +1185,25 @@ class PromptFitter:
                     score=best_score,
                     best_score=best_score,
                     baseline_score=baseline_score,
-                    elapsed_seconds=round_elapsed,
+                    elapsed_seconds=time.perf_counter() - round_t0,
                     score_history=[rs.score for rs in score_history],
                 ),
             )
+            if not round_improved and no_improvement_rounds >= effective_patience:
+                logger.warning(
+                    "   ⏹️  Early stop: {} rounds without improvement",
+                    effective_patience,
+                )
+                await self._callbacks.emit(
+                    OptimizationEvent.EARLY_STOP,
+                    EventData(
+                        agent=self.agent,
+                        experiment_id=experiment_id,
+                        round_idx=round_idx,
+                        best_score=best_score,
+                    ),
+                )
+                break
 
         # ── Step 8: Produce param suggestions ────────────────────────
         logger.info("📝 Step 8/10 — Producing param suggestions")
@@ -1114,6 +1211,10 @@ class PromptFitter:
             baseline_config,
             best_config,
         )
+        if saturation_warning:
+            suggestions.insert(0, saturation_warning)
+        if tiny_data_warning:
+            suggestions.insert(0 if not saturation_warning else 1, tiny_data_warning)
 
         # Compute metric deltas
         metric_deltas: dict[str, float] = {}
@@ -1383,9 +1484,14 @@ class PromptFitter:
             p["metadata"] = meta
             augmented_points.append(p)
 
+        # Bake few-shot examples into the system prompt override so local
+        # agents (and HTTP runners) that only honour prompt_override still
+        # see them during candidate evaluation.
+        prompt_override = self._prompt_with_few_shot(config)
+
         run_results: list[RunResult] = await self._runner.run_dataset(
             augmented_points,
-            prompt_override=config.system_prompt,
+            prompt_override=prompt_override,
             concurrency=self.concurrency,
         )
 
@@ -1490,6 +1596,26 @@ class PromptFitter:
         }
 
         return avg_score, per_dim, eval_details
+
+    @staticmethod
+    def _prompt_with_few_shot(config: PromptRuntimeConfig) -> str:
+        """Merge ``system_prompt`` + few-shot examples into one override string."""
+        prompt = (config.system_prompt or "").strip()
+        examples = list(config.few_shot_examples or [])
+        if not examples:
+            return prompt
+        blocks = ["## Few-shot examples (follow this style and grounding)"]
+        for idx, ex in enumerate(examples[:6], 1):
+            if not isinstance(ex, dict):
+                continue
+            q = str(ex.get("query") or ex.get("input") or "").strip()
+            r = str(ex.get("response") or ex.get("output") or "").strip()
+            if not q and not r:
+                continue
+            blocks.append(f"Example {idx}\nQ: {q[:400]}\nA: {r[:600]}")
+        if len(blocks) == 1:
+            return prompt
+        return (prompt + "\n\n" + "\n\n".join(blocks)).strip()
 
     def _load_baseline_config(self) -> PromptRuntimeConfig:
         """Load baseline config from the agent's ``prompts.json``.

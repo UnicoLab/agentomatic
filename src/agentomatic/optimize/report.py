@@ -945,6 +945,77 @@ def _build_fit_report_html(result: Any) -> str:
         <ol style="color: #c9d1d9; line-height: 1.8;">{suggestion_items}</ol>
         """
 
+    # Score / loss curve (Keras-style)
+    history_scores = list(getattr(result, "score_history", None) or getattr(result, "history", []) or [])
+    curve_section = ""
+    if history_scores:
+        from agentomatic.optimize.config import _score_sparkline
+
+        spark = html.escape(_score_sparkline([float(s) for s in history_scores]))
+        curve_rows = "".join(
+            f"<tr><td>epoch {i}</td><td>{float(s):.4f}</td></tr>"
+            for i, s in enumerate(history_scores)
+        )
+        curve_section = f"""
+        <h2>📈 Score / Loss Curve</h2>
+        <p style="font-family: monospace; font-size: 1.4rem; letter-spacing: 0.08em; color: #58a6ff;">{spark}</p>
+        <table>
+          <thead><tr><th>Epoch</th><th>Best Score</th></tr></thead>
+          <tbody>{curve_rows}</tbody>
+        </table>
+        """
+
+    # Prompt history / learnings
+    prompt_history = list(getattr(result, "prompt_history", None) or [])
+    prompt_history_section = ""
+    if prompt_history:
+        ph_rows = ""
+        for entry in prompt_history:
+            if not isinstance(entry, dict):
+                continue
+            rnd = int(entry.get("round_idx", 0)) + 1
+            score = float(entry.get("score", 0.0))
+            accepted = "yes" if entry.get("accepted") else "no"
+            focus = "; ".join(str(x) for x in (entry.get("next_focus") or [])[:3])
+            failed = "; ".join(str(x) for x in (entry.get("what_failed") or [])[:2])
+            snap = str(entry.get("prompt_snapshot", ""))[:180]
+            ph_rows += f"""
+            <tr>
+              <td>{rnd}</td>
+              <td>{score:.4f}</td>
+              <td>{accepted}</td>
+              <td style="color: #8b949e; font-size: 0.85rem;">{html.escape(focus or failed or "—")}</td>
+              <td><code style="font-size: 0.75rem;">{html.escape(snap)}{"…" if len(str(entry.get("prompt_snapshot", ""))) > 180 else ""}</code></td>
+            </tr>"""
+        prompt_history_section = f"""
+        <h2>🧬 Prompt History / Learnings</h2>
+        <table>
+          <thead><tr><th>Epoch</th><th>Score</th><th>Accepted</th><th>Focus / Failures</th><th>Prompt snapshot</th></tr></thead>
+          <tbody>{ph_rows}</tbody>
+        </table>
+        """
+
+    # Trial table
+    trial_section = ""
+    if result.trials:
+        trial_rows = ""
+        for t in result.trials:
+            trial_rows += f"""
+            <tr>
+              <td>{t.get("round", "—")}</td>
+              <td><code>{html.escape(str(t.get("name", "")))}</code></td>
+              <td>{html.escape(str(t.get("phase", "")))}</td>
+              <td>{float(t.get("score", 0.0)):.4f}</td>
+              <td style="color: #8b949e; font-size: 0.85rem;">{html.escape(str(t.get("mutation_notes", "") or "")[:220])}</td>
+            </tr>"""
+        trial_section = f"""
+        <h2>🧪 Trial History</h2>
+        <table>
+          <thead><tr><th>Round</th><th>Candidate</th><th>Phase</th><th>Score</th><th>Notes</th></tr></thead>
+          <tbody>{trial_rows}</tbody>
+        </table>
+        """
+
     # Prompt diff
     baseline_prompt = result.baseline_config.system_prompt
     best_prompt = result.best_config.system_prompt
@@ -1058,6 +1129,9 @@ def _build_fit_report_html(result: Any) -> str:
   <p style="color: #8b949e;">Agent: <strong style="color: #58a6ff;">{html.escape(result.agent)}</strong> | Experiment: <code>{html.escape(result.experiment_id)}</code> | {timestamp}</p>
 
   {kpis}
+  {curve_section}
+  {prompt_history_section}
+  {trial_section}
   {param_section}
   {delta_section}
   {cluster_section}
