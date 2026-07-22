@@ -151,8 +151,16 @@ def create_studio_router(
         graph topology extracted, while other frameworks receive a
         synthetic or user-defined topology.
         """
+        import asyncio
+
         _agent, adapter = _get_adapter(name)
-        return await adapter.get_graph()
+        try:
+            return await asyncio.wait_for(adapter.get_graph(), timeout=8.0)
+        except TimeoutError:
+            return StudioGraphTopology(
+                agent_name=name,
+                metadata={"error": "get_graph timed out"},
+            )
 
     @router.get(
         "/agents/{name}/schemas",

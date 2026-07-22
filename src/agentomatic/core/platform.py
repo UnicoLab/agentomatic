@@ -44,6 +44,29 @@ def _agent_tag(name: str) -> str:
     return name.replace("_", " ").replace("-", " ").title()
 
 
+def _mount_agent_router(app: FastAPI, agent: RegisteredAgent, name: str, api_prefix: str) -> None:
+    """Mount an agent router under folder name and slug (when they differ).
+
+    Studio addresses agents by ``manifest.slug`` (e.g. ``agent-assistant``) while
+    discovery mounts routes under the folder name (``assistant``). Expose both so
+    threads/chat/HITL calls from Studio do not 404.
+    """
+    if not agent.router:
+        return
+    app.include_router(
+        agent.router,
+        prefix=f"{api_prefix}/{name}",
+        tags=[_agent_tag(name)],
+    )
+    slug = getattr(agent, "slug", None) or getattr(getattr(agent, "manifest", None), "slug", None)
+    if slug and slug != name:
+        app.include_router(
+            agent.router,
+            prefix=f"{api_prefix}/{slug}",
+            tags=[_agent_tag(name)],
+        )
+
+
 def _generate_unique_id(route: APIRoute) -> str:
     """Generate a clean, stable OpenAPI ``operationId`` for a route.
 
@@ -838,12 +861,12 @@ class AgentPlatform:
                     )
                     logger.debug(f"  📌 Auto-generated router for {name}")
                 if agent.router and agent.manifest.is_subagent:
-                    app.include_router(
-                        agent.router,
-                        prefix=f"{platform.api_prefix}/{name}",
-                        tags=[_agent_tag(name)],
+                    _mount_agent_router(app, agent, name, platform.api_prefix)
+                    slug = getattr(agent, "slug", None) or name
+                    logger.info(
+                        f"  🔌 Mounted: {platform.api_prefix}/{name}"
+                        + (f" (+ /{slug})" if slug != name else "")
                     )
-                    logger.info(f"  🔌 Mounted: {platform.api_prefix}/{name}")
 
             # Run startup hooks
             for hook in platform._on_startup:
@@ -1078,11 +1101,7 @@ class AgentPlatform:
                     task_manager=task_manager,
                 )
             if agent.router and agent.manifest.is_subagent:
-                app.include_router(
-                    agent.router,
-                    prefix=f"{self.api_prefix}/{name}",
-                    tags=[_agent_tag(name)],
-                )
+                _mount_agent_router(app, agent, name, self.api_prefix)
 
         # ------------------------------------------------------------------
         # Mount Plugin API Routes
@@ -1260,16 +1279,12 @@ class AgentPlatform:
             # Custom endpoint health
             endpoints: dict[str, Any] = {}
             for name, endpoint in self._endpoint_registry.list_endpoints().items():
-                endpoints[name] = await _timed_health(
-                    f"endpoint:{name}", endpoint.health_check()
-                )
+                endpoints[name] = await _timed_health(f"endpoint:{name}", endpoint.health_check())
 
             # Ingestor health
             ingestors: dict[str, Any] = {}
             for name, ingestor in self._ingestion_registry.list_ingestors().items():
-                ingestors[name] = await _timed_health(
-                    f"ingestor:{name}", ingestor.health_check()
-                )
+                ingestors[name] = await _timed_health(f"ingestor:{name}", ingestor.health_check())
 
             # Storage health
             storage_health: dict[str, Any] = {"status": "not_configured"}
