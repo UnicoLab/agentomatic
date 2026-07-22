@@ -830,10 +830,70 @@ def generate_fit_report(
     except Exception as exc:  # noqa: BLE001
         logger.warning("holysheet fit report failed ({}), using fallback HTML", exc)
 
-    html_content = _build_fit_report_html(result)
+    html_content = _build_fit_report_html(
+        result,
+        keras_history=extras.get("keras_history") or {},
+    )
     output_path.write_text(html_content, encoding="utf-8")
     logger.info("📊 Fit report generated: {}", output_path)
     return str(output_path)
+
+
+def _prompt_evolution_entries(
+    *,
+    baseline_prompt: str,
+    baseline_score: float,
+    prompt_history: list[Any],
+) -> list[dict[str, Any]]:
+    """Build chronological prompt versions with unified diffs and score deltas.
+
+    Always includes the baseline as ``v0``. Later ``prompt_history`` entries
+    are appended so the report shows accepts (with diffs) and honest plateaus.
+    """
+    prev = baseline_prompt or ""
+    prev_score = float(baseline_score)
+    versions: list[dict[str, Any]] = [
+        {
+            "version": 0,
+            "score": prev_score,
+            "delta": 0.0,
+            "accepted": True,
+            "candidate": "baseline",
+            "prompt": prev,
+            "diff": "",
+        }
+    ]
+    for entry in prompt_history:
+        if not isinstance(entry, dict):
+            continue
+        snap = str(entry.get("prompt_snapshot") or "")
+        score = float(entry.get("score") or 0.0)
+        accepted = bool(entry.get("accepted"))
+        new_prompt = snap or prev
+        diff_lines = list(
+            difflib.unified_diff(
+                prev.splitlines(keepends=True),
+                new_prompt.splitlines(keepends=True),
+                fromfile=f"v{len(versions) - 1}",
+                tofile=f"v{len(versions)}",
+                lineterm="",
+            )
+        )
+        versions.append(
+            {
+                "version": len(versions),
+                "score": score,
+                "delta": score - prev_score,
+                "accepted": accepted,
+                "candidate": str(entry.get("candidate_name") or ""),
+                "prompt": new_prompt,
+                "diff": "".join(diff_lines),
+            }
+        )
+        if accepted or new_prompt != prev:
+            prev = new_prompt
+        prev_score = score
+    return versions
 
 
 def _generate_fit_holysheet_report(
@@ -861,7 +921,8 @@ def _generate_fit_holysheet_report(
     )
 
     improvement = float(result.best_score) - float(result.baseline_score)
-    status = "positive" if improvement > 0 else ("warning" if improvement == 0 else "negative")
+    # HolySheet KPI.status only accepts positive|negative|neutral (not "warning").
+    status = "positive" if improvement > 0 else ("neutral" if improvement == 0 else "negative")
     meta_bits = [
         f"agent=`{result.agent}`",
         f"experiment=`{result.experiment_id}`",
@@ -1043,6 +1104,32 @@ def _generate_fit_holysheet_report(
                 judge_rows.append({"epoch": epoch, "motivation": str(insight)[:400]})
         if ph_rows:
             report.add(DataTable(title="Epoch learnings", data=ph_rows))
+        # Chronological prompt evolution with diffs (baseline → accepted).
+        evolution = _prompt_evolution_entries(
+            baseline_prompt=getattr(result.baseline_config, "system_prompt", "") or "",
+            baseline_score=float(getattr(result, "baseline_score", 0.0) or 0.0),
+            prompt_history=prompt_history,
+        )
+        if evolution:
+            report.add(Section(title="Prompt Evolution (chronological)"))
+            for item in evolution:
+                header = (
+                    f"**v{item['version']}** · score=`{item['score']:.4f}` · "
+                    f"Δ=`{item['delta']:+.4f}` · "
+                    f"{'ACCEPTED' if item['accepted'] else 'unchanged'} · "
+                    f"candidate=`{item['candidate'] or '—'}`"
+                )
+                report.add(Markdown(content=header))
+                if item["diff"]:
+                    report.add(CodeBlock(code=item["diff"], language="diff"))
+                else:
+                    report.add(
+                        Markdown(
+                            content=f"_No text change vs previous._\n\n"
+                            f"```\n{item['prompt'][:600]}"
+                            f"{'…' if len(item['prompt']) > 600 else ''}\n```"
+                        )
+                    )
         if judge_rows:
             report.add(
                 DataTable(
@@ -1121,12 +1208,17 @@ def _generate_fit_holysheet_report(
     return str(output_path)
 
 
-def _build_fit_report_html(result: Any) -> str:
+def _build_fit_report_html(
+    result: Any,
+    *,
+    keras_history: dict[str, list[float]] | None = None,
+) -> str:
     """Build the self-contained HTML for a PromptFitResult."""
     improvement = result.best_score - result.baseline_score
     improvement_pct = (
         (improvement / result.baseline_score * 100) if result.baseline_score > 0 else 0
     )
+    keras_history = keras_history or {}
 
     # KPI section
     kpis = f"""
@@ -1266,15 +1358,39 @@ def _build_fit_report_html(result: Any) -> str:
 
         spark = html.escape(_score_sparkline([float(s) for s in history_scores]))
         curve_rows = "".join(
-            f"<tr><td>epoch {i}</td><td>{float(s):.4f}</td></tr>"
+            f"<tr><td>epoch {i}</td><td>{float(s):.4f}</td>"
+            f"<td>{1.0 - float(s):.4f}</td></tr>"
             for i, s in enumerate(history_scores)
         )
         curve_section = f"""
         <h2>📈 Score / Loss Curve</h2>
         <p style="font-family: monospace; font-size: 1.4rem; letter-spacing: 0.08em; color: #58a6ff;">{spark}</p>
         <table>
-          <thead><tr><th>Epoch</th><th>Best Score</th></tr></thead>
+          <thead><tr><th>Round</th><th>Best Score</th><th>Loss (1−score)</th></tr></thead>
           <tbody>{curve_rows}</tbody>
+        </table>
+        """
+
+    keras_section = ""
+    if keras_history:
+        keys = [k for k, v in keras_history.items() if isinstance(v, list) and v]
+        n = max((len(keras_history[k]) for k in keys), default=0)
+        if n and keys:
+            header = "".join(f"<th>{html.escape(k)}</th>" for k in keys)
+            rows = ""
+            for i in range(n):
+                cells = "".join(
+                    f"<td>{float(keras_history[k][i]):.4f}</td>"
+                    if i < len(keras_history[k])
+                    else "<td>—</td>"
+                    for k in keys
+                )
+                rows += f"<tr><td>{i + 1}</td>{cells}</tr>"
+            keras_section = f"""
+        <h2>📉 Keras-style Epoch Metrics</h2>
+        <table>
+          <thead><tr><th>Epoch</th>{header}</tr></thead>
+          <tbody>{rows}</tbody>
         </table>
         """
 
@@ -1300,12 +1416,30 @@ def _build_fit_report_html(result: Any) -> str:
               <td style="color: #8b949e; font-size: 0.85rem;">{html.escape(focus or failed or "—")}</td>
               <td><code style="font-size: 0.75rem;">{html.escape(snap)}{"…" if len(str(entry.get("prompt_snapshot", ""))) > 180 else ""}</code></td>
             </tr>"""
+        evo = _prompt_evolution_entries(
+            baseline_prompt=getattr(result.baseline_config, "system_prompt", "") or "",
+            baseline_score=float(getattr(result, "baseline_score", 0.0) or 0.0),
+            prompt_history=prompt_history,
+        )
+        evo_blocks = ""
+        for item in evo:
+            body = html.escape(item["diff"] or item["prompt"][:600])
+            evo_blocks += f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem;margin:0.5rem 0;">
+              <strong>v{item['version']}</strong>
+              score={item['score']:.4f} Δ={item['delta']:+.4f}
+              accepted={'yes' if item['accepted'] else 'no'}
+              candidate=<code>{html.escape(item['candidate'] or '—')}</code>
+              <pre style="white-space:pre-wrap;font-size:0.8rem;margin-top:0.5rem;">{body}</pre>
+            </div>"""
         prompt_history_section = f"""
         <h2>🧬 Prompt History / Learnings</h2>
         <table>
           <thead><tr><th>Epoch</th><th>Score</th><th>Accepted</th><th>Focus / Failures</th><th>Prompt snapshot</th></tr></thead>
           <tbody>{ph_rows}</tbody>
         </table>
+        <h2>🧬 Prompt Evolution</h2>
+        {evo_blocks}
         """
 
     # Trial table
@@ -1380,14 +1514,35 @@ def _build_fit_report_html(result: Any) -> str:
         {examples_html}
         """
 
-    # Deployment recommendation section
+    # Deployment recommendation section (object or serialized dict)
     deployment_section = ""
     if getattr(result, "deployment_recommendation", None):
         rec = result.deployment_recommendation
+        if isinstance(rec, dict):
+            prompt_version = str(rec.get("prompt_version") or rec.get("version") or "—")
+            confidence = str(rec.get("confidence") or "—")
+            rollout = rec.get("rollout") or {}
+            if isinstance(rollout, dict):
+                strategy = str(rollout.get("strategy") or "—")
+                weight = float(rollout.get("initial_weight") or 0.0)
+                monitor_h = rollout.get("monitoring_hours", "—")
+            else:
+                strategy = str(getattr(rollout, "strategy", "—"))
+                weight = float(getattr(rollout, "initial_weight", 0.0) or 0.0)
+                monitor_h = getattr(rollout, "monitoring_hours", "—")
+            safety_notes = list(rec.get("safety_notes") or [])
+        else:
+            prompt_version = str(getattr(rec, "prompt_version", "—"))
+            confidence = str(getattr(rec, "confidence", "—"))
+            rollout = getattr(rec, "rollout", None)
+            strategy = str(getattr(rollout, "strategy", "—")) if rollout else "—"
+            weight = float(getattr(rollout, "initial_weight", 0.0) or 0.0) if rollout else 0.0
+            monitor_h = getattr(rollout, "monitoring_hours", "—") if rollout else "—"
+            safety_notes = list(getattr(rec, "safety_notes", None) or [])
         safety_html = ""
-        if rec.safety_notes:
+        if safety_notes:
             safety_items = "".join(
-                f"<li style='color: #f0883e;'>{html.escape(n)}</li>" for n in rec.safety_notes
+                f"<li style='color: #f0883e;'>{html.escape(str(n))}</li>" for n in safety_notes
             )
             safety_html = f"<ul>{safety_items}</ul>"
 
@@ -1396,19 +1551,19 @@ def _build_fit_report_html(result: Any) -> str:
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0;">
           <div class="kpi-card">
             <div style="color: #8b949e; font-size: 0.85rem;">Version</div>
-            <div style="font-size: 1.2rem; font-weight: 700; color: #58a6ff;">{html.escape(rec.prompt_version)}</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #58a6ff;">{html.escape(prompt_version)}</div>
           </div>
           <div class="kpi-card">
             <div style="color: #8b949e; font-size: 0.85rem;">Confidence</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: {"#3fb950" if rec.confidence == "high" else "#f0883e" if rec.confidence == "medium" else "#f85149"};">{rec.confidence}</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: {"#3fb950" if confidence == "high" else "#f0883e" if confidence == "medium" else "#f85149"};">{html.escape(confidence)}</div>
           </div>
           <div class="kpi-card">
             <div style="color: #8b949e; font-size: 0.85rem;">Rollout Strategy</div>
-            <div style="font-size: 1.2rem; font-weight: 700; color: #d2a8ff;">{rec.rollout.strategy} @ {rec.rollout.initial_weight:.0%}</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: #d2a8ff;">{html.escape(strategy)} @ {weight:.0%}</div>
           </div>
           <div class="kpi-card">
             <div style="color: #8b949e; font-size: 0.85rem;">Monitor</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #c9d1d9;">{rec.rollout.monitoring_hours}h</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #c9d1d9;">{html.escape(str(monitor_h))}h</div>
           </div>
         </div>
         {safety_html}
@@ -1443,6 +1598,7 @@ def _build_fit_report_html(result: Any) -> str:
 
   {kpis}
   {curve_section}
+  {keras_section}
   {prompt_history_section}
   {trial_section}
   {param_section}

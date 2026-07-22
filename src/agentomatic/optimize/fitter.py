@@ -267,7 +267,11 @@ class PromptFitter:
     max_trials : int
         Total budget of candidate evaluations.
     min_absolute_improvement : float
-        Minimum composite-score lift for a candidate to be accepted.
+        Minimum composite-score lift for a candidate to be accepted
+        (default ``0.001`` — small enough for LLM-judge noise, large enough
+        to ignore pure float jitter).
+    patience : int | None
+        Rounds without improvement before early-stop (default module constant).
     api_base : str
         Base URL of the agent API server (ignored when *local_agent* is set).
     api_prefix : str
@@ -346,7 +350,8 @@ class PromptFitter:
         search_space: PromptSearchSpace | None = None,
         optimizer: str | Any = "gepa_like",
         max_trials: int = 30,
-        min_absolute_improvement: float = 0.05,
+        min_absolute_improvement: float = 0.001,
+        patience: int | None = None,
         api_base: str = "http://localhost:8000",
         api_prefix: str = "/api/v1",
         concurrency: int = 1,
@@ -377,6 +382,9 @@ class PromptFitter:
         self.local_judges = local_judges or []
         self.max_trials = max_trials
         self.min_absolute_improvement = min_absolute_improvement
+        self.patience = (
+            int(patience) if patience is not None else _EARLY_STOP_PATIENCE
+        )
         # Default concurrency=1 / sequential=True: local SLMs often spawn many
         # idle worker threads when hammered concurrently. Explicit concurrency>1
         # auto-disables sequential unless sequential=True is forced.
@@ -745,10 +753,10 @@ class PromptFitter:
 
         eval_results = self._build_eval_results(baseline_details, metric)
 
-        # Effective patience: never exceed max_rounds so early stopping fires
-        # even when PATIENCE > total rounds (e.g. 8 trials / 4 per round = 2
-        # rounds but default patience=3 would never fire).
-        effective_patience = min(_EARLY_STOP_PATIENCE, max(1, max_rounds))
+        # Effective patience: never exceed max_rounds so early stopping can
+        # still fire, but honour the configured ``self.patience`` (wired from
+        # TrainConfig) instead of always using the module default.
+        effective_patience = min(max(1, self.patience), max(1, max_rounds))
 
         # Seed curve with baseline so reports always show a trajectory start.
         score_history.append(
@@ -1048,6 +1056,10 @@ class PromptFitter:
                             "holdout_score": cand_holdout,
                             "generalization": gen_check.to_dict(),
                             "dimensions": dict(full_dims),
+                            "system_prompt": getattr(cand.config, "system_prompt", "") or "",
+                            "prompt_preview": (
+                                (getattr(cand.config, "system_prompt", "") or "")[:240]
+                            ),
                         }
                     )
                     logger.info(

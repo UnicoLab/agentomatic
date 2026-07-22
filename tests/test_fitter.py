@@ -915,7 +915,7 @@ class TestPromptFitter:
         assert fitter.agent == "test_agent"
         assert fitter.task_model == "ollama/qwen2.5:7b"
         assert fitter.max_trials == 30
-        assert fitter.min_absolute_improvement == 0.05
+        assert fitter.min_absolute_improvement == 0.001
         assert fitter.concurrency == 1  # sequential default (local-SLM safe)
         assert fitter.sequential is True
         assert fitter._search_space is not None

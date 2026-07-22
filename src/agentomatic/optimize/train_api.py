@@ -98,7 +98,7 @@ class TrainConfig:
     judge_weight: float = 0.30
     apply: bool = False
     apply_as: str | None = None
-    min_absolute_improvement: float = 0.01
+    min_absolute_improvement: float = 0.001
     sequential: bool = True
     concurrency: int = 2
     optimize_model_params: bool = False
@@ -550,6 +550,7 @@ def run_train(
         search_space=space,
         optimizer=config.optimizer,
         min_absolute_improvement=config.min_absolute_improvement,
+        patience=config.patience,
         concurrency=config.concurrency,
         sequential=config.sequential,
         experiment_dir=str(reports / ".fit"),
