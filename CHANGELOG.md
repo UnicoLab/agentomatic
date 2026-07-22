@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v1.8.2 (2026-07-22)
+
+### Bug Fixes
+
+- **platform**: Harden health probes and unblock Studio control plane
+  ([`425ca6d`](https://github.com/UnicoLab/agentomatic/commit/425ca6dad86dd9e770c3aba352c0e815925efdc4))
+
+Add timeouts around aggregate and control-plane health checks, alias /ready, skip Studio/probe paths
+  in maintenance middleware, and enable control plane by default in generated projects so Studio
+  Control tabs work out of the box.
+
+- **platform**: Mount agent slug aliases and timeout Studio graph loads
+  ([`54a9439`](https://github.com/UnicoLab/agentomatic/commit/54a9439101e1afd2c902f087ced873d68762e318))
+
+Expose /api/v1/{slug} alongside folder-name routes so Studio threads/chat work, run graph_fn off the
+  event loop with timeouts, and harden vector provider lookup against typos and dual imports.
+
+### Chores
+
+- **studio**: Bundle Studio UI with Connect and API alignment fixes
+  ([`d154f46`](https://github.com/UnicoLab/agentomatic/commit/d154f4698563021aa50d063930ded54ef1b69121))
+
+Rebuild PUBLIC_URL=/studio/ui assets so SCOOPER serves the non-blocking Connect flow and hardened
+  control/pipeline/plugin client parsers.
+
+- **studio**: Bundle Studio UI with connection and API alignment fixes
+  ([`b75b8be`](https://github.com/UnicoLab/agentomatic/commit/b75b8be9104fc1f8d987f19ec6edb3148f3d946f))
+
+Sync the freshly built agentomatic-studio assets into studio/static so platforms serving /studio/ui
+  pick up same-origin defaults and envelope fixes.
+
+
 ## v1.8.1 (2026-07-21)
 
 ### Bug Fixes
