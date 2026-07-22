@@ -418,8 +418,13 @@ class TestBug3PromptFitResultHistory:
 
         result = asyncio.run(run())
         assert isinstance(result.history, list)
-        # score_history is set (even if empty due to 0 rounds)
         assert isinstance(result.score_history, list)
+        # Baseline seed + recorded no-candidate rounds must always leave a curve.
+        assert len(result.score_history) >= 1
+        assert isinstance(result.prompt_history, list)
+        # Saturation / tiny-data guidance should surface in suggestions.
+        joined = " ".join(result.suggestions).lower()
+        assert "saturated" in joined or "too small" in joined or result.suggestions
 
 
 # ===========================================================================

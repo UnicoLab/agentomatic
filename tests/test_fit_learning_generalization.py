@@ -43,15 +43,17 @@ class TestRichExpectedReference:
         assert "next_action" in dp.expected_answer
         assert "Next steps?" in dp.expected_answer or "What should we do" in dp.expected_answer
 
-    def test_judge_expected_metadata_wins(self) -> None:
+    def test_judge_expected_metadata_prepended_not_replacing(self) -> None:
         ex = AgentExample(
             id="e2",
             input={"query": "hi"},
-            expected_output={"next_action": True},
+            expected_output={"next_action": True, "content": True},
             metadata={"judge_expected": "Propose a concrete next step with rationale."},
         )
         dp = ex.to_datapoint()
-        assert dp.expected_answer == "Propose a concrete next step with rationale."
+        assert "Propose a concrete next step with rationale." in (dp.expected_answer or "")
+        assert "quality contract" in (dp.expected_answer or "").lower()
+        assert "next_action" in (dp.expected_answer or "")
 
     def test_rich_expected_serialises_structured_output(self) -> None:
         ex = AgentExample(

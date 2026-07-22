@@ -125,15 +125,23 @@ def _rich_expected_reference(
     Boolean-flag outputs like ``{"next_action": True}`` are expanded into a
     quality contract (field meaning + required shape) rather than the useless
     phrase ``Response must include: 'next_action'``.
+
+    Explicit ``judge_expected`` / ``expected_reference`` metadata is prepended
+    as judge guidance, but structured ``expected_output`` is always retained
+    so deterministic fit metrics (must_include, content F1, gold few-shot)
+    keep a machine-readable target.
     """
+    parts: list[str] = []
+
     for key in ("judge_expected", "expected_reference", "quality_reference"):
         val = metadata.get(key)
         if isinstance(val, str) and val.strip():
-            return val.strip()
+            parts.append("## Judge guidance\n" + val.strip())
+            break
         if isinstance(val, dict) and val:
-            return json.dumps(val, ensure_ascii=False)
+            parts.append("## Judge guidance\n" + json.dumps(val, ensure_ascii=False))
+            break
 
-    parts: list[str] = []
     if rubric:
         parts.append("## Rubric\n" + json.dumps(rubric, ensure_ascii=False))
 

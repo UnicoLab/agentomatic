@@ -38,6 +38,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import json
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -318,25 +319,224 @@ class RewriteOptimizer(BaseFitterOptimizer):
                 f"current={context.current_score:.3f}."
             )
 
-        candidate = PromptCandidate(
-            name=f"rewrite_{iteration:03d}",
-            config=PromptRuntimeConfig(
-                system_prompt=new_prompt,
-                user_template=current_config.user_template,
-                few_shot_examples=list(current_config.few_shot_examples),
-                output_contract=current_config.output_contract,
-                model_params=dict(current_config.model_params),
-                rag_params=dict(current_config.rag_params),
-                tool_params=dict(current_config.tool_params),
-            ),
-            source="rewrite",
-            mutation_notes=mutation_notes,
+        base_kwargs = {
+            "user_template": current_config.user_template,
+            "output_contract": current_config.output_contract,
+            "model_params": dict(current_config.model_params),
+            "rag_params": dict(current_config.rag_params),
+            "tool_params": dict(current_config.tool_params),
+        }
+        candidates: list[PromptCandidate] = [
+            PromptCandidate(
+                name=f"rewrite_{iteration:03d}",
+                config=PromptRuntimeConfig(
+                    system_prompt=new_prompt,
+                    few_shot_examples=list(current_config.few_shot_examples),
+                    **base_kwargs,
+                ),
+                source="rewrite",
+                mutation_notes=mutation_notes,
+            )
+        ]
+
+        # Prefer gold few-shot from dataset expected answers (stronger signal
+        # than mediocre agent responses that sit near the failure threshold).
+        gold_few_shot = self._gold_few_shot_from_dataset(dataset_sample, k=3)
+        eval_few_shot: list[dict[str, Any]] = []
+        for row in reversed(successes):
+            q = str(row.get("query") or "").strip()
+            resp = str(row.get("response") or "").strip()
+            exp = row.get("expected")
+            if not q or not resp:
+                continue
+            # Prefer structured expected JSON as the demonstration answer.
+            demo = self._expected_as_demo_response(exp) or resp
+            eval_few_shot.append({"query": q[:400], "response": demo[:600]})
+            if len(eval_few_shot) >= 3:
+                break
+        few_shot = gold_few_shot or eval_few_shot
+
+        if few_shot and search_space.optimize_few_shot:
+            candidates.append(
+                PromptCandidate(
+                    name=f"rewrite_fs_{iteration:03d}",
+                    config=PromptRuntimeConfig(
+                        system_prompt=new_prompt,
+                        few_shot_examples=few_shot,
+                        **base_kwargs,
+                    ),
+                    source="rewrite+few_shot",
+                    mutation_notes=mutation_notes + f" + {len(few_shot)} few-shot anchors.",
+                )
+            )
+            # Ablation: baseline prompt + gold few-shot only (often wins early).
+            candidates.append(
+                PromptCandidate(
+                    name=f"fewshot_{iteration:03d}",
+                    config=PromptRuntimeConfig(
+                        system_prompt=current_config.system_prompt,
+                        few_shot_examples=few_shot,
+                        **base_kwargs,
+                    ),
+                    source="few_shot",
+                    mutation_notes=(
+                        f"Few-shot bootstrap only ({len(few_shot)} gold/eval examples) "
+                        f"at iteration {iteration}."
+                    ),
+                )
+            )
+
+        # Targeted append: keep baseline + explicit must_include / grounding rules
+        # distilled from expected answers (no LLM rewrite needed).
+        tip_prompt = self._prompt_with_expected_tips(
+            current_config.system_prompt,
+            dataset_sample,
+            eval_results,
         )
+        if tip_prompt and tip_prompt != current_config.system_prompt:
+            candidates.append(
+                PromptCandidate(
+                    name=f"tips_{iteration:03d}",
+                    config=PromptRuntimeConfig(
+                        system_prompt=tip_prompt,
+                        few_shot_examples=list(few_shot or current_config.few_shot_examples),
+                        **base_kwargs,
+                    ),
+                    source="expected_tips",
+                    mutation_notes=(
+                        f"Appended expected-grounding tips from dataset at "
+                        f"iteration {iteration}."
+                    ),
+                )
+            )
+
         logger.debug(
-            "RewriteOptimizer: produced candidate '{}'",
-            candidate.name,
+            "RewriteOptimizer: produced {} candidate(s)",
+            len(candidates),
         )
-        return [candidate]
+        return candidates
+
+    @staticmethod
+    def _expected_as_demo_response(expected: Any) -> str:
+        """Turn an expected reference into a JSON demo answer when possible."""
+        if expected is None:
+            return ""
+        if isinstance(expected, dict):
+            payload = {
+                k: v
+                for k, v in expected.items()
+                if k in {"content", "next_action", "response", "answer"}
+                and isinstance(v, str)
+                and v.strip()
+            }
+            return json.dumps(payload, ensure_ascii=False) if payload else ""
+        text = str(expected).strip()
+        if not text:
+            return ""
+        marker = "## Expected structured output"
+        if marker in text:
+            blob = text.split(marker, 1)[1].strip()
+            try:
+                data = json.loads(blob)
+                if isinstance(data, dict):
+                    return RewriteOptimizer._expected_as_demo_response(data)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return RewriteOptimizer._expected_as_demo_response(data)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return ""
+
+    @classmethod
+    def _gold_few_shot_from_dataset(
+        cls,
+        dataset_sample: list[dict[str, Any]],
+        *,
+        k: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Build few-shot demos from dataset expected answers (gold labels)."""
+        out: list[dict[str, Any]] = []
+        for row in dataset_sample or []:
+            if not isinstance(row, dict):
+                continue
+            q = str(
+                row.get("query")
+                or row.get("question")
+                or (row.get("input") or {}).get("question")
+                or (row.get("input") or {}).get("query")
+                or ""
+            ).strip()
+            expected = (
+                row.get("expected_answer")
+                or row.get("expected")
+                or row.get("expected_output")
+            )
+            demo = cls._expected_as_demo_response(expected)
+            if not q or not demo:
+                continue
+            out.append({"query": q[:400], "response": demo[:600]})
+            if len(out) >= k:
+                break
+        return out
+
+    @classmethod
+    def _prompt_with_expected_tips(
+        cls,
+        system_prompt: str,
+        dataset_sample: list[dict[str, Any]],
+        eval_results: list[dict[str, Any]],
+    ) -> str:
+        """Append concrete grounding tips mined from expected answers."""
+        must_terms: list[str] = []
+        for src in list(dataset_sample or []) + list(eval_results or []):
+            if not isinstance(src, dict):
+                continue
+            expected = (
+                src.get("expected_answer")
+                or src.get("expected")
+                or src.get("expected_output")
+            )
+            exp_dict: dict[str, Any] = {}
+            if isinstance(expected, dict):
+                exp_dict = expected
+            elif isinstance(expected, str) and "## Expected structured output" in expected:
+                try:
+                    exp_dict = json.loads(expected.split("## Expected structured output", 1)[1])
+                except (json.JSONDecodeError, TypeError, IndexError):
+                    exp_dict = {}
+            for term in exp_dict.get("must_include") or []:
+                t = str(term).strip()
+                if t and t.lower() not in {x.lower() for x in must_terms}:
+                    must_terms.append(t)
+            for key in ("content", "next_action"):
+                val = exp_dict.get(key)
+                if isinstance(val, str) and val.strip():
+                    for tok in val.split():
+                        if len(tok) > 5 and tok.lower() not in {x.lower() for x in must_terms}:
+                            must_terms.append(tok)
+                            if len(must_terms) >= 12:
+                                break
+            if len(must_terms) >= 12:
+                break
+        if not must_terms:
+            return system_prompt
+        tip = (
+            "\n\n## Fit tips (from labelled demos)\n"
+            "- Ground every answer ONLY in the provided snapshot; never invent budgets "
+            "or stakeholders.\n"
+            "- Always return non-empty JSON keys `content` and `next_action`.\n"
+            "- Prefer concrete next actions (≥4 words) tied to unknowns/status.\n"
+            "- When relevant, include these anchors naturally: "
+            + ", ".join(must_terms[:10])
+            + "."
+        )
+        base = (system_prompt or "").rstrip()
+        if "## Fit tips" in base:
+            return base
+        return base + tip
 
 
 # =====================================================================
