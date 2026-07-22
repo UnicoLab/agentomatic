@@ -1123,3 +1123,36 @@ async def cleanup_old_threads(agent: str, user_id: str, keep_latest: int = 10):
 - [API Reference](../architecture/api-reference.md) — Complete endpoint documentation
 - [Studio Guide](studio.md) — Studio debugging UI guide
 - [Storage Guide](storage.md) — Storage backend configuration
+
+## Invocation log history & LLM analysis
+
+Persist every invoke/chat/stream I/O per agent for auditability and live
+recommendations.
+
+```python
+from agentomatic import AgentPlatform
+from agentomatic.storage import SQLAlchemyStore  # or MemoryStore
+
+platform = AgentPlatform.from_folder(
+    "agents/",
+    store=SQLAlchemyStore("sqlite+aiosqlite:///./agentomatic.db"),
+    logs_history=True,
+    allow_logsllm_analysis=True,
+)
+```
+
+Env equivalents: `AGENTOMATIC_LOGS_HISTORY=1`,
+`AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1`.
+
+Endpoints (per agent):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/{agent}/logs` | List invocation logs |
+| GET | `/api/v1/{agent}/logs/{id}` | Fetch one log |
+| POST | `/api/v1/{agent}/logs/analyze` | LLM/heuristic analysis |
+| GET | `/api/v1/{agent}/logs/analysis` | Latest analysis |
+
+Analysis returns `score`, `summary`, `status`, and `recommendations`.
+Optimization runs can also be persisted via `OptimizationRunStore` when a
+platform store is registered with `set_fit_store(store)`.

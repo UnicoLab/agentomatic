@@ -22,6 +22,9 @@ class MemoryStore(BaseStore):
         self._feedback: list[dict[str, Any]] = []
         self._suspended_states: dict[str, dict[str, Any]] = {}
         self._checkpoints: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._invocation_logs: dict[str, dict[str, Any]] = {}
+        self._log_analyses: dict[str, dict[str, Any]] = {}
+        self._optimization_runs: dict[str, dict[str, Any]] = {}
 
     async def create_thread(
         self,
@@ -394,3 +397,188 @@ class MemoryStore(BaseStore):
         if limit is not None:
             cps = cps[:limit]
         return cps
+
+    # ------------------------------------------------------------------
+    # Invocation log history
+    # ------------------------------------------------------------------
+
+    async def create_invocation_log(
+        self,
+        *,
+        agent_name: str,
+        thread_id: str | None = None,
+        run_id: str | None = None,
+        endpoint: str = "invoke",
+        input_data: dict[str, Any] | None = None,
+        output_data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        error: str | None = None,
+        duration_ms: float | None = None,
+        status: str = "ok",
+        log_id: str | None = None,
+    ) -> dict[str, Any]:
+        import uuid
+
+        lid = log_id or f"invlog_{uuid.uuid4().hex[:16]}"
+        entry = {
+            "id": lid,
+            "agent_name": agent_name,
+            "thread_id": thread_id,
+            "run_id": run_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "endpoint": endpoint,
+            "input": input_data or {},
+            "output": output_data or {},
+            "metadata": metadata or {},
+            "error": error,
+            "duration_ms": duration_ms,
+            "status": status,
+        }
+        self._invocation_logs[lid] = entry
+        return entry
+
+    async def get_invocation_log(self, log_id: str) -> dict[str, Any] | None:
+        return self._invocation_logs.get(log_id)
+
+    async def list_invocation_logs(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        items = list(self._invocation_logs.values())
+        if agent_name:
+            items = [i for i in items if i.get("agent_name") == agent_name]
+        if thread_id:
+            items = [i for i in items if i.get("thread_id") == thread_id]
+        if status:
+            items = [i for i in items if i.get("status") == status]
+        if endpoint:
+            items = [i for i in items if i.get("endpoint") == endpoint]
+        items.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        return items[offset : offset + limit]
+
+    async def count_invocation_logs(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+    ) -> int:
+        items = await self.list_invocation_logs(
+            agent_name=agent_name,
+            thread_id=thread_id,
+            status=status,
+            endpoint=endpoint,
+            limit=10_000_000,
+            offset=0,
+        )
+        return len(items)
+
+    async def save_log_analysis(
+        self,
+        *,
+        agent_name: str,
+        score: float | None,
+        summary: str,
+        status: str,
+        recommendations: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        analysis_id: str | None = None,
+    ) -> dict[str, Any]:
+        import uuid
+
+        aid = analysis_id or f"logan_{uuid.uuid4().hex[:16]}"
+        entry = {
+            "id": aid,
+            "agent_name": agent_name,
+            "score": score,
+            "summary": summary,
+            "status": status,
+            "recommendations": recommendations or [],
+            "metadata": metadata or {},
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self._log_analyses[aid] = entry
+        return entry
+
+    async def get_latest_log_analysis(self, agent_name: str) -> dict[str, Any] | None:
+        items = [a for a in self._log_analyses.values() if a.get("agent_name") == agent_name]
+        if not items:
+            return None
+        items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        return items[0]
+
+    async def list_log_analyses(
+        self,
+        *,
+        agent_name: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        items = list(self._log_analyses.values())
+        if agent_name:
+            items = [a for a in items if a.get("agent_name") == agent_name]
+        items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        return items[offset : offset + limit]
+
+    # ------------------------------------------------------------------
+    # Optimization / retrain run history
+    # ------------------------------------------------------------------
+
+    async def create_optimization_run(
+        self,
+        *,
+        experiment_id: str,
+        agent_name: str,
+        baseline_score: float | None = None,
+        best_score: float | None = None,
+        prompt_versions: dict[str, Any] | None = None,
+        score_history: list[Any] | None = None,
+        learnings: list[Any] | None = None,
+        artefacts: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        import uuid
+
+        rid = run_id or f"optrun_{uuid.uuid4().hex[:16]}"
+        entry = {
+            "id": rid,
+            "experiment_id": experiment_id,
+            "agent_name": agent_name,
+            "baseline_score": baseline_score,
+            "best_score": best_score,
+            "prompt_versions": prompt_versions or {},
+            "score_history": score_history or [],
+            "learnings": learnings or [],
+            "artefacts": artefacts or {},
+            "metadata": metadata or {},
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self._optimization_runs[rid] = entry
+        return entry
+
+    async def get_optimization_run(self, run_id: str) -> dict[str, Any] | None:
+        return self._optimization_runs.get(run_id)
+
+    async def list_optimization_runs(
+        self,
+        *,
+        agent_name: str | None = None,
+        experiment_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        items = list(self._optimization_runs.values())
+        if agent_name:
+            items = [r for r in items if r.get("agent_name") == agent_name]
+        if experiment_id:
+            items = [r for r in items if r.get("experiment_id") == experiment_id]
+        items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        return items[offset : offset + limit]

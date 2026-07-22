@@ -127,6 +127,8 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_REQUIRE_AUTH` | Require auth globally (implies JWT + zero-trust) |
 | `AGENTOMATIC_ENABLE_CONTROL_PLANE` / `AGENTOMATIC_CONTROL_TOKEN` | Control plane |
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` | Rate limiting |
+| `AGENTOMATIC_LOGS_HISTORY` | Persist per-agent invoke/chat/stream history (default off) |
+| `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` | Enable LLM analysis over those logs (default off) |
 | `AGENTOMATIC_TITLE` | Platform title |
 | `AGENTOMATIC_STACK` | Active stack name |
 | `AGENTOMATIC_AGENTS` | Comma-separated allow-list scoping agent discovery |

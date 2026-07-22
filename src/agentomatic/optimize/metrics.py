@@ -190,10 +190,14 @@ class LLMJudgeMetric(BaseMetric):
         criteria: str,
         model: LLMSpec = "ollama/mistral:7b",
         name: str = "llm_judge",
+        temperature: float = 0.0,
     ):
         self.criteria = criteria
         self.model = model
         self.name = name
+        # Default 0.0 for reproducible scoring across epochs (avoids 0.33↔0.67
+        # oscillation from sampling noise at temp>0).
+        self.temperature = temperature
 
     async def evaluate(
         self,
@@ -271,7 +275,7 @@ class LLMJudgeMetric(BaseMetric):
                 prompt += f"CONTEXT:\n{chr(10).join(context[:3])}\n\n"
             prompt += 'Reply with ONLY a JSON object: {"score": 0.X, "reason": "..."}\n'
 
-            data = await call_llm_json(self.model, prompt, temperature=0.1)
+            data = await call_llm_json(self.model, prompt, temperature=self.temperature)
             if not data or "score" not in data:
                 return EvalResult(
                     metric_name=self.name,
@@ -360,11 +364,13 @@ class GEvalMetric(BaseMetric):
         criteria: str = "Is the response correct and relevant?",
         evaluation_steps: list[str] | None = None,
         model: LLMSpec = "ollama/mistral:7b",
+        temperature: float = 0.0,
     ):
         self.name = name
         self.criteria = criteria
         self.evaluation_steps = evaluation_steps
         self.model = model
+        self.temperature = temperature
 
     async def evaluate(
         self,
@@ -453,7 +459,7 @@ class GEvalMetric(BaseMetric):
                 '{"score": 0.X, "reason": "..."}\n'
             )
 
-            data = await call_llm_json(self.model, prompt, temperature=0.1)
+            data = await call_llm_json(self.model, prompt, temperature=self.temperature)
             if not data or "score" not in data:
                 return EvalResult(
                     metric_name=self.name,

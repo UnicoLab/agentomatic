@@ -20,7 +20,10 @@ Example::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from agentomatic.optimize.learning import EpochLearning
 
 # =====================================================================
 # Score history per round
@@ -102,6 +105,8 @@ class OptimizationContext:
 
     # ── History ──────────────────────────────────────────────────────
     score_history: list[RoundStats] = field(default_factory=list)
+    learnings_history: list[EpochLearning] = field(default_factory=list)
+    """Per-epoch prompt snapshots + synthesised learnings for progressive rewrite."""
 
     # ── Failure analysis ─────────────────────────────────────────────
     failure_clusters: list[dict[str, Any]] = field(default_factory=list)
@@ -202,6 +207,12 @@ class OptimizationContext:
             severity = cluster.get("severity", 0.0)
             lines.append(f"  {i}. [{severity:.2f}] {label} ({count} cases): {fix[:120]}")
         return "\n".join(lines)
+
+    def format_learnings_history(self, max_epochs: int = 8) -> str:
+        """Format progressive epoch learnings for rewrite prompts."""
+        from agentomatic.optimize.learning import format_learnings_history
+
+        return format_learnings_history(self.learnings_history, max_epochs=max_epochs)
 
     def format_eval_details_for_rewrite(
         self,

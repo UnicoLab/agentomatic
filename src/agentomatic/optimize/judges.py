@@ -55,13 +55,15 @@ class LocalJudgeMetric(BaseMetric):
         criteria: str = "Evaluate the quality and correctness of the response.",
         dimensions: list[str] | None = None,
         weight: float = 1.0,
-        temperature: float = 0.1,
+        temperature: float = 0.0,
     ) -> None:
         self.name = name
         self.model = model
         self.criteria = criteria
         self.dimensions = dimensions or ["correctness", "completeness", "relevance"]
         self.weight = weight
+        # Default 0.0 for reproducible scoring across epochs (reduces 0.33↔0.67
+        # oscillation from sampling noise at temp>0).
         self.temperature = temperature
 
     async def evaluate(
@@ -78,6 +80,7 @@ class LocalJudgeMetric(BaseMetric):
         """
         metric_result = await self.evaluate_rich(query, response, expected, context)
         failed = metric_result.feedback.startswith("Judge evaluation failed:")
+        extras = getattr(metric_result, "_judge_extras", {}) or {}
         return EvalResult(
             metric_name=self.name,
             score=metric_result.score,
@@ -86,6 +89,10 @@ class LocalJudgeMetric(BaseMetric):
                 "dimensions": metric_result.dimensions,
                 "metric_result": metric_result,
                 "evaluation_failed": failed,
+                "motivation": extras.get("motivation", ""),
+                "what_worked": extras.get("what_worked", []),
+                "what_failed": extras.get("what_failed", []),
+                "improvement_hints": extras.get("improvement_hints", []),
             },
         )
 
@@ -102,25 +109,40 @@ class LocalJudgeMetric(BaseMetric):
         dimensions_list = "\n".join(f"  - {d}: score (0.0–1.0)" for d in self.dimensions)
 
         prompt = (
-            "You are an expert evaluation judge. Score the following AI response.\n\n"
+            "You are an expert evaluation judge for prompt optimization.\n"
+            "Your job is to score the response AND produce extensive, actionable "
+            "motivation so a rewriter can learn what to change next.\n\n"
             f"## Evaluation Criteria\n{self.criteria}\n\n"
             f"## Dimensions to Score\n{dimensions_list}\n\n"
             f"## Query\n{query}\n\n"
             f"## AI Response\n{response}\n\n"
         )
         if expected:
-            prompt += f"## Expected Answer (Ground Truth)\n{expected}\n\n"
+            prompt += (
+                "## Expected / Quality Reference (Ground Truth)\n"
+                "Use this as the quality bar. If it contains a 'quality contract' "
+                "or schema flags, judge semantic fulfillment — not literal key names.\n"
+                f"{expected}\n\n"
+            )
         if context:
-            prompt += f"## Context Documents\n{chr(10).join(context[:3])}\n\n"
+            ctx_block = "\n".join(str(c)[:800] for c in context[:5])
+            prompt += f"## Context Documents\n{ctx_block}\n\n"
 
         prompt += (
             "## Instructions\n"
-            "1. Evaluate the response against each dimension.\n"
-            "2. Provide a brief textual feedback explaining strengths and weaknesses.\n"
-            "3. Return a JSON object with this exact structure:\n"
+            "1. Score each dimension from 0.0 to 1.0 with justification.\n"
+            "2. Write extensive motivation: what was correct, what was wrong, "
+            "and why the score is not higher.\n"
+            "3. Give concrete improvement hints the prompt rewriter can use "
+            "(general rules, NOT hardcoding this exact query).\n"
+            "4. Return a JSON object with this exact structure:\n"
             "{\n"
             '  "overall_score": 0.X,\n'
-            '  "feedback": "Your textual feedback here...",\n'
+            '  "feedback": "Concise summary of strengths and weaknesses",\n'
+            '  "motivation": "Extensive justification for the overall score",\n'
+            '  "what_worked": ["..."],\n'
+            '  "what_failed": ["..."],\n'
+            '  "improvement_hints": ["generalizable prompt fixes..."],\n'
             '  "dimensions": {\n'
         )
         for d in self.dimensions:
@@ -138,6 +160,10 @@ class LocalJudgeMetric(BaseMetric):
 
             overall = max(0.0, min(1.0, float(data["overall_score"])))
             feedback = str(data.get("feedback", ""))
+            motivation = str(data.get("motivation", "")).strip()
+            if motivation and motivation not in feedback:
+                feedback = f"{feedback}\n\nMotivation: {motivation}".strip()
+
             dims: dict[str, float] = {}
             raw_dims = data.get("dimensions", {})
             if isinstance(raw_dims, dict):
@@ -148,7 +174,18 @@ class LocalJudgeMetric(BaseMetric):
             for d in self.dimensions:
                 dims.setdefault(d, overall)
 
-            return MetricResult(score=overall, feedback=feedback, dimensions=dims)
+            result = MetricResult(score=overall, feedback=feedback, dimensions=dims)
+            # Attach rich judge fields for epoch learnings / rewrite briefings.
+            rich_meta = {
+                "motivation": motivation,
+                "what_worked": list(data.get("what_worked") or []),
+                "what_failed": list(data.get("what_failed") or []),
+                "improvement_hints": list(data.get("improvement_hints") or []),
+            }
+            # MetricResult may not have a metadata field — stash on feedback path
+            # via a dynamic attribute used by LocalJudgeMetric.evaluate().
+            result._judge_extras = rich_meta  # type: ignore[attr-defined]
+            return result
 
         except Exception as exc:
             logger.warning(f"LocalJudgeMetric '{self.name}' failed: {exc}")

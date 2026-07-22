@@ -153,6 +153,20 @@ def _wrap_local_agent(agent: Any) -> Any:
             if isinstance(input_data["metadata"], dict):
                 input_data["metadata"]["system_prompt_override"] = prompt_override
 
+        # Surface model_params / temperature for agents that honour them.
+        model_params = None
+        if isinstance(invoke, dict):
+            model_params = invoke.get("model_params")
+            if model_params is None and "temperature" in invoke:
+                model_params = {"temperature": invoke["temperature"]}
+        if isinstance(model_params, dict) and model_params:
+            input_data["model_params"] = model_params
+            input_data.setdefault("metadata", {})
+            if isinstance(input_data["metadata"], dict):
+                input_data["metadata"]["model_params"] = model_params
+            if "temperature" in model_params:
+                input_data.setdefault("temperature", model_params["temperature"])
+
         # Temporarily override the agent's system_prompt attribute so that
         # nodes which read self.system_prompt pick up the candidate prompt.
         original_prompt: str | None = None
@@ -163,6 +177,16 @@ def _wrap_local_agent(agent: Any) -> Any:
                 agent.system_prompt = prompt_override  # type: ignore[union-attr]
             except (AttributeError, TypeError):
                 has_prompt_attr = False
+
+        original_compiled: dict[str, Any] | None = None
+        if isinstance(model_params, dict) and model_params and hasattr(agent, "compiled_config"):
+            try:
+                original_compiled = dict(getattr(agent, "compiled_config") or {})
+                merged = dict(original_compiled)
+                merged.update(model_params)
+                agent.compiled_config = merged  # type: ignore[union-attr]
+            except (AttributeError, TypeError):
+                original_compiled = None
 
         try:
             if hasattr(agent, "atransform") and inspect.iscoroutinefunction(agent.atransform):
@@ -177,6 +201,11 @@ def _wrap_local_agent(agent: Any) -> Any:
             if has_prompt_attr and original_prompt is not None:
                 try:
                     agent.system_prompt = original_prompt  # type: ignore[union-attr]
+                except (AttributeError, TypeError):
+                    pass
+            if original_compiled is not None:
+                try:
+                    agent.compiled_config = original_compiled  # type: ignore[union-attr]
                 except (AttributeError, TypeError):
                     pass
 
@@ -311,7 +340,7 @@ class PromptFitter:
         min_absolute_improvement: float = 0.05,
         api_base: str = "http://localhost:8000",
         api_prefix: str = "/api/v1",
-        concurrency: int = 5,
+        concurrency: int = 1,
         experiment_dir: str = ".optimize",
         auto_report: bool = True,
         callbacks: list[OptimizationCallback] | None = None,
@@ -326,6 +355,10 @@ class PromptFitter:
         slm_default_passes: int = 3,
         llm_default_passes: int = 2,
         baseline_system_prompt: str | None = None,
+        max_generalization_gap: float = 0.15,
+        holdout_fraction: float = 0.2,
+        drain_seconds: float = 1.5,
+        sequential: bool | None = None,
     ) -> None:
         # Public configuration
         self.agent = agent
@@ -335,7 +368,14 @@ class PromptFitter:
         self.local_judges = local_judges or []
         self.max_trials = max_trials
         self.min_absolute_improvement = min_absolute_improvement
-        self.concurrency = concurrency
+        # Default concurrency=1 / sequential=True: local SLMs often spawn many
+        # idle worker threads when hammered concurrently. Explicit concurrency>1
+        # auto-disables sequential unless sequential=True is forced.
+        if sequential is None:
+            self.sequential = concurrency <= 1
+        else:
+            self.sequential = sequential
+        self.concurrency = 1 if self.sequential else max(1, concurrency)
         self.experiment_dir = experiment_dir
         self.auto_report = auto_report
         self.rewrite_passes = rewrite_passes
@@ -344,6 +384,9 @@ class PromptFitter:
         self.llm_multipass = llm_multipass
         self.slm_default_passes = slm_default_passes
         self.llm_default_passes = llm_default_passes
+        self.max_generalization_gap = max_generalization_gap
+        self.holdout_fraction = holdout_fraction
+        self.drain_seconds = drain_seconds
         # Optional pre-set baseline: overrides prompts.json on first step.
         # Used by PromptFitterBridge to compound improvements across epochs.
         self._baseline_system_prompt: str | None = baseline_system_prompt
@@ -469,12 +512,16 @@ class PromptFitter:
         t0 = time.perf_counter()
         trials: list[dict[str, Any]] = []
         score_history: list[RoundStats] = []
+        learnings_history: list[Any] = []
 
         logger.info(
-            "🚀 PromptFitter.fit — experiment={} agent={} max_trials={}",
+            "🚀 PromptFitter.fit — experiment={} agent={} max_trials={} "
+            "concurrency={} sequential={}",
             experiment_id,
             self.agent,
             self.max_trials,
+            self.concurrency,
+            self.sequential,
         )
         await self._callbacks.emit(
             OptimizationEvent.FIT_START,
@@ -488,6 +535,48 @@ class PromptFitter:
 
         metric = self._augment_metric_with_local_judges(metric)
 
+        # ── Generalization safety net: always reserve a holdout ──────
+        from agentomatic.optimize.learning import (
+            check_generalization,
+            split_holdout,
+            synthesize_epoch_learning,
+        )
+
+        fit_valset = valset
+        holdout_set: Dataset | None = testset
+        if holdout_set is None:
+
+            def _as_dicts(pts: list[Any]) -> list[dict[str, Any]]:
+                return [p.to_dict() if hasattr(p, "to_dict") else p for p in pts]
+
+            fit_pts, hold_pts = split_holdout(
+                list(valset),
+                fraction=self.holdout_fraction,
+                min_size=1,
+            )
+            holdout_source = "valset"
+            # Tiny valsets: borrow holdout from train so generalization
+            # safety stays always-on (never silently skip).
+            if not hold_pts and trainset is not None and len(trainset) >= 2:
+                _fit_train, hold_pts = split_holdout(
+                    list(trainset),
+                    fraction=self.holdout_fraction,
+                    min_size=1,
+                )
+                fit_pts = list(valset)
+                holdout_source = "trainset"
+            if hold_pts:
+                # Rebuild fit valset only when we carved holdout out of it.
+                if holdout_source == "valset":
+                    fit_valset = Dataset.from_list(_as_dicts(fit_pts))
+                holdout_set = Dataset.from_list(_as_dicts(hold_pts))
+                logger.info(
+                    "🛡️  Generalization holdout: {} fit / {} holdout (from {})",
+                    len(fit_valset),
+                    len(holdout_set),
+                    holdout_source,
+                )
+
         # ── Step 1: Load baseline config ─────────────────────────────
         logger.info("📦 Step 1/10 — Loading baseline config")
         baseline_config = self._load_baseline_config()
@@ -499,11 +588,11 @@ class PromptFitter:
         # ── Step 2: Evaluate baseline on validation set ──────────────
         logger.info(
             "📊 Step 2/10 — Evaluating baseline on valset ({} pts)",
-            len(valset),
+            len(fit_valset),
         )
         baseline_score, baseline_dims, baseline_details = await self._evaluate_config(
             baseline_config,
-            valset,
+            fit_valset,
             metric,
         )
         logger.info("📊 Baseline score: {:.4f}", baseline_score)
@@ -552,10 +641,28 @@ class PromptFitter:
         else:
             logger.info("   No failures detected — baseline is strong.")
 
+        # Baseline holdout score (generalization reference)
+        baseline_holdout_score: float | None = None
+        if holdout_set is not None and len(holdout_set) > 0:
+            try:
+                baseline_holdout_score, _, _ = await self._evaluate_config(
+                    baseline_config,
+                    holdout_set,
+                    metric,
+                )
+                logger.info(
+                    "🛡️  Baseline holdout score: {:.4f} (gap vs fit: {:+.4f})",
+                    baseline_holdout_score,
+                    baseline_score - baseline_holdout_score,
+                )
+            except Exception as exc:
+                logger.warning("Baseline holdout evaluation failed: {}", exc)
+
         # ── Iterative optimisation loop (Steps 4-7) ──────────────────
         best_config = baseline_config
         best_score = baseline_score
         best_dims = dict(baseline_dims)
+        best_holdout_score = baseline_holdout_score
         no_improvement_rounds = 0
 
         max_rounds = max(1, self.max_trials // _CANDIDATES_PER_ROUND)
@@ -566,8 +673,8 @@ class PromptFitter:
             max_rounds * _CANDIDATES_PER_ROUND,
         )
 
-        # Prepare dataset points for the runner/optimizer
-        val_points = [dp.to_dict() for dp in valset]
+        # Prepare dataset points for the runner/optimizer (fit split only)
+        val_points = [dp.to_dict() for dp in fit_valset]
         train_points = [dp.to_dict() for dp in trainset]
 
         # Prepare minibatch — clamp to available data so we never claim
@@ -636,6 +743,7 @@ class PromptFitter:
                 current_score=best_score,
                 current_dims=dict(best_dims),
                 score_history=list(score_history),
+                learnings_history=list(learnings_history),
                 failure_clusters=failure_clusters_raw,
                 eval_details=eval_results,
                 dataset_summary=dataset_summary,
@@ -774,12 +882,35 @@ class PromptFitter:
             )
 
             round_improved = False
+            accepted_name = ""
             for cand, mini_score, _ in promotable:
                 try:
                     full_score, full_dims, full_details = await self._evaluate_config(
                         cand.config,
-                        valset,
+                        fit_valset,
                         metric,
+                    )
+                    # Always-on generalization check on holdout
+                    cand_holdout: float | None = None
+                    if holdout_set is not None and len(holdout_set) > 0:
+                        try:
+                            cand_holdout, _, _ = await self._evaluate_config(
+                                cand.config,
+                                holdout_set,
+                                metric,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "      Holdout eval failed for {}: {}",
+                                cand.name,
+                                exc,
+                            )
+                    gen_check = check_generalization(
+                        fit_score=full_score,
+                        holdout_score=cand_holdout,
+                        max_gap=self.max_generalization_gap,
+                        min_holdout_improvement=0.0,
+                        baseline_holdout=baseline_holdout_score,
                     )
                     trials.append(
                         {
@@ -788,11 +919,14 @@ class PromptFitter:
                             "source": cand.source,
                             "phase": "full_val",
                             "score": full_score,
+                            "holdout_score": cand_holdout,
+                            "generalization": gen_check.to_dict(),
                             "dimensions": dict(full_dims),
                         }
                     )
                     logger.info(
-                        "      {} full-val: {:.4f} (minibatch was {:.4f})",
+                        "      {} full-val: {:.4f} (minibatch was {:.4f})"
+                        + (f", holdout={cand_holdout:.4f}" if cand_holdout is not None else ""),
                         cand.name,
                         full_score,
                         mini_score,
@@ -809,6 +943,10 @@ class PromptFitter:
                         composite_baseline=best_score,
                         composite_candidate=full_score,
                     )
+                    if accept and not gen_check.ok:
+                        accept = False
+                        reason = f"Generalization safety net: {gen_check.reason}"
+                        logger.warning("      🛡️  {}", reason)
 
                     if accept:
                         logger.info(
@@ -846,8 +984,10 @@ class PromptFitter:
                         best_config = cand.config
                         best_score = full_score
                         best_dims = dict(full_dims)
+                        best_holdout_score = cand_holdout
                         eval_results = self._build_eval_results(full_details, metric)
                         round_improved = True
+                        accepted_name = cand.name
                     else:
                         logger.info(
                             "      ❌ Rejected: {} — {}",
@@ -934,6 +1074,25 @@ class PromptFitter:
                     elapsed_seconds=round_elapsed,
                 )
             )
+            # Progressive epoch learnings (auditable prompt evolution)
+            epoch_learning = synthesize_epoch_learning(
+                round_idx=round_idx,
+                prompt_snapshot=best_config.system_prompt,
+                score=best_score,
+                dims=dict(best_dims),
+                eval_details=eval_results,
+                accepted=round_improved,
+                candidate_name=accepted_name,
+                train_score=best_score,
+                holdout_score=best_holdout_score,
+            )
+            learnings_history.append(epoch_learning)
+            logger.info(
+                "   🧠 Epoch learnings: {} worked / {} failed / focus={}",
+                len(epoch_learning.what_worked),
+                len(epoch_learning.what_failed),
+                "; ".join(epoch_learning.next_focus[:2]) or "n/a",
+            )
             await self._callbacks.emit(
                 OptimizationEvent.ROUND_END,
                 EventData(
@@ -964,9 +1123,10 @@ class PromptFitter:
                 metric_deltas[dim] = round(delta, 4)
         metric_deltas["composite"] = round(best_score - baseline_score, 4)
 
-        # ── Step 9: Validate on testset ──────────────────────────────
-        test_score: float | None = None
-        if testset is not None:
+        # ── Step 9: Final holdout / test-set validation ──────────────
+        test_score: float | None = best_holdout_score
+        if testset is not None and holdout_set is not testset:
+            # Explicit testset was provided separately from auto-holdout
             logger.info("🧪 Step 9/10 — Test-set validation ({} pts)", len(testset))
             try:
                 test_score_val, test_dims, _ = await self._evaluate_config(
@@ -975,18 +1135,28 @@ class PromptFitter:
                     metric,
                 )
                 test_score = test_score_val
+                best_holdout_score = test_score_val
                 logger.info("🧪 Test score: {:.4f}", test_score)
                 if test_dims:
                     for dim, val in test_dims.items():
                         logger.debug("   {}: {:.4f}", dim, val)
             except Exception as exc:
                 logger.warning("Test-set evaluation failed: {}", exc)
+        elif best_holdout_score is not None:
+            logger.info(
+                "🧪 Step 9/10 — Holdout generalization score: {:.4f}",
+                best_holdout_score,
+            )
         else:
-            logger.info("⏭️  Step 9/10 — No testset provided, skipping")
+            logger.info("⏭️  Step 9/10 — No holdout/testset available")
 
         # ── Step 10: Build and return PromptFitResult ────────────────
         duration = time.perf_counter() - t0
         logger.info("📦 Step 10/10 — Building PromptFitResult")
+
+        gen_gap = None
+        if best_holdout_score is not None:
+            gen_gap = best_score - best_holdout_score
 
         result = PromptFitResult(
             best_config=best_config,
@@ -1002,6 +1172,10 @@ class PromptFitter:
             experiment_id=experiment_id,
             agent=self.agent,
             score_history=[rs.score for rs in score_history],
+            prompt_history=[e.to_dict() for e in learnings_history],
+            holdout_score=best_holdout_score,
+            baseline_holdout_score=baseline_holdout_score,
+            generalization_gap=gen_gap,
         )
 
         # Build deployment recommendation
@@ -1050,11 +1224,44 @@ class PromptFitter:
         except Exception as exc:
             logger.warning("Failed to save artefacts: {}", exc)
 
-        # Final summary
+        # Persist auditable retrain artefacts into the platform store
+        try:
+            from agentomatic.optimize.fit_store import persist_fit_result
+
+            await persist_fit_result(result, experiment_dir=self.experiment_dir)
+        except Exception as exc:
+            logger.debug("Optional fit store persist skipped: {}", exc)
+
+        # Always write local retrain_history.jsonl for offline auditability
+        try:
+            artefact_dir = Path(self.experiment_dir) / self.agent
+            artefact_dir.mkdir(parents=True, exist_ok=True)
+            index_path = artefact_dir / "retrain_history.jsonl"
+            index_row = {
+                "experiment_id": experiment_id,
+                "agent": self.agent,
+                "baseline_score": baseline_score,
+                "best_score": best_score,
+                "absolute_improvement": best_score - baseline_score,
+                "holdout_score": best_holdout_score,
+                "generalization_gap": gen_gap,
+                "n_epochs": len(learnings_history),
+                "duration_seconds": round(duration, 2),
+            }
+            with index_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(index_row, ensure_ascii=False, default=str) + "\n")
+        except Exception as exc:
+            logger.warning("Failed to append retrain_history.jsonl: {}", exc)
+
+        # Final summary (Keras-style)
         logger.info("\n{}", result.summary())
+        if result.score_history:
+            from agentomatic.optimize.config import _score_sparkline
+
+            logger.info("📈 Loss/score curve: {}", _score_sparkline(result.score_history))
 
         if test_score is not None:
-            logger.info("🧪 Test score: {:.4f}", test_score)
+            logger.info("🧪 Holdout/test score: {:.4f}", test_score)
 
         await self._callbacks.emit(
             OptimizationEvent.FIT_COMPLETE,
@@ -1068,6 +1275,15 @@ class PromptFitter:
                 elapsed_seconds=time.perf_counter() - t0,
             ),
         )
+
+        # Drain: give local LLM servers / HTTP pools time to release
+        # connections after the async optimisation loop (avoids "connection
+        # reset" / half-closed socket errors on the next call).
+        if self.drain_seconds > 0:
+            import asyncio
+
+            logger.info("⏳ Draining for {:.1f}s after fit loop…", self.drain_seconds)
+            await asyncio.sleep(self.drain_seconds)
 
         return result
 
@@ -1150,8 +1366,25 @@ class PromptFitter:
         """
         points = [dp.to_dict() for dp in dataset]
 
+        # Inject model_params for deterministic eval. Prefer candidate
+        # overrides; default temperature=0.0 so scoring does not oscillate
+        # from sampling noise (common 0.33↔0.67 judge/agent jitter).
+        eval_params = dict(config.model_params or {})
+        eval_params.setdefault("temperature", 0.0)
+        augmented_points: list[dict[str, Any]] = []
+        for point in points:
+            p = dict(point)
+            meta = dict(p.get("metadata") or {})
+            invoke = dict(meta.get("invoke") or {})
+            invoke.setdefault("model_params", eval_params)
+            invoke.setdefault("temperature", eval_params.get("temperature", 0.0))
+            meta["invoke"] = invoke
+            meta["model_params"] = eval_params
+            p["metadata"] = meta
+            augmented_points.append(p)
+
         run_results: list[RunResult] = await self._runner.run_dataset(
-            points,
+            augmented_points,
             prompt_override=config.system_prompt,
             concurrency=self.concurrency,
         )
@@ -1214,14 +1447,20 @@ class PromptFitter:
                     for dim, val in point_dims.items():
                         dim_accumulators.setdefault(dim, []).append(val)
 
+                meta = eval_result.metadata or {}
                 eval_details.append(
                     {
                         "query": rr.query,
                         "response": rr.response,
                         "expected": rr.expected,
                         "avg_score": point_score,
-                        "dimensions": point_dims,
+                        "score": point_score,
+                        "dimensions": point_dims or meta.get("dimensions", {}),
                         "feedback": eval_result.reason,
+                        "motivation": meta.get("motivation", ""),
+                        "what_worked": meta.get("what_worked", []),
+                        "what_failed": meta.get("what_failed", []),
+                        "improvement_hints": meta.get("improvement_hints", []),
                         "details": [
                             {
                                 "metric": eval_result.metric_name,
@@ -1274,8 +1513,10 @@ class PromptFitter:
         else:
             system_prompt = self._load_prompt_text()
 
-        # Build default model_params from search space (first value of each)
-        model_params: dict[str, Any] = {}
+        # Build default model_params from search space (first value of each).
+        # Always default temperature to 0.0 for reproducible fit evaluation
+        # unless the search space (or an explicit candidate) overrides it.
+        model_params: dict[str, Any] = {"temperature": 0.0}
         if self._search_space.optimize_model_params:
             for param, values in self._search_space.model_param_space.items():
                 if values:

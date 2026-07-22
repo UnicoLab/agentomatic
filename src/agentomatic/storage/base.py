@@ -298,3 +298,154 @@ class BaseStore(ABC):
     ) -> list[dict[str, Any]]:
         """List checkpoints for a thread/namespace chronologically."""
         return []
+
+    # ------------------------------------------------------------------
+    # Invocation log history
+    # ------------------------------------------------------------------
+
+    async def create_invocation_log(
+        self,
+        *,
+        agent_name: str,
+        thread_id: str | None = None,
+        run_id: str | None = None,
+        endpoint: str = "invoke",
+        input_data: dict[str, Any] | None = None,
+        output_data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        error: str | None = None,
+        duration_ms: float | None = None,
+        status: str = "ok",
+        log_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a per-agent invocation log entry.
+
+        Default implementation is a no-op stub. Override for persistence.
+        """
+        return {
+            "id": log_id or "",
+            "agent_name": agent_name,
+            "thread_id": thread_id,
+            "run_id": run_id,
+            "endpoint": endpoint,
+            "input": input_data or {},
+            "output": output_data or {},
+            "metadata": metadata or {},
+            "error": error,
+            "duration_ms": duration_ms,
+            "status": status,
+            "timestamp": None,
+        }
+
+    async def get_invocation_log(self, log_id: str) -> dict[str, Any] | None:
+        """Retrieve a single invocation log by ID."""
+        return None
+
+    async def list_invocation_logs(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List invocation logs with optional filters (newest first)."""
+        return []
+
+    async def count_invocation_logs(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+    ) -> int:
+        """Count invocation logs matching optional filters."""
+        return 0
+
+    async def save_log_analysis(
+        self,
+        *,
+        agent_name: str,
+        score: float | None,
+        summary: str,
+        status: str,
+        recommendations: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        analysis_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist an LLM log-analysis result."""
+        return {
+            "id": analysis_id or "",
+            "agent_name": agent_name,
+            "score": score,
+            "summary": summary,
+            "status": status,
+            "recommendations": recommendations or [],
+            "metadata": metadata or {},
+            "created_at": None,
+        }
+
+    async def get_latest_log_analysis(self, agent_name: str) -> dict[str, Any] | None:
+        """Return the most recent log analysis for an agent."""
+        return None
+
+    async def list_log_analyses(
+        self,
+        *,
+        agent_name: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List stored log analyses (newest first)."""
+        return []
+
+    # ------------------------------------------------------------------
+    # Optimization / retrain run history
+    # ------------------------------------------------------------------
+
+    async def create_optimization_run(
+        self,
+        *,
+        experiment_id: str,
+        agent_name: str,
+        baseline_score: float | None = None,
+        best_score: float | None = None,
+        prompt_versions: dict[str, Any] | None = None,
+        score_history: list[Any] | None = None,
+        learnings: list[Any] | None = None,
+        artefacts: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist an auditable optimization/retrain run."""
+        return {
+            "id": run_id or "",
+            "experiment_id": experiment_id,
+            "agent_name": agent_name,
+            "baseline_score": baseline_score,
+            "best_score": best_score,
+            "prompt_versions": prompt_versions or {},
+            "score_history": score_history or [],
+            "learnings": learnings or [],
+            "artefacts": artefacts or {},
+            "metadata": metadata or {},
+            "created_at": None,
+        }
+
+    async def get_optimization_run(self, run_id: str) -> dict[str, Any] | None:
+        """Retrieve a single optimization run by ID."""
+        return None
+
+    async def list_optimization_runs(
+        self,
+        *,
+        agent_name: str | None = None,
+        experiment_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List optimization runs (newest first)."""
+        return []

@@ -1837,8 +1837,15 @@ print(f"Report: {{out}}")
 
 apply_as = APPLY_AS or ("v2_fit" if APPLY else None)
 if apply_as and fit_result is not None and hasattr(fit_result, "apply"):
-    fit_result.apply(version=apply_as, agent_dir=str(HERE))
-    print(f"Applied {{apply_as!r}} → {{HERE}}")
+    # Refuse to write when there is no improvement (force=True to override).
+    written = fit_result.apply(version=apply_as, agent_dir=str(HERE))
+    if written:
+        print(f"Applied {{written!r}} → {{HERE}}")
+    else:
+        print(
+            "Skipped apply: no improvement (or generalization gap too large). "
+            "Use force=True / review holdout scores."
+        )
 else:
     print("Dry-run: set APPLY=True to persist the best prompt.")
 

@@ -39,6 +39,20 @@ The unified platform starts serving your API endpoints at `http://localhost:8000
 
 ---
 
+
+## Schema-driven input forms
+
+Studio fetches `GET /studio/agents/{name}/schemas` and renders a dynamic
+**SchemaForm** from the agent's JSON Schema (same idea as LangGraph Studio).
+
+- Required fields, types, and descriptions come from `input_schema`
+- Form ↔ Raw JSON toggle for power users
+- `output_schema` is shown as a read-only summary so you know what to expect
+  while debugging
+
+Declare schemas in `agents/<name>/schemas.py` (`CustomInvokeRequest` /
+`CustomInvokeResponse` or `<Agent>Request` / `<Agent>Response` Pydantic models).
+
 ## Framework Support
 
 Agentomatic Studio uses a **universal adapter system** to provide the best possible debugging experience for every agent framework:

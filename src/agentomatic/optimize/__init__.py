@@ -77,6 +77,11 @@ from agentomatic.optimize.judges import (
     LocalJudgeMetric,
     MultiJudgePanel,
 )
+from agentomatic.optimize.learning import (
+    EpochLearning,
+    check_generalization,
+    synthesize_epoch_learning,
+)
 
 # ── Pluggable LLM type system ────────────────────────────────────────
 from agentomatic.optimize.llm_types import (
@@ -211,6 +216,10 @@ __all__ = [
     "FailureClusterer",
     "FailureCluster",
     "DimensionAnalyzer",
+    # Epoch learning + generalization
+    "EpochLearning",
+    "check_generalization",
+    "synthesize_epoch_learning",
     # ── Deployment-first API ───────────────────────────────────────
     "EvalContract",
     "DeploymentRecommendation",

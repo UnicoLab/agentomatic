@@ -34,10 +34,13 @@ from sqlalchemy.ext.asyncio import (
 
 from .base import BaseStore
 from .models import (
+    AgentInvocationLogModel,
     Base,
     CheckpointModel,
     FeedbackModel,
+    LogAnalysisModel,
     MessageModel,
+    OptimizationRunModel,
     SuspendedStateModel,
     ThreadModel,
 )
@@ -621,3 +624,247 @@ class SQLAlchemyStore(BaseStore):
 
             result = await session.execute(stmt)
             return [c.to_dict() for c in result.scalars().all()]
+
+    # ------------------------------------------------------------------
+    # Invocation log history
+    # ------------------------------------------------------------------
+
+    async def create_invocation_log(
+        self,
+        *,
+        agent_name: str,
+        thread_id: str | None = None,
+        run_id: str | None = None,
+        endpoint: str = "invoke",
+        input_data: dict[str, Any] | None = None,
+        output_data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        error: str | None = None,
+        duration_ms: float | None = None,
+        status: str = "ok",
+        log_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a per-agent invocation log entry."""
+        async with self._session() as session:
+            kwargs: dict[str, Any] = {
+                "agent_name": agent_name,
+                "thread_id": thread_id,
+                "run_id": run_id,
+                "endpoint": endpoint,
+                "input_json": input_data or {},
+                "output_json": output_data or {},
+                "metadata_json": metadata or {},
+                "error": error,
+                "duration_ms": duration_ms,
+                "status": status,
+            }
+            if log_id:
+                kwargs["id"] = log_id
+            row = AgentInvocationLogModel(**kwargs)
+            session.add(row)
+            await session.commit()
+            await session.refresh(row)
+            return row.to_dict()
+
+    async def get_invocation_log(self, log_id: str) -> dict[str, Any] | None:
+        """Retrieve a single invocation log by ID."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(AgentInvocationLogModel).where(AgentInvocationLogModel.id == log_id)
+            )
+            row = result.scalar_one_or_none()
+            return row.to_dict() if row else None
+
+    def _invocation_log_filters(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+    ) -> list[Any]:
+        """Build SQLAlchemy filter clauses for invocation logs."""
+        clauses: list[Any] = []
+        if agent_name:
+            clauses.append(AgentInvocationLogModel.agent_name == agent_name)
+        if thread_id:
+            clauses.append(AgentInvocationLogModel.thread_id == thread_id)
+        if status:
+            clauses.append(AgentInvocationLogModel.status == status)
+        if endpoint:
+            clauses.append(AgentInvocationLogModel.endpoint == endpoint)
+        return clauses
+
+    async def list_invocation_logs(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List invocation logs with optional filters (newest first)."""
+        async with self._session() as session:
+            stmt = select(AgentInvocationLogModel)
+            for clause in self._invocation_log_filters(
+                agent_name=agent_name,
+                thread_id=thread_id,
+                status=status,
+                endpoint=endpoint,
+            ):
+                stmt = stmt.where(clause)
+            stmt = (
+                stmt.order_by(AgentInvocationLogModel.timestamp.desc()).offset(offset).limit(limit)
+            )
+            result = await session.execute(stmt)
+            return [row.to_dict() for row in result.scalars().all()]
+
+    async def count_invocation_logs(
+        self,
+        *,
+        agent_name: str | None = None,
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+    ) -> int:
+        """Count invocation logs matching optional filters."""
+        async with self._session() as session:
+            stmt = select(func.count(AgentInvocationLogModel.id))
+            for clause in self._invocation_log_filters(
+                agent_name=agent_name,
+                thread_id=thread_id,
+                status=status,
+                endpoint=endpoint,
+            ):
+                stmt = stmt.where(clause)
+            result = await session.execute(stmt)
+            return int(result.scalar_one())
+
+    async def save_log_analysis(
+        self,
+        *,
+        agent_name: str,
+        score: float | None,
+        summary: str,
+        status: str,
+        recommendations: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        analysis_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist an LLM log-analysis result."""
+        async with self._session() as session:
+            kwargs: dict[str, Any] = {
+                "agent_name": agent_name,
+                "score": score,
+                "summary": summary,
+                "status": status,
+                "recommendations": recommendations or [],
+                "metadata_json": metadata or {},
+            }
+            if analysis_id:
+                kwargs["id"] = analysis_id
+            row = LogAnalysisModel(**kwargs)
+            session.add(row)
+            await session.commit()
+            await session.refresh(row)
+            return row.to_dict()
+
+    async def get_latest_log_analysis(self, agent_name: str) -> dict[str, Any] | None:
+        """Return the most recent log analysis for an agent."""
+        async with self._session() as session:
+            stmt = (
+                select(LogAnalysisModel)
+                .where(LogAnalysisModel.agent_name == agent_name)
+                .order_by(LogAnalysisModel.created_at.desc())
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
+            return row.to_dict() if row else None
+
+    async def list_log_analyses(
+        self,
+        *,
+        agent_name: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List stored log analyses (newest first)."""
+        async with self._session() as session:
+            stmt = select(LogAnalysisModel)
+            if agent_name:
+                stmt = stmt.where(LogAnalysisModel.agent_name == agent_name)
+            stmt = stmt.order_by(LogAnalysisModel.created_at.desc()).offset(offset).limit(limit)
+            result = await session.execute(stmt)
+            return [row.to_dict() for row in result.scalars().all()]
+
+    # ------------------------------------------------------------------
+    # Optimization / retrain run history
+    # ------------------------------------------------------------------
+
+    async def create_optimization_run(
+        self,
+        *,
+        experiment_id: str,
+        agent_name: str,
+        baseline_score: float | None = None,
+        best_score: float | None = None,
+        prompt_versions: dict[str, Any] | None = None,
+        score_history: list[Any] | None = None,
+        learnings: list[Any] | None = None,
+        artefacts: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist an auditable optimization/retrain run."""
+        async with self._session() as session:
+            kwargs: dict[str, Any] = {
+                "experiment_id": experiment_id,
+                "agent_name": agent_name,
+                "baseline_score": baseline_score,
+                "best_score": best_score,
+                "prompt_versions": prompt_versions or {},
+                "score_history": score_history or [],
+                "learnings": learnings or [],
+                "artefacts": artefacts or {},
+                "metadata_json": metadata or {},
+            }
+            if run_id:
+                kwargs["id"] = run_id
+            row = OptimizationRunModel(**kwargs)
+            session.add(row)
+            await session.commit()
+            await session.refresh(row)
+            return row.to_dict()
+
+    async def get_optimization_run(self, run_id: str) -> dict[str, Any] | None:
+        """Retrieve a single optimization run by ID."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(OptimizationRunModel).where(OptimizationRunModel.id == run_id)
+            )
+            row = result.scalar_one_or_none()
+            return row.to_dict() if row else None
+
+    async def list_optimization_runs(
+        self,
+        *,
+        agent_name: str | None = None,
+        experiment_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List optimization runs (newest first)."""
+        async with self._session() as session:
+            stmt = select(OptimizationRunModel)
+            if agent_name:
+                stmt = stmt.where(OptimizationRunModel.agent_name == agent_name)
+            if experiment_id:
+                stmt = stmt.where(OptimizationRunModel.experiment_id == experiment_id)
+            stmt = (
+                stmt.order_by(OptimizationRunModel.created_at.desc()).offset(offset).limit(limit)
+            )
+            result = await session.execute(stmt)
+            return [row.to_dict() for row in result.scalars().all()]

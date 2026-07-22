@@ -307,6 +307,13 @@ class ForkThreadRequest(BaseModel):
     title: str | None = None
 
 
+class AnalyzeLogsRequest(BaseModel):
+    """Optional knobs for LLM log analysis."""
+
+    sample_limit: int = Field(20, ge=1, le=100, description="Max recent logs to sample")
+    persist: bool = Field(True, description="Save analysis result to the store")
+
+
 # ---------------------------------------------------------------------------
 # Router Factory
 # ---------------------------------------------------------------------------
@@ -322,6 +329,8 @@ def create_default_router(
     max_history_messages: int = 50,
     summarize_after: int = 30,
     task_manager: Any | None = None,
+    logs_history: bool = False,
+    allow_logsllm_analysis: bool = False,
 ) -> APIRouter:
     """Create a full set of auto-generated endpoints for an agent.
 
@@ -342,6 +351,10 @@ def create_default_router(
       POST /feedback            — submit user feedback
       GET  /feedback            — list agent feedback
       GET  /feedback/export     — export feedback as JSONL
+      GET  /logs                — list invocation logs (when logs_history)
+      GET  /logs/{log_id}       — get a single invocation log
+      POST /logs/analyze        — LLM log analysis (when allowed)
+      GET  /logs/analysis       — latest analysis result
 
     Args:
       agent_name: Unique name of the agent.
@@ -349,6 +362,8 @@ def create_default_router(
       thread_store: Optional thread-storage backend.
       state_factory: Custom state builder callable.
       response_extractor: Custom response extractor callable.
+      logs_history: Persist invoke/chat/stream history when a store is set.
+      allow_logsllm_analysis: Enable LLM analysis endpoints over those logs.
 
     Returns:
       A fully-wired :class:`~fastapi.APIRouter`.
@@ -403,6 +418,13 @@ def create_default_router(
     _schema_validator = None
     if agent and agent.schema_validator:
         _schema_validator = agent.schema_validator
+
+    # ── Invocation log recorder (optional) ────────────────────────
+    log_recorder = None
+    if logs_history and thread_store is not None:
+        from agentomatic.logs.recorder import InvocationLogRecorder
+
+        log_recorder = InvocationLogRecorder(thread_store)
 
     # ── Memory Manager ────────────────────────────────────────────
     # Use ``is not None`` so a lazy store proxy (truthy only after
@@ -573,6 +595,18 @@ def create_default_router(
                 response_data = response.model_dump() if hasattr(response, "model_dump") else {}
                 _schema_validator.validate_output(response_data)
 
+            if log_recorder is not None:
+                await log_recorder.record(
+                    agent_name=agent_name,
+                    endpoint="invoke",
+                    input_data=request,
+                    output_data=response,
+                    metadata={"prompt_version": state.get("prompt_version")},
+                    thread_id=thread_id or None,
+                    duration_ms=round(duration_ms, 2),
+                    status="ok",
+                )
+
             return response
         except AgentSuspendedException as exc:
             if thread_store:
@@ -582,6 +616,17 @@ def create_default_router(
                     agent_name=agent_name,
                     node_name=exc.node_name,
                     state_json=exc.state_snapshot,
+                )
+            if log_recorder is not None:
+                await log_recorder.record(
+                    agent_name=agent_name,
+                    endpoint="invoke",
+                    input_data=request,
+                    metadata={"prompt_version": state.get("prompt_version")},
+                    thread_id=thread_id or None,
+                    duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                    status="suspended",
+                    error=exc.message,
                 )
             raise HTTPException(
                 status_code=202,
@@ -595,8 +640,19 @@ def create_default_router(
         except HTTPException:
             raise
         except Exception as exc:
+            if log_recorder is not None:
+                await log_recorder.record(
+                    agent_name=agent_name,
+                    endpoint="invoke",
+                    input_data=request,
+                    metadata={"prompt_version": state.get("prompt_version")},
+                    thread_id=thread_id or None,
+                    duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                    status="error",
+                    error=str(exc),
+                )
             logger.error(f"Agent {agent_name} invocation failed: {exc}")
-            raise HTTPException(500, f"Agent invocation failed: {exc}") from exc
+            raise HTTPException(500, detail={"error": f"Agent invocation failed: {exc}"}) from exc
 
     async def invoke_stream(request: Any) -> StreamingResponse:
         """Invoke agent with SSE streaming."""
@@ -631,9 +687,12 @@ def create_default_router(
             _raw_instance if isinstance(_raw_instance, BaseGraphAgent) else None
         )
 
+        stream_t0 = time.perf_counter()
+
         async def event_stream():
             """Yield SSE frames from graph or node execution."""
             collected_response = ""
+            collected_output: dict[str, Any] | None = None
             try:
                 if class_agent is not None:
                     # Stream per-node updates via AgentGraph.astream, then the
@@ -656,6 +715,7 @@ def create_default_router(
                     yield f"data: {json.dumps(result, default=str)}\n\n"
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")
+                        collected_output = result
                 elif agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
@@ -663,11 +723,13 @@ def create_default_router(
                         # Collect response for persistence
                         if isinstance(event, dict) and "response" in event:
                             collected_response = event["response"]
+                            collected_output = event
                 elif agent.node_fn:
                     result = await agent.node_fn(state)
                     yield f"data: {json.dumps(result, default=str)}\n\n"
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")
+                        collected_output = result
                 yield "data: [DONE]\n\n"
 
                 # Persist the turn after streaming completes
@@ -678,6 +740,17 @@ def create_default_router(
                         collected_response,
                         agent_name=agent.slug,
                     )
+                if log_recorder is not None:
+                    await log_recorder.record(
+                        agent_name=agent_name,
+                        endpoint="stream",
+                        input_data=request,
+                        output_data=collected_output or {"response": collected_response},
+                        metadata={"prompt_version": state.get("prompt_version")},
+                        thread_id=thread_id or None,
+                        duration_ms=round((time.perf_counter() - stream_t0) * 1000, 2),
+                        status="ok",
+                    )
             except AgentSuspendedException as exc:
                 if thread_store:
                     await thread_store.save_suspended_state(
@@ -687,8 +760,30 @@ def create_default_router(
                         node_name=exc.node_name,
                         state_json=exc.state_snapshot,
                     )
+                if log_recorder is not None:
+                    await log_recorder.record(
+                        agent_name=agent_name,
+                        endpoint="stream",
+                        input_data=request,
+                        metadata={"prompt_version": state.get("prompt_version")},
+                        thread_id=thread_id or None,
+                        duration_ms=round((time.perf_counter() - stream_t0) * 1000, 2),
+                        status="suspended",
+                        error=exc.message,
+                    )
                 yield f"data: {json.dumps({'status': 'suspended', 'approval_id': exc.approval_id, 'node_name': exc.node_name, 'message': exc.message})}\n\n"
             except Exception as exc:
+                if log_recorder is not None:
+                    await log_recorder.record(
+                        agent_name=agent_name,
+                        endpoint="stream",
+                        input_data=request,
+                        metadata={"prompt_version": state.get("prompt_version")},
+                        thread_id=thread_id or None,
+                        duration_ms=round((time.perf_counter() - stream_t0) * 1000, 2),
+                        status="error",
+                        error=str(exc),
+                    )
                 yield f"data: {json.dumps({'error': str(exc)})}\n\n"
 
         return StreamingResponse(
@@ -870,7 +965,7 @@ def create_default_router(
                     },
                 )
 
-            return {
+            chat_response = {
                 "response": response_text,
                 "output": structured_output,
                 "thread_id": thread_id,
@@ -885,6 +980,18 @@ def create_default_router(
                 "metadata": res_meta,
                 "history_loaded": history_loaded,
             }
+            if log_recorder is not None:
+                await log_recorder.record(
+                    agent_name=agent_name,
+                    endpoint="chat",
+                    input_data=request,
+                    output_data=chat_response,
+                    metadata=res_meta,
+                    thread_id=thread_id,
+                    duration_ms=round(duration_ms, 2),
+                    status="ok",
+                )
+            return chat_response
         except AgentSuspendedException as exc:
             if thread_store:
                 await thread_store.save_suspended_state(
@@ -893,6 +1000,17 @@ def create_default_router(
                     agent_name=agent_name,
                     node_name=exc.node_name,
                     state_json=exc.state_snapshot,
+                )
+            if log_recorder is not None:
+                await log_recorder.record(
+                    agent_name=agent_name,
+                    endpoint="chat",
+                    input_data=request,
+                    metadata={"prompt_version": state.get("prompt_version")},
+                    thread_id=thread_id,
+                    duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                    status="suspended",
+                    error=exc.message,
                 )
             raise HTTPException(
                 status_code=202,
@@ -906,8 +1024,19 @@ def create_default_router(
         except HTTPException:
             raise
         except Exception as exc:
+            if log_recorder is not None:
+                await log_recorder.record(
+                    agent_name=agent_name,
+                    endpoint="chat",
+                    input_data=request,
+                    metadata={"prompt_version": state.get("prompt_version")},
+                    thread_id=thread_id,
+                    duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+                    status="error",
+                    error=str(exc),
+                )
             logger.error(f"Chat with {agent_name} failed: {exc}")
-            raise HTTPException(500, f"Chat failed: {exc}") from exc
+            raise HTTPException(500, detail={"error": f"Chat failed: {exc}"}) from exc
 
     # ── GET /health ───────────────────────────────────────────────
     @router.get("/health")
@@ -1325,6 +1454,149 @@ def create_default_router(
             "data": jsonl,
             "count": len(jsonl.strip().split("\n")) if jsonl.strip() else 0,
         }
+
+    # ── GET /logs ─────────────────────────────────────────────────
+    @router.get("/logs")
+    async def list_invocation_logs(
+        thread_id: str | None = None,
+        status: str | None = None,
+        endpoint: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """List persisted invocation logs for this agent."""
+        if not logs_history:
+            raise HTTPException(
+                400,
+                detail={
+                    "error": "Invocation log history is disabled. "
+                    "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
+                },
+            )
+        if thread_store is None:
+            raise HTTPException(400, detail={"error": "Storage backend is not configured"})
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
+        logs = await thread_store.list_invocation_logs(
+            agent_name=agent_name,
+            thread_id=thread_id,
+            status=status,
+            endpoint=endpoint,
+            limit=limit,
+            offset=offset,
+        )
+        total = await thread_store.count_invocation_logs(
+            agent_name=agent_name,
+            thread_id=thread_id,
+            status=status,
+            endpoint=endpoint,
+        )
+        return {
+            "agent": agent_name,
+            "logs": logs,
+            "count": len(logs),
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    # ── GET /logs/analysis ────────────────────────────────────────
+    @router.get("/logs/analysis")
+    async def get_latest_log_analysis() -> dict[str, Any]:
+        """Return the most recent LLM log analysis for this agent."""
+        if not allow_logsllm_analysis:
+            raise HTTPException(
+                400,
+                detail={
+                    "error": "Log LLM analysis is disabled. "
+                    "Set allow_logsllm_analysis=True / "
+                    "AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1."
+                },
+            )
+        if thread_store is None:
+            raise HTTPException(400, detail={"error": "Storage backend is not configured"})
+        analysis = await thread_store.get_latest_log_analysis(agent_name)
+        if not analysis:
+            raise HTTPException(
+                404, detail={"error": f"No log analysis found for agent '{agent_name}'"}
+            )
+        return {"agent": agent_name, "analysis": analysis}
+
+    # ── POST /logs/analyze ────────────────────────────────────────
+    @router.post("/logs/analyze")
+    async def analyze_invocation_logs(
+        request: AnalyzeLogsRequest | None = None,
+    ) -> dict[str, Any]:
+        """Run LLM (or heuristic) analysis over recent invocation logs."""
+        if not allow_logsllm_analysis:
+            raise HTTPException(
+                400,
+                detail={
+                    "error": "Log LLM analysis is disabled. "
+                    "Set allow_logsllm_analysis=True / "
+                    "AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1."
+                },
+            )
+        if not logs_history:
+            raise HTTPException(
+                400,
+                detail={"error": "logs_history must be enabled to analyse invocation logs."},
+            )
+        if thread_store is None:
+            raise HTTPException(400, detail={"error": "Storage backend is not configured"})
+
+        opts = request or AnalyzeLogsRequest()
+        from agentomatic.logs.analyser import LogAnalyser
+
+        analyser = LogAnalyser(
+            thread_store,
+            sample_limit=opts.sample_limit,
+        )
+        try:
+            result = await analyser.analyse(agent_name, persist=opts.persist)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Log analysis failed for '{}': {}", agent_name, exc)
+            raise HTTPException(500, detail={"error": f"Log analysis failed: {exc}"}) from exc
+        return {"agent": agent_name, "analysis": result.to_dict()}
+
+    # ── GET /logs/{log_id} ────────────────────────────────────────
+    @router.get("/logs/{log_id}")
+    async def get_invocation_log(log_id: str) -> dict[str, Any]:
+        """Fetch a single invocation log by id."""
+        if not logs_history:
+            raise HTTPException(
+                400,
+                detail={
+                    "error": "Invocation log history is disabled. "
+                    "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
+                },
+            )
+        if thread_store is None:
+            raise HTTPException(400, detail={"error": "Storage backend is not configured"})
+        entry = await thread_store.get_invocation_log(log_id)
+        if not entry or entry.get("agent_name") != agent_name:
+            raise HTTPException(404, detail={"error": f"Log '{log_id}' not found"})
+        return entry
+
+    # ── GET /optimization-runs ────────────────────────────────────
+    @router.get("/optimization-runs")
+    async def list_optimization_runs(
+        experiment_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """List auditable prompt-fit / retrain runs for this agent."""
+        if thread_store is None:
+            raise HTTPException(400, detail={"error": "Storage backend is not configured"})
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
+        runs = await thread_store.list_optimization_runs(
+            agent_name=agent_name,
+            experiment_id=experiment_id,
+            limit=limit,
+            offset=offset,
+        )
+        return {"agent": agent_name, "runs": runs, "count": len(runs)}
 
     # ── GET /threads/{thread_id}/pending ──────────────────────────
     @router.get("/threads/{thread_id}/pending")

@@ -113,6 +113,97 @@ class Optimizer(Protocol):
 # ---------------------------------------------------------------------------
 
 
+def _rich_expected_reference(
+    *,
+    expected_output: dict[str, Any] | None,
+    metadata: dict[str, Any],
+    rubric: dict[str, Any],
+    input_data: dict[str, Any],
+) -> str | None:
+    """Build a judge-usable expected reference from example fields.
+
+    Boolean-flag outputs like ``{"next_action": True}`` are expanded into a
+    quality contract (field meaning + required shape) rather than the useless
+    phrase ``Response must include: 'next_action'``.
+    """
+    for key in ("judge_expected", "expected_reference", "quality_reference"):
+        val = metadata.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        if isinstance(val, dict) and val:
+            return json.dumps(val, ensure_ascii=False)
+
+    parts: list[str] = []
+    if rubric:
+        parts.append("## Rubric\n" + json.dumps(rubric, ensure_ascii=False))
+
+    if not expected_output:
+        return "\n\n".join(parts) if parts else None
+
+    exp = expected_output
+    is_flag_only = bool(exp) and all(isinstance(v, bool) for v in exp.values())
+
+    if is_flag_only:
+        include = [k for k, v in exp.items() if v is True]
+        exclude = [k for k, v in exp.items() if v is False]
+        contract_lines = [
+            "## Output quality contract (schema flags)",
+            "The expected_output uses boolean presence flags — they are NOT the "
+            "literal answer text. Score whether the response satisfies the "
+            "semantic intent of each field with correct, useful content.",
+        ]
+        if include:
+            contract_lines.append("Required fields (must be present with meaningful values):")
+            for k in include:
+                hint = _field_quality_hint(k, input_data)
+                contract_lines.append(f"- `{k}`: {hint}")
+        if exclude:
+            contract_lines.append("Forbidden fields: " + ", ".join(f"`{k}`" for k in exclude))
+        contract_lines.append(
+            "Structured expected flags (for reference): " + json.dumps(exp, ensure_ascii=False)
+        )
+        parts.append("\n".join(contract_lines))
+    else:
+        text_field = (
+            exp.get("response")
+            or exp.get("answer")
+            or (exp.get("content") if isinstance(exp.get("content"), str) else None)
+        )
+        if text_field:
+            parts.append(f"## Expected answer\n{text_field}")
+        parts.append("## Expected structured output\n" + json.dumps(exp, ensure_ascii=False))
+
+    return "\n\n".join(parts) if parts else None
+
+
+def _field_quality_hint(field_name: str, input_data: dict[str, Any]) -> str:
+    """Human-readable quality expectation for a boolean schema flag field."""
+    hints = {
+        "next_action": (
+            "Propose a concrete, actionable next step grounded in the query/context "
+            "(not just the key name)."
+        ),
+        "content": "Provide substantive, relevant content addressing the user request.",
+        "response": "Provide a clear, complete natural-language response.",
+        "answer": "Answer the question correctly and completely.",
+        "summary": "Summarize the key points accurately without hallucination.",
+        "reasoning": "Include brief, coherent reasoning that supports the conclusion.",
+    }
+    base = hints.get(
+        field_name,
+        f"Include a correct, non-empty `{field_name}` value that fulfills the task.",
+    )
+    q = (
+        input_data.get("question")
+        or input_data.get("query")
+        or input_data.get("current_query")
+        or ""
+    )
+    if q:
+        return f"{base} Context query: {str(q)[:160]}"
+    return base
+
+
 @dataclass
 class AgentExample:
     """Single evaluation example for an agent.
@@ -191,41 +282,22 @@ class AgentExample:
 
         # ── query: prefer the actual question text over meta-labels ──────
         query = (
-            self.input.get("question")      # actual question (e.g. French text)
-            or self.input.get("query")      # caller meta-label
+            self.input.get("question")  # actual question (e.g. French text)
+            or self.input.get("query")  # caller meta-label
             or self.input.get("current_query")  # agentomatic convention
             or self.input.get("request")
             or json.dumps(self.input)
         )
 
-        # ── expected answer: prefer explicit judge reference text ──────────
-        # ``metadata["judge_expected"]`` carries a human-written quality
-        # description that LLM judges can compare against the agent response.
-        # This is far more informative than auto-converting boolean flags.
-        expected: str | None = (self.metadata or {}).get("judge_expected") or None
-
-        if not expected and self.expected_output:
-            exp = self.expected_output
-            # Detect boolean-flag pattern: {key: True} means "output should include key/value"
-            is_flag_only = all(isinstance(v, bool) for v in exp.values()) if exp else False
-            if is_flag_only:
-                # Convert to readable description: True → include key, False → exclude key
-                include = [k for k, v in exp.items() if v is True]
-                exclude = [k for k, v in exp.items() if v is False]
-                parts = []
-                if include:
-                    parts.append("Response must include: " + ", ".join(f"'{k}'" for k in include))
-                if exclude:
-                    parts.append("Response must NOT include: " + ", ".join(f"'{k}'" for k in exclude))
-                expected = "; ".join(parts) if parts else None
-            else:
-                # Mixed or rich output: prefer known text fields, else serialise
-                expected = (
-                    exp.get("response")
-                    or exp.get("answer")
-                    or exp.get("content")
-                    or json.dumps(exp, ensure_ascii=False)
-                )
+        # ── expected answer: prefer rich quality references for judges ────
+        # Priority: explicit judge text → rubric → structured expected_output
+        # with a quality contract (never bare "Response must include: 'key'").
+        expected: str | None = _rich_expected_reference(
+            expected_output=self.expected_output,
+            metadata=self.metadata or {},
+            rubric=self.rubric or {},
+            input_data=self.input or {},
+        )
 
         # ── context: extract project snapshot for judge groundedness eval ─
         raw_ctx = self.input.get("context") or (self.metadata.get("invoke") or {}).get("context")
@@ -242,7 +314,8 @@ class AgentExample:
         # Ensure invoke payload carries agent inputs when not already set.
         if "invoke" not in meta and self.input:
             invoke = {
-                k: v for k, v in self.input.items()
+                k: v
+                for k, v in self.input.items()
                 if k not in {"query", "request", "question", "current_query"}
             }
             if invoke:

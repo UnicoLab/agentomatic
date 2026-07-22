@@ -209,6 +209,9 @@ class AgentPlatform:
         enable_tasks: bool = True,
         task_store: TaskStore | None = None,
         task_max_concurrency: int = 8,
+        # --- Invocation log history + optional LLM analysis ---
+        logs_history: bool = False,
+        allow_logsllm_analysis: bool = False,
     ) -> None:
         """Initialise the platform.
 
@@ -254,6 +257,10 @@ class AgentPlatform:
             enable_connections_context: Attach the routed agent's connection
                 manager to ``request.state.connections`` on every request
                 (default ``True``).
+            logs_history: When ``True``, persist full per-agent invoke/chat/
+                stream history (input, output, metadata) into ``store``.
+            allow_logsllm_analysis: When ``True``, expose LLM log-analysis
+                endpoints that score recent logs and return recommendations.
         """
         self.agents_dir = Path(agents_dir).resolve()
         self.plugins_dir = Path(plugins_dir).resolve()
@@ -270,6 +277,17 @@ class AgentPlatform:
 
         # Storage
         self._store = store
+        self._logs_history = logs_history
+        self._allow_logsllm_analysis = allow_logsllm_analysis
+        if self._logs_history and self._store is None:
+            from agentomatic.storage import MemoryStore
+
+            self._store = MemoryStore()
+            logger.warning(
+                "logs_history=True without an explicit store — using "
+                "MemoryStore (ephemeral). Pass SQLAlchemyStore(...) for "
+                "durable invocation history across restarts."
+            )
 
         # Middleware config
         self._enable_logging = enable_logging
@@ -858,6 +876,8 @@ class AgentPlatform:
                         max_history_messages=platform._max_history_messages,
                         summarize_after=platform._summarize_after,
                         task_manager=task_manager,
+                        logs_history=platform._logs_history,
+                        allow_logsllm_analysis=platform._allow_logsllm_analysis,
                     )
                     logger.debug(f"  📌 Auto-generated router for {name}")
                 if agent.router and agent.manifest.is_subagent:
@@ -867,6 +887,14 @@ class AgentPlatform:
                         f"  🔌 Mounted: {platform.api_prefix}/{name}"
                         + (f" (+ /{slug})" if slug != name else "")
                     )
+
+            # Wire fit-store persistence once the platform store is ready
+            try:
+                from agentomatic.optimize.fit_store import set_fit_store
+
+                set_fit_store(platform._store)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Fit store registration skipped: {}", exc)
 
             # Run startup hooks
             for hook in platform._on_startup:
@@ -878,6 +906,13 @@ class AgentPlatform:
             yield
 
             # --- Shutdown ---
+            try:
+                from agentomatic.optimize.fit_store import set_fit_store
+
+                set_fit_store(None)
+            except Exception:  # noqa: BLE001
+                pass
+
             # Stop custom endpoints
             for name, endpoint in platform._endpoint_registry.list_endpoints().items():
                 try:
@@ -1099,9 +1134,17 @@ class AgentPlatform:
                     max_history_messages=self._max_history_messages,
                     summarize_after=self._summarize_after,
                     task_manager=task_manager,
+                    logs_history=self._logs_history,
+                    allow_logsllm_analysis=self._allow_logsllm_analysis,
                 )
             if agent.router and agent.manifest.is_subagent:
                 _mount_agent_router(app, agent, name, self.api_prefix)
+
+        if self._logs_history:
+            logger.info(
+                "📜 Invocation log history enabled"
+                + (" (LLM analysis allowed)" if self._allow_logsllm_analysis else "")
+            )
 
         # ------------------------------------------------------------------
         # Mount Plugin API Routes
@@ -1655,6 +1698,8 @@ class AgentPlatform:
             "enable_connections_context": self._enable_connections_context,
             "enable_tasks": self._enable_tasks,
             "task_max_concurrency": self._task_max_concurrency,
+            "logs_history": self._logs_history,
+            "allow_logsllm_analysis": self._allow_logsllm_analysis,
         }
         if self._stack_arg:
             config["stack"] = self._stack_arg

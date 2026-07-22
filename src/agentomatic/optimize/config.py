@@ -47,6 +47,24 @@ from typing import Any
 
 from loguru import logger
 
+_SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
+
+
+def _score_sparkline(scores: list[float]) -> str:
+    """Render a tiny ASCII sparkline for score evolution."""
+    if not scores:
+        return ""
+    lo, hi = min(scores), max(scores)
+    span = hi - lo
+    if span <= 1e-12:
+        return _SPARK_BLOCKS[4] * len(scores)
+    chars: list[str] = []
+    max_idx = len(_SPARK_BLOCKS) - 1
+    for s in scores:
+        idx = int((s - lo) / span * max_idx)
+        chars.append(_SPARK_BLOCKS[min(idx, max_idx)])
+    return "".join(chars) + "  " + " → ".join(f"{s:.3f}" for s in scores)
+
 
 def escape_braces(text: str, preserve: list[str] | None = None) -> str:
     """Escape literal braces while preserving specific template variables.
@@ -313,6 +331,16 @@ class PromptFitResult:
     deployment_recommendation: Any = None  # DeploymentRecommendation
     score_history: list[float] = field(default_factory=list)
     """Per-round best scores (chronological). Populated by ``PromptFitter.fit()``."""
+    prompt_history: list[dict[str, Any]] = field(default_factory=list)
+    """Per-epoch prompt snapshots + learnings (auditable evolution trail)."""
+    holdout_score: float | None = None
+    """Generalization / holdout score for the best config (if evaluated)."""
+    baseline_holdout_score: float | None = None
+    """Baseline score on the same holdout slice."""
+    generalization_gap: float | None = None
+    """``best_score − holdout_score`` when holdout is available."""
+    applied: bool = False
+    """Whether :meth:`apply` successfully wrote a new prompt version."""
 
     # -- convenience properties ------------------------------------------
 
@@ -320,6 +348,11 @@ class PromptFitResult:
     def absolute_improvement(self) -> float:
         """Score lift: ``best_score − baseline_score``."""
         return self.best_score - self.baseline_score
+
+    @property
+    def improved(self) -> bool:
+        """True when best beats baseline by a positive epsilon."""
+        return self.absolute_improvement > 1e-9
 
     @property
     def history(self) -> list[float]:
@@ -398,13 +431,33 @@ class PromptFitResult:
                 lines.append(f"    • {metric}: {delta:+.4f}")
             lines.append("")
 
+        if self.holdout_score is not None:
+            lines.append(f"  Holdout score:  {self.holdout_score:.4f}")
+            if self.generalization_gap is not None:
+                lines.append(f"  Gen. gap:       {self.generalization_gap:+.4f}")
+            lines.append("")
+
+        if self.prompt_history:
+            lines.append(f"  Epoch learnings: {len(self.prompt_history)} recorded")
+            # Tiny ASCII loss/score curve
+            scores = [float(h.get("score", 0.0)) for h in self.prompt_history]
+            if scores:
+                spark = _score_sparkline(scores)
+                lines.append(f"  Score curve:     {spark}")
+            lines.append("")
+
         # Recommendation
-        if self.absolute_improvement > 0.05:
+        if not self.improved:
+            lines.append("  ❌ Recommendation: keep the baseline config (no improvement).")
+        elif self.generalization_gap is not None and self.generalization_gap > 0.15:
+            lines.append(
+                "  ⚠ Recommendation: val improved but generalization gap is high — "
+                "review before applying."
+            )
+        elif self.absolute_improvement > 0.05:
             lines.append("  ✅ Recommendation: apply the optimised config.")
-        elif self.absolute_improvement > 0:
-            lines.append("  🔶 Recommendation: marginal gain — review before applying.")
         else:
-            lines.append("  ❌ Recommendation: keep the baseline config.")
+            lines.append("  🔶 Recommendation: marginal gain — review before applying.")
 
         lines.append("=" * 60)
         return "\n".join(lines)
@@ -424,7 +477,12 @@ class PromptFitResult:
             "best_score": self.best_score,
             "baseline_score": self.baseline_score,
             "absolute_improvement": self.absolute_improvement,
+            "improved": self.improved,
             "score_history": self.score_history,
+            "prompt_history": self.prompt_history,
+            "holdout_score": self.holdout_score,
+            "baseline_holdout_score": self.baseline_holdout_score,
+            "generalization_gap": self.generalization_gap,
             "metric_deltas": self.metric_deltas,
             "param_suggestions": {k: asdict(v) for k, v in self.param_suggestions.items()},
             "best_config": self.best_config.to_dict(),
@@ -433,6 +491,7 @@ class PromptFitResult:
             "trials": self.trials,
             "suggestions": self.suggestions,
             "duration_seconds": self.duration_seconds,
+            "applied": self.applied,
             "deployment_recommendation": (
                 self.deployment_recommendation.to_dict()
                 if self.deployment_recommendation
@@ -446,7 +505,12 @@ class PromptFitResult:
         self,
         version: str = "v2_fit",
         agent_dir: str | None = None,
-    ) -> str:
+        *,
+        force: bool = False,
+        min_improvement: float = 0.0,
+        require_generalization: bool = True,
+        max_generalization_gap: float = 0.15,
+    ) -> str | None:
         """Persist the optimised configuration to disk.
 
         Writes two files into *agent_dir* (defaults to ``"."``):
@@ -455,14 +519,47 @@ class PromptFitResult:
            prompt, user template, and metadata.
         2. ``runtime_config.json`` — full :class:`PromptRuntimeConfig`
            serialised as JSON.
+        3. ``fit_history.jsonl`` — append-only audit trail of this apply.
+
+        By default refuses to write when there is no improvement
+        (``absolute_improvement <= min_improvement``). Pass ``force=True``
+        to override. When holdout scores exist and
+        ``require_generalization=True``, also refuses oversized
+        generalization gaps.
 
         Args:
-            version:   Version key for the new prompt entry.
-            agent_dir: Directory to write files into.  Defaults to cwd.
+            version: Version key for the new prompt entry.
+            agent_dir: Directory to write files into. Defaults to cwd.
+            force: Bypass improvement / generalization guards.
+            min_improvement: Minimum absolute improvement required.
+            require_generalization: Enforce holdout gap check when available.
+            max_generalization_gap: Max allowed ``best − holdout`` gap.
 
         Returns:
-            The *version* key that was written.
+            The *version* key that was written, or ``None`` if refused.
         """
+        if not force:
+            if self.absolute_improvement <= min_improvement:
+                logger.warning(
+                    "apply() refused: absolute_improvement={:+.4f} <= "
+                    "min_improvement={:.4f}. Pass force=True to override.",
+                    self.absolute_improvement,
+                    min_improvement,
+                )
+                return None
+            if (
+                require_generalization
+                and self.generalization_gap is not None
+                and self.generalization_gap > max_generalization_gap
+            ):
+                logger.warning(
+                    "apply() refused: generalization_gap={:+.4f} > "
+                    "max_generalization_gap={:.4f}. Pass force=True to override.",
+                    self.generalization_gap,
+                    max_generalization_gap,
+                )
+                return None
+
         base = Path(agent_dir) if agent_dir else Path(".")
         base.mkdir(parents=True, exist_ok=True)
 
@@ -483,6 +580,8 @@ class PromptFitResult:
                 "baseline_score": self.baseline_score,
                 "best_score": self.best_score,
                 "absolute_improvement": self.absolute_improvement,
+                "holdout_score": self.holdout_score,
+                "generalization_gap": self.generalization_gap,
                 "created_at": datetime.now(UTC).isoformat(),
             },
         }
@@ -504,6 +603,25 @@ class PromptFitResult:
         )
         logger.info("Wrote runtime config to {}", config_path.resolve())
 
+        # -- auditable retrain history -----------------------------------
+        history_path = base / "fit_history.jsonl"
+        history_row = {
+            "ts": datetime.now(UTC).isoformat(),
+            "version": version,
+            "experiment_id": self.experiment_id,
+            "agent": self.agent,
+            "baseline_score": self.baseline_score,
+            "best_score": self.best_score,
+            "absolute_improvement": self.absolute_improvement,
+            "holdout_score": self.holdout_score,
+            "generalization_gap": self.generalization_gap,
+            "prompt_history": self.prompt_history,
+            "score_history": self.score_history,
+        }
+        with history_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(history_row, ensure_ascii=False, default=str) + "\n")
+
+        self.applied = True
         return version
 
     def save(self, directory: str | Path) -> Path:
