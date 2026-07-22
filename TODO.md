@@ -20,3 +20,8 @@ looks liek we need to give much more data to the judge and to the prompt optimiz
 
 -> it woudl be nice to keep retrain history and everything so it's well auditable somehow
 -> make sure the artefacts and all the models are correctly stored in the DB and not in memory so we have persistance !
+
+
+- fit should avoid overfitting when optimizing prompts (tends to overfit to respond to provided data examples )- we need to add generalization safety net always
+- Prompts history with learnings at each epoch so we can trace the evolution and all learnings of optimization etc ! No
+- We should have main parameter like logs-hisyory=true and allow-logsllm-analysis=true that will automystore entire per agent history a with all inputs and outputs and metadata - everything. ! If activated .. we can then have a analyser agent providing recommendations based on the logs per agent with scoring, summary « , status, etc !!  So we have a real live LLM based analysis based on all logs etc !
