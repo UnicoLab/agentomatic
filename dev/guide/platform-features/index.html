@@ -1845,6 +1845,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#invocation-log-history-llm-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invocation log history &amp; LLM analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3390,6 +3401,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#invocation-log-history-llm-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invocation log history &amp; LLM analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4497,6 +4519,56 @@ Opt in to <code>any_error</code> when every exception should advance the chain.<
 <li><a href="../studio/">Studio Guide</a> — Studio debugging UI guide</li>
 <li><a href="../storage/">Storage Guide</a> — Storage backend configuration</li>
 </ul>
+<h2 id="invocation-log-history-llm-analysis">Invocation log history &amp; LLM analysis<a class="headerlink" href="#invocation-log-history-llm-analysis" title="Permanent link">&para;</a></h2>
+<p>Persist every invoke/chat/stream I/O per agent for auditability and live
+recommendations.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>  <span class="c1"># or MemoryStore</span>
+</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>
+</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+</span><span id="__span-47-5"><a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+</span><span id="__span-47-6"><a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;sqlite+aiosqlite:///./agentomatic.db&quot;</span><span class="p">),</span>
+</span><span id="__span-47-7"><a id="__codelineno-47-7" name="__codelineno-47-7" href="#__codelineno-47-7"></a>    <span class="n">logs_history</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-47-8"><a id="__codelineno-47-8" name="__codelineno-47-8" href="#__codelineno-47-8"></a>    <span class="n">allow_logsllm_analysis</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Env equivalents: <code>AGENTOMATIC_LOGS_HISTORY=1</code>,
+<code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1</code>.</p>
+<p>Endpoints (per agent):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/{agent}/logs</code></td>
+<td>List invocation logs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/{agent}/logs/{id}</code></td>
+<td>Fetch one log</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/{agent}/logs/analyze</code></td>
+<td>LLM/heuristic analysis</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/{agent}/logs/analysis</code></td>
+<td>Latest analysis</td>
+</tr>
+</tbody>
+</table>
+<p>Analysis returns <code>score</code>, <code>summary</code>, <code>status</code>, and <code>recommendations</code>.
+Optimization runs can also be persisted via <code>OptimizationRunStore</code> when a
+platform store is registered with <code>set_fit_store(store)</code>.</p>
 
 
 

@@ -2702,6 +2702,15 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 publishes). Install from git / an editable checkout until then.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Per-agent invocation log history + optional LLM analysis</strong>: Opt-in
+  flags <code>logs_history</code> / <code>AGENTOMATIC_LOGS_HISTORY</code> and
+  <code>allow_logsllm_analysis</code> / <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS</code> persist
+  full invoke/chat/stream payloads into the platform store
+  (<code>AgentInvocationLog</code>). REST endpoints: <code>GET /logs</code>, <code>GET /logs/{id}</code>,
+  <code>POST /logs/analyze</code>, <code>GET /logs/analysis</code>. Analyser samples/truncates
+  logs for API budget safety and falls back to a heuristic when no LLM
+  is configured. Related: <code>OptimizationRunStore</code> + <code>optimize/fit_store</code>
+  for auditable retrain artefacts.</li>
 <li><strong>Ordered LLM model fallbacks</strong> (ships in <strong>1.8.0</strong>): Configure
   <code>fallbacks</code> / <code>fallback_on</code> on stack LLM profiles or via
   <code>get_llm(..., fallbacks=..., fallback_on=...)</code>. On timeout, connection

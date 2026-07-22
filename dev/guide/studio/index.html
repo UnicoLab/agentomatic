@@ -1744,6 +1744,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#schema-driven-input-forms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema-driven input forms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#framework-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2458,6 +2469,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#schema-driven-input-forms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema-driven input forms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#framework-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2872,6 +2894,17 @@
 <p>This scaffolds a temporary demo agent and launches the platform with Studio enabled, giving you an instant hands-on experience with graph visualization, streaming, and state inspection.</p>
 </div>
 <hr />
+<h2 id="schema-driven-input-forms">Schema-driven input forms<a class="headerlink" href="#schema-driven-input-forms" title="Permanent link">&para;</a></h2>
+<p>Studio fetches <code>GET /studio/agents/{name}/schemas</code> and renders a dynamic
+<strong>SchemaForm</strong> from the agent's JSON Schema (same idea as LangGraph Studio).</p>
+<ul>
+<li>Required fields, types, and descriptions come from <code>input_schema</code></li>
+<li>Form ↔ Raw JSON toggle for power users</li>
+<li><code>output_schema</code> is shown as a read-only summary so you know what to expect
+  while debugging</li>
+</ul>
+<p>Declare schemas in <code>agents/&lt;name&gt;/schemas.py</code> (<code>CustomInvokeRequest</code> /
+<code>CustomInvokeResponse</code> or <code>&lt;Agent&gt;Request</code> / <code>&lt;Agent&gt;Response</code> Pydantic models).</p>
 <h2 id="framework-support">Framework Support<a class="headerlink" href="#framework-support" title="Permanent link">&para;</a></h2>
 <p>Agentomatic Studio uses a <strong>universal adapter system</strong> to provide the best possible debugging experience for every agent framework:</p>
 <table>
