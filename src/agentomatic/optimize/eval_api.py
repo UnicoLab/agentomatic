@@ -307,6 +307,19 @@ def run_eval(
         stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         out = reports / f"eval_{config.agent_name}_{stamp}.html"
 
+    run_config = {
+        "stack": stack_name,
+        "model": model,
+        "split": config.split,
+        "limit": config.limit,
+        "use_judge": config.use_judge,
+        "required_keys": list(config.required_keys or []),
+        "judge_dimensions": list(config.judge_dimensions or []),
+        "judge_criteria": config.judge_criteria,
+        "judge_weight": config.judge_weight,
+        "dataset_path": str(ds_path),
+        "prefer_augmented": bool(config.prefer_augmented),
+    }
     generate_eval_report(
         eval_report,
         output_path=out,
@@ -314,6 +327,7 @@ def run_eval(
         model_name=model,
         split=config.split,
         dataset_sizes=sizes,
+        run_config=run_config,
     )
 
     json_written: Path | None = None
@@ -327,10 +341,13 @@ def run_eval(
             "scores": scores,
             "dataset_path": str(ds_path),
             "dataset_sizes": sizes,
+            "run_config": run_config,
             "examples": [
                 {
                     "id": getattr(er, "example_id", ""),
                     "scores": getattr(er, "scores", {}),
+                    "prediction": getattr(er, "prediction", {}),
+                    "metadata": getattr(er, "metadata", {}),
                     "error": getattr(er, "error", None),
                     "duration_ms": getattr(er, "duration_ms", None),
                 }

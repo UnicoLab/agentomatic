@@ -3,6 +3,15 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+- **optimize**: HolySheet train/eval reports no longer render empty section cards.
+  Content is nested in `Section`/`Tabs`/`Accordion` children; run config,
+  deployment recommendations, Keras curves, held-out scores, full prompts, and
+  judge rationales are wired from `TrainResult` / `EvaluationReport`.
+  `OptimizeMetricAdapter` stashes `last_result` and `agent.evaluate` attaches
+  per-metric metadata for rationale panels.
+
 ### Features
 
 - **optimize**: Thin train UX — `TrainConfig` + `train_and_report` / `run_train`

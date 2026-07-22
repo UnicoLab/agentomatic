@@ -72,8 +72,19 @@ class TestEvalHolySheetReport:
             example_results=[
                 ExampleResult(
                     example_id="as_1",
+                    prediction={"content": "Demo is framing.", "next_action": "Confirm"},
                     scores={"judge": 0.7, "f1": 0.5},
                     duration_ms=120.0,
+                    metadata={
+                        "judge": {
+                            "score": 0.7,
+                            "reason": "Mostly grounded but thin next step.",
+                            "metadata": {
+                                "motivation": "Needs a clearer actionable next step.",
+                                "what_failed": ["weak next_action"],
+                            },
+                        }
+                    },
                 ),
                 ExampleResult(
                     example_id="as_2",
@@ -91,11 +102,22 @@ class TestEvalHolySheetReport:
             model_name="openai/gemini-flash",
             split="test",
             dataset_sizes={"train": 4, "validation": 2, "test": 3, "all": 9},
+            run_config={
+                "required_keys": ["content", "next_action"],
+                "judge_dimensions": ["pertinence", "groundedness"],
+                "judge_criteria": "Score groundedness thoroughly.",
+                "use_judge": True,
+            },
         )
         assert Path(path).exists()
         html = Path(path).read_text(encoding="utf-8")
         assert "assistant" in html
         assert "0.72" in html or "judge" in html
+        assert "Run Configuration" in html
+        assert "Per-example" in html
+        assert "Demo is framing." in html  # full prediction, not truncated snap
+        assert "Needs a clearer actionable next step." in html
+        assert "pertinence" in html or "required_keys" in html or "content" in html
         assert len(html) > 500
 
 

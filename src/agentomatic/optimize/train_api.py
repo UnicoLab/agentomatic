@@ -113,6 +113,9 @@ class TrainConfig:
     persist_path: Path | None = None
     augment_strategies: list[str] | None = None
     augment_model: str | None = None
+    # --- auditable fit / retrain persistence --------------------------------
+    persist_fit_store: bool = False
+    fit_store_url: str | None = None
 
     def __post_init__(self) -> None:
         """Normalise ``nr_examples`` → ``n_examples`` alias."""
@@ -137,6 +140,129 @@ class TrainResult:
     optimizer: str
     augmented: bool = False
     persist_path: Path | None = None
+    agent_name: str = ""
+
+    def print_summary(self, console: Any | None = None) -> None:
+        """Pretty-print a Rich summary of this train run.
+
+        Args:
+            console: Optional ``rich.console.Console``. When omitted a private
+                console is created so callers keep full control of styling.
+        """
+        print_train_result(self, console=console)
+
+
+def print_train_result(result: TrainResult, *, console: Any | None = None) -> None:
+    """Print a rich, scannable summary of a :class:`TrainResult`.
+
+    Extracted from project ``train_*.py`` scripts so they stay thin while
+    callers retain control (pass your own Console, or call selectively).
+
+    Args:
+        result: Train outcome from :func:`train_and_report`.
+        console: Optional Rich console; created on demand when omitted.
+    """
+    if console is None:
+        from rich.console import Console
+
+        console = Console()
+
+    agent = result.agent_name or "agent"
+    console.print(
+        f"[bold]{agent}[/bold] stack={result.stack!r} model={result.model} "
+        f"optimizer={result.optimizer}"
+    )
+    console.print(f"dataset={result.dataset_sizes} augmented={result.augmented}")
+    if result.persist_path:
+        console.print(f"persisted={result.persist_path}")
+    console.print(f"optimize_status={result.optimize_status!r}")
+
+    hist = getattr(result.history, "history", {}) or {}
+    if "loss" in hist:
+        console.print(f"loss={hist.get('loss')}")
+    if "val_loss" in hist:
+        console.print(f"val_loss={hist.get('val_loss')}")
+
+    fit = result.fit_result
+    if fit is not None:
+        console.print(
+            f"fit baseline={fit.baseline_score:.4f} best={fit.best_score:.4f} "
+            f"Δ={fit.absolute_improvement:+.4f} improved={fit.improved}"
+        )
+        console.print(f"score_history={list(fit.history)}")
+        console.print(f"early_stop={getattr(fit, 'early_stop_reason', None)!r}")
+        ph = list(getattr(fit, "prompt_history", None) or [])
+        console.print(f"prompt_history_len={len(ph)}")
+        for i, entry in enumerate(ph[:6]):
+            if not isinstance(entry, dict):
+                continue
+            snap = str(entry.get("prompt_snapshot") or "")
+            console.print(
+                f"  ph[{i}] accepted={entry.get('accepted')} "
+                f"score={float(entry.get('score') or 0):.4f} "
+                f"cand={entry.get('candidate_name')!r} "
+                f"prompt[:120]={snap[:120]!r}"
+            )
+        base_p = getattr(getattr(fit, "baseline_config", None), "system_prompt", "") or ""
+        best_p = getattr(getattr(fit, "best_config", None), "system_prompt", "") or ""
+        console.print(
+            f"prompt_changed={base_p != best_p} base_len={len(base_p)} best_len={len(best_p)}"
+        )
+
+    console.print(f"evaluate scores={result.eval_scores}")
+    console.print(f"[green]Report:[/green] {result.report_path}")
+    try:
+        rsize = Path(result.report_path).stat().st_size if result.report_path else 0
+        console.print(f"report_bytes={rsize}")
+    except OSError:
+        pass
+    if result.applied_version:
+        console.print(f"[green]Applied {result.applied_version!r}[/green]")
+    else:
+        console.print("[dim]Demo-safe: prompts unchanged (pass --apply to persist).[/dim]")
+
+
+def _resolve_fit_store_url(config: TrainConfig) -> str | None:
+    """Return a DB URL for offline fit persistence, if configured."""
+    if config.fit_store_url:
+        return str(config.fit_store_url).strip() or None
+    env_url = (os.getenv("AGENTOMATIC_FIT_STORE_URL") or "").strip()
+    if env_url:
+        return env_url
+    persist = config.persist_fit_store or os.getenv(
+        "AGENTOMATIC_PERSIST_FIT", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if not persist:
+        return None
+    return (os.getenv("AGENTOMATIC_DB_URL") or os.getenv("DATABASE_URL") or "").strip() or None
+
+
+def _bind_fit_store(config: TrainConfig) -> Any | None:
+    """Optionally bind a SQLAlchemy fit store for auditable retrain history.
+
+    Returns:
+        The bound store (caller should clear via :func:`set_fit_store`), or
+        ``None`` when persistence is disabled / unavailable.
+    """
+    url = _resolve_fit_store_url(config)
+    if not url:
+        return None
+    try:
+        from agentomatic.async_utils import run_sync
+        from agentomatic.optimize.fit_store import set_fit_store
+        from agentomatic.storage.sqlalchemy import SQLAlchemyStore
+
+        store = SQLAlchemyStore(url)
+        run_sync(store.initialize())
+        set_fit_store(store)
+        logger.info(
+            "Fit store bound for retrain audit: {}",
+            url.split("@")[-1] if "@" in url else url,
+        )
+        return store
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Fit store bind skipped: {}", exc)
+        return None
 
 
 def load_data(path: str | Path, *, name: str = "") -> Any:
@@ -590,6 +716,20 @@ def run_train(
             optimizer_name=config.optimizer,
             stack_name=stack_name,
             model_name=model,
+            run_config={
+                "stack": stack_name,
+                "model": model,
+                "optimizer": config.optimizer,
+                "epochs": config.epochs,
+                "max_trials": config.max_trials,
+                "patience": config.patience,
+                "augment": bool(config.augment),
+                "required_keys": list(config.required_keys or []),
+                "judge_dimensions": list(config.judge_dimensions or []),
+                "judge_criteria": config.judge_criteria,
+                "judge_weight": config.judge_weight,
+                "min_absolute_improvement": config.min_absolute_improvement,
+            },
         )
     else:
         out.write_text(

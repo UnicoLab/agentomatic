@@ -547,11 +547,26 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                 duration = (time.perf_counter() - t0) * 1000
 
                 scores: dict[str, float] = {}
+                metric_meta: dict[str, Any] = {}
                 for metric in metrics:
                     try:
                         score = metric.score(example, prediction)
                         scores[metric.name] = score
                         metric_totals[metric.name] += score
+                        last = getattr(metric, "last_result", None)
+                        if last is not None:
+                            raw_meta = dict(getattr(last, "metadata", None) or {})
+                            # Drop non-serialisable MetricResult objects.
+                            clean_meta = {
+                                k: v
+                                for k, v in raw_meta.items()
+                                if k != "metric_result" and not str(k).startswith("_")
+                            }
+                            metric_meta[metric.name] = {
+                                "score": float(getattr(last, "score", score) or 0.0),
+                                "reason": str(getattr(last, "reason", "") or ""),
+                                "metadata": clean_meta,
+                            }
                     except Exception as exc:
                         logger.warning(f"Metric '{metric.name}' error: {exc}")
                         scores[metric.name] = 0.0
@@ -562,6 +577,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                         prediction=prediction,
                         scores=scores,
                         duration_ms=duration,
+                        metadata=metric_meta,
                     )
                 )
             except Exception as exc:
