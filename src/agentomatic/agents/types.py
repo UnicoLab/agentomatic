@@ -174,9 +174,11 @@ class AgentExample:
         """
         from agentomatic.optimize.dataset import DataPoint
 
-        # Extract query from input — try common keys
+        # Extract query from input — try common keys (including current_query
+        # used by agents that follow the agentomatic convention).
         query = (
             self.input.get("query")
+            or self.input.get("current_query")
             or self.input.get("request")
             or self.input.get("question")
             or json.dumps(self.input)

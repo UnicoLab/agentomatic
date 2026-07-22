@@ -566,11 +566,16 @@ class PromptFitter:
         val_points = [dp.to_dict() for dp in valset]
         train_points = [dp.to_dict() for dp in trainset]
 
-        # Prepare minibatch
-        minibatch_size = max(
-            _MINIBATCH_MIN,
-            int(len(val_points) * _MINIBATCH_FRACTION),
+        # Prepare minibatch — clamp to available data so we never claim
+        # more points than exist (avoids misleading "500%" log messages).
+        minibatch_size = min(
+            len(val_points),
+            max(
+                _MINIBATCH_MIN,
+                int(len(val_points) * _MINIBATCH_FRACTION),
+            ),
         )
+        minibatch_size = max(1, minibatch_size)  # Always at least 1 if data exists
         minibatch_points = val_points[:minibatch_size]
         minibatch_dataset = Dataset.from_list(minibatch_points)
 
@@ -597,6 +602,11 @@ class PromptFitter:
         )
 
         eval_results = self._build_eval_results(baseline_details, metric)
+
+        # Effective patience: never exceed max_rounds so early stopping fires
+        # even when PATIENCE > total rounds (e.g. 8 trials / 4 per round = 2
+        # rounds but default patience=3 would never fire).
+        effective_patience = min(_EARLY_STOP_PATIENCE, max(1, max_rounds))
 
         for round_idx in range(max_rounds):
             round_t0 = time.perf_counter()
@@ -663,9 +673,9 @@ class PromptFitter:
             except Exception as exc:
                 logger.error("   Candidate proposal failed: {}", exc)
                 no_improvement_rounds += 1
-                if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
+                if no_improvement_rounds >= effective_patience:
                     logger.warning(
-                        "   ⏹️  Early stop: {} rounds without improvement", _EARLY_STOP_PATIENCE
+                        "   ⏹️  Early stop: {} rounds without improvement", effective_patience
                     )
                     break
                 continue
@@ -673,7 +683,7 @@ class PromptFitter:
             if not candidates:
                 logger.warning("   No candidates produced — skipping round")
                 no_improvement_rounds += 1
-                if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
+                if no_improvement_rounds >= effective_patience:
                     break
                 continue
 
@@ -734,7 +744,7 @@ class PromptFitter:
             if not candidate_scores:
                 logger.warning("   All candidates failed — skipping round")
                 no_improvement_rounds += 1
-                if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
+                if no_improvement_rounds >= effective_patience:
                     break
                 continue
 
@@ -747,10 +757,10 @@ class PromptFitter:
             if not promotable:
                 logger.info("   No candidates beat current best ({:.4f})", best_score)
                 no_improvement_rounds += 1
-                if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
+                if no_improvement_rounds >= effective_patience:
                     logger.warning(
                         "   ⏹️  Early stop: {} rounds without improvement",
-                        _EARLY_STOP_PATIENCE,
+                        effective_patience,
                     )
                     break
                 continue
@@ -888,10 +898,10 @@ class PromptFitter:
                 )
             else:
                 no_improvement_rounds += 1
-                if no_improvement_rounds >= _EARLY_STOP_PATIENCE:
+                if no_improvement_rounds >= effective_patience:
                     logger.warning(
                         "   ⏹️  Early stop: {} rounds without improvement",
-                        _EARLY_STOP_PATIENCE,
+                        effective_patience,
                     )
                     await self._callbacks.emit(
                         OptimizationEvent.EARLY_STOP,
