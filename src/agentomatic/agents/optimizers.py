@@ -10,7 +10,6 @@ Example::
 
 from __future__ import annotations
 
-import asyncio
 import itertools
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
@@ -448,17 +447,11 @@ class PromptFitterBridge:
     def _run_async(coro: Any) -> Any:
         """Run ``coro`` to completion (works inside a live event loop too).
 
-        When called from synchronous code with no running loop, uses
-        :func:`asyncio.run`. When already inside an event loop (FastAPI
-        handlers, notebooks), schedules ``asyncio.run`` on a worker thread
-        so ``agent.fit()`` still succeeds without requiring ``afit()``.
+        Uses a persistent thread-local loop (see
+        :func:`agentomatic.async_utils.run_sync`) instead of
+        :func:`asyncio.run`, which closes the loop and breaks LangChain /
+        OpenAI async HTTP clients for subsequent ``ainvoke`` calls.
         """
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(coro)
+        from agentomatic.async_utils import run_sync
 
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
+        return run_sync(coro)

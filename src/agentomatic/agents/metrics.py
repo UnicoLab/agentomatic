@@ -331,8 +331,9 @@ class OptimizeMetricAdapter:
     The adapter correctly:
     - Extracts ``query`` / ``expected`` from the ``AgentExample``
     - Serialises the ``prediction`` dict to a JSON string as ``response``
-    - Awaits the async ``.evaluate()`` call via ``asyncio.run()`` (with a
-      thread-pool fallback when running inside an existing event loop)
+    - Awaits the async ``.evaluate()`` call via
+      :func:`agentomatic.async_utils.run_sync` (persistent loop; works
+      inside an existing event loop via a worker thread)
 
     Args:
         optimize_metric: An instance of ``optimize.BaseMetric``.
@@ -368,8 +369,9 @@ class OptimizeMetricAdapter:
         ``optimize.BaseMetric.evaluate()``, awaits the async result,
         and returns the ``score`` as a ``float``.
         """
-        import asyncio
         import json as _json
+
+        from agentomatic.async_utils import run_sync
 
         # --- extract query ---
         inp = example.input
@@ -399,20 +401,10 @@ class OptimizeMetricAdapter:
         # --- run evaluate() synchronously ---
         # Wrap the entire call (including coro creation) so that metrics whose
         # evaluate() raises synchronously (non-coroutine callables that throw)
-        # are also handled gracefully.
+        # are also handled gracefully. Use persistent-loop run_sync so OpenAI
+        # async clients survive across fit → evaluate.
         try:
-            coro = self._metric.evaluate(query, response, expected)
-            result = asyncio.run(coro)
-        except RuntimeError:
-            # Already inside a running event loop (e.g. notebook, FastAPI handler)
-            import concurrent.futures
-
-            try:
-                coro = self._metric.evaluate(query, response, expected)
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    result = pool.submit(asyncio.run, coro).result(timeout=60)
-            except Exception:
-                return 0.5  # judge unavailable — neutral, don't crash training
+            result = run_sync(self._metric.evaluate(query, response, expected))
         except Exception:
             return 0.5  # judge unavailable — neutral, don't crash training
 
