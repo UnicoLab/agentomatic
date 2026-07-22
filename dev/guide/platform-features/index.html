@@ -4520,12 +4520,15 @@ Opt in to <code>any_error</code> when every exception should advance the chain.<
 <li><a href="../storage/">Storage Guide</a> — Storage backend configuration</li>
 </ul>
 <h2 id="invocation-log-history-llm-analysis">Invocation log history &amp; LLM analysis<a class="headerlink" href="#invocation-log-history-llm-analysis" title="Permanent link">&para;</a></h2>
-<p>Persist every invoke/chat/stream I/O per agent for auditability and live
-recommendations. When <code>logs_history</code> is on, the platform derives a durable
-<code>SQLAlchemyStore</code> from <code>AGENTOMATIC_DB_URL</code> / <code>DATABASE_URL</code> / stack
-<code>database.url</code> (Postgres, SQLite, …) — it does <strong>not</strong> eagerly install
-<code>MemoryStore</code> (that would preempt DB auto-derive). If a DB URL is set but
-init fails, MemoryStore fallback is refused.</p>
+<p>Persist full I/O + metadata for <strong>agents, plugins, pipelines, ingestion, and
+custom endpoints</strong> when <code>logs_history</code> is on. Pipeline agent/plugin/endpoint/
+ingestion steps that run in-process (bypassing HTTP) are also recorded with
+<code>endpoint=pipeline_step</code> and <code>metadata.pipeline</code> set.</p>
+<p>When <code>logs_history</code> is on, the platform derives a durable <code>SQLAlchemyStore</code>
+from <code>AGENTOMATIC_DB_URL</code> / <code>DATABASE_URL</code> / stack <code>database.url</code> (Postgres,
+SQLite, …) — it does <strong>not</strong> eagerly install <code>MemoryStore</code> (that would
+preempt DB auto-derive). If a DB URL is set but init fails, MemoryStore
+fallback is refused.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
 </span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>  <span class="c1"># or MemoryStore</span>
 </span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>
@@ -4539,7 +4542,40 @@ init fails, MemoryStore fallback is refused.</p>
 <p>Env equivalents: <code>AGENTOMATIC_LOGS_HISTORY=1</code>,
 <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1</code>, plus <code>DATABASE_URL</code> /
 <code>AGENTOMATIC_DB_URL</code> for multi-backend persistence.</p>
-<p>Endpoints (per agent):</p>
+<p>Cross-resource endpoints:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logs?resource=plugin&amp;name=…</code></td>
+<td>List logs (filter by type/name)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logs/{id}</code></td>
+<td>Fetch one log</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/logs/analyze</code></td>
+<td>LLM/heuristic analysis (<code>resource</code> + <code>name</code> in body)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logs/analysis?resource=…&amp;name=…</code></td>
+<td>Latest analysis</td>
+</tr>
+</tbody>
+</table>
+<p><code>resource</code> is one of: <code>agent</code> | <code>plugin</code> | <code>pipeline</code> | <code>ingestion</code> | <code>endpoint</code>.</p>
+<p>Per-agent routes remain for backward compatibility:</p>
 <table>
 <thead>
 <tr>
@@ -4552,7 +4588,7 @@ init fails, MemoryStore fallback is refused.</p>
 <tr>
 <td>GET</td>
 <td><code>/api/v1/{agent}/logs</code></td>
-<td>List invocation logs</td>
+<td>List agent logs</td>
 </tr>
 <tr>
 <td>GET</td>
@@ -4571,8 +4607,10 @@ init fails, MemoryStore fallback is refused.</p>
 </tr>
 </tbody>
 </table>
-<p>Analysis returns <code>score</code>, <code>summary</code>, <code>status</code>, and <code>recommendations</code>.
-Offline train can also audit retrain runs with
+<p>Each log entry includes <code>resource_type</code>, <code>resource_name</code> (and BC
+<code>agent_name</code>), <code>endpoint</code>, <code>input</code>, <code>output</code>, <code>metadata</code>, <code>duration_ms</code>,
+<code>status</code>. Analysis returns <code>score</code>, <code>summary</code>, <code>status</code>, and
+<code>recommendations</code>. Offline train can also audit retrain runs with
 <code>TrainConfig.persist_fit_store</code> / <code>fit_store_url</code> →
 <code>AGENTOMATIC_FIT_STORE_URL</code> / <code>DATABASE_URL</code> (<code>OptimizationRunStore</code>).
 See <a href="../optimization/">Prompt Optimization</a>.</p>
