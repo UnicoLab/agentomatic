@@ -29,19 +29,14 @@ def _run_coro_sync(coro: Any) -> Any:
     """Run *coro* to completion from a sync caller.
 
     Used by :meth:`AgentGraph.invoke` so async node handlers work under the
-    sync ``transform`` / ``evaluate`` / ``fit`` path. Raises if an event loop
-    is already running (callers should use :meth:`AgentGraph.ainvoke` then).
-    """
-    import asyncio
+    sync ``transform`` / ``evaluate`` / ``fit`` path.
 
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    raise RuntimeError(
-        "Cannot await async graph nodes from sync invoke() while an event "
-        "loop is running — use ainvoke() / atransform() instead"
-    )
+    Uses a persistent thread-local loop (not ``asyncio.run``) so LangChain /
+    OpenAI async HTTP clients survive across fit → evaluate calls.
+    """
+    from agentomatic.async_utils import run_sync
+
+    return run_sync(coro)
 
 
 # ---------------------------------------------------------------------------

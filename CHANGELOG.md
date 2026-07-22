@@ -17,6 +17,11 @@
 
 ### Bug Fixes
 
+- **platform**: Sync fit/evaluate paths no longer use `asyncio.run` (which
+  closes the loop and kills LangChain OpenAI async HTTP clients). New
+  `agentomatic.async_utils.run_sync` keeps a thread-local persistent loop so
+  post-fit `agent.evaluate()` / epoch metrics stop failing with
+  `APIConnectionError: Connection error`.
 - **optimize**: Boolean-flag `expected_output` now expands to a quality contract
   (not useless `Response must include: 'key'`). Judge temperature defaults to
   0.0 for stable scoring across epochs.

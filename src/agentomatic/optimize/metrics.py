@@ -1011,8 +1011,7 @@ class CompositeMetric(BaseMetric):
 
         Extracts ``query``, ``response``, and ``expected`` from
         *example* / *prediction* and runs :meth:`evaluate` synchronously
-        via :func:`asyncio.run` (or a thread-pool when a loop is already
-        running).
+        via :func:`agentomatic.async_utils.run_sync` (persistent loop).
 
         Args:
             example: An ``AgentExample`` with ``.input`` and
@@ -1022,8 +1021,9 @@ class CompositeMetric(BaseMetric):
         Returns:
             Composite score in ``[0, 1]``.
         """
-        import asyncio
         import json as _json
+
+        from agentomatic.async_utils import run_sync
 
         query = ""
         inp = getattr(example, "input", example)
@@ -1045,18 +1045,8 @@ class CompositeMetric(BaseMetric):
             else (str(exp_out) if exp_out is not None else None)
         )
 
-        coro = self.evaluate(query, response, expected)
         try:
-            result = asyncio.run(coro)
-        except RuntimeError:
-            # Running inside an existing event loop — use a thread pool
-            import concurrent.futures
-
-            try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    result = pool.submit(asyncio.run, coro).result(timeout=60)
-            except Exception:
-                return 0.0
+            result = run_sync(self.evaluate(query, response, expected))
         except Exception:
             return 0.0
         return float(getattr(result, "score", 0.0))
