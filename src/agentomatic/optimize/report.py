@@ -788,11 +788,13 @@ def generate_eval_report(
     model_name: str | None = None,
     split: str | None = None,
     dataset_sizes: dict[str, int] | None = None,
+    run_config: dict[str, Any] | None = None,
 ) -> str:
     """Generate an interactive HTML report for an ``EvaluationReport``.
 
-    Prefers HolySheet (KPI cards + per-example table). Falls back to a
-    compact static HTML page when HolySheet is unavailable.
+    Prefers HolySheet (nested sections, per-example accordion, judge
+    rationales). Falls back to a compact static HTML page when HolySheet
+    is unavailable.
 
     Args:
         report: ``EvaluationReport`` from ``agent.evaluate()``.
@@ -801,6 +803,7 @@ def generate_eval_report(
         model_name: Task model label for the header.
         split: Dataset split label (``test``, ``eval``, …).
         dataset_sizes: Optional ``{{train, validation, test, all}}`` counts.
+        run_config: Optional run metadata (keys, judge dims, criteria, …).
 
     Returns:
         Path to the generated report file.
@@ -813,13 +816,16 @@ def generate_eval_report(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        path = _generate_eval_holysheet_report(
+        from agentomatic.optimize.holysheet_reports import build_eval_holysheet_report
+
+        path = build_eval_holysheet_report(
             report,
             output_path,
             stack_name=stack_name or "",
             model_name=model_name or "",
             split=split or "",
             dataset_sizes=dataset_sizes or {},
+            run_config=run_config or {},
         )
         logger.info("📊 Eval report (holysheet) generated: {}", path)
         return path
@@ -837,84 +843,6 @@ def generate_eval_report(
     )
     output_path.write_text(html_content, encoding="utf-8")
     logger.info("📊 Eval report generated: {}", output_path)
-    return str(output_path)
-
-
-def _generate_eval_holysheet_report(
-    report: Any,
-    output_path: Path,
-    *,
-    stack_name: str,
-    model_name: str,
-    split: str,
-    dataset_sizes: dict[str, int],
-) -> str:
-    """Interactive HolySheet dashboard for an EvaluationReport."""
-    from holysheet import KPI, DataTable, Markdown, Report, Section
-
-    scores = dict(getattr(report, "scores", {}) or {})
-    examples = list(getattr(report, "example_results", []) or [])
-    n = len(examples)
-    errors = sum(1 for er in examples if getattr(er, "error", None))
-    pass_rate = float(getattr(report, "pass_rate", 0.0) or 0.0)
-    agent = str(getattr(report, "agent_name", "") or "agent")
-
-    meta_bits = [f"agent=`{agent}`"]
-    if stack_name:
-        meta_bits.append(f"stack=`{stack_name}`")
-    if model_name:
-        meta_bits.append(f"model=`{model_name}`")
-    if split:
-        meta_bits.append(f"split=`{split}`")
-    if dataset_sizes:
-        meta_bits.append(
-            "data="
-            + "/".join(
-                f"{k}={dataset_sizes.get(k, 0)}"
-                for k in ("train", "validation", "test", "all")
-                if k in dataset_sizes
-            )
-        )
-
-    hs = Report(
-        title="Agent Evaluation Report",
-        subtitle=" · ".join(meta_bits),
-        theme="light",
-        author="agentomatic",
-    )
-    hs.add(Section(title="Summary"))
-    hs.add(KPI(label="Examples", value=n))
-    hs.add(KPI(label="Pass rate", value=round(pass_rate, 3)))
-    hs.add(KPI(label="Errors", value=errors, status="negative" if errors else "neutral"))
-    for name, score in sorted(scores.items()):
-        hs.add(KPI(label=str(name), value=round(float(score), 4)))
-
-    hs.add(Markdown(content=f"## `{agent}`\n\nEvaluated **{n}** examples."))
-    rows = []
-    for er in examples:
-        er_scores = getattr(er, "scores", {}) or {}
-        rows.append(
-            {
-                "id": getattr(er, "example_id", ""),
-                "passed": bool(getattr(er, "passed", False)),
-                "scores": json.dumps(
-                    {k: round(float(v), 3) for k, v in er_scores.items()},
-                    ensure_ascii=False,
-                )[:120],
-                "error": (getattr(er, "error", None) or "")[:80],
-                "ms": round(float(getattr(er, "duration_ms", 0) or 0), 1),
-            }
-        )
-    if rows:
-        hs.add(Section(title="Per-example"))
-        hs.add(
-            DataTable(
-                title="Results",
-                data=rows,
-                columns=["id", "passed", "scores", "error", "ms"],
-            )
-        )
-    hs.export_html(str(output_path))
     return str(output_path)
 
 
@@ -979,11 +907,12 @@ def generate_fit_report(
     optimizer_name: str | None = None,
     stack_name: str | None = None,
     model_name: str | None = None,
+    run_config: dict[str, Any] | None = None,
 ) -> str:
     """Generate an interactive HTML report for ``PromptFitResult``.
 
-    Prefers HolySheet (charts, tables, prompt history). Falls back to the
-    built-in static HTML when HolySheet is unavailable.
+    Prefers HolySheet (nested sections/tabs, charts, full prompt accordion).
+    Falls back to the built-in static HTML when HolySheet is unavailable.
 
     Args:
         result: ``PromptFitResult`` from ``PromptFitter.fit()``.
@@ -994,6 +923,7 @@ def generate_fit_report(
         optimizer_name: Optimizer label for the header.
         stack_name: Stack name for the header.
         model_name: Task model label for the header.
+        run_config: Optional train knobs (epochs, trials, judge dims, …).
 
     Returns:
         Path to the generated report file.
@@ -1010,9 +940,12 @@ def generate_fit_report(
         "optimizer_name": optimizer_name or "",
         "stack_name": stack_name or "",
         "model_name": model_name or "",
+        "run_config": run_config or {},
     }
     try:
-        path = _generate_fit_holysheet_report(result, output_path, **extras)
+        from agentomatic.optimize.holysheet_reports import build_fit_holysheet_report
+
+        path = build_fit_holysheet_report(result, output_path, **extras)
         logger.info("📊 Fit report (holysheet) generated: {}", path)
         return path
     except ImportError:
@@ -1037,365 +970,18 @@ def _prompt_evolution_entries(
 ) -> list[dict[str, Any]]:
     """Build chronological prompt versions with unified diffs and score deltas.
 
-    Always includes the baseline as ``v0``. Later ``prompt_history`` entries
-    are appended so the report shows accepts (with diffs) and honest plateaus.
+    Re-exported for fallback HTML; canonical implementation lives in
+    :mod:`agentomatic.optimize.holysheet_reports`.
     """
-    prev = baseline_prompt or ""
-    prev_score = float(baseline_score)
-    versions: list[dict[str, Any]] = [
-        {
-            "version": 0,
-            "score": prev_score,
-            "delta": 0.0,
-            "accepted": True,
-            "candidate": "baseline",
-            "prompt": prev,
-            "diff": "",
-        }
-    ]
-    for entry in prompt_history:
-        if not isinstance(entry, dict):
-            continue
-        snap = str(entry.get("prompt_snapshot") or "")
-        score = float(entry.get("score") or 0.0)
-        accepted = bool(entry.get("accepted"))
-        new_prompt = snap or prev
-        diff_lines = list(
-            difflib.unified_diff(
-                prev.splitlines(keepends=True),
-                new_prompt.splitlines(keepends=True),
-                fromfile=f"v{len(versions) - 1}",
-                tofile=f"v{len(versions)}",
-                lineterm="",
-            )
-        )
-        versions.append(
-            {
-                "version": len(versions),
-                "score": score,
-                "delta": score - prev_score,
-                "accepted": accepted,
-                "candidate": str(entry.get("candidate_name") or ""),
-                "prompt": new_prompt,
-                "diff": "".join(diff_lines),
-            }
-        )
-        if accepted or new_prompt != prev:
-            prev = new_prompt
-        prev_score = score
-    return versions
-
-
-def _generate_fit_holysheet_report(
-    result: Any,
-    output_path: Path,
-    *,
-    keras_history: dict[str, list[float]],
-    eval_scores: dict[str, float],
-    dataset_sizes: dict[str, int],
-    optimizer_name: str,
-    stack_name: str,
-    model_name: str,
-) -> str:
-    """Interactive HolySheet dashboard for a PromptFitResult."""
-    from holysheet import (
-        KPI,
-        Callout,
-        CodeBlock,
-        DataTable,
-        Divider,
-        LineChart,
-        Markdown,
-        Report,
-        Section,
+    from agentomatic.optimize.holysheet_reports import (
+        _prompt_evolution_entries as _impl,
     )
 
-    improvement = float(result.best_score) - float(result.baseline_score)
-    # HolySheet KPI.status only accepts positive|negative|neutral (not "warning").
-    status = "positive" if improvement > 0 else ("neutral" if improvement == 0 else "negative")
-    meta_bits = [
-        f"agent=`{result.agent}`",
-        f"experiment=`{result.experiment_id}`",
-    ]
-    if stack_name:
-        meta_bits.append(f"stack=`{stack_name}`")
-    if model_name:
-        meta_bits.append(f"model=`{model_name}`")
-    if optimizer_name:
-        meta_bits.append(f"optimizer=`{optimizer_name}`")
-    if dataset_sizes:
-        meta_bits.append(
-            "data="
-            + "/".join(
-                f"{k}={dataset_sizes.get(k, 0)}" for k in ("train", "validation", "test")
-            )
-        )
-
-    report = Report(
-        title="PromptFitter Report",
-        subtitle=" · ".join(meta_bits),
-        theme="dark",
-        author="agentomatic",
+    return _impl(
+        baseline_prompt=baseline_prompt,
+        baseline_score=baseline_score,
+        prompt_history=prompt_history,
     )
-
-    report.add(Section(title="Key Results"))
-    report.add(KPI(label="Baseline Score", value=round(float(result.baseline_score), 4)))
-    report.add(
-        KPI(
-            label="Best Score",
-            value=round(float(result.best_score), 4),
-            status="positive" if improvement > 0 else None,
-        )
-    )
-    report.add(
-        KPI(
-            label="Improvement",
-            value=round(improvement, 4),
-            delta=f"{improvement:+.4f}",
-            status=status,
-        )
-    )
-    report.add(KPI(label="Trials", value=len(result.trials or [])))
-    report.add(KPI(label="Duration", value=round(float(result.duration_seconds or 0), 1), unit="s"))
-    if result.holdout_score is not None:
-        report.add(KPI(label="Holdout", value=round(float(result.holdout_score), 4)))
-
-    early_stop = getattr(result, "early_stop_reason", None) or ""
-    opt_name = optimizer_name or getattr(result, "optimizer_name", "") or ""
-    sizes = dataset_sizes or getattr(result, "dataset_sizes", None) or {}
-    meta_lines = [
-        f"**Optimizer:** `{opt_name or 'unknown'}`",
-        f"**Early-stop / stop reason:** {early_stop or 'completed normally'}",
-    ]
-    if sizes:
-        meta_lines.append(
-            "**Dataset sizes:** "
-            + ", ".join(f"`{k}={v}`" for k, v in sizes.items())
-        )
-    report.add(Section(title="Run Configuration"))
-    report.add(Markdown(content="\n\n".join(meta_lines)))
-
-    suggestions = list(result.suggestions or [])
-    if suggestions:
-        report.add(Section(title="Recommendations"))
-        report.add(
-            Callout(
-                content="\n".join(f"- {s}" for s in suggestions[:8]),
-                variant="note" if improvement > 0 else "highlight",
-            )
-        )
-
-    report.add(Divider())
-
-    # Fit score curve
-    scores = list(getattr(result, "score_history", None) or getattr(result, "history", []) or [])
-    if scores:
-        report.add(Section(title="Score / Loss Curve (fit rounds)"))
-        curve = [
-            {"epoch": i, "best_score": round(float(s), 4), "loss": round(1.0 - float(s), 4)}
-            for i, s in enumerate(scores)
-        ]
-        report.add(
-            LineChart(
-                title="Best score over rounds (incl. baseline seed)",
-                data=curve,
-                x="epoch",
-                y=["best_score", "loss"],
-                height=320,
-            )
-        )
-
-    # Keras outer-epoch history
-    if keras_history:
-        report.add(Section(title="Keras-style Epoch Metrics"))
-        preferred = ("loss", "val_loss", "f1", "val_f1", "judge", "val_judge")
-        hist_keys = [k for k in preferred if k in keras_history] + [
-            k for k in keras_history if k not in preferred
-        ]
-        n = max((len(v) for v in keras_history.values() if isinstance(v, list)), default=0)
-        if n:
-            rows = []
-            for i in range(n):
-                row: dict[str, Any] = {"epoch": i + 1}
-                for key in hist_keys:
-                    vals = keras_history.get(key)
-                    if isinstance(vals, list) and i < len(vals):
-                        row[key] = round(float(vals[i]), 4)
-                rows.append(row)
-            y_keys = [k for k in ("loss", "val_loss") if k in rows[0]]
-            if y_keys:
-                report.add(
-                    LineChart(
-                        title="Train / val loss across epochs",
-                        data=rows,
-                        x="epoch",
-                        y=y_keys,
-                        height=300,
-                    )
-                )
-            for key in hist_keys:
-                if key in {"loss", "val_loss"}:
-                    continue
-                report.add(
-                    LineChart(
-                        title=f"{key} across epochs",
-                        data=rows,
-                        x="epoch",
-                        y=key,
-                        height=260,
-                    )
-                )
-            report.add(
-                DataTable(
-                    title="Epoch table",
-                    data=rows,
-                    columns=["epoch", *hist_keys],
-                )
-            )
-
-    if eval_scores:
-        report.add(Section(title="Held-out Evaluate Scores"))
-        report.add(
-            DataTable(
-                title="Evaluate",
-                data=[{"metric": k, "score": round(float(v), 4)} for k, v in eval_scores.items()],
-                columns=["metric", "score"],
-            )
-        )
-
-    # Prompt history / learnings / judge motivations
-    prompt_history = list(getattr(result, "prompt_history", None) or [])
-    if prompt_history:
-        report.add(Section(title="Prompt History / Learnings"))
-        ph_rows = []
-        judge_rows = []
-        for entry in prompt_history:
-            if not isinstance(entry, dict):
-                continue
-            epoch = int(entry.get("round_idx", 0)) + 1
-            focus = "; ".join(str(x) for x in (entry.get("next_focus") or [])[:3])
-            failed = "; ".join(str(x) for x in (entry.get("what_failed") or [])[:2])
-            worked = "; ".join(str(x) for x in (entry.get("what_worked") or [])[:2])
-            snap = str(entry.get("prompt_snapshot", ""))[:200]
-            ph_rows.append(
-                {
-                    "epoch": epoch,
-                    "score": round(float(entry.get("score", 0.0)), 4),
-                    "accepted": "yes" if entry.get("accepted") else "no",
-                    "focus": (focus or "—")[:160],
-                    "failed": (failed or "—")[:160],
-                    "worked": (worked or "—")[:160],
-                    "candidate": str(entry.get("candidate_name") or "")[:40],
-                    "prompt_snapshot": snap
-                    + ("…" if len(str(entry.get("prompt_snapshot", ""))) > 200 else ""),
-                }
-            )
-            for insight in (entry.get("judge_insights") or [])[:8]:
-                judge_rows.append({"epoch": epoch, "motivation": str(insight)[:400]})
-        if ph_rows:
-            report.add(DataTable(title="Epoch learnings", data=ph_rows))
-        # Chronological prompt evolution with diffs (baseline → accepted).
-        evolution = _prompt_evolution_entries(
-            baseline_prompt=getattr(result.baseline_config, "system_prompt", "") or "",
-            baseline_score=float(getattr(result, "baseline_score", 0.0) or 0.0),
-            prompt_history=prompt_history,
-        )
-        if evolution:
-            report.add(Section(title="Prompt Evolution (chronological)"))
-            for item in evolution:
-                header = (
-                    f"**v{item['version']}** · score=`{item['score']:.4f}` · "
-                    f"Δ=`{item['delta']:+.4f}` · "
-                    f"{'ACCEPTED' if item['accepted'] else 'unchanged'} · "
-                    f"candidate=`{item['candidate'] or '—'}`"
-                )
-                report.add(Markdown(content=header))
-                if item["diff"]:
-                    report.add(CodeBlock(code=item["diff"], language="diff"))
-                else:
-                    report.add(
-                        Markdown(
-                            content=f"_No text change vs previous._\n\n"
-                            f"```\n{item['prompt'][:600]}"
-                            f"{'…' if len(item['prompt']) > 600 else ''}\n```"
-                        )
-                    )
-        if judge_rows:
-            report.add(
-                DataTable(
-                    title="Judge samples / motivations",
-                    data=judge_rows,
-                    columns=["epoch", "motivation"],
-                )
-            )
-        else:
-            report.add(
-                Callout(
-                    content=(
-                        "No judge motivations captured in prompt_history "
-                        "(fit metric may be deterministic-only, or judge "
-                        "did not return reasoning)."
-                    ),
-                    variant="note",
-                )
-            )
-
-    # Trials
-    if result.trials:
-        report.add(Section(title="Trial History"))
-        trial_rows = [
-            {
-                "round": t.get("round", "—"),
-                "name": str(t.get("name", "")),
-                "phase": str(t.get("phase", "")),
-                "score": round(float(t.get("score", 0.0)), 4),
-                "notes": str(t.get("mutation_notes", "") or t.get("accept_reason", "") or "")[:160],
-            }
-            for t in result.trials
-        ]
-        report.add(DataTable(title="Candidates", data=trial_rows))
-
-    # Prompt diff
-    report.add(Section(title="Prompt Diff"))
-    baseline_prompt = getattr(result.baseline_config, "system_prompt", "") or ""
-    best_prompt = getattr(result.best_config, "system_prompt", "") or ""
-    diff_lines = list(
-        difflib.unified_diff(
-            baseline_prompt.splitlines(keepends=True),
-            best_prompt.splitlines(keepends=True),
-            fromfile="baseline",
-            tofile="best",
-            lineterm="",
-        )
-    )
-    if diff_lines:
-        report.add(CodeBlock(code="".join(diff_lines), language="diff"))
-    else:
-        report.add(Markdown(content="_No prompt text change (baseline kept)._"))
-
-    # Best prompt snapshot
-    report.add(Section(title="Best System Prompt"))
-    report.add(CodeBlock(code=best_prompt or "(empty)", language="markdown"))
-
-    # Judge-style motivations from trial notes / failure clusters
-    if result.failure_clusters:
-        report.add(Section(title="Failure Clusters"))
-        fc_rows = []
-        for cluster in result.failure_clusters:
-            if isinstance(cluster, dict):
-                fc_rows.append(
-                    {
-                        "label": cluster.get("label", ""),
-                        "count": cluster.get("count", 0),
-                        "description": str(cluster.get("description", ""))[:200],
-                        "fix": str(cluster.get("suggested_fix", ""))[:200],
-                    }
-                )
-        if fc_rows:
-            report.add(DataTable(title="Clusters", data=fc_rows))
-
-    report.export_html(str(output_path))
-    return str(output_path)
 
 
 def _build_fit_report_html(

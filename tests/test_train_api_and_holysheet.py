@@ -107,6 +107,39 @@ class TestFitHolySheetReport:
         assert "0.42" in html or "Best" in html
         assert "Prompt Evolution" in html or "BEST PROMPT" in html
         assert "val_loss" in html or "0.28" in html
+        assert "Run Configuration" in html
+        assert "Recommendations" in html
+        assert "BEST PROMPT with tips" in html
+        # Nested Section children must not be empty (HolySheet UX regression).
+        import re
+
+        m = re.search(r'"blocks"\s*:\s*(\[.*?\])\s*,\s*"filters"', html, re.S)
+        if m:
+            blocks = json.loads(m.group(1))
+
+            def _walk(items: list) -> list:
+                out: list = []
+                for b in items:
+                    out.append(b)
+                    props = b.get("props") or {}
+                    kids = props.get("children") or []
+                    if isinstance(kids, list):
+                        out.extend(_walk(kids))
+                    for tab in props.get("tabs") or []:
+                        out.extend(_walk(tab.get("children") or []))
+                    for panel in props.get("panels") or []:
+                        out.extend(_walk(panel.get("children") or []))
+                return out
+
+            flat = _walk(blocks)
+            sections = {
+                (b.get("props") or {}).get("title"): (b.get("props") or {}).get("children") or []
+                for b in flat
+                if b.get("type") == "section"
+            }
+            assert sections.get("Run Configuration"), "Run Configuration section empty"
+            assert sections.get("Key Results"), "Key Results section empty"
+            assert sections.get("Recommendations"), "Recommendations section empty"
         # HolySheet interactive bundle is large; fallback is still richer than a stub.
         assert len(html) > 2000
 

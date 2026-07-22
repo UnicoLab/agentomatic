@@ -356,6 +356,8 @@ class OptimizeMetricAdapter:
     ) -> None:
         self._metric = optimize_metric
         self.name = name or getattr(optimize_metric, "name", "adapted_metric")
+        self.last_result: Any | None = None
+        """Most recent ``EvalResult`` from :meth:`score` (for report rationales)."""
 
     def score(
         self,
@@ -368,10 +370,16 @@ class OptimizeMetricAdapter:
         ``(query, response, expected)`` string tuple expected by
         ``optimize.BaseMetric.evaluate()``, awaits the async result,
         and returns the ``score`` as a ``float``.
+
+        The rich ``EvalResult`` (reason / motivation / dimensions) is
+        stashed on :attr:`last_result` so ``agent.evaluate`` can attach
+        judge rationales to ``ExampleResult.metadata``.
         """
         import json as _json
 
         from agentomatic.async_utils import run_sync
+
+        self.last_result = None
 
         # Prefer AgentExample.to_datapoint() so judge query / expected / context
         # match the fit path (question over meta-query, rich expected, snapshot).
@@ -442,6 +450,7 @@ class OptimizeMetricAdapter:
         except Exception:
             return 0.5  # judge unavailable — neutral, don't crash training
 
+        self.last_result = result
         if (getattr(result, "metadata", None) or {}).get("evaluation_failed"):
             return 0.0
         return float(getattr(result, "score", 0.5))
