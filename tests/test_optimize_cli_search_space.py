@@ -348,11 +348,16 @@ class TestFullTemplateEnrichments:
         assert "judge_dimensions" in train
         assert "required_keys" in train
 
-    def test_full_eval_uses_weighted_metric(self) -> None:
+    def test_full_eval_uses_evaluate_and_report(self) -> None:
         files = get_template_files("full", "demo_agent")
         eval_py = files["eval.py"]
-        assert "WeightedMetric" in eval_py
-        assert "METRICS = [" in eval_py
+        # Thin eval.py delegates metrics/judge/report to evaluate_and_report.
+        assert "EvalConfig" in eval_py
+        assert "evaluate_and_report" in eval_py
+        assert "prefer_augmented" in eval_py
+        assert "judge_criteria" in eval_py
+        assert "judge_dimensions" in eval_py
+        assert "required_keys" in eval_py
 
     def test_full_optimize_mentions_new_modes(self) -> None:
         files = get_template_files("full", "demo_agent")

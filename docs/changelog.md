@@ -7,11 +7,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Targeting **v1.8.0** (PyPI may still show 1.7.0 until the release job
-publishes). Install from git / an editable checkout until then.
+Docs and scaffolds track shipped **1.8.3–1.8.8** train/eval/logs APIs.
+Install from git / an editable checkout until PyPI catches up.
 
 ### Added
 
+- **Docs + CLI templates for thin train/eval** (1.8.8 docs):
+  [Prompt Optimization](guide/optimization.md) documents
+  `TrainConfig` / `train_and_report` / `print_train_result` and
+  `EvalConfig` / `evaluate_and_report`, including knobs
+  (`optimizer`, `epochs`, `trials`, `patience`, `augment` /
+  `n_examples` / `persist`, `apply`, judge metrics, HolySheet reports,
+  `persist_fit_store` / `DATABASE_URL`, `logs_history` /
+  `allow_logsllm_analysis`). Scaffold `_train_py` / `_eval_py` match
+  the SCOOPER assistant thin pattern.
 - **Durable multi-backend logs / retrain persistence** (1.8.8): When
   `logs_history` is on, the platform no longer eagerly installs
   `MemoryStore` (that preempted DB auto-derive). Store resolution is
@@ -28,6 +37,8 @@ publishes). Install from git / an editable checkout until then.
   HolySheet `generate_eval_report`. Scaffold `agents/*/eval.py` updated.
   `OptimizeMetricAdapter` now prefers `question` over meta-`query` and
   forwards snapshot `context` + rich expected references to judges.
+- **`TrainConfig` / `train_and_report`** (1.8.5): Thin train scripts with
+  HolySheet fit dashboards, augment/persist knobs, and apply guards.
 - **Per-agent invocation log history + optional LLM analysis**: Opt-in
   flags `logs_history` / `AGENTOMATIC_LOGS_HISTORY` and
   `allow_logsllm_analysis` / `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` persist
@@ -72,6 +83,8 @@ publishes). Install from git / an editable checkout until then.
 
 ### Fixed
 
+- **HolySheet nested report sections** (1.8.7): Fit/eval dashboards nest
+  content in `Section`/`Tabs`/`Accordion` children so cards are not empty.
 - **Train / optimize mechanics**: Fitted prompts and overrides apply during
   evaluate/reevaluate; GridSearch/PromptFitterBridge persist
   `system_prompt`; local in-process runner for `fit()`; honest LLM-as-judge

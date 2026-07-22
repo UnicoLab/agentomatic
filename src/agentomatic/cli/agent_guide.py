@@ -60,13 +60,22 @@ agentomatic init hello --template basic     # add an agent under agents/
 #    Prefers uvicorn main:app when main.py is present (same as deploy).
 agentomatic run                              # http://127.0.0.1:8000
 
-# 3. Optimize (prompt tuning / Keras-style fit) against a dataset
-agentomatic optimize hello --dataset data.jsonl
+# 3. Optimize — prefer thin train/eval scripts (class agents)
+#    agentomatic init hello --template class
+uv run python agents/hello/train.py --augment --persist --optimizer rewrite
+uv run python agents/hello/eval.py --split test --prefer-augmented
+#    Or CLI: agentomatic optimize hello --dataset data.jsonl
 
 # 4. Deploy: generate a container that serves the SAME app via uvicorn
 agentomatic deploy --stack remote --distroless          # full profile
 agentomatic deploy --profile minimal --stack remote     # production-lean
 ```
+
+Prefer `train_and_report(TrainConfig(...))` / `evaluate_and_report(EvalConfig(...))`
+plus `print_train_result` over hand-wiring `PromptFitterBridge`. Knobs:
+`epochs`, `trials`, `patience`, `optimizer`, `augment`/`n_examples`/`persist`,
+`apply`, judge metrics, HolySheet reports, `persist_fit_store`/`DATABASE_URL`,
+and platform `logs_history` / `allow_logsllm_analysis`. See the optimization guide.
 
 ## Key CLI commands
 
@@ -80,6 +89,7 @@ agentomatic deploy --profile minimal --stack remote     # production-lean
 | `agentomatic demo` | Run a self-contained demo platform + Studio |
 | `agentomatic list` / `inspect NAME` / `doctor` | Discover, inspect, diagnose |
 | `agentomatic optimize AGENT --dataset data.jsonl` | Prompt / Keras-style optimization |
+| `agents/*/train.py` / `eval.py` | Thin `train_and_report` / `evaluate_and_report` scripts |
 | `agentomatic test NAME` / `ui` | Interactive console / Chainlit chat UI |
 | `agentomatic stack init\\|list\\|show\\|use\\|export` | Multi-environment stack management |
 | `agentomatic pipeline list` | Discover YAML/Python pipelines |

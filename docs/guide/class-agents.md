@@ -1159,60 +1159,55 @@ agents/my_agent/
             return state.output
     ```
 
-??? example "Generated `train.py`"
+??? example "Generated `train.py` / `eval.py` (thin APIs)"
+
+    Class scaffolds emit thin scripts that call
+    [`train_and_report`](optimization.md) / [`evaluate_and_report`](optimization.md):
 
     ```python
-    """Train script for my_agent — ML-like workflow."""
-    from __future__ import annotations
-
-    from pathlib import Path
-
-    from .agent import MyAgentAgent
-
-    from agentomatic.agents import AgentDataset
-    from agentomatic.agents.metrics import (
-        ContainsTermsMetric,
-        ExactKeyMatchMetric,
+    from agentomatic.optimize import (
+        TrainConfig, print_train_result, train_and_report,
+        EvalConfig, evaluate_and_report,
     )
-    from agentomatic.agents.optimizers import NoOpOptimizer
+    from agents.my_agent.agent import MyAgentAgent
 
+    # Fit
+    result = train_and_report(
+        agent,
+        config=TrainConfig(
+            agent_name="my_agent",
+            agent_dir=HERE,
+            stacks_dir=ROOT / "stacks",
+            env_path=ROOT / ".env",
+            epochs=2,
+            max_trials=12,
+            optimizer="rewrite",
+            required_keys=["response"],
+            augment=True,
+            n_examples=40,
+            persist=True,
+        ),
+    )
+    print_train_result(result)
 
-    def main() -> None:
-        """Run the ML-like training workflow."""
-        # 1. Create agent
-        agent = MyAgentAgent(llm=None)
-
-        # 2. Load dataset
-        data_path = Path(__file__).parent / "dataset.jsonl"
-        dataset = AgentDataset.from_jsonl(str(data_path))
-        print(f"Loaded {len(dataset)} examples")
-
-        # 3. Compile
-        metrics = [
-            ExactKeyMatchMetric(["response"]),
-            ContainsTermsMetric(["Result"]),
-        ]
-        agent.compile(dataset, metrics, optimizer=NoOpOptimizer())
-
-        # 4. Fit
-        agent.fit(dataset)
-
-        # 5. Evaluate
-        report = agent.evaluate(dataset.test, metrics)
-        print(report.summary())
-
-        # 6. Inference
-        result = agent.transform({"request": "Test query"})
-        print(f"Output: {result}")
-
-        # 7. Save
-        agent.save("compiled/my_agent")
-        print("Done!")
-
-
-    if __name__ == "__main__":
-        main()
+    # Evaluate
+    ev = evaluate_and_report(
+        agent,
+        config=EvalConfig(
+            agent_name="my_agent",
+            agent_dir=HERE,
+            stacks_dir=ROOT / "stacks",
+            env_path=ROOT / ".env",
+            split="test",
+            prefer_augmented=True,
+            required_keys=["response"],
+        ),
+    )
+    print(ev.scores, ev.report_path)
     ```
+
+    For lower-level `compile` → `fit` → `evaluate` control, see
+    [Prompt Fitting](optimization.md#prompt-fitting-deployment-first-optimization).
 
 ??? example "Generated `dataset.jsonl`"
 

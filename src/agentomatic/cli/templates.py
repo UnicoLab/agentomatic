@@ -1590,14 +1590,14 @@ def _train_py(name: str) -> str:
     return f'''#!/usr/bin/env python3
 """Fit **{name}** prompts via Agentomatic ``train_and_report``.
 
-Thin entrypoint — stack / metrics / augment / fitter / HolySheet report live
-in ``agentomatic.optimize``.
+Thin, high-UX entrypoint — stack / metrics / augment / fitter / HolySheet
+report live in ``agentomatic.optimize``.
 
 Usage (from project root)::
 
-    uv run python agents/{name}/train.py
+    AGENTOMATIC_STACK=local uv run python agents/{name}/train.py
     AGENTOMATIC_STACK=gemini uv run python agents/{name}/train.py \\
-        --augment --n-examples 100 --persist --optimizer rewrite
+        --augment --n-examples 40 --persist --optimizer rewrite
 """
 from __future__ import annotations
 
@@ -1606,21 +1606,22 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]   # project root
+ROOT = Path(__file__).resolve().parents[2]  # → project root (agents/<name>/..)
 os.chdir(ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agentomatic.config.settings import load_environment
-from agentomatic.optimize import TrainConfig, train_and_report
+from agentomatic.optimize import TrainConfig, print_train_result, train_and_report
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
 from rich.console import Console
 
-from .agent import {title}Agent
+from agents.{name}.agent import {title}Agent
 
 AGENT = "{name}"
 HERE = Path(__file__).resolve().parent
+ENV_PATH = ROOT / ".env"  # nested layouts (e.g. ai_platform/) may use ROOT.parent
 console = Console()
 
 
@@ -1636,18 +1637,37 @@ def main(argv: list[str] | None = None) -> int:
         default="rewrite",
         choices=["rewrite", "gepa_like", "mipro_like", "few_shot_bootstrap", "param_search"],
     )
-    p.add_argument("--dataset", type=Path, default=None)
-    p.add_argument("--augment", action="store_true", help="LLM-augment seed data")
+    p.add_argument("--dataset", type=Path, default=None, help="JSONL path (default datasets/all.jsonl)")
+    p.add_argument("--augment", action="store_true", help="LLM-augment seed data before fit")
     p.add_argument(
-        "--n-examples", "--nr-examples", dest="n_examples", type=int, default=None,
-        help="Target size after augment (default: 3× seed)",
+        "--n-examples",
+        "--nr-examples",
+        dest="n_examples",
+        type=int,
+        default=None,
+        help="Target example count after augment (default: 3× seed)",
     )
-    p.add_argument("--persist", action="store_true", help="Write dataset JSONL to disk")
+    p.add_argument(
+        "--persist",
+        action="store_true",
+        help="Write augmented/loaded dataset to datasets/all.augmented.jsonl",
+    )
     p.add_argument("--apply", action="store_true", help="Persist best prompt if improved")
-    p.add_argument("--apply-as", default=None)
+    p.add_argument("--apply-as", default=None, help="prompts.json version key")
+    p.add_argument(
+        "--min-improvement",
+        type=float,
+        default=None,
+        help="Min absolute score lift to accept a candidate (default: TrainConfig 0.001)",
+    )
+    p.add_argument(
+        "--persist-fit-store",
+        action="store_true",
+        help="Also write retrain artefacts to DATABASE_URL / AGENTOMATIC_FIT_STORE_URL",
+    )
     args = p.parse_args(argv)
 
-    load_environment(ROOT.parent / ".env")
+    load_environment(ENV_PATH)
     stacks = StackManager(ROOT / "stacks")
     stacks.load(args.stack)
     apply_stack_defaults(stacks)
@@ -1661,7 +1681,7 @@ def main(argv: list[str] | None = None) -> int:
             agent_name=AGENT,
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
-            env_path=ROOT.parent / ".env",
+            env_path=ENV_PATH,
             stack=args.stack,
             dataset_path=args.dataset,
             epochs=args.epochs,
@@ -1680,29 +1700,15 @@ def main(argv: list[str] | None = None) -> int:
             persist=args.persist,
             apply=args.apply,
             apply_as=args.apply_as,
+            persist_fit_store=args.persist_fit_store,
+            **(
+                {{"min_absolute_improvement": args.min_improvement}}
+                if args.min_improvement is not None
+                else {{}}
+            ),
         ),
     )
-
-    console.print(
-        f"[bold]{{AGENT}}[/bold] stack={{result.stack!r}} model={{result.model}} "
-        f"optimizer={{result.optimizer}} sizes={{result.dataset_sizes}} "
-        f"augmented={{result.augmented}}"
-    )
-    console.print(f"optimize_status={{result.optimize_status!r}}")
-    hist = getattr(result.history, "history", {{}}) or {{}}
-    if "val_loss" in hist:
-        console.print(f"val_loss={{hist['val_loss']}}")
-    fit = result.fit_result
-    if fit is not None:
-        console.print(
-            f"fit baseline={{fit.baseline_score:.4f}} best={{fit.best_score:.4f}} "
-            f"Δ={{fit.absolute_improvement:+.4f}}"
-        )
-        console.print(f"score_history={{list(fit.history)}}")
-    console.print(f"evaluate={{result.eval_scores}}")
-    console.print(f"Report: {{result.report_path}}")
-    if not result.applied_version:
-        console.print("[dim]Demo-safe: pass --apply to persist the best prompt.[/dim]")
+    print_train_result(result, console=console)
     return 0
 
 
@@ -1716,14 +1722,14 @@ def _eval_py(name: str) -> str:
     return f'''#!/usr/bin/env python3
 """Evaluate **{name}** via Agentomatic ``evaluate_and_report``.
 
-Thin entrypoint — stack / metrics / LLM-judge / HolySheet report live in
-``agentomatic.optimize``. Mirrors ``train.py`` / ``train_and_report``.
+Thin, high-UX entrypoint — stack / metrics / LLM-judge / HolySheet report
+live in ``agentomatic.optimize``. Mirrors ``train.py``.
 
 Usage (from project root)::
 
-    uv run python agents/{name}/eval.py
+    AGENTOMATIC_STACK=local uv run python agents/{name}/eval.py
     AGENTOMATIC_STACK=gemini uv run python agents/{name}/eval.py \\
-        --split test --prefer-augmented
+        --split test --prefer-augmented --limit 3
 """
 from __future__ import annotations
 
@@ -1732,7 +1738,7 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]   # project root
+ROOT = Path(__file__).resolve().parents[2]  # → project root (agents/<name>/..)
 os.chdir(ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -1743,10 +1749,11 @@ from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
 from rich.console import Console
 
-from .agent import {title}Agent
+from agents.{name}.agent import {title}Agent
 
 AGENT = "{name}"
 HERE = Path(__file__).resolve().parent
+ENV_PATH = ROOT / ".env"  # nested layouts (e.g. ai_platform/) may use ROOT.parent
 console = Console()
 
 
@@ -1754,7 +1761,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry for {name} evaluation."""
     p = argparse.ArgumentParser(description=f"Evaluate {{AGENT}} (Agentomatic)")
     p.add_argument("--stack", default=os.getenv("AGENTOMATIC_STACK", "local"))
-    p.add_argument("--dataset", type=Path, default=None)
+    p.add_argument("--dataset", type=Path, default=None, help="JSONL path")
     p.add_argument(
         "--split",
         choices=["test", "validation", "train", "eval", "all"],
@@ -1768,10 +1775,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Use datasets/all.augmented.jsonl when present",
     )
     p.add_argument("--json-out", type=Path, default=None)
+    p.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="Explicit HTML report path (default: timestamped under reports/)",
+    )
     p.add_argument("--compiled", type=str, default=None, help="Load compiled agent dir")
     args = p.parse_args(argv)
 
-    load_environment(ROOT.parent / ".env")
+    load_environment(ENV_PATH)
     stacks = StackManager(ROOT / "stacks")
     stacks.load(args.stack)
     apply_stack_defaults(stacks)
@@ -1788,9 +1801,10 @@ def main(argv: list[str] | None = None) -> int:
             agent_name=AGENT,
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
-            env_path=ROOT.parent / ".env",
+            env_path=ENV_PATH,
             stack=args.stack,
             dataset_path=args.dataset,
+            report_path=args.report,
             split=args.split,
             limit=args.limit,
             required_keys=["response"],
@@ -1812,7 +1826,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     console.print(f"dataset={{result.dataset_path}} sizes={{result.dataset_sizes}}")
     console.print(f"scores={{result.scores}}")
+    for er in result.example_results[:8]:
+        console.print(
+            f"  {{getattr(er, 'example_id', '?')}}: "
+            f"scores={{getattr(er, 'scores', {{}})}} "
+            f"err={{getattr(er, 'error', None)!r}}"
+        )
     console.print(f"[green]Report:[/green] {{result.report_path}}")
+    try:
+        rsize = Path(result.report_path).stat().st_size if result.report_path else 0
+        console.print(f"report_bytes={{rsize}}")
+    except OSError:
+        pass
     if result.json_out:
         console.print(f"json={{result.json_out}}")
     return 0

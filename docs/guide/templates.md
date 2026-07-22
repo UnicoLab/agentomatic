@@ -523,60 +523,41 @@ agents/analyzer/
     {"id": "analyzer_003", "split": "test", "input": {"request": "Analyze the risks"}, "expected_output": {"response": "Risks identified: ..."}, "metadata": {"domain": "general", "difficulty": "hard"}}
     ```
 
-??? example "Generated `train.py`"
+??? example "Generated `train.py` (thin `train_and_report`)"
+
+    Scaffolded class agents use a thin script that delegates to
+    [`train_and_report`](optimization.md). Key surface:
 
     ```python
-    """Train script for analyzer — ML-like workflow."""
-    from __future__ import annotations
+    from agentomatic.optimize import TrainConfig, print_train_result, train_and_report
+    from agents.analyzer.agent import AnalyzerAgent
 
-    from pathlib import Path
-
-    from .agent import AnalyzerAgent
-
-    from agentomatic.agents import AgentDataset
-    from agentomatic.agents.metrics import (
-        ContainsTermsMetric,
-        ExactKeyMatchMetric,
+    result = train_and_report(
+        agent,
+        config=TrainConfig(
+            agent_name="analyzer",
+            agent_dir=HERE,
+            stacks_dir=ROOT / "stacks",
+            env_path=ROOT / ".env",
+            stack=args.stack,
+            epochs=args.epochs,
+            max_trials=args.trials,
+            patience=args.patience,
+            optimizer=args.optimizer,
+            required_keys=["response"],
+            judge_dimensions=["relevance", "accuracy", "structure"],
+            augment=args.augment,
+            n_examples=args.n_examples,
+            persist=args.persist,
+            apply=args.apply,
+            persist_fit_store=args.persist_fit_store,
+        ),
     )
-    from agentomatic.agents.optimizers import NoOpOptimizer
-
-
-    def main() -> None:
-        """Run the ML-like training workflow."""
-        # 1. Create agent
-        agent = AnalyzerAgent(llm=None)
-
-        # 2. Load dataset
-        data_path = Path(__file__).parent / "dataset.jsonl"
-        dataset = AgentDataset.from_jsonl(str(data_path))
-        print(f"Loaded {len(dataset)} examples")
-
-        # 3. Compile
-        metrics = [
-            ExactKeyMatchMetric(["response"]),
-            ContainsTermsMetric(["Result"]),
-        ]
-        agent.compile(dataset, metrics, optimizer=NoOpOptimizer())
-
-        # 4. Fit
-        agent.fit(dataset)
-
-        # 5. Evaluate
-        report = agent.evaluate(dataset.test, metrics)
-        print(report.summary())
-
-        # 6. Inference
-        result = agent.transform({"request": "Test query"})
-        print(f"Output: {result}")
-
-        # 7. Save
-        agent.save("compiled/analyzer")
-        print("Done!")
-
-
-    if __name__ == "__main__":
-        main()
+    print_train_result(result)
     ```
+
+    Matching `eval.py` calls `evaluate_and_report(EvalConfig(...))`. See
+    [Prompt Optimization](optimization.md) for the full knob table.
 
 !!! info "No LangGraph Required"
     Class agents use the built-in `AgentGraph` runtime. Wire your graph in `build_graph()` using `new_graph()` — no need for `langgraph` or `StateGraph`.
