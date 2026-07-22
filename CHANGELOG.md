@@ -8,9 +8,11 @@
 - **logs**: Multi-resource `logs_history` — persist full I/O + metadata for
   agents, plugins, pipelines, ingestion, and custom endpoints (same
   SQLAlchemyStore / MemoryStore backends). Cross-resource REST:
-  `GET /api/v1/logs?resource=plugin&name=…`, `POST /logs/analyze`, plus
-  per-agent `/{agent}/logs` BC. In-process pipeline steps record with
-  `endpoint=pipeline_step` and `metadata.pipeline`.
+  `GET /api/v1/logs?resource=plugin&name=…`, `GET /logs/{id}`,
+  `POST /logs/analyze`, `GET /logs/analysis`, plus per-agent `/{agent}/logs`
+  BC. In-process pipeline steps record with `endpoint=pipeline_step` and
+  `metadata.pipeline`. Not covered yet: async task invocations; no
+  per-plugin convenience `/logs` routes.
 - **optimize**: Thin train UX — `TrainConfig` + `train_and_report` / `run_train`
   / `run_training` package stack load, metrics, PromptFitterBridge, evaluate,
   and HolySheet fit reports so project `train.py` scripts stay declarative.
@@ -35,9 +37,10 @@
 - **studio**: Schema-driven invoke forms (SchemaForm) from agent input/output
   JSON schemas — LangGraph-Studio-like debugging of required fields.
 - **logs**: Durable multi-backend `logs_history` / `allow_logsllm_analysis`
-  (+ env) persist full per-agent I/O via `SQLAlchemyStore`
+  (+ env) persist full resource I/O via `SQLAlchemyStore`
   (`AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack `database.url`) and expose
-  `/logs` + `/logs/analyze`. MemoryStore is not eagerly installed when
+  cross-resource `/api/v1/logs` + `/logs/analyze` (agents/plugins/pipelines/
+  ingestion/endpoints as of 1.8.9). MemoryStore is not eagerly installed when
   logs_history is on (so DB auto-derive is not preempted).
 
 ### Bug Fixes

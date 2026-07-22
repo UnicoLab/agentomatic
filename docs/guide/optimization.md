@@ -119,7 +119,7 @@ AGENTOMATIC_STACK=gemini uv run python agents/assistant/eval.py \
 | `split` / `prefer_augmented` / `limit` | eval | Which examples to score; reuse augmented dataset |
 | HolySheet reports | automatic | Nested `Section`/`Tabs`/`Accordion` dashboards (score curves, prompts, judge rationales); fallback HTML if HolySheet absent |
 | `persist_fit_store` / `fit_store_url` | train | Audit retrain runs via `OptimizationRunStore` → `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` |
-| `logs_history` / `allow_logsllm_analysis` | platform | Persist invoke I/O for agents/plugins/pipelines/ingestion/endpoints + optional LLM log analysis (`AGENTOMATIC_LOGS_HISTORY`, `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`); REST `/api/v1/logs?resource=&name=` |
+| `logs_history` / `allow_logsllm_analysis` | platform | Persist sync invoke I/O for agents/plugins/pipelines/ingestion/endpoints + optional LLM log analysis (`AGENTOMATIC_LOGS_HISTORY`, `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`); REST `GET /api/v1/logs?resource=&name=` (+ `/analyze`). Async tasks and per-plugin `/logs` routes are not covered — see [Platform Features](platform-features.md#invocation-log-history-llm-analysis) |
 
 !!! tip "Nested projects (e.g. SCOOPER `ai_platform/`)"
     When the agent package lives one level under a monorepo (`.env` beside the

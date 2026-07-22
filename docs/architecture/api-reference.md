@@ -31,6 +31,7 @@ These endpoints are global — not scoped to a specific agent.
 | `GET`/`POST` | `/api/v1/pipelines[/{name}/run\|/validate\|/visualize]` | Pipelines — list, run, validate, visualize |
 | `GET`/`POST` | `/api/v1/ingestion[/{name}/run]` | Ingestors — list, info, health, run |
 | `GET`/`POST` | `/api/v1/endpoints[/{name}{path}]` | Custom endpoints — list, call |
+| `GET`/`POST` | `/api/v1/logs[/{id}\|/analyze\|/analysis]` | Invocation logs across resources (`?resource=` + `name=`; when `logs_history` on) |
 | `GET`/`POST` | `/api/v1/control[/...]` | Control plane (when enabled) |
 
 !!! info "Dedicated guides"
