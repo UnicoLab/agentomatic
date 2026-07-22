@@ -2698,10 +2698,19 @@
 This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</p>
 <hr />
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
-<p>Targeting <strong>v1.8.0</strong> (PyPI may still show 1.7.0 until the release job
-publishes). Install from git / an editable checkout until then.</p>
+<p>Docs and scaffolds track shipped <strong>1.8.3–1.8.8</strong> train/eval/logs APIs.
+Install from git / an editable checkout until PyPI catches up.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Docs + CLI templates for thin train/eval</strong> (1.8.8 docs):
+  <a href="../guide/optimization/">Prompt Optimization</a> documents
+  <code>TrainConfig</code> / <code>train_and_report</code> / <code>print_train_result</code> and
+  <code>EvalConfig</code> / <code>evaluate_and_report</code>, including knobs
+  (<code>optimizer</code>, <code>epochs</code>, <code>trials</code>, <code>patience</code>, <code>augment</code> /
+  <code>n_examples</code> / <code>persist</code>, <code>apply</code>, judge metrics, HolySheet reports,
+  <code>persist_fit_store</code> / <code>DATABASE_URL</code>, <code>logs_history</code> /
+  <code>allow_logsllm_analysis</code>). Scaffold <code>_train_py</code> / <code>_eval_py</code> match
+  the SCOOPER assistant thin pattern.</li>
 <li><strong>Durable multi-backend logs / retrain persistence</strong> (1.8.8): When
   <code>logs_history</code> is on, the platform no longer eagerly installs
   <code>MemoryStore</code> (that preempted DB auto-derive). Store resolution is
@@ -2718,6 +2727,8 @@ publishes). Install from git / an editable checkout until then.</p>
   HolySheet <code>generate_eval_report</code>. Scaffold <code>agents/*/eval.py</code> updated.
   <code>OptimizeMetricAdapter</code> now prefers <code>question</code> over meta-<code>query</code> and
   forwards snapshot <code>context</code> + rich expected references to judges.</li>
+<li><strong><code>TrainConfig</code> / <code>train_and_report</code></strong> (1.8.5): Thin train scripts with
+  HolySheet fit dashboards, augment/persist knobs, and apply guards.</li>
 <li><strong>Per-agent invocation log history + optional LLM analysis</strong>: Opt-in
   flags <code>logs_history</code> / <code>AGENTOMATIC_LOGS_HISTORY</code> and
   <code>allow_logsllm_analysis</code> / <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS</code> persist
@@ -2762,6 +2773,8 @@ publishes). Install from git / an editable checkout until then.</p>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>HolySheet nested report sections</strong> (1.8.7): Fit/eval dashboards nest
+  content in <code>Section</code>/<code>Tabs</code>/<code>Accordion</code> children so cards are not empty.</li>
 <li><strong>Train / optimize mechanics</strong>: Fitted prompts and overrides apply during
   evaluate/reevaluate; GridSearch/PromptFitterBridge persist
   <code>system_prompt</code>; local in-process runner for <code>fit()</code>; honest LLM-as-judge

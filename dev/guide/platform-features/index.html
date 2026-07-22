@@ -4521,7 +4521,11 @@ Opt in to <code>any_error</code> when every exception should advance the chain.<
 </ul>
 <h2 id="invocation-log-history-llm-analysis">Invocation log history &amp; LLM analysis<a class="headerlink" href="#invocation-log-history-llm-analysis" title="Permanent link">&para;</a></h2>
 <p>Persist every invoke/chat/stream I/O per agent for auditability and live
-recommendations.</p>
+recommendations. When <code>logs_history</code> is on, the platform derives a durable
+<code>SQLAlchemyStore</code> from <code>AGENTOMATIC_DB_URL</code> / <code>DATABASE_URL</code> / stack
+<code>database.url</code> (Postgres, SQLite, …) — it does <strong>not</strong> eagerly install
+<code>MemoryStore</code> (that would preempt DB auto-derive). If a DB URL is set but
+init fails, MemoryStore fallback is refused.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
 </span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>  <span class="c1"># or MemoryStore</span>
 </span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>
@@ -4533,7 +4537,8 @@ recommendations.</p>
 </span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Env equivalents: <code>AGENTOMATIC_LOGS_HISTORY=1</code>,
-<code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1</code>.</p>
+<code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1</code>, plus <code>DATABASE_URL</code> /
+<code>AGENTOMATIC_DB_URL</code> for multi-backend persistence.</p>
 <p>Endpoints (per agent):</p>
 <table>
 <thead>
@@ -4567,8 +4572,10 @@ recommendations.</p>
 </tbody>
 </table>
 <p>Analysis returns <code>score</code>, <code>summary</code>, <code>status</code>, and <code>recommendations</code>.
-Optimization runs can also be persisted via <code>OptimizationRunStore</code> when a
-platform store is registered with <code>set_fit_store(store)</code>.</p>
+Offline train can also audit retrain runs with
+<code>TrainConfig.persist_fit_store</code> / <code>fit_store_url</code> →
+<code>AGENTOMATIC_FIT_STORE_URL</code> / <code>DATABASE_URL</code> (<code>OptimizationRunStore</code>).
+See <a href="../optimization/">Prompt Optimization</a>.</p>
 
 
 
