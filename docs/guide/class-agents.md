@@ -1159,51 +1159,46 @@ agents/my_agent/
             return state.output
     ```
 
-??? example "Generated `train.py` / `eval.py` (thin APIs)"
+??? example "Generated `train.py` / `eval.py` (flat settings APIs)"
 
-    Class scaffolds emit thin scripts that call
+    Class scaffolds emit flat scripts:
+    `TrainCliSettings` / `EvalCliSettings` →
     [`train_and_report`](optimization.md) / [`evaluate_and_report`](optimization.md):
 
     ```python
     from agentomatic.optimize import (
-        TrainConfig, print_train_result, train_and_report,
-        EvalConfig, evaluate_and_report,
+        TrainCliSettings, print_train_result, train_and_report,
+        EvalCliSettings, evaluate_and_report, print_eval_result,
     )
     from agents.my_agent.agent import MyAgentAgent
 
     # Fit
+    train_cli = TrainCliSettings.parse(["--augment", "--n-examples", "40", "--persist"])
     result = train_and_report(
         agent,
-        config=TrainConfig(
+        config=train_cli.to_train_config(
             agent_name="my_agent",
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
             env_path=ROOT / ".env",
-            epochs=2,
-            max_trials=12,
-            optimizer="rewrite",
             required_keys=["response"],
-            augment=True,
-            n_examples=40,
-            persist=True,
         ),
     )
     print_train_result(result)
 
     # Evaluate
+    eval_cli = EvalCliSettings.parse(["--split", "test", "--prefer-augmented"])
     ev = evaluate_and_report(
         agent,
-        config=EvalConfig(
+        config=eval_cli.to_eval_config(
             agent_name="my_agent",
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
             env_path=ROOT / ".env",
-            split="test",
-            prefer_augmented=True,
             required_keys=["response"],
         ),
     )
-    print(ev.scores, ev.report_path)
+    print_eval_result(ev, agent_name="my_agent")
     ```
 
     For lower-level `compile` → `fit` → `evaluate` control, see

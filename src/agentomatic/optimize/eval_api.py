@@ -376,6 +376,51 @@ def run_eval(
     )
 
 
+def print_eval_result(
+    result: EvaluateResult,
+    *,
+    agent_name: str = "",
+    console: Any | None = None,
+    max_examples: int = 8,
+) -> None:
+    """Print a rich, scannable summary of an :class:`EvaluateResult`.
+
+    Extracted from project ``eval.py`` scripts so they stay thin.
+
+    Args:
+        result: Eval outcome from :func:`evaluate_and_report`.
+        agent_name: Optional display name (defaults to ``"agent"``).
+        console: Optional Rich console; created on demand when omitted.
+        max_examples: Max per-example rows to print (default 8).
+    """
+    if console is None:
+        from rich.console import Console
+
+        console = Console()
+
+    agent = agent_name or "agent"
+    console.print(
+        f"[bold]{agent}[/bold] stack={result.stack!r} model={result.model} "
+        f"split={result.split!r} n={result.n_examples}"
+    )
+    console.print(f"dataset={result.dataset_path} sizes={result.dataset_sizes}")
+    console.print(f"scores={result.scores}")
+    for er in result.example_results[: max(0, int(max_examples))]:
+        console.print(
+            f"  {getattr(er, 'example_id', '?')}: "
+            f"scores={getattr(er, 'scores', {})} "
+            f"err={getattr(er, 'error', None)!r}"
+        )
+    console.print(f"[green]Report:[/green] {result.report_path}")
+    try:
+        rsize = Path(result.report_path).stat().st_size if result.report_path else 0
+        console.print(f"report_bytes={rsize}")
+    except OSError:
+        pass
+    if result.json_out:
+        console.print(f"json={result.json_out}")
+
+
 # Public aliases — preferred names in docs / templates.
 evaluate_and_report = run_eval
 run_evaluate = run_eval
@@ -385,6 +430,7 @@ __all__ = [
     "EvaluateResult",
     "evaluate_and_report",
     "load_data",
+    "print_eval_result",
     "resolve_eval_dataset_path",
     "run_eval",
     "run_evaluate",

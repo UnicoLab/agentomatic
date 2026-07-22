@@ -16,10 +16,10 @@ The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and s
 
 ## ⚡ Quick Start — `train_and_report` / `evaluate_and_report`
 
-The recommended public API for class agents is a **thin script** that delegates
-stack load, metrics, augmentation, PromptFitter, evaluate, and HolySheet HTML
-reports to `agentomatic.optimize`. Scaffolded agents ship with matching
-`agents/<name>/train.py` and `agents/<name>/eval.py`
+The recommended public API for class agents is a **flat script** that loads
+`TrainCliSettings` / `EvalCliSettings` (env + CLI), builds the agent, then
+delegates fit/eval + HolySheet HTML to `agentomatic.optimize`. Scaffolded
+agents ship with matching `agents/<name>/train.py` and `agents/<name>/eval.py`
 (`agentomatic init … --template class`).
 
 ### Train (fit prompts)
@@ -27,43 +27,40 @@ reports to `agentomatic.optimize`. Scaffolded agents ship with matching
 ```python
 from pathlib import Path
 
-from agentomatic.optimize import TrainConfig, print_train_result, train_and_report
+from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
 
 from agents.assistant.agent import AssistantAgent
 
 ROOT = Path(".")  # project root
+HERE = ROOT / "agents" / "assistant"
+
+# --- settings (AGENTOMATIC_* env + optional CLI overrides) ---
+cli = TrainCliSettings.parse()  # or parse(["--augment", "--n-examples", "40"])
+
+# --- environment / stack ---
 stacks = StackManager(ROOT / "stacks")
-stacks.load("gemini")
+stacks.load(cli.stack)
 apply_stack_defaults(stacks)
 
+# --- agent ---
 agent = AssistantAgent(llm=get_llm_for_agent("assistant", stack_manager=stacks))
+
+# --- fit + HolySheet report ---
 result = train_and_report(
     agent,
-    config=TrainConfig(
+    config=cli.to_train_config(
         agent_name="assistant",
-        agent_dir=ROOT / "agents" / "assistant",
+        agent_dir=HERE,
         stacks_dir=ROOT / "stacks",
         env_path=ROOT / ".env",
-        stack="gemini",
-        epochs=2,
-        max_trials=12,
-        patience=2,
-        optimizer="rewrite",  # rewrite | gepa_like | mipro_like | few_shot_bootstrap | param_search
         required_keys=["content", "next_action"],
         judge_criteria=(
             "Evaluate pertinence, groundedness, and actionability. "
             "Score each dimension 0–1 with clear motivation."
         ),
         judge_dimensions=["pertinence", "groundedness", "actionability"],
-        augment=True,          # LLM-expand seed JSONL before fit
-        n_examples=40,         # alias: nr_examples; default 3× seed when omitted
-        persist=True,          # write datasets/all.augmented.jsonl
-        apply=False,           # set True to persist best prompt when improved
-        apply_as="v2_fit",
-        persist_fit_store=False,  # True → also audit to DATABASE_URL / FIT_STORE_URL
-        min_absolute_improvement=0.001,
     ),
 )
 print_train_result(result)          # or result.print_summary()
@@ -71,55 +68,62 @@ print(result.report_path)           # HolySheet HTML under agents/.../reports/
 ```
 
 ```bash
-# Scaffolded train.py (same knobs as CLI flags)
+# Scaffolded train.py — same knobs via env and/or CLI (see --help)
 AGENTOMATIC_STACK=gemini uv run python agents/assistant/train.py \
   --augment --n-examples 40 --persist --optimizer rewrite --epochs 2 --trials 12
 # Persist improved prompt + optional DB retrain audit:
 #   ... --apply --apply-as v2_fit --persist-fit-store
+# Env-only example:
+#   AGENTOMATIC_STACK=gemini AGENTOMATIC_EPOCHS=2 AGENTOMATIC_AUGMENT=true \
+#     uv run python agents/assistant/train.py
 ```
 
 ### Evaluate (score a split)
 
 ```python
-from agentomatic.optimize import EvalConfig, evaluate_and_report
+from agentomatic.optimize import EvalCliSettings, evaluate_and_report, print_eval_result
 
+cli = EvalCliSettings.parse()  # or parse(["--split", "test", "--prefer-augmented"])
 result = evaluate_and_report(
     agent,
-    config=EvalConfig(
+    config=cli.to_eval_config(
         agent_name="assistant",
-        agent_dir=ROOT / "agents" / "assistant",
+        agent_dir=HERE,
         stacks_dir=ROOT / "stacks",
         env_path=ROOT / ".env",
-        stack="gemini",
-        split="test",              # test | validation | train | eval | all
-        prefer_augmented=True,     # reuse datasets/all.augmented.jsonl when present
         required_keys=["content", "next_action"],
         judge_dimensions=["pertinence", "groundedness", "actionability"],
-        use_judge=True,
     ),
 )
-print(result.scores, result.report_path)
+print_eval_result(result, agent_name="assistant")
 ```
 
 ```bash
 AGENTOMATIC_STACK=gemini uv run python agents/assistant/eval.py \
   --split test --prefer-augmented --limit 3
+# uv run python agents/assistant/eval.py --help
 ```
 
 ### Knob reference
 
-| Knob | Where | Purpose |
+| Knob | Env / CLI | Purpose |
 |---|---|---|
-| `optimizer` | `TrainConfig` / `--optimizer` | Fitter strategy: `rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search` |
-| `epochs` / `max_trials` / `patience` | train | Outer Keras epochs, inner trial budget, EarlyStopping on `val_loss` |
-| `augment` / `n_examples` / `persist` | train (eval rare) | LLM-augment seed data, target size, write `all.augmented.jsonl` |
+| `stack` | `AGENTOMATIC_STACK` / `--stack` | Stack YAML to load |
+| `optimizer` | `AGENTOMATIC_OPTIMIZER` / `--optimizer` | Fitter strategy: `rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search` |
+| `epochs` / `trials` / `patience` | `AGENTOMATIC_EPOCHS` etc. / `--epochs` `--trials` `--patience` | Outer Keras epochs, inner trial budget (`max_trials`), EarlyStopping on `val_loss` |
+| `augment` / `n_examples` / `persist` | train | LLM-augment seed data, target size, write `all.augmented.jsonl` |
 | `apply` / `apply_as` | train | Persist best prompt to `prompts.json` when improved (guards refuse zero/overfit) |
-| `min_absolute_improvement` | train | Acceptance threshold for candidates (default `0.001`) |
-| `required_keys` + `judge_*` | train & eval | Structured schema metrics + LLM-as-judge criteria/dimensions |
+| `min_improvement` | `--min-improvement` → `TrainConfig.min_absolute_improvement` | Acceptance threshold for candidates (default `0.001`) |
+| `required_keys` + `judge_*` | script (`to_train_config` / `to_eval_config`) | Structured schema metrics + LLM-as-judge criteria/dimensions |
 | `split` / `prefer_augmented` / `limit` | eval | Which examples to score; reuse augmented dataset |
+| `judge` | `AGENTOMATIC_JUDGE` / `--judge` / `--no-judge` | LLM-as-judge on/off (default on) |
 | HolySheet reports | automatic | Nested `Section`/`Tabs`/`Accordion` dashboards (score curves, prompts, judge rationales); fallback HTML if HolySheet absent |
 | `persist_fit_store` / `fit_store_url` | train | Audit retrain runs via `OptimizationRunStore` → `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` |
 | `logs_history` / `allow_logsllm_analysis` | platform | Persist sync invoke I/O for agents/plugins/pipelines/ingestion/endpoints + optional LLM log analysis (`AGENTOMATIC_LOGS_HISTORY`, `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`); REST `GET /api/v1/logs?resource=&name=` (+ `/analyze`). Async tasks and per-plugin `/logs` routes are not covered — see [Platform Features](platform-features.md#invocation-log-history-llm-analysis) |
+
+`TrainCliSettings` / `EvalCliSettings` map into `TrainConfig` / `EvalConfig` via
+`.to_train_config(...)` / `.to_eval_config(...)` — agent-specific judge text and
+`required_keys` stay in the flat script, not in argparse.
 
 !!! tip "Nested projects (e.g. SCOOPER `ai_platform/`)"
     When the agent package lives one level under a monorepo (`.env` beside the

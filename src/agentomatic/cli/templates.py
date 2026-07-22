@@ -1590,8 +1590,8 @@ def _train_py(name: str) -> str:
     return f'''#!/usr/bin/env python3
 """Fit **{name}** prompts via Agentomatic ``train_and_report``.
 
-Thin, high-UX entrypoint — stack / metrics / augment / fitter / HolySheet
-report live in ``agentomatic.optimize``.
+Flat script: ``TrainCliSettings`` (env + CLI) → agent → fit → report.
+Knobs: ``AGENTOMATIC_*`` env vars and/or ``--help`` flags.
 
 Usage (from project root)::
 
@@ -1601,7 +1601,6 @@ Usage (from project root)::
 """
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 from pathlib import Path
@@ -1612,7 +1611,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agentomatic.config.settings import load_environment
-from agentomatic.optimize import TrainConfig, print_train_result, train_and_report
+from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
 from rich.console import Console
@@ -1626,68 +1625,28 @@ console = Console()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry for {name} prompt fitting."""
-    p = argparse.ArgumentParser(description=f"Fit {{AGENT}} prompts (Agentomatic)")
-    p.add_argument("--stack", default=os.getenv("AGENTOMATIC_STACK", "local"))
-    p.add_argument("--epochs", type=int, default=2)
-    p.add_argument("--trials", type=int, default=12)
-    p.add_argument("--patience", type=int, default=2)
-    p.add_argument(
-        "--optimizer",
-        default="rewrite",
-        choices=["rewrite", "gepa_like", "mipro_like", "few_shot_bootstrap", "param_search"],
-    )
-    p.add_argument("--dataset", type=Path, default=None, help="JSONL path (default datasets/all.jsonl)")
-    p.add_argument("--augment", action="store_true", help="LLM-augment seed data before fit")
-    p.add_argument(
-        "--n-examples",
-        "--nr-examples",
-        dest="n_examples",
-        type=int,
-        default=None,
-        help="Target example count after augment (default: 3× seed)",
-    )
-    p.add_argument(
-        "--persist",
-        action="store_true",
-        help="Write augmented/loaded dataset to datasets/all.augmented.jsonl",
-    )
-    p.add_argument("--apply", action="store_true", help="Persist best prompt if improved")
-    p.add_argument("--apply-as", default=None, help="prompts.json version key")
-    p.add_argument(
-        "--min-improvement",
-        type=float,
-        default=None,
-        help="Min absolute score lift to accept a candidate (default: TrainConfig 0.001)",
-    )
-    p.add_argument(
-        "--persist-fit-store",
-        action="store_true",
-        help="Also write retrain artefacts to DATABASE_URL / AGENTOMATIC_FIT_STORE_URL",
-    )
-    args = p.parse_args(argv)
+    """Fit {name} prompts (settings → agent → train_and_report)."""
+    # --- settings (AGENTOMATIC_* env + optional CLI overrides) ---
+    cli = TrainCliSettings.parse(argv)
 
+    # --- environment / stack ---
     load_environment(ENV_PATH)
     stacks = StackManager(ROOT / "stacks")
-    stacks.load(args.stack)
+    stacks.load(cli.stack)
     apply_stack_defaults(stacks)
 
+    # --- agent ---
     llm = get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
     agent = {title}Agent(llm=llm)
 
+    # --- fit + HolySheet report ---
     result = train_and_report(
         agent,
-        config=TrainConfig(
+        config=cli.to_train_config(
             agent_name=AGENT,
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
             env_path=ENV_PATH,
-            stack=args.stack,
-            dataset_path=args.dataset,
-            epochs=args.epochs,
-            max_trials=args.trials,
-            patience=args.patience,
-            optimizer=args.optimizer,
             required_keys=["response"],
             judge_criteria=(
                 "Evaluate whether the response is relevant to the query, "
@@ -1695,17 +1654,6 @@ def main(argv: list[str] | None = None) -> int:
                 "0–1 scores with clear motivation."
             ),
             judge_dimensions=["relevance", "accuracy", "structure"],
-            augment=args.augment,
-            n_examples=args.n_examples,
-            persist=args.persist,
-            apply=args.apply,
-            apply_as=args.apply_as,
-            persist_fit_store=args.persist_fit_store,
-            **(
-                {{"min_absolute_improvement": args.min_improvement}}
-                if args.min_improvement is not None
-                else {{}}
-            ),
         ),
     )
     print_train_result(result, console=console)
@@ -1722,8 +1670,8 @@ def _eval_py(name: str) -> str:
     return f'''#!/usr/bin/env python3
 """Evaluate **{name}** via Agentomatic ``evaluate_and_report``.
 
-Thin, high-UX entrypoint — stack / metrics / LLM-judge / HolySheet report
-live in ``agentomatic.optimize``. Mirrors ``train.py``.
+Flat script: ``EvalCliSettings`` (env + CLI) → agent → evaluate → report.
+Knobs: ``AGENTOMATIC_*`` env vars and/or ``--help`` flags. Mirrors ``train.py``.
 
 Usage (from project root)::
 
@@ -1733,7 +1681,6 @@ Usage (from project root)::
 """
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 from pathlib import Path
@@ -1744,7 +1691,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agentomatic.config.settings import load_environment
-from agentomatic.optimize import EvalConfig, evaluate_and_report
+from agentomatic.optimize import EvalCliSettings, evaluate_and_report, print_eval_result
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
 from rich.console import Console
@@ -1758,55 +1705,31 @@ console = Console()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry for {name} evaluation."""
-    p = argparse.ArgumentParser(description=f"Evaluate {{AGENT}} (Agentomatic)")
-    p.add_argument("--stack", default=os.getenv("AGENTOMATIC_STACK", "local"))
-    p.add_argument("--dataset", type=Path, default=None, help="JSONL path")
-    p.add_argument(
-        "--split",
-        choices=["test", "validation", "train", "eval", "all"],
-        default="test",
-    )
-    p.add_argument("--limit", type=int, default=None)
-    p.add_argument("--no-judge", action="store_true", help="Skip LLM-as-judge")
-    p.add_argument(
-        "--prefer-augmented",
-        action="store_true",
-        help="Use datasets/all.augmented.jsonl when present",
-    )
-    p.add_argument("--json-out", type=Path, default=None)
-    p.add_argument(
-        "--report",
-        type=Path,
-        default=None,
-        help="Explicit HTML report path (default: timestamped under reports/)",
-    )
-    p.add_argument("--compiled", type=str, default=None, help="Load compiled agent dir")
-    args = p.parse_args(argv)
+    """Evaluate {name} (settings → agent → evaluate_and_report)."""
+    # --- settings (AGENTOMATIC_* env + optional CLI overrides) ---
+    cli = EvalCliSettings.parse(argv)
 
+    # --- environment / stack ---
     load_environment(ENV_PATH)
     stacks = StackManager(ROOT / "stacks")
-    stacks.load(args.stack)
+    stacks.load(cli.stack)
     apply_stack_defaults(stacks)
 
-    llm = None if args.no_judge else get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
+    # --- agent ---
+    llm = None if not cli.judge else get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
     agent = {title}Agent(llm=llm)
-    if args.compiled:
-        agent.load_compiled(args.compiled)
-        console.print(f"Loaded compiled config from {{args.compiled}}")
+    if cli.compiled:
+        agent.load_compiled(cli.compiled)
+        console.print(f"Loaded compiled config from {{cli.compiled}}")
 
+    # --- evaluate + HolySheet report ---
     result = evaluate_and_report(
         agent,
-        config=EvalConfig(
+        config=cli.to_eval_config(
             agent_name=AGENT,
             agent_dir=HERE,
             stacks_dir=ROOT / "stacks",
             env_path=ENV_PATH,
-            stack=args.stack,
-            dataset_path=args.dataset,
-            report_path=args.report,
-            split=args.split,
-            limit=args.limit,
             required_keys=["response"],
             judge_criteria=(
                 "Evaluate whether the response is relevant to the query, "
@@ -1814,32 +1737,9 @@ def main(argv: list[str] | None = None) -> int:
                 "0–1 scores with clear motivation."
             ),
             judge_dimensions=["relevance", "accuracy", "structure"],
-            use_judge=not args.no_judge,
-            prefer_augmented=args.prefer_augmented,
-            json_out=args.json_out,
         ),
     )
-
-    console.print(
-        f"[bold]{{AGENT}}[/bold] stack={{result.stack!r}} model={{result.model}} "
-        f"split={{result.split!r}} n={{result.n_examples}}"
-    )
-    console.print(f"dataset={{result.dataset_path}} sizes={{result.dataset_sizes}}")
-    console.print(f"scores={{result.scores}}")
-    for er in result.example_results[:8]:
-        console.print(
-            f"  {{getattr(er, 'example_id', '?')}}: "
-            f"scores={{getattr(er, 'scores', {{}})}} "
-            f"err={{getattr(er, 'error', None)!r}}"
-        )
-    console.print(f"[green]Report:[/green] {{result.report_path}}")
-    try:
-        rsize = Path(result.report_path).stat().st_size if result.report_path else 0
-        console.print(f"report_bytes={{rsize}}")
-    except OSError:
-        pass
-    if result.json_out:
-        console.print(f"json={{result.json_out}}")
+    print_eval_result(result, agent_name=AGENT, console=console)
     return 0
 
 
