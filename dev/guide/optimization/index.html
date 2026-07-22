@@ -3278,7 +3278,7 @@ reports to <code>agentomatic.optimize</code>. Scaffolded agents ship with matchi
 <tr>
 <td><code>logs_history</code> / <code>allow_logsllm_analysis</code></td>
 <td>platform</td>
-<td>Persist invoke I/O for agents/plugins/pipelines/ingestion/endpoints + optional LLM log analysis (<code>AGENTOMATIC_LOGS_HISTORY</code>, <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS</code>); REST <code>/api/v1/logs?resource=&amp;name=</code></td>
+<td>Persist sync invoke I/O for agents/plugins/pipelines/ingestion/endpoints + optional LLM log analysis (<code>AGENTOMATIC_LOGS_HISTORY</code>, <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS</code>); REST <code>GET /api/v1/logs?resource=&amp;name=</code> (+ <code>/analyze</code>). Async tasks and per-plugin <code>/logs</code> routes are not covered — see <a href="../platform-features/#invocation-log-history-llm-analysis">Platform Features</a></td>
 </tr>
 </tbody>
 </table>

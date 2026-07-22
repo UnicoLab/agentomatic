@@ -2290,6 +2290,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#invocation-logs-multi-resource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invocation logs (multi-resource)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#control-plane" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2755,6 +2766,17 @@
   
     <nav class="md-nav" aria-label="Platform Surfaces (beyond a single agent)">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invocation-logs-multi-resource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invocation logs (multi-resource)
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#control-plane" class="md-nav__link">
@@ -3711,6 +3733,42 @@ of their primary route.</p>
 <p>Besides the per-agent endpoints above, the platform exposes cross-cutting
 surfaces a frontend can consume. These power the <strong>Agentomatic Studio</strong> views
 (Control, Endpoints, Connections, Pipelines, Plugins).</p>
+<h3 id="invocation-logs-multi-resource">Invocation logs (multi-resource)<a class="headerlink" href="#invocation-logs-multi-resource" title="Permanent link">&para;</a></h3>
+<p>When <code>logs_history</code> is enabled, use the cross-resource logs API (filter by
+<code>resource</code> + <code>name</code>). Agent-scoped <code>/{agent}/logs</code> remains for BC. There are
+no per-plugin convenience <code>/logs</code> routes; async task runs are not persisted
+here — see <a href="../guide/platform-features/#invocation-log-history-llm-analysis">Platform Features</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/logs?resource=plugin&amp;name=…</code></td>
+<td>List logs (<code>resource</code>: agent|plugin|pipeline|ingestion|endpoint)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/logs/{id}</code></td>
+<td>Fetch one log</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/logs/analyze</code></td>
+<td>LLM/heuristic analysis (<code>resource</code> + <code>name</code> in body)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/logs/analysis?resource=…&amp;name=…</code></td>
+<td>Latest analysis</td>
+</tr>
+</tbody>
+</table>
 <h3 id="control-plane">Control Plane<a class="headerlink" href="#control-plane" title="Permanent link">&para;</a></h3>
 <p>Mounted at <code>{api_prefix}/control</code> when <code>enable_control_plane=True</code>. Mutating
 calls require the <code>X-Control-Token</code> header if a <code>control_token</code> is configured.</p>

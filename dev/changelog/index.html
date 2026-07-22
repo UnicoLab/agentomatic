@@ -2704,9 +2704,12 @@ Install from git / an editable checkout until PyPI catches up.</p>
 <ul>
 <li><strong>Multi-resource <code>logs_history</code></strong> (1.8.9): Persist full I/O for plugins,
   pipelines, ingestion, and custom endpoints (not only agents). Cross-resource
-  REST at <code>/api/v1/logs?resource=…&amp;name=…</code> + <code>/logs/analyze</code>; per-agent
+  REST: <code>GET /api/v1/logs?resource=…&amp;name=…</code>, <code>GET /api/v1/logs/{id}</code>,
+  <code>POST /api/v1/logs/analyze</code>, <code>GET /api/v1/logs/analysis</code>; per-agent
   <code>/{agent}/logs</code> kept for BC. In-process pipeline steps log with
-  <code>endpoint=pipeline_step</code> and <code>metadata.pipeline</code>.</li>
+  <code>endpoint=pipeline_step</code> and <code>metadata.pipeline</code>. Gaps (documented): async
+  task invocations are not written to invocation logs; there are no
+  per-plugin/pipeline/ingestion/endpoint convenience <code>/logs</code> routes.</li>
 <li><strong>Docs + CLI templates for thin train/eval</strong> (1.8.8 docs):
   <a href="../guide/optimization/">Prompt Optimization</a> documents
   <code>TrainConfig</code> / <code>train_and_report</code> / <code>print_train_result</code> and
@@ -2734,15 +2737,16 @@ Install from git / an editable checkout until PyPI catches up.</p>
   forwards snapshot <code>context</code> + rich expected references to judges.</li>
 <li><strong><code>TrainConfig</code> / <code>train_and_report</code></strong> (1.8.5): Thin train scripts with
   HolySheet fit dashboards, augment/persist knobs, and apply guards.</li>
-<li><strong>Per-agent invocation log history + optional LLM analysis</strong>: Opt-in
-  flags <code>logs_history</code> / <code>AGENTOMATIC_LOGS_HISTORY</code> and
-  <code>allow_logsllm_analysis</code> / <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS</code> persist
-  full invoke/chat/stream payloads into the platform store
-  (<code>AgentInvocationLog</code>). REST endpoints: <code>GET /logs</code>, <code>GET /logs/{id}</code>,
-  <code>POST /logs/analyze</code>, <code>GET /logs/analysis</code>. Analyser samples/truncates
-  logs for API budget safety and falls back to a heuristic when no LLM
-  is configured. Related: <code>OptimizationRunStore</code> + <code>optimize/fit_store</code>
-  for auditable retrain artefacts.</li>
+<li><strong>Invocation log history + optional LLM analysis</strong> (extended in <strong>1.8.9</strong>
+  to multi-resource): Opt-in flags <code>logs_history</code> /
+  <code>AGENTOMATIC_LOGS_HISTORY</code> and <code>allow_logsllm_analysis</code> /
+  <code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS</code> persist full sync invoke/chat/stream
+  payloads into the platform store (<code>AgentInvocationLog</code>). REST:
+  <code>GET /api/v1/logs</code>, <code>GET /api/v1/logs/{id}</code>, <code>POST /api/v1/logs/analyze</code>,
+  <code>GET /api/v1/logs/analysis</code> (plus agent-scoped <code>/{agent}/logs</code> BC).
+  Analyser samples/truncates logs for API budget safety and falls back to a
+  heuristic when no LLM is configured. Related: <code>OptimizationRunStore</code> +
+  <code>optimize/fit_store</code> for auditable retrain artefacts.</li>
 <li><strong>Ordered LLM model fallbacks</strong> (ships in <strong>1.8.0</strong>): Configure
   <code>fallbacks</code> / <code>fallback_on</code> on stack LLM profiles or via
   <code>get_llm(..., fallbacks=..., fallback_on=...)</code>. On timeout, connection

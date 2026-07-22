@@ -4614,6 +4614,19 @@ fallback is refused.</p>
 <code>TrainConfig.persist_fit_store</code> / <code>fit_store_url</code> →
 <code>AGENTOMATIC_FIT_STORE_URL</code> / <code>DATABASE_URL</code> (<code>OptimizationRunStore</code>).
 See <a href="../optimization/">Prompt Optimization</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Current gaps</p>
+<ul>
+<li><strong>Async tasks are not recorded</strong> in invocation logs. Synchronous
+  <code>invoke</code> / <code>chat</code> / <code>invoke/stream</code> (and the equivalent sync plugin /
+  pipeline / ingestion / endpoint routes) are logged; work submitted via
+  <code>/invoke/async</code>, <code>/invoke/batch</code>, or the task board is not.</li>
+<li><strong>No per-plugin (or per-pipeline / ingestion / endpoint) convenience
+  routes</strong> like <code>/{plugin}/logs</code>. Query the cross-resource API with
+  <code>?resource=</code> + <code>name=</code> (or use the agent-scoped <code>/{agent}/logs</code> routes
+  for agents only).</li>
+</ul>
+</div>
 
 
 
