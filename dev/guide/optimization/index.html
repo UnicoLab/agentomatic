@@ -3141,108 +3141,111 @@
 <p><img alt="Prompt Optimization Flow" src="../../assets/optimization_flow.png" /></p>
 <hr />
 <h2 id="quick-start-train_and_report-evaluate_and_report">⚡ Quick Start — <code>train_and_report</code> / <code>evaluate_and_report</code><a class="headerlink" href="#quick-start-train_and_report-evaluate_and_report" title="Permanent link">&para;</a></h2>
-<p>The recommended public API for class agents is a <strong>thin script</strong> that delegates
-stack load, metrics, augmentation, PromptFitter, evaluate, and HolySheet HTML
-reports to <code>agentomatic.optimize</code>. Scaffolded agents ship with matching
-<code>agents/&lt;name&gt;/train.py</code> and <code>agents/&lt;name&gt;/eval.py</code>
+<p>The recommended public API for class agents is a <strong>flat script</strong> that loads
+<code>TrainCliSettings</code> / <code>EvalCliSettings</code> (env + CLI), builds the agent, then
+delegates fit/eval + HolySheet HTML to <code>agentomatic.optimize</code>. Scaffolded
+agents ship with matching <code>agents/&lt;name&gt;/train.py</code> and <code>agents/&lt;name&gt;/eval.py</code>
 (<code>agentomatic init … --template class</code>).</p>
 <h3 id="train-fit-prompts">Train (fit prompts)<a class="headerlink" href="#train-fit-prompts" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainConfig</span><span class="p">,</span> <span class="n">print_train_result</span><span class="p">,</span> <span class="n">train_and_report</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainCliSettings</span><span class="p">,</span> <span class="n">print_train_result</span><span class="p">,</span> <span class="n">train_and_report</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">apply_stack_defaults</span><span class="p">,</span> <span class="n">get_llm_for_agent</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.stacks.manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">StackManager</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agents.assistant.agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssistantAgent</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">ROOT</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>  <span class="c1"># project root</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">stacks</span> <span class="o">=</span> <span class="n">StackManager</span><span class="p">(</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;stacks&quot;</span><span class="p">)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">stacks</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;gemini&quot;</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">apply_stack_defaults</span><span class="p">(</span><span class="n">stacks</span><span class="p">)</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">AssistantAgent</span><span class="p">(</span><span class="n">llm</span><span class="o">=</span><span class="n">get_llm_for_agent</span><span class="p">(</span><span class="s2">&quot;assistant&quot;</span><span class="p">,</span> <span class="n">stack_manager</span><span class="o">=</span><span class="n">stacks</span><span class="p">))</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">result</span> <span class="o">=</span> <span class="n">train_and_report</span><span class="p">(</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">agent</span><span class="p">,</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">config</span><span class="o">=</span><span class="n">TrainConfig</span><span class="p">(</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="n">agent_dir</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;agents&quot;</span> <span class="o">/</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        <span class="n">stacks_dir</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;stacks&quot;</span><span class="p">,</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="n">env_path</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;.env&quot;</span><span class="p">,</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        <span class="n">stack</span><span class="o">=</span><span class="s2">&quot;gemini&quot;</span><span class="p">,</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="n">epochs</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>        <span class="n">max_trials</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>        <span class="n">patience</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;rewrite&quot;</span><span class="p">,</span>  <span class="c1"># rewrite | gepa_like | mipro_like | few_shot_bootstrap | param_search</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        <span class="n">required_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">,</span> <span class="s2">&quot;next_action&quot;</span><span class="p">],</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="n">judge_criteria</span><span class="o">=</span><span class="p">(</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>            <span class="s2">&quot;Evaluate pertinence, groundedness, and actionability. &quot;</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>            <span class="s2">&quot;Score each dimension 0–1 with clear motivation.&quot;</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>        <span class="p">),</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>        <span class="n">judge_dimensions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;pertinence&quot;</span><span class="p">,</span> <span class="s2">&quot;groundedness&quot;</span><span class="p">,</span> <span class="s2">&quot;actionability&quot;</span><span class="p">],</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>        <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>          <span class="c1"># LLM-expand seed JSONL before fit</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>        <span class="n">n_examples</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>         <span class="c1"># alias: nr_examples; default 3× seed when omitted</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>        <span class="n">persist</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>          <span class="c1"># write datasets/all.augmented.jsonl</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>        <span class="n">apply</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>           <span class="c1"># set True to persist best prompt when improved</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>        <span class="n">apply_as</span><span class="o">=</span><span class="s2">&quot;v2_fit&quot;</span><span class="p">,</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>        <span class="n">persist_fit_store</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># True → also audit to DATABASE_URL / FIT_STORE_URL</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>        <span class="n">min_absolute_improvement</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>    <span class="p">),</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="p">)</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="n">print_train_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>          <span class="c1"># or result.print_summary()</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">report_path</span><span class="p">)</span>           <span class="c1"># HolySheet HTML under agents/.../reports/</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">HERE</span> <span class="o">=</span> <span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;agents&quot;</span> <span class="o">/</span> <span class="s2">&quot;assistant&quot;</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># --- settings (AGENTOMATIC_* env + optional CLI overrides) ---</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">cli</span> <span class="o">=</span> <span class="n">TrainCliSettings</span><span class="o">.</span><span class="n">parse</span><span class="p">()</span>  <span class="c1"># or parse([&quot;--augment&quot;, &quot;--n-examples&quot;, &quot;40&quot;])</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="c1"># --- environment / stack ---</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">stacks</span> <span class="o">=</span> <span class="n">StackManager</span><span class="p">(</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;stacks&quot;</span><span class="p">)</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">stacks</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">stack</span><span class="p">)</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="n">apply_stack_defaults</span><span class="p">(</span><span class="n">stacks</span><span class="p">)</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="c1"># --- agent ---</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">AssistantAgent</span><span class="p">(</span><span class="n">llm</span><span class="o">=</span><span class="n">get_llm_for_agent</span><span class="p">(</span><span class="s2">&quot;assistant&quot;</span><span class="p">,</span> <span class="n">stack_manager</span><span class="o">=</span><span class="n">stacks</span><span class="p">))</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="c1"># --- fit + HolySheet report ---</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="n">result</span> <span class="o">=</span> <span class="n">train_and_report</span><span class="p">(</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="n">agent</span><span class="p">,</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="n">config</span><span class="o">=</span><span class="n">cli</span><span class="o">.</span><span class="n">to_train_config</span><span class="p">(</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="n">agent_dir</span><span class="o">=</span><span class="n">HERE</span><span class="p">,</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>        <span class="n">stacks_dir</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;stacks&quot;</span><span class="p">,</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>        <span class="n">env_path</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;.env&quot;</span><span class="p">,</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>        <span class="n">required_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">,</span> <span class="s2">&quot;next_action&quot;</span><span class="p">],</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>        <span class="n">judge_criteria</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>            <span class="s2">&quot;Evaluate pertinence, groundedness, and actionability. &quot;</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>            <span class="s2">&quot;Score each dimension 0–1 with clear motivation.&quot;</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>        <span class="p">),</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>        <span class="n">judge_dimensions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;pertinence&quot;</span><span class="p">,</span> <span class="s2">&quot;groundedness&quot;</span><span class="p">,</span> <span class="s2">&quot;actionability&quot;</span><span class="p">],</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>    <span class="p">),</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="p">)</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">print_train_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>          <span class="c1"># or result.print_summary()</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">report_path</span><span class="p">)</span>           <span class="c1"># HolySheet HTML under agents/.../reports/</span>
 </span></code></pre></div>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Scaffolded train.py (same knobs as CLI flags)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Scaffolded train.py — same knobs via env and/or CLI (see --help)</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">AGENTOMATIC_STACK</span><span class="o">=</span>gemini<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>agents/assistant/train.py<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--augment<span class="w"> </span>--n-examples<span class="w"> </span><span class="m">40</span><span class="w"> </span>--persist<span class="w"> </span>--optimizer<span class="w"> </span>rewrite<span class="w"> </span>--epochs<span class="w"> </span><span class="m">2</span><span class="w"> </span>--trials<span class="w"> </span><span class="m">12</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Persist improved prompt + optional DB retrain audit:</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1">#   ... --apply --apply-as v2_fit --persist-fit-store</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># Env-only example:</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1">#   AGENTOMATIC_STACK=gemini AGENTOMATIC_EPOCHS=2 AGENTOMATIC_AUGMENT=true \</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1">#     uv run python agents/assistant/train.py</span>
 </span></code></pre></div>
 <h3 id="evaluate-score-a-split">Evaluate (score a split)<a class="headerlink" href="#evaluate-score-a-split" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">EvalConfig</span><span class="p">,</span> <span class="n">evaluate_and_report</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">EvalCliSettings</span><span class="p">,</span> <span class="n">evaluate_and_report</span><span class="p">,</span> <span class="n">print_eval_result</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">evaluate_and_report</span><span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">agent</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">config</span><span class="o">=</span><span class="n">EvalConfig</span><span class="p">(</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">agent_dir</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;agents&quot;</span> <span class="o">/</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">stacks_dir</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;stacks&quot;</span><span class="p">,</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">env_path</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;.env&quot;</span><span class="p">,</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="n">stack</span><span class="o">=</span><span class="s2">&quot;gemini&quot;</span><span class="p">,</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">split</span><span class="o">=</span><span class="s2">&quot;test&quot;</span><span class="p">,</span>              <span class="c1"># test | validation | train | eval | all</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">prefer_augmented</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>     <span class="c1"># reuse datasets/all.augmented.jsonl when present</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="n">required_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">,</span> <span class="s2">&quot;next_action&quot;</span><span class="p">],</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">judge_dimensions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;pertinence&quot;</span><span class="p">,</span> <span class="s2">&quot;groundedness&quot;</span><span class="p">,</span> <span class="s2">&quot;actionability&quot;</span><span class="p">],</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="n">use_judge</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="p">),</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="p">)</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">scores</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">report_path</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">cli</span> <span class="o">=</span> <span class="n">EvalCliSettings</span><span class="o">.</span><span class="n">parse</span><span class="p">()</span>  <span class="c1"># or parse([&quot;--split&quot;, &quot;test&quot;, &quot;--prefer-augmented&quot;])</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">evaluate_and_report</span><span class="p">(</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">agent</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">config</span><span class="o">=</span><span class="n">cli</span><span class="o">.</span><span class="n">to_eval_config</span><span class="p">(</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">agent_dir</span><span class="o">=</span><span class="n">HERE</span><span class="p">,</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">stacks_dir</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;stacks&quot;</span><span class="p">,</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="n">env_path</span><span class="o">=</span><span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;.env&quot;</span><span class="p">,</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">required_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">,</span> <span class="s2">&quot;next_action&quot;</span><span class="p">],</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">judge_dimensions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;pertinence&quot;</span><span class="p">,</span> <span class="s2">&quot;groundedness&quot;</span><span class="p">,</span> <span class="s2">&quot;actionability&quot;</span><span class="p">],</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="p">),</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="p">)</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">print_eval_result</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;assistant&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">AGENTOMATIC_STACK</span><span class="o">=</span>gemini<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>agents/assistant/eval.py<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--split<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--prefer-augmented<span class="w"> </span>--limit<span class="w"> </span><span class="m">3</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># uv run python agents/assistant/eval.py --help</span>
 </span></code></pre></div>
 <h3 id="knob-reference">Knob reference<a class="headerlink" href="#knob-reference" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
 <th>Knob</th>
-<th>Where</th>
+<th>Env / CLI</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td><code>stack</code></td>
+<td><code>AGENTOMATIC_STACK</code> / <code>--stack</code></td>
+<td>Stack YAML to load</td>
+</tr>
+<tr>
 <td><code>optimizer</code></td>
-<td><code>TrainConfig</code> / <code>--optimizer</code></td>
+<td><code>AGENTOMATIC_OPTIMIZER</code> / <code>--optimizer</code></td>
 <td>Fitter strategy: <code>rewrite</code>, <code>gepa_like</code>, <code>mipro_like</code>, <code>few_shot_bootstrap</code>, <code>param_search</code></td>
 </tr>
 <tr>
-<td><code>epochs</code> / <code>max_trials</code> / <code>patience</code></td>
-<td>train</td>
-<td>Outer Keras epochs, inner trial budget, EarlyStopping on <code>val_loss</code></td>
+<td><code>epochs</code> / <code>trials</code> / <code>patience</code></td>
+<td><code>AGENTOMATIC_EPOCHS</code> etc. / <code>--epochs</code> <code>--trials</code> <code>--patience</code></td>
+<td>Outer Keras epochs, inner trial budget (<code>max_trials</code>), EarlyStopping on <code>val_loss</code></td>
 </tr>
 <tr>
 <td><code>augment</code> / <code>n_examples</code> / <code>persist</code></td>
-<td>train (eval rare)</td>
+<td>train</td>
 <td>LLM-augment seed data, target size, write <code>all.augmented.jsonl</code></td>
 </tr>
 <tr>
@@ -3251,19 +3254,24 @@ reports to <code>agentomatic.optimize</code>. Scaffolded agents ship with matchi
 <td>Persist best prompt to <code>prompts.json</code> when improved (guards refuse zero/overfit)</td>
 </tr>
 <tr>
-<td><code>min_absolute_improvement</code></td>
-<td>train</td>
+<td><code>min_improvement</code></td>
+<td><code>--min-improvement</code> → <code>TrainConfig.min_absolute_improvement</code></td>
 <td>Acceptance threshold for candidates (default <code>0.001</code>)</td>
 </tr>
 <tr>
 <td><code>required_keys</code> + <code>judge_*</code></td>
-<td>train &amp; eval</td>
+<td>script (<code>to_train_config</code> / <code>to_eval_config</code>)</td>
 <td>Structured schema metrics + LLM-as-judge criteria/dimensions</td>
 </tr>
 <tr>
 <td><code>split</code> / <code>prefer_augmented</code> / <code>limit</code></td>
 <td>eval</td>
 <td>Which examples to score; reuse augmented dataset</td>
+</tr>
+<tr>
+<td><code>judge</code></td>
+<td><code>AGENTOMATIC_JUDGE</code> / <code>--judge</code> / <code>--no-judge</code></td>
+<td>LLM-as-judge on/off (default on)</td>
 </tr>
 <tr>
 <td>HolySheet reports</td>
@@ -3282,6 +3290,9 @@ reports to <code>agentomatic.optimize</code>. Scaffolded agents ship with matchi
 </tr>
 </tbody>
 </table>
+<p><code>TrainCliSettings</code> / <code>EvalCliSettings</code> map into <code>TrainConfig</code> / <code>EvalConfig</code> via
+<code>.to_train_config(...)</code> / <code>.to_eval_config(...)</code> — agent-specific judge text and
+<code>required_keys</code> stay in the flat script, not in argparse.</p>
 <div class="admonition tip">
 <p class="admonition-title">Nested projects (e.g. SCOOPER <code>ai_platform/</code>)</p>
 <p>When the agent package lives one level under a monorepo (<code>.env</code> beside the

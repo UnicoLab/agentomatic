@@ -2698,10 +2698,15 @@
 This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</p>
 <hr />
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
-<p>Docs and scaffolds track shipped <strong>1.8.3–1.8.9</strong> train/eval/logs APIs.
+<p>Docs and scaffolds track shipped <strong>1.8.3–1.8.10</strong> train/eval/logs APIs.
 Install from git / an editable checkout until PyPI catches up.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>TrainCliSettings</code> / <code>EvalCliSettings</code></strong> (1.8.10): Pydantic settings
+  (env <code>AGENTOMATIC_*</code> + kebab-case CLI) with <code>.parse()</code> /
+  <code>.to_train_config()</code> / <code>.to_eval_config()</code> so scaffolded <code>train.py</code> /
+  <code>eval.py</code> stay flat. Also <code>print_eval_result</code> mirroring
+  <code>print_train_result</code>. Docs + <code>_train_py</code> / <code>_eval_py</code> updated.</li>
 <li><strong>Multi-resource <code>logs_history</code></strong> (1.8.9): Persist full I/O for plugins,
   pipelines, ingestion, and custom endpoints (not only agents). Cross-resource
   REST: <code>GET /api/v1/logs?resource=…&amp;name=…</code>, <code>GET /api/v1/logs/{id}</code>,
