@@ -1,40 +1,22 @@
-# Agentomatic + Studio — SCOOPER Gemini validation
+# Agentomatic studion -> shoudl adapt the forms to agents inputs and outputs based on schema dynamically
+-> currently we can just provide input but we do not know what agent needs in the studio which is hard for debuggin so we shoudl use what info we have for schemas etc like langgraph sdutio does to display dynamically all the required inputs etc !
 
-## Goal
-Use the SCOOPER Gemini stack (`:18765`) to extensively test Agentomatic Studio
-(debug, logs, chat, control plane, pipelines, plugins).
 
-## Status
-- [x] Studio defaults to same-origin when embedded under `/studio/ui`
-- [x] Remove obsolete bare `/agents` fallbacks → `/studio/agents` + `/api/v1/agents`
-- [x] Client request timeouts (avoid infinite "Checking server connectivity…")
-- [x] Normalize thread/message API envelopes (`{threads}`, `{messages}`, `thread_id`)
-- [x] Timed `/health` probes + `/ready` alias in agentomatic
-- [x] Control plane skips `/studio` + probes; SCOOPER enables control plane by default
-- [x] Connect no longer blocks on graph load; selected agent set on connect
-- [x] Backend mounts agent routers under both folder name and slug
-- [x] `graph_fn` / get_graph timeouts so Studio Connect cannot wedge the loop
-- [x] Rebuild Studio UI into `agentomatic/studio/static` (`./scripts/build_studio.sh`)
-- [x] E2E verify: connect, graph, chat, threads, control, pipelines, plugins, connections
-- [x] Commit + push `agentomatic` and `agentomatic-studio` with clean conventional messages
-- [ ] History rewrite for polluted commit subjects — **needs explicit force-push approval**
+# Imrpove fit (fix)
 
-## Local verify
-```bash
-# Native (recommended when Docker Desktop is flaky):
-cd SCOOPER_NEW/ai_platform
-PYTHONPATH=../../agentomatic/src AGENTOMATIC_ENABLE_STUDIO=1 \
-  AGENTOMATIC_ENABLE_CONTROL_PLANE=1 uv run uvicorn main:app --port 18765
++ imrpove this fitting mechanism much much further to make it great and fully functional for any optimizer and any metric etc -> make sure it's well passing all info that can help write new prompt and eveluate everything correctly, keep history and learning to guide new prompt generation across several epochs progressively ... So make sure we have everything in place to make it work fully, then test it ! Make it great in terms of UX and displayed info (like keras fit), show progress, loss evolution and curve at the end etc ! + let's make sure that usage of processes or threads for each model is well controlled cause I can see 3 threads for LM2.5 and one for qwen3 and some are not used  .. looks like during the train we use one thread of lm2.5 and one qwen but on lm2.5 I se several 305 thredas with generating part ... but always one active and streaming ! Well when I run the train script it looks liek we are not imrpoving at all, which is surprising to see ... cause new prompt shoudl give better results is we provide sufficient data and context and hhistory etc !!! So Deep dive in all the parts and make sure the are well connected and passing everything nicely correctly ! We will need to make sure we provide enough signal at each epoch and learnings, and synthesis what was correct and what was not so that next prompt rewrite could be based on these learning, examples, previosu evolutions etc ... this means we are progressively building a context and learning and everything to know how to imrpove the prompt and we are measuring it etc ... and also SLM judge shoudl rpovide extensive motivation and justification for it's scoring so that we can learn and improve ! So redesing this implementation (adding additional validaiton, steps, context, storage etc ...) everything you need to make it actually work ! We are free to desing any architecture here that will work, can be multi pass where we preselect candidates condensate learning and run another pass by LLM etc ... we just need to be carefull for budges if using LLMs throug APIs. 
 
-curl -sS http://127.0.0.1:18765/readiness
-curl -sS http://127.0.0.1:18765/studio/info
-curl -sS http://127.0.0.1:18765/api/v1/control
-curl -sS http://127.0.0.1:18765/api/v1/agent-assistant/threads
+There are still some bugs to be fixed for fitting process but we need it to work perfectly and be a great tested and productiont ready building block of this package ! So make sure it works perfectly !
 
-# Bundle latest Studio into agentomatic:
-cd agentomatic && ./scripts/build_studio.sh ../agentomatic-studio
-```
+We also have some recent learning:
+Judge gives 0.33 consistently: The val example as_next_steps has expected_output: {"next_action": True} → converted to "Response must include: 'next_action'" — useless as a quality reference. The judge has nothing to compare against.
+Score oscillates 0.33↔0.67: Agent runs at temp=0.1, non-deterministic — different response each run, different judge score.
+Apply-without-improvement bug: fit_result.apply() is called even when absolute_improvement = 0.0.
+Connection errors: No drain time after the async optimization loop.
 
-## Notes
-- Local `.env` must use `AI_VECTOR_PROVIDER=local_npz` (not `local_tensorflow`).
-  SCOOPER also registers a `local_tensorflow` alias for resilience.
+looks liek we need to give much more data to the judge and to the prompt optimizer as well.. Maybe async optimization is not the best option and sequential will be more controllable ! We can parallelize what we can but let's make sure we have everything implemented correctly !
+
+# Plugins etc
+
+-> it woudl be nice to keep retrain history and everything so it's well auditable somehow
+-> make sure the artefacts and all the models are correctly stored in the DB and not in memory so we have persistance !

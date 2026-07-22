@@ -198,9 +198,13 @@ class AgentExample:
             or json.dumps(self.input)
         )
 
-        # ── expected answer: convert boolean flags → human-readable text ─
-        expected: str | None = None
-        if self.expected_output:
+        # ── expected answer: prefer explicit judge reference text ──────────
+        # ``metadata["judge_expected"]`` carries a human-written quality
+        # description that LLM judges can compare against the agent response.
+        # This is far more informative than auto-converting boolean flags.
+        expected: str | None = (self.metadata or {}).get("judge_expected") or None
+
+        if not expected and self.expected_output:
             exp = self.expected_output
             # Detect boolean-flag pattern: {key: True} means "output should include key/value"
             is_flag_only = all(isinstance(v, bool) for v in exp.values()) if exp else False
