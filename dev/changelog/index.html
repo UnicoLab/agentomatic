@@ -2702,6 +2702,16 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 publishes). Install from git / an editable checkout until then.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Durable multi-backend logs / retrain persistence</strong> (1.8.8): When
+  <code>logs_history</code> is on, the platform no longer eagerly installs
+  <code>MemoryStore</code> (that preempted DB auto-derive). Store resolution is
+  backend-agnostic via <code>SQLAlchemyStore</code>: MEMORY connection →
+  <code>AGENTOMATIC_DB_URL</code> / <code>DATABASE_URL</code> / stack <code>database.url</code> (Postgres,
+  SQLite, MySQL, …). If a DB URL is configured but init fails, MemoryStore
+  fallback is refused. Offline train can audit retrain runs with
+  <code>TrainConfig.persist_fit_store</code> / <code>fit_store_url</code> /
+  <code>AGENTOMATIC_PERSIST_FIT</code>. Train UX helpers:
+  <code>print_train_result(result)</code> / <code>TrainResult.print_summary()</code>.</li>
 <li><strong><code>EvalConfig</code> / <code>evaluate_and_report</code></strong> (1.8.6): Thin eval scripts
   mirroring <code>train_and_report</code> — stack load, structured + LLM-judge
   metrics, split selection, optional augmented dataset reuse, and
