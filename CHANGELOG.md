@@ -5,6 +5,14 @@
 
 ### Features
 
+- **optimize**: Thin train UX — `TrainConfig` + `train_and_report` / `run_train`
+  / `run_training` package stack load, metrics, PromptFitterBridge, evaluate,
+  and HolySheet fit reports so project `train.py` scripts stay declarative.
+  First-class data knobs: `augment`, `n_examples` / `nr_examples`, `persist`,
+  plus `load_data()` / `prepare_dataset()`. Scaffold `train.py` matches.
+- **optimize**: HolySheet fit dashboards (score/loss curves, Keras epoch
+  tables, trial history, prompt diffs, judge motivations, early-stop reason,
+  dataset sizes, optimizer). Fallback HTML when HolySheet is absent.
 - **optimize**: Production-ready PromptFitter with epoch learnings, always-on
   generalization holdout, sequential/default concurrency=1, post-fit drain,
   richer SLM judge motivation, and `apply()` guards that refuse zero-improvement
