@@ -1127,7 +1127,11 @@ async def cleanup_old_threads(agent: str, user_id: str, keep_latest: int = 10):
 ## Invocation log history & LLM analysis
 
 Persist every invoke/chat/stream I/O per agent for auditability and live
-recommendations.
+recommendations. When `logs_history` is on, the platform derives a durable
+`SQLAlchemyStore` from `AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack
+`database.url` (Postgres, SQLite, …) — it does **not** eagerly install
+`MemoryStore` (that would preempt DB auto-derive). If a DB URL is set but
+init fails, MemoryStore fallback is refused.
 
 ```python
 from agentomatic import AgentPlatform
@@ -1142,7 +1146,8 @@ platform = AgentPlatform.from_folder(
 ```
 
 Env equivalents: `AGENTOMATIC_LOGS_HISTORY=1`,
-`AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1`.
+`AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1`, plus `DATABASE_URL` /
+`AGENTOMATIC_DB_URL` for multi-backend persistence.
 
 Endpoints (per agent):
 
@@ -1154,5 +1159,7 @@ Endpoints (per agent):
 | GET | `/api/v1/{agent}/logs/analysis` | Latest analysis |
 
 Analysis returns `score`, `summary`, `status`, and `recommendations`.
-Optimization runs can also be persisted via `OptimizationRunStore` when a
-platform store is registered with `set_fit_store(store)`.
+Offline train can also audit retrain runs with
+`TrainConfig.persist_fit_store` / `fit_store_url` →
+`AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` (`OptimizationRunStore`).
+See [Prompt Optimization](optimization.md).

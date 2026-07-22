@@ -14,38 +14,119 @@ The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and s
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start — `train_and_report` / `evaluate_and_report`
 
-You can run prompt optimization programmatically in Python or with a single CLI command.
+The recommended public API for class agents is a **thin script** that delegates
+stack load, metrics, augmentation, PromptFitter, evaluate, and HolySheet HTML
+reports to `agentomatic.optimize`. Scaffolded agents ship with matching
+`agents/<name>/train.py` and `agents/<name>/eval.py`
+(`agentomatic init … --template class`).
 
-### 1. Programmatic Optimization (Python)
+### Train (fit prompts)
 
 ```python
-from agentomatic.optimize import PromptOptimizer, Dataset
+from pathlib import Path
 
-# 1. Initialize the optimizer
-optimizer = PromptOptimizer(
-    agent="my_agent",
-    metrics=["exact_match", "contains"],
-    strategy="iterative_rewrite",
+from agentomatic.optimize import TrainConfig, print_train_result, train_and_report
+from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
+from agentomatic.stacks.manager import StackManager
+
+from agents.assistant.agent import AssistantAgent
+
+ROOT = Path(".")  # project root
+stacks = StackManager(ROOT / "stacks")
+stacks.load("gemini")
+apply_stack_defaults(stacks)
+
+agent = AssistantAgent(llm=get_llm_for_agent("assistant", stack_manager=stacks))
+result = train_and_report(
+    agent,
+    config=TrainConfig(
+        agent_name="assistant",
+        agent_dir=ROOT / "agents" / "assistant",
+        stacks_dir=ROOT / "stacks",
+        env_path=ROOT / ".env",
+        stack="gemini",
+        epochs=2,
+        max_trials=12,
+        patience=2,
+        optimizer="rewrite",  # rewrite | gepa_like | mipro_like | few_shot_bootstrap | param_search
+        required_keys=["content", "next_action"],
+        judge_criteria=(
+            "Evaluate pertinence, groundedness, and actionability. "
+            "Score each dimension 0–1 with clear motivation."
+        ),
+        judge_dimensions=["pertinence", "groundedness", "actionability"],
+        augment=True,          # LLM-expand seed JSONL before fit
+        n_examples=40,         # alias: nr_examples; default 3× seed when omitted
+        persist=True,          # write datasets/all.augmented.jsonl
+        apply=False,           # set True to persist best prompt when improved
+        apply_as="v2_fit",
+        persist_fit_store=False,  # True → also audit to DATABASE_URL / FIT_STORE_URL
+        min_absolute_improvement=0.001,
+    ),
 )
-
-# 2. Load the evaluation dataset
-dataset = Dataset.from_jsonl("eval.jsonl")
-
-# 3. Run the optimization loop
-result = await optimizer.optimize(
-    dataset=dataset,
-    max_iterations=10,
-    target_score=0.9,
-)
-
-# 4. Print results & apply
-print(result.report())   # Terminal report summary
-result.apply()           # Saves the optimized prompt as a new version in prompts.json
+print_train_result(result)          # or result.print_summary()
+print(result.report_path)           # HolySheet HTML under agents/.../reports/
 ```
 
-### 2. CLI Command
+```bash
+# Scaffolded train.py (same knobs as CLI flags)
+AGENTOMATIC_STACK=gemini uv run python agents/assistant/train.py \
+  --augment --n-examples 40 --persist --optimizer rewrite --epochs 2 --trials 12
+# Persist improved prompt + optional DB retrain audit:
+#   ... --apply --apply-as v2_fit --persist-fit-store
+```
+
+### Evaluate (score a split)
+
+```python
+from agentomatic.optimize import EvalConfig, evaluate_and_report
+
+result = evaluate_and_report(
+    agent,
+    config=EvalConfig(
+        agent_name="assistant",
+        agent_dir=ROOT / "agents" / "assistant",
+        stacks_dir=ROOT / "stacks",
+        env_path=ROOT / ".env",
+        stack="gemini",
+        split="test",              # test | validation | train | eval | all
+        prefer_augmented=True,     # reuse datasets/all.augmented.jsonl when present
+        required_keys=["content", "next_action"],
+        judge_dimensions=["pertinence", "groundedness", "actionability"],
+        use_judge=True,
+    ),
+)
+print(result.scores, result.report_path)
+```
+
+```bash
+AGENTOMATIC_STACK=gemini uv run python agents/assistant/eval.py \
+  --split test --prefer-augmented --limit 3
+```
+
+### Knob reference
+
+| Knob | Where | Purpose |
+|---|---|---|
+| `optimizer` | `TrainConfig` / `--optimizer` | Fitter strategy: `rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search` |
+| `epochs` / `max_trials` / `patience` | train | Outer Keras epochs, inner trial budget, EarlyStopping on `val_loss` |
+| `augment` / `n_examples` / `persist` | train (eval rare) | LLM-augment seed data, target size, write `all.augmented.jsonl` |
+| `apply` / `apply_as` | train | Persist best prompt to `prompts.json` when improved (guards refuse zero/overfit) |
+| `min_absolute_improvement` | train | Acceptance threshold for candidates (default `0.001`) |
+| `required_keys` + `judge_*` | train & eval | Structured schema metrics + LLM-as-judge criteria/dimensions |
+| `split` / `prefer_augmented` / `limit` | eval | Which examples to score; reuse augmented dataset |
+| HolySheet reports | automatic | Nested `Section`/`Tabs`/`Accordion` dashboards (score curves, prompts, judge rationales); fallback HTML if HolySheet absent |
+| `persist_fit_store` / `fit_store_url` | train | Audit retrain runs via `OptimizationRunStore` → `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` |
+| `logs_history` / `allow_logsllm_analysis` | platform | Persist invoke I/O + optional LLM log analysis (`AGENTOMATIC_LOGS_HISTORY`, `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`) |
+
+!!! tip "Nested projects (e.g. SCOOPER `ai_platform/`)"
+    When the agent package lives one level under a monorepo (`.env` beside the
+    parent folder), set `env_path=ROOT.parent / ".env"` — the scaffolded
+    templates default to `ROOT / ".env"` for flat `agentomatic new` projects.
+
+### CLI alternative
 
 ```bash
 agentomatic optimize my_agent \
@@ -54,6 +135,22 @@ agentomatic optimize my_agent \
   --strategy iterative_rewrite \
   --max-iterations 10 \
   --apply
+```
+
+### Lower-level `PromptOptimizer` (optional)
+
+```python
+from agentomatic.optimize import PromptOptimizer, Dataset
+
+optimizer = PromptOptimizer(
+    agent="my_agent",
+    metrics=["exact_match", "contains"],
+    strategy="iterative_rewrite",
+)
+dataset = Dataset.from_jsonl("eval.jsonl")
+result = await optimizer.optimize(dataset=dataset, max_iterations=10, target_score=0.9)
+print(result.report())
+result.apply()
 ```
 
 ---
@@ -315,18 +412,35 @@ class MyNotifier(OptimizationCallback):
 fitter = PromptFitter(..., callbacks=[MyNotifier()])
 ```
 
-## 📊 Interactive HTML Reports
+## 📊 Interactive HTML Reports (HolySheet)
 
-Every optimization run generates a rich, interactive HTML report comparing prompt versions side-by-side. The report includes:
-- **Latencies and Durations**: Graphing execution times.
-- **Metric Scores**: Side-by-side score comparison bars.
-- **Prompt Diff Viewer**: Clean GitHub-style diff showing exactly what instructions were added/removed.
-- **Trial Traces**: Full message logs, reasoning steps, and tool calls for every test case.
+`train_and_report` and `evaluate_and_report` write interactive HTML dashboards
+via **HolySheet** when installed (`pip install holysheet` / `agentomatic[optimize]`).
+Content is nested under `Section` / `Tabs` / `Accordion` children so cards render
+correctly — empty top-level sections are avoided.
+
+**Fit reports** (`generate_fit_report` / `TrainResult.report_path`) include:
+
+- Score / loss curves and Keras-style epoch history
+- Trial table, early-stop reason, dataset sizes, optimizer
+- Prompt evolution diffs + full baseline/best prompts
+- Judge motivations / what-worked / what-failed
+- Deployment recommendation
+
+**Eval reports** (`generate_eval_report` / `EvaluateResult.report_path`) include:
+
+- Aggregate scores and per-example tables
+- Judge rationale panels (when `OptimizeMetricAdapter.last_result` is available)
+- Split / stack / model metadata
+
+When HolySheet is absent, a built-in static HTML fallback is written instead.
 
 ```python
-from agentomatic.optimize import generate_html_report
+from agentomatic.optimize import generate_fit_report, generate_eval_report, generate_html_report
 
-# Generate static report file
+generate_fit_report(fit_result, output_path="reports/train_assistant.html")
+generate_eval_report(eval_report, output_path="reports/eval_assistant.html")
+# Lower-level PromptOptimizer loop:
 generate_html_report(result, filepath="reports/my_agent_optimization.html")
 ```
 
@@ -711,6 +825,11 @@ your script
 | `LocalJudgeMetric` | LLM-as-judge over a local server | `agentomatic.optimize` |
 | `CustomMetric` | Function-based fitter objective | `agentomatic.optimize` |
 | `PromptSearchSpace` | Defines what the fitter can change | `agentomatic.optimize` |
+
+!!! tip "Prefer `train_and_report` for day-to-day fitting"
+    The example below wires `PromptFitterBridge` manually. For project scripts,
+    use `train_and_report` / `TrainConfig` in the Quick Start section above —
+    same stack/metrics/HolySheet path with far less boilerplate.
 
 **Complete example — stack-driven, no env-var hacks, no HTTP server:**
 

@@ -3,15 +3,6 @@
 
 ## Unreleased
 
-### Bug Fixes
-
-- **optimize**: HolySheet train/eval reports no longer render empty section cards.
-  Content is nested in `Section`/`Tabs`/`Accordion` children; run config,
-  deployment recommendations, Keras curves, held-out scores, full prompts, and
-  judge rationales are wired from `TrainResult` / `EvaluationReport`.
-  `OptimizeMetricAdapter` stashes `last_result` and `agent.evaluate` attaches
-  per-metric metadata for rationale panels.
-
 ### Features
 
 - **optimize**: Thin train UX — `TrainConfig` + `train_and_report` / `run_train`
@@ -19,7 +10,15 @@
   and HolySheet fit reports so project `train.py` scripts stay declarative.
   First-class data knobs: `augment`, `n_examples` / `nr_examples`, `persist`,
   plus `load_data()` / `prepare_dataset()`. Scaffold `train.py` matches.
-- **optimize**: HolySheet fit dashboards (score/loss curves, Keras epoch
+- **optimize**: Thin eval UX — `EvalConfig` + `evaluate_and_report` / `run_eval`
+  mirror train (split selection, judge metrics, `prefer_augmented`, HolySheet
+  `generate_eval_report`). Scaffold `eval.py` matches.
+- **optimize**: Train print helpers — `print_train_result(result)` /
+  `TrainResult.print_summary()` for Rich summaries from thin scripts.
+- **optimize**: Optional DB retrain audit via `TrainConfig.persist_fit_store` /
+  `fit_store_url` → `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL`
+  (`OptimizationRunStore` + `fit_store`).
+- **optimize**: HolySheet fit/eval dashboards (score/loss curves, Keras epoch
   tables, trial history, prompt diffs, judge motivations, early-stop reason,
   dataset sizes, optimizer). Fallback HTML when HolySheet is absent.
 - **optimize**: Production-ready PromptFitter with epoch learnings, always-on
@@ -29,8 +28,20 @@
   `retrain_history.jsonl` / optional DB `OptimizationRunStore`.
 - **studio**: Schema-driven invoke forms (SchemaForm) from agent input/output
   JSON schemas — LangGraph-Studio-like debugging of required fields.
-- **logs**: `logs_history` / `allow_logsllm_analysis` platform flags (+ env)
-  persist full per-agent I/O and expose LLM/heuristic log analysis endpoints.
+- **logs**: Durable multi-backend `logs_history` / `allow_logsllm_analysis`
+  (+ env) persist full per-agent I/O via `SQLAlchemyStore`
+  (`AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack `database.url`) and expose
+  `/logs` + `/logs/analyze`. MemoryStore is not eagerly installed when
+  logs_history is on (so DB auto-derive is not preempted).
+
+### Bug Fixes
+
+- **optimize**: HolySheet train/eval reports no longer render empty section cards.
+  Content is nested in `Section`/`Tabs`/`Accordion` children; run config,
+  deployment recommendations, Keras curves, held-out scores, full prompts, and
+  judge rationales are wired from `TrainResult` / `EvaluationReport`.
+  `OptimizeMetricAdapter` stashes `last_result` and `agent.evaluate` attaches
+  per-metric metadata for rationale panels.
 
 ### Bug Fixes
 

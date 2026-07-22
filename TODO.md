@@ -32,6 +32,13 @@ Shipped:
 Covered by `test_logs_history` (incl. SQLite restart survival).
 
 
+# Docs / templates for train-eval APIs — DONE
+
+Shipped with this docs pass: MkDocs `guide/optimization.md` + changelog,
+scaffold `_train_py` / `_eval_py` (`print_train_result`, augment knobs,
+`persist_fit_store`, `evaluate_and_report`), agent primer, README pointer.
+
+
 # Remaining product ideas
 
 (none from the previous logs/DB/train-UX backlog — see studio schema UX above)

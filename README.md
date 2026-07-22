@@ -544,6 +544,29 @@ to fit against real evaluation data. The output is never a compiled program — 
 **better deployment configuration**: an improved prompt, tuned model parameters,
 optimized RAG settings, and a rollout recommendation you can ship with confidence.
 
+**Recommended entrypoints** for class agents (scaffolded as `train.py` / `eval.py`):
+
+```python
+from agentomatic.optimize import (
+    TrainConfig, train_and_report, print_train_result,
+    EvalConfig, evaluate_and_report,
+)
+
+result = train_and_report(agent, config=TrainConfig(
+    agent_name="assistant", agent_dir=HERE, stacks_dir=ROOT / "stacks",
+    epochs=2, max_trials=12, optimizer="rewrite",
+    augment=True, n_examples=40, persist=True,
+))
+print_train_result(result)  # HolySheet HTML at result.report_path
+
+ev = evaluate_and_report(agent, config=EvalConfig(
+    agent_name="assistant", agent_dir=HERE, stacks_dir=ROOT / "stacks",
+    split="test", prefer_augmented=True,
+))
+```
+
+See the [Prompt Optimization guide](https://unicolab.github.io/agentomatic/guide/optimization/).
+
 > **Philosophy:** Your agent is already deployed. Optimization produces a *better version*
 > of that deployment, not a new artifact. Every result includes a `DeploymentRecommendation`
 > with canary weights and confidence scores so you can roll out safely.

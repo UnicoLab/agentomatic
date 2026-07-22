@@ -309,11 +309,27 @@ def test_train_template_uses_run_train() -> None:
     src = _train_py("assistant")
     assert "TrainConfig" in src
     assert "train_and_report" in src
+    assert "print_train_result" in src
     assert "augment" in src
     assert "n_examples" in src
     assert "persist" in src
+    assert "persist_fit_store" in src
+    assert "from agents.assistant.agent import" in src
     assert "PromptFitterBridge" not in src
     assert "generate_fit_report" not in src
+
+
+def test_eval_template_uses_evaluate_and_report() -> None:
+    """Scaffold eval.py template is the thin evaluate_and_report pattern."""
+    from agentomatic.cli.templates import _eval_py
+
+    src = _eval_py("assistant")
+    assert "EvalConfig" in src
+    assert "evaluate_and_report" in src
+    assert "prefer_augmented" in src
+    assert "report_path" in src
+    assert "from agents.assistant.agent import" in src
+    assert "PromptFitterBridge" not in src
 
 
 def test_prepare_dataset_persist_without_augment(tmp_path) -> None:
