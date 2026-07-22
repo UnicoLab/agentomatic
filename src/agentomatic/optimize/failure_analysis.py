@@ -336,7 +336,7 @@ class DimensionAnalyzer:
     def should_accept(
         self,
         comparisons: list[DimensionComparison],
-        min_composite_delta: float = 0.05,
+        min_composite_delta: float = 0.001,
         composite_baseline: float = 0.0,
         composite_candidate: float = 0.0,
     ) -> tuple[bool, str]:

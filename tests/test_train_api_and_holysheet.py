@@ -54,6 +54,7 @@ class TestTrainConfigDefaults:
         assert cfg.epochs == 2
         assert cfg.optimizer == "rewrite"
         assert cfg.apply is False
+        assert cfg.min_absolute_improvement == 0.001
 
 
 class TestFitHolySheetReport:
@@ -104,4 +105,55 @@ class TestFitHolySheetReport:
         assert Path(path).exists()
         html = Path(path).read_text(encoding="utf-8")
         assert "0.42" in html or "Best" in html
-        assert len(html) > 500
+        assert "Prompt Evolution" in html or "BEST PROMPT" in html
+        assert "val_loss" in html or "0.28" in html
+        # HolySheet interactive bundle is large; fallback is still richer than a stub.
+        assert len(html) > 2000
+
+    def test_zero_improvement_holysheet_does_not_crash(self, tmp_path: Path) -> None:
+        """Regression: KPI status='warning' used to break HolySheet export."""
+        from agentomatic.optimize.report import generate_fit_report
+
+        result = PromptFitResult(
+            best_config=PromptRuntimeConfig(system_prompt="SAME"),
+            baseline_config=PromptRuntimeConfig(system_prompt="SAME"),
+            best_score=0.36,
+            baseline_score=0.36,
+            suggestions=["No configuration changes improved over the baseline."],
+            trials=[{"round": 1, "name": "x", "phase": "full_val", "score": 0.36}],
+            score_history=[0.36, 0.36],
+            prompt_history=[
+                {
+                    "round_idx": 0,
+                    "score": 0.36,
+                    "accepted": False,
+                    "prompt_snapshot": "SAME",
+                    "candidate_name": "",
+                }
+            ],
+            duration_seconds=5.0,
+            experiment_id="flat000",
+            agent="assistant",
+            deployment_recommendation={
+                "prompt_version": "v1",
+                "confidence": "no_improvement",
+                "rollout": {"strategy": "hold", "initial_weight": 0.0, "monitoring_hours": 0},
+                "safety_notes": [],
+            },
+        )
+        out = tmp_path / "flat.html"
+        path = generate_fit_report(
+            result,
+            output_path=out,
+            keras_history={"loss": [0.64, 0.64], "val_loss": [0.64, 0.64]},
+            eval_scores={"composite": 0.36},
+            dataset_sizes={"train": 4, "validation": 2, "test": 2},
+            optimizer_name="rewrite",
+            stack_name="gemini",
+            model_name="gemini",
+        )
+        html = Path(path).read_text(encoding="utf-8")
+        assert Path(path).exists()
+        assert "0.36" in html
+        assert "Prompt Evolution" in html or "val_loss" in html or "Keras" in html
+        assert len(html) > 1500
