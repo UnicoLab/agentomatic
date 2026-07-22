@@ -1509,7 +1509,8 @@ def resolve_fitter_optimizer(
 
     # -- build kwargs per optimizer type ---------------------------------
     if cls is RewriteOptimizer:
-        return RewriteOptimizer(model=model, **rewrite_only, **kwargs)
+        # Use the dedicated rewrite model (separate from task_model) when provided.
+        return RewriteOptimizer(model=rewrite_model or model, **rewrite_only, **kwargs)
 
     if cls is FewShotBootstrapOptimizer:
         return FewShotBootstrapOptimizer(**kwargs)

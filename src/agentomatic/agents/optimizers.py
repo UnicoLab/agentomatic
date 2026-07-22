@@ -239,6 +239,7 @@ class PromptFitterBridge:
         agent_name: str = "",
         task_model: LLMSpec = "ollama/qwen2.5:7b",
         rewrite_model: LLMSpec = "openai/gpt-4.1",
+        optimizer: str = "rewrite",
         metric: Any | None = None,
         max_trials: int = 8,
         fitter: Any | None = None,
@@ -250,6 +251,7 @@ class PromptFitterBridge:
         self.agent_name = agent_name
         self.task_model = task_model
         self.rewrite_model = rewrite_model
+        self.optimizer = optimizer
         self.metric = metric
         self.max_trials = max_trials
         self.fitter = fitter
@@ -333,6 +335,9 @@ class PromptFitterBridge:
         overrides = dict(getattr(agent, "_fit_optimize_options", None) or {})
         # Bridge-level defaults, then per-fit() overrides win.
         kwargs = dict(self.kwargs)
+        # Seed kwargs with the explicit optimizer attribute so it is always
+        # present even when the user didn't pass it through **kwargs.
+        kwargs.setdefault("optimizer", self.optimizer)
         kwargs.update(overrides)
         max_trials = kwargs.pop("max_trials", self.max_trials)
         # Drop agent-facing / bridge-only keys that are not PromptFitter args
