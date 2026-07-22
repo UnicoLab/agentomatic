@@ -373,12 +373,54 @@ class OptimizeMetricAdapter:
 
         from agentomatic.async_utils import run_sync
 
-        # --- extract query ---
-        inp = example.input
-        if hasattr(inp, "get"):
-            query = inp.get("query", inp.get("current_query", ""))
+        # Prefer AgentExample.to_datapoint() so judge query / expected / context
+        # match the fit path (question over meta-query, rich expected, snapshot).
+        query = ""
+        expected: str | None = None
+        context: list[str] | None = None
+        to_dp = getattr(example, "to_datapoint", None)
+        if callable(to_dp):
+            try:
+                dp = to_dp()
+                query = str(getattr(dp, "query", "") or "")
+                expected = getattr(dp, "expected_answer", None)
+                ctx = getattr(dp, "context", None) or []
+                context = [str(c) for c in ctx if c] or None
+            except Exception:  # noqa: BLE001
+                dp = None
         else:
-            query = str(inp)
+            dp = None
+
+        if not query:
+            inp = example.input
+            if hasattr(inp, "get"):
+                query = str(
+                    inp.get("question")
+                    or inp.get("current_query")
+                    or inp.get("query")
+                    or inp.get("request")
+                    or ""
+                )
+            else:
+                query = str(inp)
+
+        if expected is None:
+            exp_out = getattr(example, "expected_output", None)
+            expected = (
+                _json.dumps(exp_out, ensure_ascii=False)
+                if isinstance(exp_out, dict)
+                else (str(exp_out) if exp_out is not None else None)
+            )
+
+        if context is None:
+            inp = getattr(example, "input", None) or {}
+            raw_ctx = None
+            if hasattr(inp, "get"):
+                raw_ctx = inp.get("context")
+            if isinstance(raw_ctx, dict) and raw_ctx:
+                context = [_json.dumps(raw_ctx, ensure_ascii=False)]
+            elif isinstance(raw_ctx, list) and raw_ctx:
+                context = [str(c) for c in raw_ctx if c]
 
         # --- serialise prediction as response string ---
         if isinstance(prediction, dict):
@@ -390,21 +432,13 @@ class OptimizeMetricAdapter:
         else:
             response = str(prediction)
 
-        # --- serialise expected output ---
-        exp_out = getattr(example, "expected_output", None)
-        expected = (
-            _json.dumps(exp_out, ensure_ascii=False)
-            if isinstance(exp_out, dict)
-            else (str(exp_out) if exp_out is not None else None)
-        )
-
         # --- run evaluate() synchronously ---
         # Wrap the entire call (including coro creation) so that metrics whose
         # evaluate() raises synchronously (non-coroutine callables that throw)
         # are also handled gracefully. Use persistent-loop run_sync so OpenAI
         # async clients survive across fit → evaluate.
         try:
-            result = run_sync(self._metric.evaluate(query, response, expected))
+            result = run_sync(self._metric.evaluate(query, response, expected, context))
         except Exception:
             return 0.5  # judge unavailable — neutral, don't crash training
 

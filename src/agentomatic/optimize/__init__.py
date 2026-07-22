@@ -116,7 +116,20 @@ from agentomatic.optimize.metrics import (
     resolve_metrics,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
-from agentomatic.optimize.report import generate_fit_report, generate_html_report
+from agentomatic.optimize.eval_api import (
+    EvalConfig,
+    EvaluateResult,
+    evaluate_and_report,
+    resolve_eval_dataset_path,
+    run_eval,
+    run_evaluate,
+    select_examples,
+)
+from agentomatic.optimize.report import (
+    generate_eval_report,
+    generate_fit_report,
+    generate_html_report,
+)
 from agentomatic.optimize.search_space import PromptSearchSpace, load_search_space
 from agentomatic.optimize.structured_metrics import (
     make_structured_fit_metric,
@@ -192,6 +205,7 @@ __all__ = [
     "red_team",
     # Reports
     "generate_html_report",
+    "generate_eval_report",
     # High-level train API (thin train.py scripts)
     "TrainConfig",
     "TrainResult",
@@ -202,6 +216,14 @@ __all__ = [
     "prepare_dataset",
     "make_structured_fit_metric",
     "structured_composite_score",
+    # High-level eval API (thin eval.py scripts)
+    "EvalConfig",
+    "EvaluateResult",
+    "evaluate_and_report",
+    "run_eval",
+    "run_evaluate",
+    "select_examples",
+    "resolve_eval_dataset_path",
     # ── PromptFitter API ──────────────────────────────────────────
     "PromptFitter",
     "PromptRuntimeConfig",
