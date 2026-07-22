@@ -347,10 +347,11 @@ class DimensionAnalyzer:
         """
         composite_delta = composite_candidate - composite_baseline
 
-        # Check: composite improvement threshold
-        if composite_delta < min_composite_delta:
+        # Check: composite improvement threshold (epsilon for float noise so
+        # printed "+0.010" vs threshold 0.01 is not spuriously rejected).
+        if composite_delta + 1e-6 < min_composite_delta:
             return False, (
-                f"Composite improvement {composite_delta:+.3f} is below "
+                f"Composite improvement {composite_delta:+.4f} is below "
                 f"threshold {min_composite_delta}"
             )
 

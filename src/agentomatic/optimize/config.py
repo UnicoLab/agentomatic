@@ -341,6 +341,12 @@ class PromptFitResult:
     """``best_score − holdout_score`` when holdout is available."""
     applied: bool = False
     """Whether :meth:`apply` successfully wrote a new prompt version."""
+    optimizer_name: str = ""
+    """Fitter optimizer strategy used for this run (e.g. ``rewrite``)."""
+    early_stop_reason: str | None = None
+    """Why the inner optimize loop stopped early, if it did."""
+    dataset_sizes: dict[str, int] = field(default_factory=dict)
+    """Dataset cardinalities used during fit (train/val/holdout/test)."""
 
     # -- convenience properties ------------------------------------------
 
@@ -492,6 +498,9 @@ class PromptFitResult:
             "suggestions": self.suggestions,
             "duration_seconds": self.duration_seconds,
             "applied": self.applied,
+            "optimizer_name": self.optimizer_name,
+            "early_stop_reason": self.early_stop_reason,
+            "dataset_sizes": dict(self.dataset_sizes),
             "deployment_recommendation": (
                 self.deployment_recommendation.to_dict()
                 if self.deployment_recommendation

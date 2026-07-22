@@ -937,8 +937,9 @@ class TestPlatformExecutionSurfaces:
 class TestScaffoldScriptsExecute:
     def test_generated_train_and_optimize_contracts(self, tmp_path: Path, monkeypatch) -> None:
         files = get_template_files("full", "scaffold_bot")
-        assert "PromptFitterBridge" in files["train.py"]
-        assert "llm_base_url" in files["train.py"]
+        assert "TrainConfig" in files["train.py"]
+        assert "train_and_report" in files["train.py"]
+        assert "augment" in files["train.py"]
         assert "prompt_only" in files["optimize.py"]
         assert "GridSearchOptimizer" in files["optimize.py"]
 

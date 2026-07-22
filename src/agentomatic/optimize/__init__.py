@@ -118,6 +118,19 @@ from agentomatic.optimize.metrics import (
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
 from agentomatic.optimize.report import generate_fit_report, generate_html_report
 from agentomatic.optimize.search_space import PromptSearchSpace, load_search_space
+from agentomatic.optimize.structured_metrics import (
+    make_structured_fit_metric,
+    structured_composite_score,
+)
+from agentomatic.optimize.train_api import (
+    TrainConfig,
+    TrainResult,
+    load_data,
+    prepare_dataset,
+    run_train,
+    run_training,
+    train_and_report,
+)
 from agentomatic.optimize.strategies import (
     MIPRO,
     BootstrapRandomSearch,
@@ -179,6 +192,16 @@ __all__ = [
     "red_team",
     # Reports
     "generate_html_report",
+    # High-level train API (thin train.py scripts)
+    "TrainConfig",
+    "TrainResult",
+    "run_train",
+    "run_training",
+    "train_and_report",
+    "load_data",
+    "prepare_dataset",
+    "make_structured_fit_metric",
+    "structured_composite_score",
     # ── PromptFitter API ──────────────────────────────────────────
     "PromptFitter",
     "PromptRuntimeConfig",

@@ -522,6 +522,7 @@ class PromptFitter:
         trials: list[dict[str, Any]] = []
         score_history: list[RoundStats] = []
         learnings_history: list[Any] = []
+        early_stop_reason: str | None = None
 
         logger.info(
             "🚀 PromptFitter.fit — experiment={} agent={} max_trials={} "
@@ -1190,6 +1191,10 @@ class PromptFitter:
                 ),
             )
             if not round_improved and no_improvement_rounds >= effective_patience:
+                early_stop_reason = (
+                    f"no improvement for {effective_patience} round(s) "
+                    f"(patience={effective_patience}, monitor=best_score)"
+                )
                 logger.warning(
                     "   ⏹️  Early stop: {} rounds without improvement",
                     effective_patience,
@@ -1259,6 +1264,12 @@ class PromptFitter:
         if best_holdout_score is not None:
             gen_gap = best_score - best_holdout_score
 
+        if early_stop_reason is None:
+            early_stop_reason = (
+                f"completed all {max_rounds} optimize round(s) "
+                f"(max_trials={self.max_trials})"
+            )
+
         result = PromptFitResult(
             best_config=best_config,
             baseline_config=baseline_config,
@@ -1277,6 +1288,14 @@ class PromptFitter:
             holdout_score=best_holdout_score,
             baseline_holdout_score=baseline_holdout_score,
             generalization_gap=gen_gap,
+            optimizer_name=str(getattr(self._optimizer, "name", "") or ""),
+            early_stop_reason=early_stop_reason,
+            dataset_sizes={
+                "train": len(trainset),
+                "fit_val": len(fit_valset),
+                "holdout": len(holdout_set) if holdout_set is not None else 0,
+                "test": len(testset) if testset is not None else 0,
+            },
         )
 
         # Build deployment recommendation

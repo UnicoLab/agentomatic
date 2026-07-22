@@ -1588,270 +1588,126 @@ def _dataset_jsonl(name: str) -> str:
 def _train_py(name: str) -> str:
     title = name.replace("_", " ").title().replace(" ", "")
     return f'''#!/usr/bin/env python3
-"""Fit **{name}** prompts + model params via Agentomatic compile/fit.
+"""Fit **{name}** prompts via Agentomatic ``train_and_report``.
 
-Stack-driven — edit ``stacks/local.yaml`` to switch models/providers.
-No running agentomatic HTTP server required (local_agent mode).
+Thin entrypoint — stack / metrics / augment / fitter / HolySheet report live
+in ``agentomatic.optimize``.
 
 Usage (from project root)::
 
     uv run python agents/{name}/train.py
-    # or
-    python -m agents.{name}.train
+    AGENTOMATIC_STACK=gemini uv run python agents/{name}/train.py \\
+        --augment --n-examples 100 --persist --optimizer rewrite
 """
 from __future__ import annotations
 
-import json
+import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]   # project root
 os.chdir(ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agentomatic.agents import (
-    AgentDataset,
-    CallableMetric,
-    EarlyStopping,
-    ExactKeyMatchMetric,
-    MetricLoss,
-    OptimizeMetricAdapter,
-    PromptFitterBridge,
-    WeightedMetric,
-)
 from agentomatic.config.settings import load_environment
-from agentomatic.optimize import (
-    CustomMetric,
-    LocalJudgeMetric,
-    PromptSearchSpace,
-    generate_fit_report,
-)
+from agentomatic.optimize import TrainConfig, train_and_report
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
+from rich.console import Console
 
 from .agent import {title}Agent
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-AGENT        = "{name}"
-HERE         = Path(__file__).resolve().parent
-DATASETS     = HERE / "datasets"
-REPORTS      = HERE / "reports"
-REQUIRED_KEYS: list[str] = ["response"]   # keys the agent must return
-
-# ---------------------------------------------------------------------------
-# Run config  (edit here instead of CLI flags)
-# ---------------------------------------------------------------------------
-
-STACK      : str      = os.getenv("AGENTOMATIC_STACK", "local")
-EPOCHS     : int      = 1
-MAX_TRIALS : int      = 8
-PATIENCE   : int      = 1
-OPTIMIZER  : str      = "gepa_like"   # gepa_like | rewrite | mipro_like | param_search
-APPLY      : bool     = False
-APPLY_AS   : str|None = None          # e.g. "v2_fit" to persist best prompt
-
-# ---------------------------------------------------------------------------
-# Metric helpers — customise for your task
-# ---------------------------------------------------------------------------
-
-def _json_valid(example: Any, prediction: dict[str, Any]) -> float:
-    """1.0 if prediction is a non-empty dict (valid structured output)."""
-    return 1.0 if isinstance(prediction, dict) and prediction else 0.0
+AGENT = "{name}"
+HERE = Path(__file__).resolve().parent
+console = Console()
 
 
-def _keyword_score(example: Any, prediction: dict[str, Any]) -> float:
-    expected = example.expected_output or {{}}
-    text = json.dumps(prediction, ensure_ascii=False).lower()
-    terms = [
-        str(v) for v in (expected.values() if isinstance(expected, dict) else [])
-        if isinstance(v, str) and v.strip()
-    ]
-    if not terms:
-        return 1.0
-    return sum(1 for t in terms if t.lower() in text) / len(terms)
-
-
-def _opt_composite(query: str, response: str,
-                   expected: str|None = None, context: Any = None) -> float:
-    """Optimization metric: JSON key presence (0.5) + keyword coverage (0.5)."""
-    try:
-        pred = json.loads(response) if response else {{}}
-    except (json.JSONDecodeError, TypeError):
-        pred = {{}}
-    key_score = sum(1 for k in REQUIRED_KEYS if k in pred) / max(len(REQUIRED_KEYS), 1)
-    try:
-        exp = json.loads(expected) if expected else {{}}
-    except (json.JSONDecodeError, TypeError):
-        exp = {{}}
-    text = json.dumps(pred, ensure_ascii=False).lower()
-    terms = [str(v) for v in (exp.values() if isinstance(exp, dict) else [])
-             if isinstance(v, str) and v.strip()]
-    kw_score = sum(1 for t in terms if t.lower() in text) / len(terms) if terms else key_score
-    return 0.5 * key_score + 0.5 * kw_score
-
-
-def _model_spec(entry: Any) -> str:
-    return f"{{entry.provider}}/{{entry.model}}"
-
-
-# ---------------------------------------------------------------------------
-# 0) Stack + environment
-# ---------------------------------------------------------------------------
-
-load_environment(ROOT.parent / ".env")        # load .env one level up
-stacks = StackManager(ROOT / "stacks")
-stacks.load(STACK)
-apply_stack_defaults(stacks)
-entry        = stacks.get_llm_config("default")
-rewrite_entry = stacks.get_llm_config_or_default("rewrite")  # falls back to default
-model         = _model_spec(entry)
-rewrite_model = _model_spec(rewrite_entry)
-REPORTS.mkdir(parents=True, exist_ok=True)
-
-print(f"stack={{STACK!r}}  model={{model}}  rewrite_model={{rewrite_model}}")
-
-# ---------------------------------------------------------------------------
-# 1) Data
-# ---------------------------------------------------------------------------
-
-dataset = AgentDataset.from_jsonl(DATASETS / "all.jsonl", name=AGENT)
-print(f"{{AGENT}} train={{len(dataset.train)}} val={{len(dataset.validation)}} test={{len(dataset.test)}}")
-
-# ---------------------------------------------------------------------------
-# 2) Agent + metrics
-# ---------------------------------------------------------------------------
-
-llm   = get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
-agent = {title}Agent(llm=llm)
-
-# LLM-as-judge: OptimizeMetricAdapter bridges async .evaluate() to sync .score()
-judge   = LocalJudgeMetric(
-    model=model,
-    criteria=(
-        "Evaluate whether the response is relevant to the query, "
-        "accurate, and well-structured."
-    ),
-    dimensions=["relevance", "accuracy", "structure"],
-)
-judge_m   = OptimizeMetricAdapter(judge, name="judge")
-key_m     = ExactKeyMatchMetric(REQUIRED_KEYS)
-json_m    = CallableMetric("json_valid", _json_valid)
-keyword_m = CallableMetric("keywords",  _keyword_score)
-
-metrics = [judge_m, key_m, json_m, keyword_m]
-
-# agents.WeightedMetric has .score() — compatible with MetricLoss
-loss_metric = WeightedMetric(
-    [
-        ("judge",      judge_m,   0.40),
-        ("key_match",  key_m,     0.30),
-        ("json_valid", json_m,    0.15),
-        ("keywords",   keyword_m, 0.15),
-    ],
-    name="composite_loss",
-)
-
-# ---------------------------------------------------------------------------
-# 3) Search space + PromptFitterBridge
-# ---------------------------------------------------------------------------
-
-space = PromptSearchSpace(
-    optimize_system_prompt=True,
-    optimize_few_shot=True,
-    optimize_model_params=True,
-    model_param_space={{
-        "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
-        "top_p":       [0.7, 0.9, 1.0],
-    }},
-)
-
-fitter = PromptFitterBridge(
-    agent_name=AGENT,
-    task_model=model,
-    rewrite_model=rewrite_model,          # dedicated SLM for prompt rewriting
-    # local_agent is wired automatically from the live agent in optimize()
-    llm_base_url=entry.base_url,          # routes openai/ specs to local server
-    llm_api_key=entry.api_key or "local",
-    max_trials=MAX_TRIALS,
-    metric=CustomMetric(fn=_opt_composite, name="composite"),
-    base_prompt_version="v1",
-    search_space=space,
-    optimizer=OPTIMIZER,
-    min_absolute_improvement=0.02,
-    concurrency=2,
-    experiment_dir=str(REPORTS / ".fit"),
-    auto_report=True,
-)
-
-# ---------------------------------------------------------------------------
-# 4) Compile → fit → evaluate
-# ---------------------------------------------------------------------------
-
-agent.compile(dataset, metrics=metrics, optimizer=fitter, loss=MetricLoss(loss_metric))
-history = agent.fit(
-    dataset,
-    epochs=EPOCHS,
-    validation_data=dataset.validation,
-    callbacks=[EarlyStopping(monitor="val_loss", patience=PATIENCE, mode="min")],
-    max_trials=MAX_TRIALS,
-    search_space=space,
-    optimize_mode=OPTIMIZER,
-    optimize_prompt=True,
-    optimize_params=True,
-    verbose=1,
-)
-fit_result  = getattr(agent, "_last_fit_result", None)
-opt_status  = getattr(agent, "_last_optimize_status", "")
-print(f"optimize_status={{opt_status!r}}")
-print(f"history={{getattr(history, 'history', history)}}")
-
-held_out = dataset.test or dataset.validation or dataset.train
-report   = agent.evaluate(held_out, metrics)
-print(f"scores={{report.scores}}")
-
-# ---------------------------------------------------------------------------
-# 5) HTML report
-# ---------------------------------------------------------------------------
-
-out = REPORTS / f"train_{{AGENT}}.html"
-if fit_result is not None:
-    generate_fit_report(fit_result, output_path=out)
-    print(f"score history={{fit_result.history}}")   # list[float]
-else:
-    out.write_text(
-        f"<html><body><h1>{{AGENT}} fit</h1>"
-        f"<pre>{{getattr(history, 'history', history)}}</pre></body></html>",
-        encoding="utf-8",
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry for {name} prompt fitting."""
+    p = argparse.ArgumentParser(description=f"Fit {{AGENT}} prompts (Agentomatic)")
+    p.add_argument("--stack", default=os.getenv("AGENTOMATIC_STACK", "local"))
+    p.add_argument("--epochs", type=int, default=2)
+    p.add_argument("--trials", type=int, default=12)
+    p.add_argument("--patience", type=int, default=2)
+    p.add_argument(
+        "--optimizer",
+        default="rewrite",
+        choices=["rewrite", "gepa_like", "mipro_like", "few_shot_bootstrap", "param_search"],
     )
-print(f"Report: {{out}}")
+    p.add_argument("--dataset", type=Path, default=None)
+    p.add_argument("--augment", action="store_true", help="LLM-augment seed data")
+    p.add_argument(
+        "--n-examples", "--nr-examples", dest="n_examples", type=int, default=None,
+        help="Target size after augment (default: 3× seed)",
+    )
+    p.add_argument("--persist", action="store_true", help="Write dataset JSONL to disk")
+    p.add_argument("--apply", action="store_true", help="Persist best prompt if improved")
+    p.add_argument("--apply-as", default=None)
+    args = p.parse_args(argv)
 
-# ---------------------------------------------------------------------------
-# 6) Optional: apply best prompt
-# ---------------------------------------------------------------------------
+    load_environment(ROOT.parent / ".env")
+    stacks = StackManager(ROOT / "stacks")
+    stacks.load(args.stack)
+    apply_stack_defaults(stacks)
 
-apply_as = APPLY_AS or ("v2_fit" if APPLY else None)
-if apply_as and fit_result is not None and hasattr(fit_result, "apply"):
-    # Refuse to write when there is no improvement (force=True to override).
-    written = fit_result.apply(version=apply_as, agent_dir=str(HERE))
-    if written:
-        print(f"Applied {{written!r}} → {{HERE}}")
-    else:
-        print(
-            "Skipped apply: no improvement (or generalization gap too large). "
-            "Use force=True / review holdout scores."
+    llm = get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
+    agent = {title}Agent(llm=llm)
+
+    result = train_and_report(
+        agent,
+        config=TrainConfig(
+            agent_name=AGENT,
+            agent_dir=HERE,
+            stacks_dir=ROOT / "stacks",
+            env_path=ROOT.parent / ".env",
+            stack=args.stack,
+            dataset_path=args.dataset,
+            epochs=args.epochs,
+            max_trials=args.trials,
+            patience=args.patience,
+            optimizer=args.optimizer,
+            required_keys=["response"],
+            judge_criteria=(
+                "Evaluate whether the response is relevant to the query, "
+                "accurate, well-structured, and actionable. Provide graded "
+                "0–1 scores with clear motivation."
+            ),
+            judge_dimensions=["relevance", "accuracy", "structure"],
+            augment=args.augment,
+            n_examples=args.n_examples,
+            persist=args.persist,
+            apply=args.apply,
+            apply_as=args.apply_as,
+        ),
+    )
+
+    console.print(
+        f"[bold]{{AGENT}}[/bold] stack={{result.stack!r}} model={{result.model}} "
+        f"optimizer={{result.optimizer}} sizes={{result.dataset_sizes}} "
+        f"augmented={{result.augmented}}"
+    )
+    console.print(f"optimize_status={{result.optimize_status!r}}")
+    hist = getattr(result.history, "history", {{}}) or {{}}
+    if "val_loss" in hist:
+        console.print(f"val_loss={{hist['val_loss']}}")
+    fit = result.fit_result
+    if fit is not None:
+        console.print(
+            f"fit baseline={{fit.baseline_score:.4f}} best={{fit.best_score:.4f}} "
+            f"Δ={{fit.absolute_improvement:+.4f}}"
         )
-else:
-    print("Dry-run: set APPLY=True to persist the best prompt.")
+        console.print(f"score_history={{list(fit.history)}}")
+    console.print(f"evaluate={{result.eval_scores}}")
+    console.print(f"Report: {{result.report_path}}")
+    if not result.applied_version:
+        console.print("[dim]Demo-safe: pass --apply to persist the best prompt.[/dim]")
+    return 0
 
 
 if __name__ == "__main__":
-    pass   # script runs at import; guarded by __main__ in each section
+    raise SystemExit(main())
 '''
 
 

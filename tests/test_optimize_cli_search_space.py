@@ -340,13 +340,13 @@ class TestFullTemplateEnrichments:
     def test_full_train_uses_weighted_metric(self) -> None:
         files = get_template_files("full", "demo_agent")
         train = files["train.py"]
-        assert "WeightedMetric" in train
-        # New template uses PromptFitterBridge + LocalJudgeMetric pattern
-        assert "PromptFitterBridge" in train
-        assert "LocalJudgeMetric" in train
-        assert "OptimizeMetricAdapter" in train
-        assert "MetricLoss" in train
-        assert "loss_metric = WeightedMetric" in train
+        # Thin train.py delegates metrics/judge/fitter to train_and_report.
+        assert "TrainConfig" in train
+        assert "train_and_report" in train
+        assert "augment" in train
+        assert "judge_criteria" in train
+        assert "judge_dimensions" in train
+        assert "required_keys" in train
 
     def test_full_eval_uses_weighted_metric(self) -> None:
         files = get_template_files("full", "demo_agent")
