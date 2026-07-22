@@ -275,19 +275,13 @@ class AgentPlatform:
         self.log_level = log_level
         self.settings = settings
 
-        # Storage
+        # Storage — do NOT eagerly install MemoryStore when logs_history is on.
+        # That used to preempt lifespan auto-derive from MEMORY connections /
+        # DATABASE_URL and silently made invocation history ephemeral.
         self._store = store
         self._logs_history = logs_history
         self._allow_logsllm_analysis = allow_logsllm_analysis
-        if self._logs_history and self._store is None:
-            from agentomatic.storage import MemoryStore
-
-            self._store = MemoryStore()
-            logger.warning(
-                "logs_history=True without an explicit store — using "
-                "MemoryStore (ephemeral). Pass SQLAlchemyStore(...) for "
-                "durable invocation history across restarts."
-            )
+        self._provisional_memory_store = False
 
         # Middleware config
         self._enable_logging = enable_logging
@@ -634,8 +628,62 @@ class AgentPlatform:
                 await manager.initialize()
                 logger.info(f"  ✅ Connections ready for scope '{scope}' ({manager.count})")
 
+        db_url_configured = bool(self._resolve_database_url())
         if self._store is None:
             await self._auto_derive_store_from_connections()
+        if self._store is None:
+            await self._auto_derive_store_from_database_url()
+        if self._store is None and self._logs_history:
+            if db_url_configured:
+                # A DB was configured — do not silently fall back to memory
+                # (that would make audit/logs look "on" while not persisting).
+                logger.error(
+                    "logs_history=True and a database URL is configured, but "
+                    "SQLAlchemyStore could not be initialised. Fix DATABASE_URL "
+                    "/ AGENTOMATIC_DB_URL / MEMORY connection — refusing "
+                    "ephemeral MemoryStore fallback."
+                )
+            else:
+                from agentomatic.storage import MemoryStore
+
+                self._store = MemoryStore()
+                self._provisional_memory_store = True
+                logger.warning(
+                    "logs_history=True without a durable store — using MemoryStore "
+                    "(ephemeral; lost on restart). Pass store=SQLAlchemyStore(...), "
+                    "declare a MEMORY connection, or set DATABASE_URL / "
+                    "AGENTOMATIC_DB_URL (Postgres, SQLite, or any SQLAlchemy async URL)."
+                )
+
+    def _resolve_database_url(self) -> str | None:
+        """Resolve the platform DB URL from env / active stack (if any).
+
+        Works for any SQLAlchemy async backend (``postgresql+asyncpg``,
+        ``sqlite+aiosqlite``, ``mysql+aiomysql``, …) — the same URL surface
+        used by :class:`~agentomatic.storage.sqlalchemy.SQLAlchemyStore`.
+
+        Resolution order:
+          1. ``AGENTOMATIC_DB_URL``
+          2. ``DATABASE_URL``
+          3. Active stack ``database.url`` when ``features.enable_db`` is true
+        """
+        import os
+
+        url = (os.getenv("AGENTOMATIC_DB_URL") or os.getenv("DATABASE_URL") or "").strip()
+        if not url:
+            stack = getattr(getattr(self, "_stack_manager", None), "_active_stack", None)
+            if stack is not None:
+                enable_db = bool(getattr(getattr(stack, "features", None), "enable_db", False))
+                stack_url = str(getattr(getattr(stack, "database", None), "url", "") or "").strip()
+                if enable_db and stack_url:
+                    if stack_url.startswith("${") and stack_url.endswith("}"):
+                        env_key = stack_url[2:-1]
+                        stack_url = (os.getenv(env_key) or "").strip()
+                    if stack_url and "${" not in stack_url:
+                        url = stack_url
+        if not url or "${" in url:
+            return None
+        return url
 
     async def _auto_derive_store_from_connections(self) -> None:
         """Populate ``self._store`` from the first MEMORY connection, if any."""
@@ -664,6 +712,28 @@ class AgentPlatform:
                     f"Failed to auto-derive store from connection "
                     f"'{getattr(candidate, 'name', '?')}' in scope '{scope}': {exc}"
                 )
+
+    async def _auto_derive_store_from_database_url(self) -> None:
+        """Build ``SQLAlchemyStore`` from the resolved database URL.
+
+        Backend-agnostic: whatever dialect is in the URL (Postgres, SQLite,
+        MySQL, …) is used via SQLAlchemy async drivers.
+        """
+        url = self._resolve_database_url()
+        if not url:
+            return
+        try:
+            from agentomatic.storage.sqlalchemy import SQLAlchemyStore
+
+            store = SQLAlchemyStore(url)
+            await store.initialize()
+            self._store = store
+            logger.info(
+                "🗄️ Auto-derived SQLAlchemyStore from database URL "
+                f"({url.split('@')[-1] if '@' in url else url})"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to auto-derive store from database URL: {}", exc)
 
     def _build_task_manager(self) -> TaskManager:
         """Create the task manager and register a dispatcher per resource type."""
@@ -863,6 +933,15 @@ class AgentPlatform:
 
             # --- Register + initialize connections (per-agent + platform) ---
             await platform._init_connections()
+
+            # Stores derived during connection init (MEMORY / DATABASE_URL /
+            # logs_history MemoryStore fallback) need an initialize pass when
+            # nothing was configured at construction time.
+            if platform._store is not None:
+                try:
+                    await platform._store.initialize()
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Post-connection store initialize skipped: {}", exc)
 
             # Auto-generate + mount routers for NEWLY discovered agents
             for name, agent in platform._registry.all().items():

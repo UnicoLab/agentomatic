@@ -57,6 +57,15 @@ from agentomatic.optimize.deployment import (
     RolloutConfig,
     build_deployment_recommendation,
 )
+from agentomatic.optimize.eval_api import (
+    EvalConfig,
+    EvaluateResult,
+    evaluate_and_report,
+    resolve_eval_dataset_path,
+    run_eval,
+    run_evaluate,
+    select_examples,
+)
 from agentomatic.optimize.eval_contract import EvalContract
 from agentomatic.optimize.failure_analysis import (
     DimensionAnalyzer,
@@ -116,34 +125,12 @@ from agentomatic.optimize.metrics import (
     resolve_metrics,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
-from agentomatic.optimize.eval_api import (
-    EvalConfig,
-    EvaluateResult,
-    evaluate_and_report,
-    resolve_eval_dataset_path,
-    run_eval,
-    run_evaluate,
-    select_examples,
-)
 from agentomatic.optimize.report import (
     generate_eval_report,
     generate_fit_report,
     generate_html_report,
 )
 from agentomatic.optimize.search_space import PromptSearchSpace, load_search_space
-from agentomatic.optimize.structured_metrics import (
-    make_structured_fit_metric,
-    structured_composite_score,
-)
-from agentomatic.optimize.train_api import (
-    TrainConfig,
-    TrainResult,
-    load_data,
-    prepare_dataset,
-    run_train,
-    run_training,
-    train_and_report,
-)
 from agentomatic.optimize.strategies import (
     MIPRO,
     BootstrapRandomSearch,
@@ -153,12 +140,26 @@ from agentomatic.optimize.strategies import (
     IterativeRewrite,
     OptimizationStrategy,
 )
+from agentomatic.optimize.structured_metrics import (
+    make_structured_fit_metric,
+    structured_composite_score,
+)
 from agentomatic.optimize.synthesizer import (
     DataSynthesizer,
     augment_dataset,
     generate_dataset,
     generate_from_docs,
     red_team,
+)
+from agentomatic.optimize.train_api import (
+    TrainConfig,
+    TrainResult,
+    load_data,
+    prepare_dataset,
+    print_train_result,
+    run_train,
+    run_training,
+    train_and_report,
 )
 
 __all__ = [
@@ -212,6 +213,7 @@ __all__ = [
     "run_train",
     "run_training",
     "train_and_report",
+    "print_train_result",
     "load_data",
     "prepare_dataset",
     "make_structured_fit_metric",

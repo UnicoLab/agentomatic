@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -354,16 +355,111 @@ class TestLogsHistoryEndpoints:
             assert store._invocation_logs == {}
 
 
-def test_platform_auto_memory_store_when_logs_history() -> None:
-    """logs_history without store auto-provisions MemoryStore."""
+def test_platform_defers_memory_store_until_lifespan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a DB URL, logs_history falls back to MemoryStore at lifespan."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("AGENTOMATIC_DB_URL", raising=False)
     platform = AgentPlatform(
         agents_dir=".",
         logs_history=True,
         enable_studio=False,
         enable_telemetry=False,
+        enable_tasks=False,
     )
-    assert platform.store is not None
-    assert isinstance(platform.store, MemoryStore)
+    # Deferred — construction must not install MemoryStore (that used to
+    # preempt SQLAlchemyStore auto-derive from DATABASE_URL).
+    assert platform.store is None
+    with TestClient(platform.build()):
+        assert platform.store is not None
+        assert isinstance(platform.store, MemoryStore)
+
+
+@pytest.mark.asyncio
+async def test_logs_history_uses_sqlite_url_across_restart(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When DATABASE_URL is set, invocation logs persist via SQLAlchemyStore."""
+    from agentomatic.storage.sqlalchemy import SQLAlchemyStore
+
+    db_path = tmp_path / "logs.db"
+    url = f"sqlite+aiosqlite:///{db_path}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.delenv("AGENTOMATIC_DB_URL", raising=False)
+
+    platform = AgentPlatform(
+        agents_dir=".",
+        logs_history=True,
+        allow_logsllm_analysis=True,
+        enable_studio=False,
+        enable_telemetry=False,
+        enable_tasks=False,
+    )
+    platform.register_agent(
+        manifest=AgentManifest(name="echo", slug="echo", description="Echo"),
+        node_fn=_echo_node,
+    )
+    with TestClient(platform.build()) as client:
+        inv = client.post("/api/v1/echo/invoke", json={"query": "persist-me"})
+        assert inv.status_code == 200, inv.text
+        listed = client.get("/api/v1/echo/logs")
+        assert listed.status_code == 200
+        body = listed.json()
+        assert body["total"] >= 1
+        log_id = body["logs"][0]["id"]
+        assert isinstance(platform.store, SQLAlchemyStore)
+
+    # New process / new store instance against the same SQLite file.
+    store2 = SQLAlchemyStore(url)
+    await store2.initialize()
+    try:
+        rows = await store2.list_invocation_logs(agent_name="echo", limit=10)
+        assert any(row["id"] == log_id for row in rows)
+        assert any(
+            (row.get("input") or {}).get("query") == "persist-me" for row in rows
+        )
+    finally:
+        await store2.close()
+
+
+@pytest.mark.asyncio
+async def test_optimization_runs_survive_sqlite_restart(tmp_path: Path) -> None:
+    """Retrain artefacts written to SQLAlchemyStore survive a new store open."""
+    from agentomatic.logs.optimization_store import OptimizationRunStore
+    from agentomatic.storage.sqlalchemy import SQLAlchemyStore
+
+    url = f"sqlite+aiosqlite:///{tmp_path / 'retrain.db'}"
+    store = SQLAlchemyStore(url)
+    await store.initialize()
+    try:
+        run_store = OptimizationRunStore(store)
+        saved = await run_store.save_run(
+            experiment_id="exp-restart",
+            agent_name="tuner",
+            baseline_score=0.4,
+            best_score=0.75,
+            prompt_versions={"baseline": "old", "best": "new"},
+            score_history=[0.4, 0.75],
+            learnings=["prefer shorter answers"],
+            artefacts={"n_trials": 2},
+        )
+        assert saved is not None
+        run_id = saved["id"]
+    finally:
+        await store.close()
+
+    store2 = SQLAlchemyStore(url)
+    await store2.initialize()
+    try:
+        fetched = await store2.get_optimization_run(run_id)
+        assert fetched is not None
+        assert fetched["experiment_id"] == "exp-restart"
+        assert fetched["best_score"] == pytest.approx(0.75)
+        assert fetched["learnings"] == ["prefer shorter answers"]
+    finally:
+        await store2.close()
 
 
 @pytest.mark.asyncio

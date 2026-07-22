@@ -30,9 +30,10 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from loguru import logger
 
@@ -74,6 +75,13 @@ class TrainConfig:
         augment_strategies: Strategies forwarded to
             :meth:`~agentomatic.optimize.DataSynthesizer.augment`.
         augment_model: Model for augmentation (defaults to rewrite model).
+        persist_fit_store: When ``True``, bind a SQLAlchemy fit store from
+            ``fit_store_url`` / ``AGENTOMATIC_FIT_STORE_URL`` /
+            ``DATABASE_URL`` so retrain artefacts survive process restart
+            (any SQLAlchemy async backend).
+        fit_store_url: Explicit DB URL for auditable retrain persistence
+            (overrides env). Same dialects as platform storage
+            (Postgres, SQLite, …).
     """
 
     agent_name: str
@@ -663,110 +671,123 @@ def run_train(
         optimize_rag_params=False,
     )
 
-    fitter = PromptFitterBridge(
-        agent_name=config.agent_name,
-        task_model=model,
-        rewrite_model=rewrite_model,
-        local_agent=agent,
-        llm_base_url=entry.base_url,
-        llm_api_key=entry.api_key or "local",
-        max_trials=config.max_trials,
-        metric=fit_metric,
-        base_prompt_version=config.base_prompt_version,
-        search_space=space,
-        optimizer=config.optimizer,
-        min_absolute_improvement=config.min_absolute_improvement,
-        patience=config.patience,
-        concurrency=config.concurrency,
-        sequential=config.sequential,
-        experiment_dir=str(reports / ".fit"),
-        auto_report=True,
-        drain_seconds=config.drain_seconds,
-    )
-
-    agent.compile(dataset, metrics=metrics, optimizer=fitter, loss=loss)
-    history = agent.fit(
-        dataset,
-        epochs=config.epochs,
-        validation_data=dataset.validation,
-        callbacks=[EarlyStopping(monitor="val_loss", patience=config.patience, mode="min")],
-        max_trials=config.max_trials,
-        search_space=space,
-        optimize_mode=config.optimizer,
-        optimize_prompt=True,
-        optimize_params=config.optimize_model_params,
-        verbose=config.verbose,
-    )
-
-    status = str(getattr(agent, "_last_optimize_status", "") or "")
-    fit_result = getattr(agent, "_last_fit_result", None)
-
-    held_out = dataset.test or dataset.validation or dataset.train
-    eval_report = agent.evaluate(held_out, metrics)
-    eval_scores = dict(getattr(eval_report, "scores", {}) or {})
-
-    out = reports / f"train_{config.agent_name}.html"
-    if fit_result is not None:
-        generate_fit_report(
-            fit_result,
-            output_path=out,
-            keras_history=getattr(history, "history", None),
-            eval_scores=eval_scores,
-            dataset_sizes=sizes,
-            optimizer_name=config.optimizer,
-            stack_name=stack_name,
-            model_name=model,
-            run_config={
-                "stack": stack_name,
-                "model": model,
-                "optimizer": config.optimizer,
-                "epochs": config.epochs,
-                "max_trials": config.max_trials,
-                "patience": config.patience,
-                "augment": bool(config.augment),
-                "required_keys": list(config.required_keys or []),
-                "judge_dimensions": list(config.judge_dimensions or []),
-                "judge_criteria": config.judge_criteria,
-                "judge_weight": config.judge_weight,
-                "min_absolute_improvement": config.min_absolute_improvement,
-            },
-        )
-    else:
-        out.write_text(
-            f"<html><body><h1>{config.agent_name} fit</h1>"
-            f"<pre>{getattr(history, 'history', history)}</pre></body></html>",
-            encoding="utf-8",
+    bound_fit_store = _bind_fit_store(config)
+    try:
+        fitter = PromptFitterBridge(
+            agent_name=config.agent_name,
+            task_model=model,
+            rewrite_model=rewrite_model,
+            local_agent=agent,
+            llm_base_url=entry.base_url,
+            llm_api_key=entry.api_key or "local",
+            max_trials=config.max_trials,
+            metric=fit_metric,
+            base_prompt_version=config.base_prompt_version,
+            search_space=space,
+            optimizer=config.optimizer,
+            min_absolute_improvement=config.min_absolute_improvement,
+            patience=config.patience,
+            concurrency=config.concurrency,
+            sequential=config.sequential,
+            experiment_dir=str(reports / ".fit"),
+            auto_report=True,
+            drain_seconds=config.drain_seconds,
         )
 
-    applied: str | None = None
-    apply_as = config.apply_as or ("v2_fit" if config.apply else None)
-    if apply_as and fit_result is not None and hasattr(fit_result, "apply"):
-        if getattr(fit_result, "improved", False):
-            written = fit_result.apply(version=apply_as, agent_dir=str(agent_dir))
-            applied = written
-            if written:
-                logger.info("Applied prompt version {!r} → {}", written, agent_dir)
+        agent.compile(dataset, metrics=metrics, optimizer=fitter, loss=loss)
+        history = agent.fit(
+            dataset,
+            epochs=config.epochs,
+            validation_data=dataset.validation,
+            callbacks=[EarlyStopping(monitor="val_loss", patience=config.patience, mode="min")],
+            max_trials=config.max_trials,
+            search_space=space,
+            optimize_mode=config.optimizer,
+            optimize_prompt=True,
+            optimize_params=config.optimize_model_params,
+            verbose=config.verbose,
+        )
+
+        status = str(getattr(agent, "_last_optimize_status", "") or "")
+        fit_result = getattr(agent, "_last_fit_result", None)
+
+        held_out = dataset.test or dataset.validation or dataset.train
+        eval_report = agent.evaluate(held_out, metrics)
+        eval_scores = dict(getattr(eval_report, "scores", {}) or {})
+
+        out = reports / f"train_{config.agent_name}.html"
+        if fit_result is not None:
+            generate_fit_report(
+                fit_result,
+                output_path=out,
+                keras_history=getattr(history, "history", None),
+                eval_scores=eval_scores,
+                dataset_sizes=sizes,
+                optimizer_name=config.optimizer,
+                stack_name=stack_name,
+                model_name=model,
+                run_config={
+                    "stack": stack_name,
+                    "model": model,
+                    "optimizer": config.optimizer,
+                    "epochs": config.epochs,
+                    "max_trials": config.max_trials,
+                    "patience": config.patience,
+                    "augment": bool(config.augment),
+                    "required_keys": list(config.required_keys or []),
+                    "judge_dimensions": list(config.judge_dimensions or []),
+                    "judge_criteria": config.judge_criteria,
+                    "judge_weight": config.judge_weight,
+                    "min_absolute_improvement": config.min_absolute_improvement,
+                },
+            )
         else:
-            logger.info(
-                "Skip apply: absolute_improvement={:+.4f}",
-                getattr(fit_result, "absolute_improvement", 0.0),
+            out.write_text(
+                f"<html><body><h1>{config.agent_name} fit</h1>"
+                f"<pre>{getattr(history, 'history', history)}</pre></body></html>",
+                encoding="utf-8",
             )
 
-    return TrainResult(
-        history=history,
-        fit_result=fit_result,
-        eval_scores=eval_scores,
-        report_path=out,
-        optimize_status=status,
-        applied_version=applied,
-        dataset_sizes=sizes,
-        stack=stack_name,
-        model=model,
-        rewrite_model=rewrite_model,
-        optimizer=config.optimizer,
-        augmented=bool(config.augment),
-        persist_path=persist_written,
-    )
+        applied: str | None = None
+        apply_as = config.apply_as or ("v2_fit" if config.apply else None)
+        if apply_as and fit_result is not None and hasattr(fit_result, "apply"):
+            if getattr(fit_result, "improved", False):
+                written = fit_result.apply(version=apply_as, agent_dir=str(agent_dir))
+                applied = written
+                if written:
+                    logger.info("Applied prompt version {!r} → {}", written, agent_dir)
+            else:
+                logger.info(
+                    "Skip apply: absolute_improvement={:+.4f}",
+                    getattr(fit_result, "absolute_improvement", 0.0),
+                )
+
+        return TrainResult(
+            history=history,
+            fit_result=fit_result,
+            eval_scores=eval_scores,
+            report_path=out,
+            optimize_status=status,
+            applied_version=applied,
+            dataset_sizes=sizes,
+            stack=stack_name,
+            model=model,
+            rewrite_model=rewrite_model,
+            optimizer=config.optimizer,
+            augmented=bool(config.augment),
+            persist_path=persist_written,
+            agent_name=config.agent_name,
+        )
+    finally:
+        if bound_fit_store is not None:
+            try:
+                from agentomatic.async_utils import run_sync
+                from agentomatic.optimize.fit_store import set_fit_store
+
+                set_fit_store(None)
+                run_sync(bound_fit_store.close())
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Fit store cleanup skipped: {}", exc)
 
 
 # Public aliases — preferred names in docs / templates.

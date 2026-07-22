@@ -12,6 +12,16 @@ publishes). Install from git / an editable checkout until then.
 
 ### Added
 
+- **Durable multi-backend logs / retrain persistence** (1.8.8): When
+  `logs_history` is on, the platform no longer eagerly installs
+  `MemoryStore` (that preempted DB auto-derive). Store resolution is
+  backend-agnostic via `SQLAlchemyStore`: MEMORY connection →
+  `AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack `database.url` (Postgres,
+  SQLite, MySQL, …). If a DB URL is configured but init fails, MemoryStore
+  fallback is refused. Offline train can audit retrain runs with
+  `TrainConfig.persist_fit_store` / `fit_store_url` /
+  `AGENTOMATIC_PERSIST_FIT`. Train UX helpers:
+  `print_train_result(result)` / `TrainResult.print_summary()`.
 - **`EvalConfig` / `evaluate_and_report`** (1.8.6): Thin eval scripts
   mirroring `train_and_report` — stack load, structured + LLM-judge
   metrics, split selection, optional augmented dataset reuse, and
