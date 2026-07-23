@@ -14,15 +14,24 @@ The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and s
 
 ---
 
-## ⚡ Quick Start — `train_and_report` / `evaluate_and_report`
+## ⚡ Quick Start — two tiers (same primitives)
 
-The recommended public API for class agents is a **flat script** that loads
-`TrainCliSettings` / `EvalCliSettings` (env + CLI), builds the agent, then
-delegates fit/eval + HolySheet HTML to `agentomatic.optimize`. Scaffolded
-agents ship with matching `agents/<name>/train.py` and `agents/<name>/eval.py`
-(`agentomatic init … --template class`).
+Agentomatic exposes **both** a thin one-shot path and a Keras-like staged path.
+They share the same building blocks (`load_data` / `prepare_dataset`,
+`build_default_metrics`, `compile_agent`, `fit_agent`, `evaluate_agent`,
+`generate_fit_report`). `train_and_report` is implemented **on top of** those
+primitives — not a parallel stack.
 
-### Train (fit prompts)
+| Tier | When to use | Entry point |
+|---|---|---|
+| **Full abstraction** | Thin project scripts, CLI/env knobs, HolySheet for free | `TrainCliSettings` → `train_and_report` |
+| **Full control** | Swap metrics/loss/optimizer, custom loops, inspect each step | `compile_agent` → `fit_agent` → `evaluate_agent` |
+
+Scaffolded agents ship with `agents/<name>/train.py` / `eval.py`
+(`agentomatic init … --template class`): one-shot by default, with a
+**commented staged example** in `train.py`.
+
+### Train — one-shot (`train_and_report`)
 
 ```python
 from pathlib import Path
@@ -77,6 +86,76 @@ AGENTOMATIC_STACK=gemini uv run python agents/assistant/train.py \
 #   AGENTOMATIC_STACK=gemini AGENTOMATIC_EPOCHS=2 AGENTOMATIC_AUGMENT=true \
 #     uv run python agents/assistant/train.py
 ```
+
+### Train — staged Keras-like (full control) {#staged-keras-fit}
+
+Own each step; swap any piece (custom metrics, different optimizer, extra
+eval passes). Same internals as `train_and_report`:
+
+```python
+from agentomatic.optimize import (
+    build_default_metrics,
+    compile_agent,
+    evaluate_agent,
+    fit_agent,
+    generate_fit_report,
+    load_data,
+    prepare_dataset,
+)
+
+# 1. Data
+data, written = prepare_dataset(
+    load_data(HERE / "datasets" / "all.jsonl"),
+    augment=True,
+    n_examples=100,
+    persist=True,
+    seed_path=HERE / "datasets" / "all.jsonl",
+    model=rewrite_model,  # stack rewrite LLM
+)
+
+# 2. Metrics / loss
+metrics, loss, fit_metric = build_default_metrics(
+    model=model,
+    required_keys=["content", "next_action"],
+    judge_criteria="Evaluate pertinence, groundedness, actionability.",
+    judge_dimensions=["pertinence", "groundedness", "actionability"],
+)
+
+# 3. Compile
+compiled = compile_agent(
+    agent,
+    dataset=data,
+    metrics=metrics,
+    loss=loss,
+    fit_metric=fit_metric,
+    optimizer="rewrite",
+    task_model=model,
+    rewrite_model=rewrite_model,
+    llm_base_url=entry.base_url,
+    llm_api_key=entry.api_key or "local",
+    agent_name="assistant",
+    max_trials=12,
+    patience=2,
+)
+
+# 4. Fit
+history = fit_agent(compiled, data, epochs=2, trials=12)
+
+# 5. Evaluate + report
+scores = evaluate_agent(compiled, data.test or data.validation).scores
+generate_fit_report(
+    compiled.fit_result,
+    output_path=HERE / "reports" / "train_assistant.html",
+    keras_history=history.history,
+    eval_scores=scores,
+)
+```
+
+You can also call `agent.compile(...)` / `agent.fit(...)` / `agent.evaluate(...)`
+directly with a hand-built `PromptFitterBridge` — see
+[Local-mode Training](#local-mode-training-compile-fit-evaluate) below.
+Prefer the `compile_agent` / `fit_agent` helpers when you want the same
+defaults as `train_and_report` without the one-shot packaging.
 
 ### Evaluate (score a split)
 
@@ -830,10 +909,12 @@ your script
 | `CustomMetric` | Function-based fitter objective | `agentomatic.optimize` |
 | `PromptSearchSpace` | Defines what the fitter can change | `agentomatic.optimize` |
 
-!!! tip "Prefer `train_and_report` for day-to-day fitting"
-    The example below wires `PromptFitterBridge` manually. For project scripts,
-    use `train_and_report` / `TrainConfig` in the Quick Start section above —
-    same stack/metrics/HolySheet path with far less boilerplate.
+!!! tip "Choose your tier"
+    - **Thin scripts** → `train_and_report` / `TrainCliSettings` (Quick Start).
+    - **Composable steps** → `compile_agent` / `fit_agent` / `evaluate_agent`
+      (same primitives; swap metrics/optimizer freely).
+    - **Maximum wiring control** → hand-build `PromptFitterBridge` as below
+      (still the same fitter engine).
 
 **Complete example — stack-driven, no env-var hacks, no HTTP server:**
 

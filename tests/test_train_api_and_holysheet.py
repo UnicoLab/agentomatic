@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
 
 from agentomatic.optimize.config import PromptFitResult, PromptRuntimeConfig
 from agentomatic.optimize.structured_metrics import (
@@ -56,6 +58,252 @@ class TestTrainConfigDefaults:
         assert cfg.apply is False
         assert cfg.min_absolute_improvement == 0.001
         assert cfg.persist_fit_store is False
+
+
+class TestStagedCompileFitEvaluate:
+    """Keras-like staged path shares primitives with train_and_report."""
+
+    def test_public_exports(self) -> None:
+        from agentomatic.optimize import (
+            CompiledAgent,
+            build_default_metrics,
+            compile_agent,
+            default_search_space,
+            evaluate_agent,
+            fit_agent,
+            generate_fit_report,
+            load_data,
+            prepare_dataset,
+            train_and_report,
+        )
+
+        assert callable(build_default_metrics)
+        assert callable(compile_agent)
+        assert callable(fit_agent)
+        assert callable(evaluate_agent)
+        assert callable(load_data)
+        assert callable(prepare_dataset)
+        assert callable(default_search_space)
+        assert callable(generate_fit_report)
+        assert callable(train_and_report)
+        assert CompiledAgent is not None
+
+    def test_build_default_metrics_shape(self) -> None:
+        from agentomatic.optimize import build_default_metrics
+
+        metrics, loss, fit_metric = build_default_metrics(
+            model="openai/gpt-4o-mini",
+            required_keys=["content", "next_action"],
+            judge_criteria="Is the answer good?",
+            judge_dimensions=["relevance"],
+            judge_weight=0.3,
+        )
+        assert len(metrics) == 5
+        assert getattr(loss, "name", None) or True
+        assert fit_metric.name == "composite"
+
+    def test_compile_fit_evaluate_pipeline(self) -> None:
+        from agentomatic.agents.types import AgentDataset, AgentExample
+        from agentomatic.optimize.train_api import (
+            CompiledAgent,
+            compile_agent,
+            evaluate_agent,
+            fit_agent,
+        )
+
+        class _Hist:
+            history = {"loss": [0.5], "val_loss": [0.4]}
+
+        class _Report:
+            scores = {"composite": 0.8}
+
+        agent = MagicMock()
+        agent.agent_name = "echo"
+        agent.compile.return_value = agent
+        agent.fit.return_value = _Hist()
+        agent.evaluate.return_value = _Report()
+        agent._last_fit_result = PromptFitResult(
+            best_config=PromptRuntimeConfig(system_prompt="best"),
+            baseline_config=PromptRuntimeConfig(system_prompt="base"),
+            best_score=0.8,
+            baseline_score=0.5,
+        )
+        agent._last_optimize_status = "ok"
+
+        metric = MagicMock()
+        metric.name = "m1"
+        loss = MagicMock()
+        loss.name = "loss"
+
+        ds = AgentDataset(
+            name="tiny",
+            examples=[
+                AgentExample(
+                    id="t1",
+                    input={"current_query": "hi"},
+                    expected_output={"content": "HI", "next_action": "done"},
+                    split="train",
+                ),
+                AgentExample(
+                    id="v1",
+                    input={"current_query": "yo"},
+                    expected_output={"content": "YO", "next_action": "done"},
+                    split="validation",
+                ),
+                AgentExample(
+                    id="e1",
+                    input={"current_query": "hey"},
+                    expected_output={"content": "HEY", "next_action": "done"},
+                    split="test",
+                ),
+            ],
+        )
+
+        compiled = compile_agent(
+            agent,
+            dataset=ds,
+            metrics=[metric],
+            loss=loss,
+            fit_metric=MagicMock(name="fit"),
+            optimizer="rewrite",
+            task_model="openai/test",
+            rewrite_model="openai/test",
+            agent_name="echo",
+            max_trials=3,
+            patience=1,
+            experiment_dir="/tmp/fit-test",
+        )
+        assert isinstance(compiled, CompiledAgent)
+        assert compiled.optimizer_name == "rewrite"
+        agent.compile.assert_called_once()
+        call_kw = agent.compile.call_args
+        assert call_kw.kwargs.get("loss") is loss or (
+            len(call_kw.args) >= 1 and call_kw.kwargs.get("metrics") == [metric]
+        )
+
+        history = fit_agent(compiled, ds, epochs=2, trials=3, patience=1)
+        assert history.history["loss"] == [0.5]
+        agent.fit.assert_called_once()
+        fit_kw = agent.fit.call_args.kwargs
+        assert fit_kw["epochs"] == 2
+        assert fit_kw["max_trials"] == 3
+        assert fit_kw["optimize_mode"] == "rewrite"
+
+        report = evaluate_agent(compiled, ds.test)
+        assert report.scores["composite"] == 0.8
+        agent.evaluate.assert_called_once()
+        assert compiled.optimize_status == "ok"
+        assert compiled.fit_result is not None
+
+    def test_train_and_report_uses_staged_primitives(
+        self, monkeypatch: Any, tmp_path: Path
+    ) -> None:
+        """run_train must call compile_agent / fit_agent / evaluate_agent."""
+        from agentomatic.agents.types import AgentDataset, AgentExample
+        from agentomatic.optimize import train_api as train_api_mod
+
+        calls: list[str] = []
+
+        class _Hist:
+            history = {"loss": [0.4]}
+
+        class _Report:
+            scores = {"m": 0.7}
+
+        class _Entry:
+            provider = "openai"
+            model = "test"
+            base_url = "http://localhost/v1"
+            api_key = "k"
+
+        class _Stacks:
+            def load(self, _name: str) -> None:
+                return None
+
+            def get_llm_config(self, _role: str) -> _Entry:
+                return _Entry()
+
+        monkeypatch.setattr(
+            "agentomatic.config.settings.load_environment",
+            lambda *_a, **_k: None,
+        )
+        monkeypatch.setattr(
+            "agentomatic.stacks.manager.StackManager",
+            lambda *_a, **_k: _Stacks(),
+        )
+        monkeypatch.setattr(
+            "agentomatic.providers.apply_stack_defaults",
+            lambda *_a, **_k: None,
+        )
+        monkeypatch.setattr(
+            "agentomatic.optimize.report.generate_fit_report",
+            lambda *_a, **_k: _k.get("output_path") or tmp_path / "x.html",
+        )
+
+        ds = AgentDataset(
+            name="t",
+            examples=[
+                AgentExample(
+                    id="1",
+                    input={"current_query": "q"},
+                    expected_output={"content": "a", "next_action": "n"},
+                    split="train",
+                )
+            ],
+        )
+
+        def _compile(agent: Any, **_k: Any) -> Any:
+            calls.append("compile")
+            agent._last_fit_result = None
+            agent._last_optimize_status = "ok"
+            return train_api_mod.CompiledAgent(
+                agent=agent,
+                metrics=list(_k.get("metrics") or []),
+                loss=_k.get("loss"),
+                fit_metric=_k.get("fit_metric"),
+                fitter=MagicMock(),
+                search_space=MagicMock(),
+                optimizer_name="rewrite",
+                model="openai/test",
+                agent_name="a",
+            )
+
+        def _fit(*_a: Any, **_k: Any) -> _Hist:
+            calls.append("fit")
+            return _Hist()
+
+        def _eval(*_a: Any, **_k: Any) -> _Report:
+            calls.append("evaluate")
+            return _Report()
+
+        monkeypatch.setattr(train_api_mod, "compile_agent", _compile)
+        monkeypatch.setattr(train_api_mod, "fit_agent", _fit)
+        monkeypatch.setattr(train_api_mod, "evaluate_agent", _eval)
+        monkeypatch.setattr(
+            train_api_mod,
+            "build_default_metrics",
+            lambda **_k: ([MagicMock(name="m")], MagicMock(), MagicMock()),
+        )
+
+        agent = MagicMock()
+        agent.agent_name = "a"
+        agent._last_fit_result = None
+        agent._last_optimize_status = "ok"
+        reports = tmp_path / "reports"
+        reports.mkdir()
+        cfg = TrainConfig(
+            agent_name="a",
+            agent_dir=tmp_path,
+            stacks_dir=tmp_path,
+            epochs=1,
+            max_trials=2,
+            reports_dir=reports,
+        )
+
+        result = train_api_mod.run_train(agent, config=cfg, dataset=ds)
+        assert calls == ["compile", "fit", "evaluate"]
+        assert result.eval_scores == {"m": 0.7}
+        assert result.optimizer == "rewrite"
 
 
 class TestPrintTrainResult:

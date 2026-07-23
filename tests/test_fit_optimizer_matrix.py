@@ -303,7 +303,7 @@ def test_train_api_aliases() -> None:
 
 
 def test_train_template_uses_run_train() -> None:
-    """Scaffold train.py template is the flat TrainCliSettings pattern."""
+    """Scaffold train.py: one-shot default + commented staged full-control."""
     from agentomatic.cli.templates import _train_py
 
     src = _train_py("assistant")
@@ -314,7 +314,12 @@ def test_train_template_uses_run_train() -> None:
     assert "import argparse" not in src
     assert "from agents.assistant.agent import" in src
     assert "PromptFitterBridge" not in src
-    assert "generate_fit_report" not in src
+    # Active path stays thin; staged helpers appear only in comments.
+    assert "result = train_and_report(" in src
+    assert "# compiled = compile_agent(" in src
+    assert "# history = fit_agent(" in src
+    assert "# scores = evaluate_agent(" in src
+    assert "# generate_fit_report(" in src
 
 
 def test_eval_template_uses_evaluate_and_report() -> None:

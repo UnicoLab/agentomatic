@@ -5,6 +5,12 @@
 
 ### Features
 
+- **optimize**: Dual-tier Keras-like fit API — staged
+  `load_data` / `prepare_dataset` → `build_default_metrics` →
+  `compile_agent` → `fit_agent` → `evaluate_agent` → `generate_fit_report`
+  for full control, with `train_and_report` / `TrainCliSettings` as the thin
+  one-shot path **on the same primitives** (`CompiledAgent` handle). Docs,
+  scaffold `train.py` (commented staged example), and tests cover both tiers.
 - **optimize**: `TrainCliSettings` / `EvalCliSettings` — Pydantic BaseSettings
   for flat train/eval scripts (env `AGENTOMATIC_*` + kebab-case CLI via
   `.parse()` → `.to_train_config()` / `.to_eval_config()`). Scaffold templates

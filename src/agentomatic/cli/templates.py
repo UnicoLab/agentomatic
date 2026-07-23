@@ -1593,6 +1593,9 @@ def _train_py(name: str) -> str:
 Flat script: ``TrainCliSettings`` (env + CLI) → agent → fit → report.
 Knobs: ``AGENTOMATIC_*`` env vars and/or ``--help`` flags.
 
+For staged Keras-like control (load → metrics → compile → fit → evaluate),
+see the commented block at the bottom of ``main`` and optimization.md.
+
 Usage (from project root)::
 
     AGENTOMATIC_STACK=local uv run python agents/{name}/train.py
@@ -1639,7 +1642,7 @@ def main(argv: list[str] | None = None) -> int:
     llm = get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
     agent = {title}Agent(llm=llm)
 
-    # --- fit + HolySheet report ---
+    # --- fit + HolySheet report (one-shot convenience) ---
     result = train_and_report(
         agent,
         config=cli.to_train_config(
@@ -1657,6 +1660,34 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     print_train_result(result, console=console)
+
+    # --- optional staged Keras-like path (same primitives as train_and_report) ---
+    # from agentomatic.optimize import (
+    #     build_default_metrics, compile_agent, evaluate_agent, fit_agent,
+    #     generate_fit_report, load_data, prepare_dataset,
+    # )
+    # data, _ = prepare_dataset(
+    #     load_data(HERE / "datasets" / "all.jsonl"),
+    #     augment=cli.augment, n_examples=cli.n_examples, persist=cli.persist,
+    #     seed_path=HERE / "datasets" / "all.jsonl",
+    # )
+    # entry = stacks.get_llm_config("default")
+    # model = f"{{entry.provider}}/{{entry.model}}"
+    # metrics, loss, fit_metric = build_default_metrics(
+    #     model=model, required_keys=["response"],
+    #     judge_criteria="…", judge_dimensions=["relevance", "accuracy", "structure"],
+    # )
+    # compiled = compile_agent(
+    #     agent, dataset=data, metrics=metrics, loss=loss, fit_metric=fit_metric,
+    #     optimizer=cli.optimizer, task_model=model, rewrite_model=model,
+    #     llm_base_url=entry.base_url, llm_api_key=entry.api_key or "local",
+    #     agent_name=AGENT, max_trials=cli.trials, patience=cli.patience,
+    # )
+    # history = fit_agent(compiled, data, epochs=cli.epochs, trials=cli.trials)
+    # scores = evaluate_agent(compiled, data.test or data.validation).scores
+    # generate_fit_report(compiled.fit_result, output_path=HERE / "reports" / f"train_{{AGENT}}.html",
+    #                     keras_history=history.history, eval_scores=scores)
+
     return 0
 
 

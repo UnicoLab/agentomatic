@@ -41,6 +41,13 @@ scaffold `_train_py` / `_eval_py` (`print_train_result`, augment knobs,
 `persist_fit_store`, `evaluate_and_report`), agent primer, README pointer.
 
 
+# Dual-tier Keras fit surface — DONE (v1.8.11)
+
+Staged public API (`compile_agent` / `fit_agent` / `evaluate_agent` +
+`build_default_metrics`) with `train_and_report` on the same primitives.
+Docs (both styles), scaffold commented staged example, tests.
+
+
 # Remaining product ideas
 
 (none from the previous logs/DB/train-UX backlog — see studio schema UX above)

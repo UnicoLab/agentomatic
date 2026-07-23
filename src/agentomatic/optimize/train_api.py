@@ -1,10 +1,19 @@
 """High-level Keras-style train API for class-owned agents.
 
-Packages stack loading, optional data augmentation, judge + structured
-metrics, PromptFitterBridge, compile → fit → evaluate → HolySheet report
-→ optional apply into one call so project ``train.py`` scripts stay thin.
+Two public styles share the same primitives:
 
-Example::
+1. **Staged (Keras-like)** — full control::
+
+       data, _ = prepare_dataset(load_data(...), augment=True, persist=True)
+       metrics, loss, fit_metric = build_default_metrics(...)
+       compiled = compile_agent(agent, metrics=metrics, loss=loss, ...)
+       history = fit_agent(compiled, data, epochs=2, trials=12)
+       scores = evaluate_agent(compiled, data.test)
+
+2. **One-shot** — thin scripts via :func:`train_and_report` (calls the same
+   ``compile_agent`` → ``fit_agent`` → ``evaluate_agent`` path).
+
+Example (one-shot)::
 
     from agentomatic.optimize import TrainConfig, load_data, train_and_report
 
@@ -489,7 +498,7 @@ def build_default_metrics(
     """Build agent metrics, loss, and optimize-fit CustomMetric.
 
     Returns:
-        ``(metrics, loss, fit_metric)`` ready for ``compile`` / bridge.
+        ``(metrics, loss, fit_metric)`` ready for :func:`compile_agent`.
     """
     from agentomatic.agents import (
         CallableMetric,
@@ -543,6 +552,301 @@ def build_default_metrics(
     return metrics, loss, fit_metric
 
 
+@dataclass(slots=True)
+class CompiledAgent:
+    """Handle from :func:`compile_agent` — ready for :func:`fit_agent`.
+
+    Wraps the live agent plus the metrics / fitter / search-space used at
+    compile time so staged scripts do not re-thread those objects manually.
+    ``train_and_report`` uses the same handle internally.
+    """
+
+    agent: Any
+    metrics: list[Any]
+    loss: Any
+    fit_metric: Any | None = None
+    fitter: Any | None = None
+    search_space: Any | None = None
+    optimizer_name: str = "rewrite"
+    model: str = ""
+    rewrite_model: str = ""
+    stack: str = ""
+    agent_name: str = ""
+    max_trials: int = 12
+    patience: int = 2
+    optimize_model_params: bool = False
+    verbose: int = 1
+
+    @property
+    def fit_result(self) -> Any | None:
+        """Last :class:`~agentomatic.optimize.PromptFitResult` from fit."""
+        return getattr(self.agent, "_last_fit_result", None)
+
+    @property
+    def optimize_status(self) -> str:
+        """Last optimize status string from the fitter bridge."""
+        return str(getattr(self.agent, "_last_optimize_status", "") or "")
+
+
+def _as_compiled(compiled: CompiledAgent | Any) -> tuple[Any, CompiledAgent | None]:
+    """Return ``(agent, compiled_or_none)`` for staged helpers."""
+    if isinstance(compiled, CompiledAgent):
+        return compiled.agent, compiled
+    return compiled, None
+
+
+def default_search_space(*, optimize_model_params: bool = False) -> Any:
+    """Build the default :class:`~agentomatic.optimize.PromptSearchSpace`."""
+    from agentomatic.optimize.search_space import PromptSearchSpace
+
+    return PromptSearchSpace(
+        optimize_system_prompt=True,
+        optimize_few_shot=True,
+        optimize_model_choice=False,
+        optimize_model_params=optimize_model_params,
+        model_param_space={
+            "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
+            "top_p": [0.7, 0.9, 1.0],
+        },
+        optimize_rag_params=False,
+    )
+
+
+def compile_agent(
+    agent: Any,
+    *,
+    dataset: Any | None = None,
+    metrics: Sequence[Any] | None = None,
+    loss: Any | None = None,
+    fit_metric: Any | None = None,
+    optimizer: str | Any = "rewrite",
+    task_model: str | None = None,
+    rewrite_model: str | None = None,
+    llm_base_url: str | None = None,
+    llm_api_key: str | None = None,
+    agent_name: str | None = None,
+    max_trials: int = 12,
+    patience: int = 2,
+    search_space: Any | None = None,
+    optimize_model_params: bool = False,
+    min_absolute_improvement: float = 0.001,
+    sequential: bool = True,
+    concurrency: int = 2,
+    experiment_dir: str | Path | None = None,
+    base_prompt_version: str = "v1",
+    drain_seconds: float = 1.0,
+    auto_report: bool = True,
+    stack: str = "",
+    verbose: int = 1,
+) -> CompiledAgent:
+    """Compile an agent for prompt fitting (Keras-style ``model.compile``).
+
+    Builds (or accepts) a :class:`~agentomatic.agents.PromptFitterBridge`,
+    then calls ``agent.compile(...)``. Does **not** run trials — use
+    :func:`fit_agent` next.
+
+    Args:
+        agent: Live ``BaseGraphAgent`` (or compatible) instance.
+        dataset: Optional dataset stored on the agent at compile time.
+        metrics: Agent-level metrics (from :func:`build_default_metrics` or
+            custom). Required for a training signal.
+        loss: Loss objective (typically the ``loss`` from
+            :func:`build_default_metrics`).
+        fit_metric: Metric used inside PromptFitter candidate ranking.
+        optimizer: Optimizer name (``rewrite``, ``gepa_like``, …) or a
+            pre-built ``PromptFitterBridge`` / optimizer instance.
+        task_model / rewrite_model: LLM specs (``provider/model``).
+        llm_base_url / llm_api_key: OpenAI-compatible routing for local stacks.
+        agent_name: Artefact / report name (defaults to ``agent.agent_name``).
+        max_trials: Inner PromptFitter trial budget.
+        patience: Early-stop patience mirrored onto the bridge.
+        search_space: Optional :class:`~agentomatic.optimize.PromptSearchSpace`.
+        optimize_model_params: Whether the default search space tunes
+            temperature / top_p.
+        min_absolute_improvement: Candidate acceptance threshold.
+        sequential / concurrency: Evaluation parallelism.
+        experiment_dir: Directory for fitter artefacts.
+        base_prompt_version: Starting prompt version key.
+        drain_seconds: Post-fit async drain for HTTP clients.
+        auto_report: Forwarded to ``PromptFitterBridge``.
+        stack: Optional stack name kept for reporting metadata.
+        verbose: Default verbosity for subsequent :func:`fit_agent` calls.
+
+    Returns:
+        :class:`CompiledAgent` handle for :func:`fit_agent` /
+        :func:`evaluate_agent`.
+    """
+    from agentomatic.agents import PromptFitterBridge
+
+    name = agent_name or getattr(agent, "agent_name", None) or type(agent).__name__
+    metrics_list = list(metrics or [])
+    space = (
+        search_space
+        if search_space is not None
+        else default_search_space(optimize_model_params=optimize_model_params)
+    )
+
+    if isinstance(optimizer, str):
+        opt_name = optimizer
+        fitter = PromptFitterBridge(
+            agent_name=name,
+            task_model=task_model or "",
+            rewrite_model=rewrite_model or task_model or "",
+            local_agent=agent,
+            llm_base_url=llm_base_url,
+            llm_api_key=llm_api_key or "local",
+            max_trials=max_trials,
+            metric=fit_metric,
+            base_prompt_version=base_prompt_version,
+            search_space=space,
+            optimizer=opt_name,
+            min_absolute_improvement=min_absolute_improvement,
+            patience=patience,
+            concurrency=concurrency,
+            sequential=sequential,
+            experiment_dir=str(experiment_dir) if experiment_dir else None,
+            auto_report=auto_report,
+            drain_seconds=drain_seconds,
+        )
+    else:
+        fitter = optimizer
+        raw_name = getattr(optimizer, "optimizer", None)
+        opt_name = raw_name if isinstance(raw_name, str) and raw_name else type(optimizer).__name__
+
+    agent.compile(dataset, metrics=metrics_list, optimizer=fitter, loss=loss)
+    return CompiledAgent(
+        agent=agent,
+        metrics=metrics_list,
+        loss=loss,
+        fit_metric=fit_metric,
+        fitter=fitter,
+        search_space=space,
+        optimizer_name=str(opt_name),
+        model=task_model or "",
+        rewrite_model=rewrite_model or task_model or "",
+        stack=stack,
+        agent_name=name,
+        max_trials=max_trials,
+        patience=patience,
+        optimize_model_params=optimize_model_params,
+        verbose=verbose,
+    )
+
+
+def fit_agent(
+    compiled: CompiledAgent | Any,
+    dataset: Any,
+    *,
+    epochs: int = 2,
+    max_trials: int | None = None,
+    trials: int | None = None,
+    patience: int | None = None,
+    validation_data: Any | None = None,
+    callbacks: Sequence[Any] | None = None,
+    optimize_mode: str | None = None,
+    optimize_prompt: bool = True,
+    optimize_params: bool | None = None,
+    search_space: Any | None = None,
+    verbose: int | None = None,
+    **fit_kwargs: Any,
+) -> Any:
+    """Fit a compiled agent (Keras-style ``model.fit``).
+
+    Args:
+        compiled: :class:`CompiledAgent` from :func:`compile_agent`, or a
+            raw agent already passed through ``agent.compile(...)``.
+        dataset: Training ``AgentDataset`` (uses ``.train`` when present).
+        epochs: Outer Keras-style epochs.
+        max_trials / trials: Inner PromptFitter trial budget (``trials`` is
+            an alias).
+        patience: EarlyStopping patience on ``val_loss``.
+        validation_data: Held-out split (defaults to ``dataset.validation``).
+        callbacks: Optional callback list (default: EarlyStopping).
+        optimize_mode: Fitter strategy override (defaults to compile-time
+            optimizer name).
+        optimize_prompt / optimize_params: Search-space toggles for this fit.
+        search_space: Optional override search space.
+        verbose: Fit verbosity (0/1).
+        **fit_kwargs: Extra kwargs forwarded to ``agent.fit``.
+
+    Returns:
+        Keras-style :class:`~agentomatic.agents.History`.
+    """
+    from agentomatic.agents import EarlyStopping
+
+    agent, handle = _as_compiled(compiled)
+    if trials is not None:
+        trial_budget = int(trials)
+    elif max_trials is not None:
+        trial_budget = int(max_trials)
+    else:
+        trial_budget = int(handle.max_trials) if handle is not None else 12
+    if patience is not None:
+        stop_patience = int(patience)
+    else:
+        stop_patience = int(handle.patience) if handle is not None else 2
+    mode = optimize_mode or (handle.optimizer_name if handle else None) or "rewrite"
+    space = search_space
+    if space is None and handle is not None:
+        space = handle.search_space
+    if optimize_params is not None:
+        opt_params = optimize_params
+    else:
+        opt_params = bool(handle.optimize_model_params) if handle is not None else False
+    if verbose is not None:
+        verb = int(verbose)
+    else:
+        verb = int(handle.verbose) if handle is not None else 1
+    val = validation_data
+    if val is None and hasattr(dataset, "validation"):
+        val = dataset.validation
+    if callbacks is not None:
+        cbs = list(callbacks)
+    else:
+        cbs = [EarlyStopping(monitor="val_loss", patience=stop_patience, mode="min")]
+
+    return agent.fit(
+        dataset,
+        epochs=epochs,
+        validation_data=val,
+        callbacks=cbs,
+        max_trials=trial_budget,
+        search_space=space,
+        optimize_mode=mode,
+        optimize_prompt=optimize_prompt,
+        optimize_params=opt_params,
+        verbose=verb,
+        **fit_kwargs,
+    )
+
+
+def evaluate_agent(
+    compiled: CompiledAgent | Any,
+    dataset: Any,
+    *,
+    metrics: Sequence[Any] | None = None,
+) -> Any:
+    """Evaluate a compiled (or raw) agent on a split / dataset.
+
+    Args:
+        compiled: :class:`CompiledAgent` or agent with ``evaluate()``.
+        dataset: Examples, ``AgentDataset``, or a split list
+            (e.g. ``data.test``).
+        metrics: Optional metric override; defaults to compile-time metrics.
+
+    Returns:
+        :class:`~agentomatic.agents.EvaluationReport` (use ``.scores`` for
+        the flat score dict).
+    """
+    agent, handle = _as_compiled(compiled)
+    resolved = (
+        list(metrics)
+        if metrics is not None
+        else (list(handle.metrics) if handle is not None else None)
+    )
+    return agent.evaluate(dataset, resolved)
+
+
 def run_train(
     agent: Any,
     *,
@@ -551,10 +855,10 @@ def run_train(
 ) -> TrainResult:
     """Compile → fit → evaluate → report for a class-owned agent.
 
-    Pipeline::
+    Thin convenience over the staged primitives::
 
-        load data → optional augment (+ persist) → metrics → PromptFitterBridge
-        → compile → fit → evaluate → HolySheet report → optional apply
+        load_data / prepare_dataset → build_default_metrics → compile_agent
+        → fit_agent → evaluate_agent → generate_fit_report → optional apply
 
     Args:
         agent: Live ``BaseGraphAgent`` instance (already constructed with LLM).
@@ -565,9 +869,8 @@ def run_train(
     Returns:
         :class:`TrainResult` with history, fit artefacts, and report path.
     """
-    from agentomatic.agents import AgentDataset, EarlyStopping, PromptFitterBridge
     from agentomatic.config.settings import load_environment
-    from agentomatic.optimize import PromptSearchSpace, generate_fit_report
+    from agentomatic.optimize.report import generate_fit_report
     from agentomatic.providers import apply_stack_defaults
     from agentomatic.stacks.manager import StackManager
 
@@ -582,7 +885,9 @@ def run_train(
                 load_environment(candidate)
                 break
 
-    stacks_dir = Path(config.stacks_dir) if config.stacks_dir else agent_dir.parent.parent / "stacks"
+    stacks_dir = (
+        Path(config.stacks_dir) if config.stacks_dir else agent_dir.parent.parent / "stacks"
+    )
     stacks = StackManager(stacks_dir)
     stacks.load(stack_name)
     apply_stack_defaults(stacks)
@@ -605,7 +910,7 @@ def run_train(
         Path(config.dataset_path) if config.dataset_path else agent_dir / "datasets" / "all.jsonl"
     )
     if dataset is None:
-        dataset = AgentDataset.from_jsonl(ds_path, name=config.agent_name)
+        dataset = load_data(ds_path, name=config.agent_name)
 
     sizes_before = {
         "train": len(dataset.train),
@@ -659,60 +964,52 @@ def run_train(
         judge_weight=config.judge_weight,
     )
 
-    space = PromptSearchSpace(
-        optimize_system_prompt=True,
-        optimize_few_shot=True,
-        optimize_model_choice=False,
-        optimize_model_params=config.optimize_model_params,
-        model_param_space={
-            "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
-            "top_p": [0.7, 0.9, 1.0],
-        },
-        optimize_rag_params=False,
-    )
-
     bound_fit_store = _bind_fit_store(config)
     try:
-        fitter = PromptFitterBridge(
-            agent_name=config.agent_name,
+        compiled = compile_agent(
+            agent,
+            dataset=dataset,
+            metrics=metrics,
+            loss=loss,
+            fit_metric=fit_metric,
+            optimizer=config.optimizer,
             task_model=model,
             rewrite_model=rewrite_model,
-            local_agent=agent,
             llm_base_url=entry.base_url,
             llm_api_key=entry.api_key or "local",
+            agent_name=config.agent_name,
             max_trials=config.max_trials,
-            metric=fit_metric,
-            base_prompt_version=config.base_prompt_version,
-            search_space=space,
-            optimizer=config.optimizer,
-            min_absolute_improvement=config.min_absolute_improvement,
             patience=config.patience,
-            concurrency=config.concurrency,
+            search_space=default_search_space(optimize_model_params=config.optimize_model_params),
+            optimize_model_params=config.optimize_model_params,
+            min_absolute_improvement=config.min_absolute_improvement,
             sequential=config.sequential,
-            experiment_dir=str(reports / ".fit"),
-            auto_report=True,
+            concurrency=config.concurrency,
+            experiment_dir=reports / ".fit",
+            base_prompt_version=config.base_prompt_version,
             drain_seconds=config.drain_seconds,
+            stack=stack_name,
+            verbose=config.verbose,
         )
 
-        agent.compile(dataset, metrics=metrics, optimizer=fitter, loss=loss)
-        history = agent.fit(
+        history = fit_agent(
+            compiled,
             dataset,
             epochs=config.epochs,
-            validation_data=dataset.validation,
-            callbacks=[EarlyStopping(monitor="val_loss", patience=config.patience, mode="min")],
             max_trials=config.max_trials,
-            search_space=space,
+            patience=config.patience,
+            validation_data=dataset.validation,
             optimize_mode=config.optimizer,
             optimize_prompt=True,
             optimize_params=config.optimize_model_params,
             verbose=config.verbose,
         )
 
-        status = str(getattr(agent, "_last_optimize_status", "") or "")
-        fit_result = getattr(agent, "_last_fit_result", None)
+        status = compiled.optimize_status
+        fit_result = compiled.fit_result
 
         held_out = dataset.test or dataset.validation or dataset.train
-        eval_report = agent.evaluate(held_out, metrics)
+        eval_report = evaluate_agent(compiled, held_out)
         eval_scores = dict(getattr(eval_report, "scores", {}) or {})
 
         out = reports / f"train_{config.agent_name}.html"
