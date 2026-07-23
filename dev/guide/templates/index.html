@@ -3122,9 +3122,12 @@ conversation, not the legacy <code>graph.py</code> / <code>nodes.py</code> layou
 </span></code></pre></div>
 </details>
 <details class="example">
-<summary>Generated <code>train.py</code> (flat <code>TrainCliSettings</code>)</summary>
+<summary>Generated <code>train.py</code> (flat <code>TrainCliSettings</code> + staged comment)</summary>
 <p>Scaffolded class agents use a flat script: settings → agent →
-<a href="../optimization/"><code>train_and_report</code></a>. Key surface:</p>
+<a href="../optimization/"><code>train_and_report</code></a> (full abstraction). The same file
+includes a <strong>commented staged Keras-like</strong> example
+(<code>load_data</code> → <code>build_default_metrics</code> → <code>compile_agent</code> → <code>fit_agent</code> →
+<code>evaluate_agent</code>) for full control — both tiers share the same primitives.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainCliSettings</span><span class="p">,</span> <span class="n">print_train_result</span><span class="p">,</span> <span class="n">train_and_report</span>
 </span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agents.analyzer.agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnalyzerAgent</span>
 </span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
@@ -3143,8 +3146,8 @@ conversation, not the legacy <code>graph.py</code> / <code>nodes.py</code> layou
 </span><span id="__span-29-16"><a id="__codelineno-29-16" name="__codelineno-29-16" href="#__codelineno-29-16"></a><span class="n">print_train_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Matching <code>eval.py</code> uses <code>EvalCliSettings</code> → <code>evaluate_and_report</code> →
-<code>print_eval_result</code>. See <a href="../optimization/">Prompt Optimization</a> for the
-full knob table.</p>
+<code>print_eval_result</code>. See <a href="../optimization/">Prompt Optimization</a> for both
+tiers and the full knob table.</p>
 </details>
 <div class="admonition info">
 <p class="admonition-title">No LangGraph Required</p>
