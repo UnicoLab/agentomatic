@@ -1,84 +1,199 @@
 # CHANGELOG
 
 
-## Unreleased
+## v1.9.0 (2026-07-23)
+
+### Bug Fixes
+
+- 5 optimizer bugs causing zero improvement signal (v1.8.3)
+  ([`c822e54`](https://github.com/UnicoLab/agentomatic/commit/c822e5452a94a0fb85684595dff6ce8fd4d9be79))
+
+BUG-1 fitter_optimizers: RewriteOptimizer used task_model instead of rewrite_model for prompt
+  rewriting.
+
+BUG-2 fitter: minibatch_size was not clamped to len(val_points), producing misleading '500%' log and
+  no additional signal.
+
+BUG-3 fitter: _EARLY_STOP_PATIENCE=3 > max_rounds=2 for typical budgets; early stopping never fired.
+  Replaced with effective_patience = min(patience, max_rounds) so the loop exits after the first
+  fruitless round.
+
+BUG-4 agents/types: AgentExample.to_datapoint() skipped 'current_query' (the standard agentomatic
+  input field), falling back to json.dumps(input) as the optimizer query — degrading judge
+  evaluation and briefing quality.
+
+BUG-5 agents/optimizers: PromptFitterBridge hid 'optimizer' in **kwargs with no explicit default.
+  Promoted to named parameter (default='rewrite') and seeded into kwargs before overrides so it is
+  always present.
+
+Also adds BUGS.md documenting root-cause analysis + how to install from source.
+
+- Epoch compounding + judge context + to_datapoint correctness (v1.8.4)
+  ([`c8fc46a`](https://github.com/UnicoLab/agentomatic/commit/c8fc46abafd1a0be82f0d2e5ef3b2ab290284c5a))
+
+to_datapoint(): - Prefer input['question'] over input['query'] (actual question vs meta-label) -
+  Extract input['context'] dict → DataPoint.context list so judge can evaluate groundedness against
+  the project snapshot - Convert boolean-flag expected_output {k: True} → human-readable description
+  'Response must include: k' so judge can compare quality - Fix invoke payload to exclude
+  question/current_query/query (already in query field)
+
+PromptFitter: - Add baseline_system_prompt param: when set, _load_baseline_config uses it instead of
+  prompts.json so successive fit() epochs compound improvement
+
+PromptFitterBridge._build_fitter: - Pass agent.compiled_config['system_prompt'] as
+  baseline_system_prompt so epoch N+1 starts from epoch N's best prompt, not the original file
+
+train_next.py: - Use stack judge profile (temp=0.0, no thinking) for deterministic scoring -
+  EPOCHS=5, MAX_TRIALS=12, PATIENCE=3 for meaningful multi-epoch curve -
+  min_absolute_improvement=0.01 (was 0.02) — accept 1%+ consistent gains - APPLY=True — persist
+  improvements to prompts.json - Rich loss-curve table (epoch / loss / val_loss / judge / val_judge
+  / f1) - Clear model-role console banner at startup
+
+Version: 1.8.3 → 1.8.4
+
+- Judge_expected priority in to_datapoint + structural keys for expected_output (v1.8.5)
+  ([`d4df6a6`](https://github.com/UnicoLab/agentomatic/commit/d4df6a6414722b1b333e955478255bb7b4332a1e))
+
+to_datapoint(): - Read metadata['judge_expected'] first as judge reference answer (human-written
+  quality description beats auto-converted boolean flags) - Fall through to existing boolean-flag →
+  text conversion when no judge_expected
+
+dataset all.jsonl (SCOOPER_NEW): - Add judge_expected to all examples for quality reference -
+  as_next_steps val: update expected_output to {content: true, next_action: true} - Add 2 new
+  validation examples (as_val_budget, as_val_status) → 3 val examples total (was 1), reduces binary
+  score oscillation
+
+Version: 1.8.4 → 1.8.5
+
+- **ci**: Clear lint, mypy, and failing release-gate tests
+  ([`228785d`](https://github.com/UnicoLab/agentomatic/commit/228785d7ca309ef43117ef1e4ca09a53f1615c88))
+
+Format drifted sources, tighten store/failover/report typing for mypy, and align
+  dataset/metric/failover tests with current intentional APIs.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Nest HolySheet train/eval report sections
+  ([`3c19fac`](https://github.com/UnicoLab/agentomatic/commit/3c19fac57c6cdfc11378a3fa11bed2030c916444))
+
+Empty section cards came from flat report.add(Section) + sibling blocks; HolySheet only renders
+  nested children. Rebuild fit/eval dashboards with Tabs/Accordion, full prompts, run config,
+  deployment recommendations, held-out scores, and judge rationales via
+  OptimizeMetricAdapter.last_result.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Restore HolySheet fit reports and real training curves
+  ([`5e76553`](https://github.com/UnicoLab/agentomatic/commit/5e76553f4325e900241eeecb078187b3fd040ce7))
+
+KPI status='warning' crashed HolySheet export into a 258-line stub; acceptance threshold 0.01
+  rejected real LLM-judge gains. Lower default to 0.001, wire fitter patience from TrainConfig, and
+  add chronological prompt evolution diffs.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Restore real fit learning signal and report curves
+  ([`d3f2247`](https://github.com/UnicoLab/agentomatic/commit/d3f2247dadc045014ecf4826a7c8d3de18fc0e48))
+
+Keep structured expected_output alongside judge_expected so metrics, gold few-shot, and tip
+  candidates receive machine-readable targets. Always record score/prompt history (including
+  no-improve rounds), bake few-shot into prompt overrides, diversify rewrite proposals, and surface
+  score/prompt/trial sections in the HTML fit report.
+
+### Chores
+
+- Bump version 1.8.4
+  ([`1c4ece8`](https://github.com/UnicoLab/agentomatic/commit/1c4ece8bf73c7925e30167ee2ad42b2393926842))
+
+- **studio**: Sync static UI bundle for schema-driven forms
+  ([`b0ac2b6`](https://github.com/UnicoLab/agentomatic/commit/b0ac2b6bb10f90deef0e03f3c4cbdb2076281544))
+
+Refresh packaged Studio assets to match SchemaForm/ChatView updates and capture remaining fit/logs
+  follow-ups in TODO.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+### Documentation
+
+- Adding todo form fitting observations
+  ([`69390e3`](https://github.com/UnicoLab/agentomatic/commit/69390e3b3e56f59c2cf7967d3c666c9f64b22221))
+
+- Mark fit/learning/train-UX TODO items done
+  ([`8a597f2`](https://github.com/UnicoLab/agentomatic/commit/8a597f21cf6d42ba026d20170726452a63d3f7a5))
+
+Reflect shipped PromptFitter learnings, generalization, train_and_report, and HolySheet reports;
+  leave studio schema forms and log-analysis open.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Document train/eval APIs and sync CLI templates
+  ([`83a8f48`](https://github.com/UnicoLab/agentomatic/commit/83a8f4813a6e5d5fc5d50b81270fed51e9498f34))
+
+Align MkDocs, changelog, primer, and scaffold train.py/eval.py with train_and_report /
+  evaluate_and_report, print helpers, augment knobs, HolySheet reports, and logs/DB persistence.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Document train_and_report, HolySheet, and augment knobs
+  ([`39c12ba`](https://github.com/UnicoLab/agentomatic/commit/39c12baaa0f8bf364735ffcb30cc34f9e9b5f4ff))
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
 
 ### Features
 
-- **optimize**: Dual-tier Keras-like fit API — staged
-  `load_data` / `prepare_dataset` → `build_default_metrics` →
-  `compile_agent` → `fit_agent` → `evaluate_agent` → `generate_fit_report`
-  for full control, with `train_and_report` / `TrainCliSettings` as the thin
-  one-shot path **on the same primitives** (`CompiledAgent` handle). Docs,
-  scaffold `train.py` (commented staged example), and tests cover both tiers.
-- **optimize**: `TrainCliSettings` / `EvalCliSettings` — Pydantic BaseSettings
-  for flat train/eval scripts (env `AGENTOMATIC_*` + kebab-case CLI via
-  `.parse()` → `.to_train_config()` / `.to_eval_config()`). Scaffold templates
-  and docs use the settings style; `print_eval_result` mirrors
-  `print_train_result`.
-- **logs**: Multi-resource `logs_history` — persist full I/O + metadata for
-  agents, plugins, pipelines, ingestion, and custom endpoints (same
-  SQLAlchemyStore / MemoryStore backends). Cross-resource REST:
-  `GET /api/v1/logs?resource=plugin&name=…`, `GET /logs/{id}`,
-  `POST /logs/analyze`, `GET /logs/analysis`, plus per-agent `/{agent}/logs`
-  BC. In-process pipeline steps record with `endpoint=pipeline_step` and
-  `metadata.pipeline`. Not covered yet: async task invocations; no
-  per-plugin convenience `/logs` routes.
-- **optimize**: Thin train UX — `TrainConfig` + `train_and_report` / `run_train`
-  / `run_training` package stack load, metrics, PromptFitterBridge, evaluate,
-  and HolySheet fit reports so project `train.py` scripts stay declarative.
-  First-class data knobs: `augment`, `n_examples` / `nr_examples`, `persist`,
-  plus `load_data()` / `prepare_dataset()`. Scaffold `train.py` matches.
-- **optimize**: Thin eval UX — `EvalConfig` + `evaluate_and_report` / `run_eval`
-  mirror train (split selection, judge metrics, `prefer_augmented`, HolySheet
-  `generate_eval_report`). Scaffold `eval.py` matches.
-- **optimize**: Train print helpers — `print_train_result(result)` /
-  `TrainResult.print_summary()` for Rich summaries from thin scripts.
-- **optimize**: Optional DB retrain audit via `TrainConfig.persist_fit_store` /
-  `fit_store_url` → `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL`
-  (`OptimizationRunStore` + `fit_store`).
-- **optimize**: HolySheet fit/eval dashboards (score/loss curves, Keras epoch
-  tables, trial history, prompt diffs, judge motivations, early-stop reason,
-  dataset sizes, optimizer). Fallback HTML when HolySheet is absent.
-- **optimize**: Production-ready PromptFitter with epoch learnings, always-on
-  generalization holdout, sequential/default concurrency=1, post-fit drain,
-  richer SLM judge motivation, and `apply()` guards that refuse zero-improvement
-  / overfit prompts (force=True to override). Auditable `prompt_history` +
-  `retrain_history.jsonl` / optional DB `OptimizationRunStore`.
-- **studio**: Schema-driven invoke forms (SchemaForm) from agent input/output
-  JSON schemas — LangGraph-Studio-like debugging of required fields.
-- **logs**: Durable multi-backend `logs_history` / `allow_logsllm_analysis`
-  (+ env) persist full resource I/O via `SQLAlchemyStore`
-  (`AGENTOMATIC_DB_URL` / `DATABASE_URL` / stack `database.url`) and expose
-  cross-resource `/api/v1/logs` + `/logs/analyze` (agents/plugins/pipelines/
-  ingestion/endpoints as of 1.8.9). MemoryStore is not eagerly installed when
-  logs_history is on (so DB auto-derive is not preempted).
+- **logs**: Durable multi-backend logs history and train print helpers
+  ([`1d4720b`](https://github.com/UnicoLab/agentomatic/commit/1d4720b2d6898bc53a06e7ca941489fd058a1349))
 
-### Bug Fixes
+Persist invocation logs and retrain artefacts via SQLAlchemyStore for any configured DB URL
+  (Postgres/SQLite/…); stop MemoryStore from preempting auto-derive. Add print_train_result /
+  TrainResult.print_summary and TrainConfig.persist_fit_store for auditable offline fits.
 
-- **optimize**: HolySheet train/eval reports no longer render empty section cards.
-  Content is nested in `Section`/`Tabs`/`Accordion` children; run config,
-  deployment recommendations, Keras curves, held-out scores, full prompts, and
-  judge rationales are wired from `TrainResult` / `EvaluationReport`.
-  `OptimizeMetricAdapter` stashes `last_result` and `agent.evaluate` attaches
-  per-metric metadata for rationale panels.
+Co-authored-by: Cursor <cursoragent@cursor.com>
 
-### Bug Fixes
+- **logs**: Extend logs_history to plugins, pipelines, ingestion, endpoints
+  ([`d5dc4f7`](https://github.com/UnicoLab/agentomatic/commit/d5dc4f7feebf6d0f3a2025464dad77b01031ff51))
 
-- **platform**: Sync fit/evaluate paths no longer use `asyncio.run` (which
-  closes the loop and kills LangChain OpenAI async HTTP clients). New
-  `agentomatic.async_utils.run_sync` keeps a thread-local persistent loop so
-  post-fit `agent.evaluate()` / epoch metrics stop failing with
-  `APIConnectionError: Connection error`.
-- **optimize**: Boolean-flag `expected_output` now expands to a quality contract
-  (not useless `Response must include: 'key'`). Judge temperature defaults to
-  0.0 for stable scoring across epochs.
-- **optimize**: `LLMJudgeMetric` / `GEvalMetric` fallbacks now use
-  `temperature=0.0` (was `0.1`). Fit evaluation injects `model_params` with
-  default `temperature=0.0` into agent invokes for deterministic scoring.
-- **optimize**: Always-on holdout works on tiny valsets (`min_size=1`) and
-  borrows from train when val has fewer than 2 points. PromptFitterBridge
-  includes `test`-split examples in the val pool for holdout coverage.
+Persist full I/O across resource types with cross-resource REST (/api/v1/logs) while keeping
+  per-agent routes; also record in-process pipeline steps. Bump to 1.8.9.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Add evaluate_and_report API with HolySheet eval reports
+  ([`d1ab06c`](https://github.com/UnicoLab/agentomatic/commit/d1ab06c9c65b1d79efe7476ae3019f146e0e7a18))
+
+Package stack/metrics/judge/split selection into EvalConfig so project eval.py scripts stay thin
+  like train_and_report. Fix OptimizeMetricAdapter to prefer question + snapshot context for judges.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Add train_and_report API with HolySheet fit dashboards
+  ([`62459f4`](https://github.com/UnicoLab/agentomatic/commit/62459f40d33c98e2b0c90d5c08a1621a746c5e63))
+
+Package Keras-style fit plumbing into TrainConfig/run_train so agent train scripts stay thin. Add
+  non-saturating structured fit metrics, HolySheet interactive fit reports (score curves, epoch
+  tables, prompt history, trials), and scaffold train.py to match. Cover all fitter optimizers plus
+  judge wiring in a matrix test.
+
+- **optimize**: Add TrainCliSettings/EvalCliSettings for flat train/eval scripts
+  ([`b5451d7`](https://github.com/UnicoLab/agentomatic/commit/b5451d78a03e7eed346b82c08762657ad460cfd6))
+
+Replace argparse walls with pydantic-settings (AGENTOMATIC_* env + kebab CLI), print_eval_result,
+  and scaffold/docs updates. Bump to 1.8.10.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+- **optimize**: Expose staged Keras-like compile/fit/evaluate API
+  ([`e83c667`](https://github.com/UnicoLab/agentomatic/commit/e83c667909e589deeca8719b8b5240055dce2e3c))
+
+Add compile_agent/fit_agent/evaluate_agent on shared primitives with train_and_report as the thin
+  one-shot path; document and test both tiers.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+### Refactoring
+
+- Improving optimizer
+  ([`d9b73f8`](https://github.com/UnicoLab/agentomatic/commit/d9b73f8e2761bd73da7d64f641f378d3b70664ce))
 
 
 ## v1.8.2 (2026-07-22)
