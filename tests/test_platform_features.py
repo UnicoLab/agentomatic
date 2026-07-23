@@ -368,12 +368,22 @@ async def test_agentomatic_checkpointer_db():
 
 def test_failover_fallback_llm():
     """Verify that get_llm supports fallbacks parameters and chains them."""
-    from agentomatic.providers.llm import get_llm
+    from agentomatic.providers.fallback import FallbackLLM
+    from agentomatic.providers.llm import get_llm, reset_llm
 
-    # We pass 'dummy' as primary, and another model list as fallbacks
-    llm = get_llm(provider="dummy", fallbacks=["dummy"])
-    # It should have a fallback list (which uses ChatOpenAI/etc. or fallbacks RunnableWithFallbacks)
-    assert hasattr(llm, "fallbacks") or llm.__class__.__name__ == "RunnableWithFallbacks"
+    reset_llm()
+
+    # Distinct primary/fallback endpoints — duplicate provider+model is deduped.
+    llm = get_llm(
+        provider="dummy",
+        model="primary",
+        fallbacks=[{"provider": "dummy", "model": "backup"}],
+    )
+    assert isinstance(llm, FallbackLLM)
+    assert hasattr(llm, "fallbacks")
+    assert len(llm.fallbacks) == 1
+
+    reset_llm()
 
 
 # =========================================================================
@@ -878,8 +888,12 @@ def test_failover_chain_configuration():
 
     reset_llm()
 
-    # Build chain with dummy primary and dummy fallback
-    llm = get_llm(provider="dummy", fallbacks=["dummy"])
+    # Build chain with distinct dummy primary and fallback models
+    llm = get_llm(
+        provider="dummy",
+        model="primary",
+        fallbacks=[{"provider": "dummy", "model": "backup"}],
+    )
 
     assert isinstance(llm, FallbackLLM)
     assert llm.__class__.__name__ in {"FallbackLLM", "RunnableWithFallbacks"}

@@ -148,11 +148,7 @@ def structured_composite_score(
     penalty = 0.3 * coverage(forbid, text) if forbid else 0.0
 
     score = (
-        0.20 * schema
-        + 0.35 * content_score
-        + 0.25 * include_score
-        + 0.20 * next_score
-        - penalty
+        0.20 * schema + 0.35 * content_score + 0.25 * include_score + 0.20 * next_score - penalty
     )
     if query and pred_content:
         q_terms = [w for w in query.lower().split() if len(w) > 3][:6]

@@ -89,9 +89,7 @@ def _mount_ingestor(
                 )
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         duration = (time.perf_counter() - t0) * 1000
-        logger.debug(
-            f"Ingestor '{_ingestor.ingestor_name}' ran in {duration:.1f}ms"
-        )
+        logger.debug(f"Ingestor '{_ingestor.ingestor_name}' ran in {duration:.1f}ms")
         if log_recorder is not None:
             from agentomatic.logs.helpers import record_invocation
 

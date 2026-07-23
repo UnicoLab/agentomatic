@@ -49,12 +49,15 @@ def is_empty_llm_response(result: Any) -> bool:
     """
     from agentomatic.providers.message_utils import message_text
 
+    text: str
     try:
         text = message_text(result)
     except Exception:  # noqa: BLE001
-        text = getattr(result, "content", None)
-        if text is None:
+        content = getattr(result, "content", None)
+        if content is None:
             text = str(result) if result is not None else ""
+        else:
+            text = str(content)
     return not str(text or "").strip()
 
 

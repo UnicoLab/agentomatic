@@ -653,9 +653,7 @@ def run(
         # Map AGENTOMATIC_ENABLE_METRICS so /metrics works under `run` too.
         "enable_metrics": _env_bool("AGENTOMATIC_ENABLE_METRICS", True),
         "logs_history": _env_bool("AGENTOMATIC_LOGS_HISTORY", False),
-        "allow_logsllm_analysis": _env_bool(
-            "AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False
-        ),
+        "allow_logsllm_analysis": _env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),
     }
     if require_auth_globally:
         # Auto-enable the zero-trust enforcer so the flag actually has effect.

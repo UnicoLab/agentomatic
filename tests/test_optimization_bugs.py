@@ -717,7 +717,10 @@ class TestBug5OptimizeMetricAdapter:
         ex = self._make_example(expected=exp)
         adapter.score(ex, {"response": "r"})
         assert received_expected[0] is not None
-        assert json.loads(received_expected[0]) == exp
+        # OptimizeMetricAdapter uses to_datapoint() rich expected for judge alignment.
+        assert "42" in received_expected[0]
+        assert '"type": "numeric"' in received_expected[0]
+        assert "## Expected structured output" in received_expected[0]
 
     def test_expected_output_none_passed_as_none(self):
         received_expected: list[Any] = []

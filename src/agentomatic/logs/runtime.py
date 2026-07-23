@@ -57,7 +57,6 @@ def normalize_resource_type(resource_type: str | None) -> str:
     value = (resource_type or "agent").strip().lower()
     if value not in RESOURCE_TYPES:
         raise ValueError(
-            f"Invalid resource_type {resource_type!r}; "
-            f"expected one of {sorted(RESOURCE_TYPES)}"
+            f"Invalid resource_type {resource_type!r}; expected one of {sorted(RESOURCE_TYPES)}"
         )
     return value

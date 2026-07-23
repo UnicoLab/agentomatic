@@ -281,9 +281,9 @@ def record_llm_call(
             LLM_GENERATION.labels(provider=provider, model=model, profile=profile).observe(gen)
 
     if prompt_tokens:
-        LLM_TOKENS.labels(
-            direction="prompt", provider=provider, model=model, profile=profile
-        ).inc(prompt_tokens)
+        LLM_TOKENS.labels(direction="prompt", provider=provider, model=model, profile=profile).inc(
+            prompt_tokens
+        )
     if completion_tokens:
         LLM_TOKENS.labels(
             direction="completion", provider=provider, model=model, profile=profile
@@ -315,9 +315,7 @@ def record_structure_error(
     """Record a structured-output / JSON schema parse failure (model-fit signal)."""
     if llm is not None:
         provider, model, profile, _host = llm_identity(llm)
-    LLM_STRUCTURE_ERRORS.labels(
-        provider=provider, model=model, profile=profile, agent=agent
-    ).inc()
+    LLM_STRUCTURE_ERRORS.labels(provider=provider, model=model, profile=profile, agent=agent).inc()
 
 
 @asynccontextmanager

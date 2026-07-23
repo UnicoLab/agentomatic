@@ -804,9 +804,7 @@ async def invoke_with_retry(
                             normalized = SimpleNamespace(
                                 content=getattr(normalized, "content", ""),
                                 additional_kwargs=additional,
-                                response_metadata=getattr(
-                                    normalized, "response_metadata", {}
-                                ),
+                                response_metadata=getattr(normalized, "response_metadata", {}),
                                 raw=result,
                             )
                     else:

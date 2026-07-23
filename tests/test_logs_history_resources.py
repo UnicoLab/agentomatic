@@ -184,9 +184,7 @@ class TestPipelineLogs:
             assert result.status == PipelineStatus.SUCCESS
 
             step_logs = [
-                e
-                for e in store._invocation_logs.values()
-                if e.get("endpoint") == "pipeline_step"
+                e for e in store._invocation_logs.values() if e.get("endpoint") == "pipeline_step"
             ]
             assert len(step_logs) >= 1
             assert step_logs[0]["resource_type"] == "agent"
@@ -200,10 +198,7 @@ class TestPipelineLogs:
         pipes_dir = tmp_path / "pipelines"
         pipes_dir.mkdir()
         (pipes_dir / "simple_pipe.yaml").write_text(
-            "name: simple_pipe\n"
-            "steps:\n"
-            "  - name: plan\n"
-            "    agent: echo\n"
+            "name: simple_pipe\nsteps:\n  - name: plan\n    agent: echo\n"
         )
         platform = _platform(tmp_path)
         with TestClient(platform.build()) as client:
@@ -242,9 +237,7 @@ class TestPipelineLogs:
             assert analysis["resource_name"] == "sentiment"
             assert analysis["status"] in {"healthy", "degraded", "failing", "unknown"}
 
-            latest = client.get(
-                "/api/v1/logs/analysis?resource=plugin&name=sentiment"
-            )
+            latest = client.get("/api/v1/logs/analysis?resource=plugin&name=sentiment")
             assert latest.status_code == 200
             assert latest.json()["analysis"]["id"] == analysis["id"]
 

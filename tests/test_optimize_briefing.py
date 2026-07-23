@@ -203,7 +203,7 @@ async def test_rewrite_optimizer_uses_multipass_for_omlx() -> None:
             current_config=cfg,
             eval_results=results,
             dataset_sample=[{"query": "q", "expected_answer": "yes"}],
-            search_space=PromptSearchSpace(),
+            search_space=PromptSearchSpace(optimize_few_shot=False),
             iteration=1,
         )
 

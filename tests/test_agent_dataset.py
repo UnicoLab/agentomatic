@@ -96,7 +96,10 @@ class TestAgentExampleDatapointBridge:
         )
         dp = ex.to_datapoint()
         assert dp.query == "What is AI?"
-        assert dp.expected_answer == "Artificial Intelligence"
+        # Rich judge reference includes answer text plus structured JSON block.
+        assert dp.expected_answer is not None
+        assert "Artificial Intelligence" in dp.expected_answer
+        assert "## Expected answer" in dp.expected_answer
 
     def test_to_datapoint_request_fallback(self):
         """to_datapoint() should fallback to 'request' key."""

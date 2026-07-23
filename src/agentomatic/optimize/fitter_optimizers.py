@@ -319,7 +319,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
                 f"current={context.current_score:.3f}."
             )
 
-        base_kwargs = {
+        base_kwargs: dict[str, Any] = {
             "user_template": current_config.user_template,
             "output_contract": current_config.output_contract,
             "model_params": dict(current_config.model_params),
@@ -404,8 +404,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
                     ),
                     source="expected_tips",
                     mutation_notes=(
-                        f"Appended expected-grounding tips from dataset at "
-                        f"iteration {iteration}."
+                        f"Appended expected-grounding tips from dataset at iteration {iteration}."
                     ),
                 )
             )
@@ -470,9 +469,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
                 or ""
             ).strip()
             expected = (
-                row.get("expected_answer")
-                or row.get("expected")
-                or row.get("expected_output")
+                row.get("expected_answer") or row.get("expected") or row.get("expected_output")
             )
             demo = cls._expected_as_demo_response(expected)
             if not q or not demo:
@@ -495,9 +492,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
             if not isinstance(src, dict):
                 continue
             expected = (
-                src.get("expected_answer")
-                or src.get("expected")
-                or src.get("expected_output")
+                src.get("expected_answer") or src.get("expected") or src.get("expected_output")
             )
             exp_dict: dict[str, Any] = {}
             if isinstance(expected, dict):
@@ -529,9 +524,7 @@ class RewriteOptimizer(BaseFitterOptimizer):
             "or stakeholders.\n"
             "- Always return non-empty JSON keys `content` and `next_action`.\n"
             "- Prefer concrete next actions (≥4 words) tied to unknowns/status.\n"
-            "- When relevant, include these anchors naturally: "
-            + ", ".join(must_terms[:10])
-            + "."
+            "- When relevant, include these anchors naturally: " + ", ".join(must_terms[:10]) + "."
         )
         base = (system_prompt or "").rstrip()
         if "## Fit tips" in base:
