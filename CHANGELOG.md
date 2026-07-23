@@ -1,31 +1,19 @@
 # CHANGELOG
 
 
-## Unreleased
+## v1.10.0 (2026-07-23)
 
 ### Features
 
-- **artifacts**: First-class `ArtifactRegistry` for versioned blue/green
-  plugin/model bundles (`promote` / `rollback` / `current_dir`). Env:
-  `AGENTOMATIC_ARTIFACT_ROOT`. `BaseMLPlugin.artifact_dir()` helper + docs
-  promote→reload flow.
-- **tasks**: ContextVar progress bridge — `report_stage` /
-  `report_stage_sync` from nested graph/pipeline code without plumbing
-  `TaskContext`. Auto-installed when the platform builds its task manager.
-- **providers**: Public `extract_json` / `repair_json` /
-  `extract_json_object` / `loads_repaired` for small-LLM structured output;
-  optimize path reuses the same helper.
-- **agents**: Lightweight `detect_language` / `resolve_language` /
-  `output_directive` helpers.
-- **connections**: Built-in `local_npz` vector provider + `TextEncoder`
-  with hash fallback (optional `agentomatic[vector]` / numpy). Zero-infra
-  local RAG for demos and tests.
-- **ingestion**: Text helpers (`normalize_markdown`, `extract_sections`,
-  `chunk_text`, `quality_score`, `ingest_text`) and `MARKITDOWN_*` format
-  constants; builtin MarkdownIngestor accepts `engine="markitdown"`.
-- **observability**: Optional JSONL op-audit sink via
-  `AGENTOMATIC_AUDIT_LOG` (`configure_audit_logging` / `emit_audit_event`).
-  Distinct from security zero-trust audit.
+- Migrate generic ai_core batteries into Agentomatic
+  ([`15ce8ef`](https://github.com/UnicoLab/agentomatic/commit/15ce8efd71c8da729c20f24b8bab9bbfce141db3))
+
+Add ArtifactRegistry, task-progress ContextVar bridge, JSON repair, local_npz + TextEncoder,
+  ingestion text helpers, op-audit sink, and language helpers so projects no longer need a parallel
+  domain library for plugin persistence and common RAG/ops plumbing. Keep estimation and Cosmos out
+  of core (reference under examples/scooper-ai-core).
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
 
 
 ## v1.9.0 (2026-07-23)
