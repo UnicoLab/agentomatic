@@ -2961,6 +2961,42 @@
 <td><code>*</code></td>
 <td>Comma-separated origins</td>
 </tr>
+<tr>
+<td><code>AGENTOMATIC_ARTIFACT_ROOT</code></td>
+<td><code>artifact_root</code></td>
+<td><code>.local/artifacts</code></td>
+<td>Versioned plugin/model artifact bundles</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_RUNS_ROOT</code></td>
+<td><code>runs_root</code></td>
+<td><code>.local/runs</code></td>
+<td>Scratch directory for pipeline/task outputs</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_AUDIT_LOG</code></td>
+<td><code>audit_log</code></td>
+<td><code>""</code> (disabled)</td>
+<td>JSONL op-audit sink path (non-PII metadata only)</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_CHUNK_SIZE_TOKENS</code></td>
+<td><code>chunk_size_tokens</code></td>
+<td><code>1200</code></td>
+<td>Default ingestion chunk size</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_CHUNK_OVERLAP_TOKENS</code></td>
+<td><code>chunk_overlap_tokens</code></td>
+<td><code>150</code></td>
+<td>Default ingestion chunk overlap</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_MIN_QUALITY_SCORE</code></td>
+<td><code>min_quality_score</code></td>
+<td><code>0.70</code></td>
+<td>Ingestion quality warning threshold</td>
+</tr>
 </tbody>
 </table>
 <h3 id="platformsettings-nested-variables"><code>PlatformSettings</code> Nested Variables<a class="headerlink" href="#platformsettings-nested-variables" title="Permanent link">&para;</a></h3>

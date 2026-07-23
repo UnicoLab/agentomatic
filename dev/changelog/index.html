@@ -2130,6 +2130,34 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#190-2026-07-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [1.9.0] - 2026-07-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[1.9.0] - 2026-07-23">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
           <li class="md-nav__item">
   <a href="#fixed" class="md-nav__link">
     <span class="md-ellipsis">
@@ -2159,7 +2187,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2276,7 +2304,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2315,7 +2343,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_3" class="md-nav__link">
+  <a href="#added_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2354,7 +2382,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_4" class="md-nav__link">
+  <a href="#added_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2426,6 +2454,34 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#190-2026-07-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [1.9.0] - 2026-07-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[1.9.0] - 2026-07-23">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
           <li class="md-nav__item">
   <a href="#fixed" class="md-nav__link">
     <span class="md-ellipsis">
@@ -2455,7 +2511,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2572,7 +2628,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2611,7 +2667,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_3" class="md-nav__link">
+  <a href="#added_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2650,7 +2706,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_4" class="md-nav__link">
+  <a href="#added_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2698,9 +2754,21 @@
 This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</p>
 <hr />
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
-<p>Docs and scaffolds track shipped <strong>1.8.3–1.8.10</strong> train/eval/logs APIs.
-Install from git / an editable checkout until PyPI catches up.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Generic <code>ai_core</code> batteries migrated into Agentomatic</strong>:
+  <code>ArtifactRegistry</code> (blue/green promote/rollback), task-progress
+  <code>report_stage</code> ContextVar bridge, public <code>extract_json</code> /
+  <code>repair_json</code>, <code>local_npz</code> + <code>TextEncoder</code>, ingestion text helpers +
+  MarkItDown formats, optional JSONL op-audit (<code>AGENTOMATIC_AUDIT_LOG</code>),
+  and language helpers. Domain estimation / Cosmos stay out of core
+  (reference copy under <code>examples/scooper-ai-core/</code>).</li>
+</ul>
+<h2 id="190-2026-07-23">[1.9.0] - 2026-07-23<a class="headerlink" href="#190-2026-07-23" title="Permanent link">&para;</a></h2>
+<p>See root <a href="https://github.com/UnicoLab/agentomatic/blob/main/CHANGELOG.md"><code>CHANGELOG.md</code></a>
+for the full semantic-release notes (optimizer bugfixes, train/eval UX,
+multi-resource logs, HolySheet reports).</p>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>TrainCliSettings</code> / <code>EvalCliSettings</code></strong> (1.8.10): Pydantic settings
   (env <code>AGENTOMATIC_*</code> + kebab-case CLI) with <code>.parse()</code> /
@@ -2819,7 +2887,7 @@ Install from git / an editable checkout until PyPI catches up.</p>
 <p>Minor release: deployment ergonomics and coding-agent enablement. Builds on the
 1.2.x production-readiness fixes (which ship together in this release). No
 breaking API changes.</p>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Fully-featured, env-driven scaffolded <code>main.py</code></strong>: the project <code>main.py</code>
   builds a module-level <code>app</code> that is feature-identical to <code>agentomatic run</code>
@@ -3203,7 +3271,7 @@ and the wiring fixes below.</p>
 </ul>
 <hr />
 <h2 id="030-2026-06-18"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.3.0">0.3.0</a> - 2026-06-18<a class="headerlink" href="#030-2026-06-18" title="Permanent link">&para;</a></h2>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Agentomatic Studio</strong> — Built-in visual debugging environment</li>
 <li>Real-time graph visualization for any agent framework</li>
@@ -3267,7 +3335,7 @@ and the wiring fixes below.</p>
 </ul>
 <hr />
 <h2 id="020-2026-06-14"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.2.0">0.2.0</a> - 2026-06-14<a class="headerlink" href="#020-2026-06-14" title="Permanent link">&para;</a></h2>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Universal Studio Adapter Architecture</strong></li>
 <li>Pluggable adapter system for any agent framework</li>
@@ -3297,7 +3365,7 @@ and the wiring fixes below.</p>
 </ul>
 <hr />
 <h2 id="010-2026-06-12"><a href="https://github.com/UnicoLab/agentomatic/releases/tag/v0.1.0">0.1.0</a> - 2026-06-12<a class="headerlink" href="#010-2026-06-12" title="Permanent link">&para;</a></h2>
-<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Core Framework</strong></li>
 <li><code>AgentPlatform</code> class for zero-code multi-agent API creation</li>
