@@ -1159,11 +1159,14 @@ agents/my_agent/
             return state.output
     ```
 
-??? example "Generated `train.py` / `eval.py` (flat settings APIs)"
+??? example "Generated `train.py` / `eval.py` (flat + staged)"
 
-    Class scaffolds emit flat scripts:
+    Class scaffolds emit flat scripts (full abstraction):
     `TrainCliSettings` / `EvalCliSettings` →
-    [`train_and_report`](optimization.md) / [`evaluate_and_report`](optimization.md):
+    [`train_and_report`](optimization.md) / [`evaluate_and_report`](optimization.md).
+    `train.py` also includes a **commented staged** path
+    (`compile_agent` → `fit_agent` → `evaluate_agent`) for full control —
+    same primitives under the hood.
 
     ```python
     from agentomatic.optimize import (
@@ -1172,7 +1175,7 @@ agents/my_agent/
     )
     from agents.my_agent.agent import MyAgentAgent
 
-    # Fit
+    # Fit (one-shot)
     train_cli = TrainCliSettings.parse(["--augment", "--n-examples", "40", "--persist"])
     result = train_and_report(
         agent,
@@ -1201,8 +1204,8 @@ agents/my_agent/
     print_eval_result(ev, agent_name="my_agent")
     ```
 
-    For lower-level `compile` → `fit` → `evaluate` control, see
-    [Prompt Fitting](optimization.md#prompt-fitting-deployment-first-optimization).
+    For the staged Keras-like API and hand-wired `PromptFitterBridge`, see
+    [Prompt Optimization](optimization.md#staged-keras-fit).
 
 ??? example "Generated `dataset.jsonl`"
 

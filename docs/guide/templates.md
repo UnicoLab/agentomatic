@@ -523,10 +523,13 @@ agents/analyzer/
     {"id": "analyzer_003", "split": "test", "input": {"request": "Analyze the risks"}, "expected_output": {"response": "Risks identified: ..."}, "metadata": {"domain": "general", "difficulty": "hard"}}
     ```
 
-??? example "Generated `train.py` (flat `TrainCliSettings`)"
+??? example "Generated `train.py` (flat `TrainCliSettings` + staged comment)"
 
     Scaffolded class agents use a flat script: settings → agent →
-    [`train_and_report`](optimization.md). Key surface:
+    [`train_and_report`](optimization.md) (full abstraction). The same file
+    includes a **commented staged Keras-like** example
+    (`load_data` → `build_default_metrics` → `compile_agent` → `fit_agent` →
+    `evaluate_agent`) for full control — both tiers share the same primitives.
 
     ```python
     from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
@@ -548,8 +551,8 @@ agents/analyzer/
     ```
 
     Matching `eval.py` uses `EvalCliSettings` → `evaluate_and_report` →
-    `print_eval_result`. See [Prompt Optimization](optimization.md) for the
-    full knob table.
+    `print_eval_result`. See [Prompt Optimization](optimization.md) for both
+    tiers and the full knob table.
 
 !!! info "No LangGraph Required"
     Class agents use the built-in `AgentGraph` runtime. Wire your graph in `build_graph()` using `new_graph()` — no need for `langgraph` or `StateGraph`.

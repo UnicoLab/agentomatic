@@ -154,8 +154,14 @@ from agentomatic.optimize.synthesizer import (
     red_team,
 )
 from agentomatic.optimize.train_api import (
+    CompiledAgent,
     TrainConfig,
     TrainResult,
+    build_default_metrics,
+    compile_agent,
+    default_search_space,
+    evaluate_agent,
+    fit_agent,
     load_data,
     prepare_dataset,
     print_train_result,
@@ -209,15 +215,21 @@ __all__ = [
     # Reports
     "generate_html_report",
     "generate_eval_report",
-    # High-level train API (thin train.py scripts)
+    # High-level train API (thin train.py scripts + staged Keras-like)
     "TrainConfig",
     "TrainResult",
+    "CompiledAgent",
     "run_train",
     "run_training",
     "train_and_report",
     "print_train_result",
     "load_data",
     "prepare_dataset",
+    "build_default_metrics",
+    "default_search_space",
+    "compile_agent",
+    "fit_agent",
+    "evaluate_agent",
     "make_structured_fit_metric",
     "structured_composite_score",
     # High-level eval API (thin eval.py scripts)
