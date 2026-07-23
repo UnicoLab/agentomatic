@@ -9,9 +9,23 @@ client) — and Agentomatic packages it as a first-class, deployable resource.
 !!! tip "Philosophy"
     Agentomatic provides the **packaging**: discovery, REST endpoints,
     task/queue execution with live progress and cancellation, health/status
-    integration, and deployment. It does **not** ship its own PDF parsers,
-    chunkers, or vector adapters — you reuse the best existing library for the
-    job.
+    integration, and deployment. You still bring the parser / embedder /
+    vector DB you prefer. Optional batteries — ``ingest_text`` /
+    ``normalize_markdown`` / ``chunk_text`` / ``quality_score`` and the
+    ``MARKITDOWN_*`` format constants — live under ``agentomatic.ingestion``
+    so you do not re-write the same helpers in every project.
+
+### Text helpers (batteries)
+
+```python
+from agentomatic.ingestion import ingest_text, MARKITDOWN_ACCEPT_ATTR
+
+result = ingest_text(path_or_markdown, is_path=True)
+# result.sections, result.chunks, result.quality_score, result.warnings
+```
+
+The builtin ``MarkdownIngestor`` also accepts ``engine="markitdown"`` (soft
+import) alongside ``pymupdf4llm`` / ``docling`` / ``plain``.
 
 ## What you get
 

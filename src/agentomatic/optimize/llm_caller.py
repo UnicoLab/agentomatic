@@ -49,9 +49,6 @@ _DEFAULT_OMLX_BASE_URL = "http://127.0.0.1:8000/v1"
 _SUPPORTED_PROVIDERS = ("ollama", "openai", "litellm", "omlx", "gemini")
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
-# Regex for stripping markdown code fences (```json ... ``` or ``` ... ```)
-_CODE_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)```", re.DOTALL)
-
 
 # =====================================================================
 # Helpers
@@ -87,25 +84,16 @@ def parse_model_spec(model: str) -> tuple[str, str]:
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Best-effort JSON object extraction from free-form LLM text.
 
-    Strategy:
-    1. Strip markdown code fences.
-    2. Locate the first ``{`` and the **last** ``}`` and try to parse
-       the substring between them.
-    3. Raise :exc:`ValueError` if nothing works.
+    Delegates to :func:`agentomatic.providers.jsonutil.extract_json_object`
+    (fence strip, thinking strip, trailing-comma repair). Raises
+    :exc:`ValueError` when nothing parses — matching the previous contract.
     """
-    # 1. Try stripping code fences first
-    fence_match = _CODE_FENCE_RE.search(text)
-    if fence_match:
-        text = fence_match.group(1).strip()
+    from agentomatic.providers.jsonutil import extract_json_object
 
-    # 2. Find first '{' … last '}'
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
+    result = extract_json_object(text)
+    if result is None:
         raise ValueError("No JSON object delimiters found in response")
-
-    candidate = text[start : end + 1]
-    return json.loads(candidate)  # type: ignore[no-any-return]
+    return result
 
 
 # =====================================================================

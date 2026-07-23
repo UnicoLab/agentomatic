@@ -180,6 +180,20 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_TITLE` | Platform title |
 | `AGENTOMATIC_STACK` | Active stack name |
 | `AGENTOMATIC_AGENTS` | Comma-separated allow-list scoping agent discovery |
+| `AGENTOMATIC_ARTIFACT_ROOT` | Versioned plugin/model artifact bundles (default `.local/artifacts`) |
+| `AGENTOMATIC_AUDIT_LOG` | Optional JSONL op-audit path (empty = disabled) |
+
+## Batteries included (prefer framework helpers)
+
+- **Artifacts**: `from agentomatic import ArtifactRegistry` — blue/green
+  promote/rollback for plugin weights; then `POST /api/v1/plugins/reload`.
+- **Task progress**: `from agentomatic.tasks import report_stage` inside nested
+  graph/pipeline code (ContextVar bridge; no-op outside a task).
+- **JSON repair**: `from agentomatic.providers import extract_json_object`.
+- **Local RAG**: `provider="local_npz"` on `VectorConnectionConfig`
+  (needs `agentomatic[vector]` / numpy); `TextEncoder` hash-falls back offline.
+- **Ingestion text**: `from agentomatic.ingestion import ingest_text, chunk_text`.
+- **Language**: `from agentomatic.agents import detect_language, output_directive`.
 
 ## Security defaults (safe by default)
 
@@ -206,6 +220,7 @@ platform.register_store_provider("my_store", my_store_factory)
 ```
 
 Do **not** add first-party Cosmos (or other vendor) connectors to the framework.
+A zero-infra local store is built-in as ``local_npz`` (not a vendor SDK).
 
 ### Custom DB & vector-store connections
 

@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from agentomatic.connections.custom import CustomConnection
 from agentomatic.connections.database import DatabaseConnection
+from agentomatic.connections.encoder import TextEncoder, hash_embed
 from agentomatic.connections.http import HttpConnection
+from agentomatic.connections.local_npz import (
+    EmbeddingStore,
+    LocalNpzVectorStore,
+    register_local_npz_backends,
+)
 from agentomatic.connections.manager import (
     PLATFORM_SCOPE,
     ConnectionManager,
@@ -52,17 +58,22 @@ __all__ = [
     "CustomConnectionConfig",
     "DatabaseConnection",
     "DatabaseConnectionConfig",
+    "EmbeddingStore",
     "HttpConnection",
     "HttpConnectionConfig",
+    "LocalNpzVectorStore",
+    "TextEncoder",
     "VectorConnection",
     "VectorConnectionConfig",
     "VectorStore",
     "all_managers",
     "create_store_from_connection",
     "get_connections",
+    "hash_embed",
     "initialize_connections",
     "register_connection_type",
     "register_connections",
+    "register_local_npz_backends",
     "register_store_provider",
     "register_vector_provider",
     "register_vector_store_adapter",

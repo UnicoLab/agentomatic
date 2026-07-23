@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typing
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -90,6 +91,16 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         """
         self._is_loaded = True
         self._loaded_at = datetime.now(UTC).isoformat()
+
+    def artifact_dir(self) -> Path | None:
+        """Return the active artifact bundle directory, or ``None``.
+
+        Convenience for ``load_model`` implementations that read weights from
+        :class:`~agentomatic.artifacts.ArtifactRegistry.current_dir`.
+        """
+        from agentomatic.artifacts import ArtifactRegistry
+
+        return ArtifactRegistry().current_dir()
 
     async def reload_model(self) -> dict[str, Any]:
         """Reload model weights from the current artifact pointer.

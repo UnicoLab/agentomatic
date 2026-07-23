@@ -55,7 +55,8 @@ telemetry = [
 dotenv = ["python-dotenv>=1.0"]
 security = ["pyjwt[crypto]>=2.8", "cryptography>=42.0"]
 swarm = ["langgraph-swarm>=0.1"]
-all = ["agentomatic[langgraph,ollama,metrics,db,cli,studio,optimize,telemetry,dotenv,security,swarm]"]
+vector = ["numpy>=1.26"]
+all = ["agentomatic[langgraph,ollama,metrics,db,cli,studio,optimize,telemetry,dotenv,security,swarm,vector]"]
 docs = [
     "mkdocs-material>=9.5",
     "mike>=2.1",

@@ -10,7 +10,7 @@ resolution-markers = [
 
 [[package]]
 name = "agentomatic"
-version = "1.8.11"
+version = "1.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -35,6 +35,7 @@ all = [
     { name = "langchain-ollama" },
     { name = "langgraph" },
     { name = "langgraph-swarm" },
+    { name = "numpy" },
     { name = "ollama" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -121,6 +122,9 @@ telemetry = [
 ui = [
     { name = "chainlit" },
 ]
+vector = [
+    { name = "numpy" },
+]
 vertex = [
     { name = "langchain-google-vertexai" },
 ]
@@ -148,7 +152,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry", "dotenv", "security", "swarm"], marker = "extra == 'all'" },
+    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry", "dotenv", "security", "swarm", "vector"], marker = "extra == 'all'" },
     { name = "aiosqlite", marker = "extra == 'db'", specifier = ">=0.20" },
     { name = "asyncpg", marker = "extra == 'db-postgres'", specifier = ">=0.30" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0" },
@@ -173,6 +177,7 @@ requires-dist = [
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
+    { name = "numpy", marker = "extra == 'vector'", specifier = ">=1.26" },
     { name = "ollama", marker = "extra == 'ollama'", specifier = ">=0.4" },
     { name = "opentelemetry-api", marker = "extra == 'telemetry'", specifier = ">=1.20" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'telemetry'", specifier = ">=0.40" },
@@ -201,7 +206,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.12" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
-provides-extras = ["langgraph", "langchain", "ollama", "openai", "azure", "vertex", "metrics", "db", "db-postgres", "cli", "ui", "studio", "optimize", "telemetry", "dotenv", "security", "swarm", "all", "docs", "dev"]
+provides-extras = ["langgraph", "langchain", "ollama", "openai", "azure", "vertex", "metrics", "db", "db-postgres", "cli", "ui", "studio", "optimize", "telemetry", "dotenv", "security", "swarm", "vector", "all", "docs", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -22,16 +22,48 @@ from __future__ import annotations
 
 from .base import BaseIngestor
 from .context import IngestionContext, NullIngestionContext
+from .formats import (
+    MARKITDOWN_ACCEPT_ATTR,
+    MARKITDOWN_EXTENSIONS,
+    MARKITDOWN_MIME_SUFFIX,
+    is_markitdown_extension,
+)
 from .models import IngestionRequest, IngestionResult
 from .registry import IngestionRegistry
 from .router import create_ingestion_router
+from .text import (
+    Chunk,
+    IngestTextResult,
+    Section,
+    chunk_text,
+    content_hash,
+    convert_to_markdown,
+    extract_sections,
+    ingest_text,
+    normalize_markdown,
+    quality_score,
+)
 
 __all__ = [
+    "MARKITDOWN_ACCEPT_ATTR",
+    "MARKITDOWN_EXTENSIONS",
+    "MARKITDOWN_MIME_SUFFIX",
     "BaseIngestor",
+    "Chunk",
+    "IngestTextResult",
     "IngestionContext",
     "IngestionRegistry",
     "IngestionRequest",
     "IngestionResult",
     "NullIngestionContext",
+    "Section",
+    "chunk_text",
+    "content_hash",
+    "convert_to_markdown",
     "create_ingestion_router",
+    "extract_sections",
+    "ingest_text",
+    "is_markitdown_extension",
+    "normalize_markdown",
+    "quality_score",
 ]

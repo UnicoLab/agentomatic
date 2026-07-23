@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- **artifacts**: First-class `ArtifactRegistry` for versioned blue/green
+  plugin/model bundles (`promote` / `rollback` / `current_dir`). Env:
+  `AGENTOMATIC_ARTIFACT_ROOT`. `BaseMLPlugin.artifact_dir()` helper + docs
+  promote→reload flow.
+- **tasks**: ContextVar progress bridge — `report_stage` /
+  `report_stage_sync` from nested graph/pipeline code without plumbing
+  `TaskContext`. Auto-installed when the platform builds its task manager.
+- **providers**: Public `extract_json` / `repair_json` /
+  `extract_json_object` / `loads_repaired` for small-LLM structured output;
+  optimize path reuses the same helper.
+- **agents**: Lightweight `detect_language` / `resolve_language` /
+  `output_directive` helpers.
+- **connections**: Built-in `local_npz` vector provider + `TextEncoder`
+  with hash fallback (optional `agentomatic[vector]` / numpy). Zero-infra
+  local RAG for demos and tests.
+- **ingestion**: Text helpers (`normalize_markdown`, `extract_sections`,
+  `chunk_text`, `quality_score`, `ingest_text`) and `MARKITDOWN_*` format
+  constants; builtin MarkdownIngestor accepts `engine="markitdown"`.
+- **observability**: Optional JSONL op-audit sink via
+  `AGENTOMATIC_AUDIT_LOG` (`configure_audit_logging` / `emit_audit_event`).
+  Distinct from security zero-trust audit.
+
+
 ## v1.9.0 (2026-07-23)
 
 ### Bug Fixes

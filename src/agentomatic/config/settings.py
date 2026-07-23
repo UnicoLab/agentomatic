@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,9 +43,15 @@ class LLMSettings(BaseModel):
 class EmbeddingSettings(BaseModel):
     """Embedding provider configuration."""
 
-    provider: str = Field("dummy", description="Embedding provider: ollama|dummy")
+    provider: str = Field(
+        "dummy",
+        description="Embedding provider: ollama|openai|hash|dummy|…",
+    )
     model: str = Field("nomic-embed-text")
     dimension: int = Field(768)
+    base_url: str = Field("", description="Optional OpenAI-compatible embed base URL")
+    api_key: str = Field("", description="Optional embedding API key")
+    enabled: bool = Field(True, description="When False, TextEncoder uses hash fallback")
 
 
 class DatabaseSettings(BaseModel):
@@ -111,12 +117,54 @@ class PlatformSettings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)  # type: ignore[arg-type]
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)  # type: ignore[arg-type]
 
+    # Batteries: artifact bundles, run scratch, audit, ingestion text knobs.
+    # Prefer AGENTOMATIC_* env aliases via Field validation_alias where noted;
+    # nested EMBEDDING__* still applies through pydantic-settings.
+    artifact_root: Path = Field(
+        default=Path(".local/artifacts"),
+        description="Root for versioned plugin/model artifact bundles",
+        validation_alias=AliasChoices("AGENTOMATIC_ARTIFACT_ROOT", "artifact_root"),
+    )
+    runs_root: Path = Field(
+        default=Path(".local/runs"),
+        description="Scratch directory for pipeline / task run outputs",
+        validation_alias=AliasChoices("AGENTOMATIC_RUNS_ROOT", "runs_root"),
+    )
+    audit_log: str = Field(
+        default="",
+        description=(
+            "Path for the JSONL op-audit sink. Empty disables the file sink "
+            "(env: AGENTOMATIC_AUDIT_LOG)."
+        ),
+        validation_alias=AliasChoices("AGENTOMATIC_AUDIT_LOG", "audit_log"),
+    )
+    chunk_size_tokens: int = Field(
+        1200,
+        ge=1,
+        description="Default ingestion chunk size (approx. tokens)",
+        validation_alias=AliasChoices("AGENTOMATIC_CHUNK_SIZE_TOKENS", "chunk_size_tokens"),
+    )
+    chunk_overlap_tokens: int = Field(
+        150,
+        ge=0,
+        description="Default ingestion chunk overlap (approx. tokens)",
+        validation_alias=AliasChoices("AGENTOMATIC_CHUNK_OVERLAP_TOKENS", "chunk_overlap_tokens"),
+    )
+    min_quality_score: float = Field(
+        0.70,
+        ge=0.0,
+        le=1.0,
+        description="Minimum ingestion quality score before a warning is emitted",
+        validation_alias=AliasChoices("AGENTOMATIC_MIN_QUALITY_SCORE", "min_quality_score"),
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="",
         env_nested_delimiter="__",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
 

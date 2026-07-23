@@ -11,6 +11,41 @@ first-class connection with correct startup/shutdown lifecycle.
     backends). You register your client against a stable, documented surface —
     so you stay in control of versions, auth, and dependencies.
 
+## Built-in: local `.npz` (zero-infra RAG)
+
+For demos, tests, and artifact bundles that need an on-disk store without
+Qdrant/Chroma, use the built-in ``local_npz`` provider
+(requires ``pip install numpy`` or ``agentomatic[vector]``):
+
+```python
+from agentomatic.connections import (
+    ConnectionPurpose,
+    TextEncoder,
+    VectorConnectionConfig,
+    get_connections,
+    initialize_connections,
+)
+
+await initialize_connections(
+    "rag_agent",
+    [
+        VectorConnectionConfig(
+            name="kb",
+            provider="local_npz",
+            url=".local/vectors/kb",  # directory for embeddings.npz + metadata.jsonl
+            purpose=ConnectionPurpose.VECTOR,
+        )
+    ],
+)
+store = await get_connections("rag_agent").vector("kb").as_store()
+await store.upsert(texts=["Agentomatic is batteries-included"], ids=["1"])
+hits = await store.query(text="batteries", k=3)
+```
+
+:class:`~agentomatic.connections.TextEncoder` overlays stack embedding
+settings when the provider is real; otherwise it falls back to a
+deterministic hash embedder so offline tests keep working.
+
 ## The 3-layer model
 
 Every custom integration follows the same three layers. Keep them separate and

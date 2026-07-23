@@ -39,6 +39,7 @@ from __future__ import annotations
 from agentomatic._version import __version__
 
 # Core public API
+from agentomatic.artifacts import ArtifactRegistry
 from agentomatic.core.manifest import AgentManifest, RegisteredAgent
 from agentomatic.core.memory_manager import ConversationMemoryManager
 from agentomatic.core.platform import AgentPlatform
@@ -128,6 +129,7 @@ __all__ = [
     # Core
     "AgentPlatform",
     "AgentManifest",
+    "ArtifactRegistry",
     "RegisteredAgent",
     "AgentRegistry",
     "BaseAgentState",

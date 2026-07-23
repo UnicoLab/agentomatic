@@ -7,8 +7,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Docs and scaffolds track shipped **1.8.3–1.8.10** train/eval/logs APIs.
-Install from git / an editable checkout until PyPI catches up.
+### Added
+
+- **Generic `ai_core` batteries migrated into Agentomatic**:
+  `ArtifactRegistry` (blue/green promote/rollback), task-progress
+  `report_stage` ContextVar bridge, public `extract_json` /
+  `repair_json`, `local_npz` + `TextEncoder`, ingestion text helpers +
+  MarkItDown formats, optional JSONL op-audit (`AGENTOMATIC_AUDIT_LOG`),
+  and language helpers. Domain estimation / Cosmos stay out of core
+  (reference copy under `examples/scooper-ai-core/`).
+
+## [1.9.0] - 2026-07-23
+
+See root [`CHANGELOG.md`](https://github.com/UnicoLab/agentomatic/blob/main/CHANGELOG.md)
+for the full semantic-release notes (optimizer bugfixes, train/eval UX,
+multi-resource logs, HolySheet reports).
 
 ### Added
 

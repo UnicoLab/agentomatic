@@ -846,6 +846,11 @@ class AgentPlatform:
                 plugins=self._plugin_registry,
             ),
         )
+        from agentomatic.tasks.progress import install_task_progress_bridge
+
+        # Bind TaskContext into a ContextVar so nested graph/pipeline code can
+        # call report_stage() without plumbing the context explicitly.
+        install_task_progress_bridge(manager)
         return manager
 
     # ------------------------------------------------------------------
@@ -939,6 +944,12 @@ class AgentPlatform:
             """Manage startup / shutdown lifecycle."""
             # --- Startup ---
             configure_logging(platform.log_level)
+            try:
+                from agentomatic.observability.audit import configure_audit_logging
+
+                configure_audit_logging()
+            except Exception as exc:  # noqa: BLE001 - audit is optional
+                logger.debug(f"configure_audit_logging skipped: {exc}")
             logger.info(f"🚀 {platform.title} starting...")
             logger.info(f"📂 Agents directory: {platform.agents_dir}")
 
