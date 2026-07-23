@@ -382,9 +382,7 @@ class PromptFitter:
         self.local_judges = local_judges or []
         self.max_trials = max_trials
         self.min_absolute_improvement = min_absolute_improvement
-        self.patience = (
-            int(patience) if patience is not None else _EARLY_STOP_PATIENCE
-        )
+        self.patience = int(patience) if patience is not None else _EARLY_STOP_PATIENCE
         # Default concurrency=1 / sequential=True: local SLMs often spawn many
         # idle worker threads when hammered concurrently. Explicit concurrency>1
         # auto-disables sequential unless sequential=True is forced.
@@ -1278,8 +1276,7 @@ class PromptFitter:
 
         if early_stop_reason is None:
             early_stop_reason = (
-                f"completed all {max_rounds} optimize round(s) "
-                f"(max_trials={self.max_trials})"
+                f"completed all {max_rounds} optimize round(s) (max_trials={self.max_trials})"
             )
 
         result = PromptFitResult(

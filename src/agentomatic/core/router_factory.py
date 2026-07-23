@@ -1519,9 +1519,7 @@ def create_default_router(
             )
         if thread_store is None:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
-        analysis = await thread_store.get_latest_log_analysis(
-            agent_name, resource_type="agent"
-        )
+        analysis = await thread_store.get_latest_log_analysis(agent_name, resource_type="agent")
         if not analysis:
             raise HTTPException(
                 404, detail={"error": f"No log analysis found for agent '{agent_name}'"}

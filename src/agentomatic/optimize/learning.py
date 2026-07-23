@@ -280,6 +280,7 @@ def synthesize_epoch_learning(
         for name, val in weak:
             if val < 0.7:
                 next_focus.append(f"Improve dimension '{name}' (currently {val:.3f}).")
+    gap: float | None = None
     if holdout_score is not None and train_score is not None:
         gap = train_score - holdout_score
         if gap > 0.1:
@@ -287,14 +288,10 @@ def synthesize_epoch_learning(
                 f"Reduce overfitting (train/holdout gap={gap:+.3f}): prefer general rules "
                 "over example-specific instructions."
             )
-    if not next_focus:
-        next_focus.append("Preserve strengths; tighten output contract and edge-case coverage.")
-
-    gap = None
-    if holdout_score is not None and train_score is not None:
-        gap = train_score - holdout_score
     elif holdout_score is not None:
         gap = score - holdout_score
+    if not next_focus:
+        next_focus.append("Preserve strengths; tighten output contract and edge-case coverage.")
 
     return EpochLearning(
         round_idx=round_idx,

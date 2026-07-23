@@ -27,10 +27,11 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from loguru import logger
 
@@ -201,7 +202,9 @@ def run_eval(
                 load_environment(candidate)
                 break
 
-    stacks_dir = Path(config.stacks_dir) if config.stacks_dir else agent_dir.parent.parent / "stacks"
+    stacks_dir = (
+        Path(config.stacks_dir) if config.stacks_dir else agent_dir.parent.parent / "stacks"
+    )
     stacks = StackManager(stacks_dir)
     stacks.load(stack_name)
     apply_stack_defaults(stacks)

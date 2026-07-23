@@ -419,9 +419,7 @@ async def test_logs_history_uses_sqlite_url_across_restart(
     try:
         rows = await store2.list_invocation_logs(agent_name="echo", limit=10)
         assert any(row["id"] == log_id for row in rows)
-        assert any(
-            (row.get("input") or {}).get("query") == "persist-me" for row in rows
-        )
+        assert any((row.get("input") or {}).get("query") == "persist-me" for row in rows)
     finally:
         await store2.close()
 

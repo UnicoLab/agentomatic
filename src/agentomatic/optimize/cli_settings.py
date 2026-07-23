@@ -109,10 +109,7 @@ class TrainCliSettings(BaseSettings):
     )
     persist_fit_store: bool = Field(
         default=False,
-        description=(
-            "Also write retrain artefacts to DATABASE_URL / "
-            "AGENTOMATIC_FIT_STORE_URL"
-        ),
+        description=("Also write retrain artefacts to DATABASE_URL / AGENTOMATIC_FIT_STORE_URL"),
     )
 
     @classmethod

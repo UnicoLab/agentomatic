@@ -228,9 +228,7 @@ class PipelineEngine:
                     pipeline_result.status = PipelineStatus.FAILED
                     pipeline_result.error = "; ".join(input_errors)
                     pipeline_result.duration_ms = (time.perf_counter() - t0) * 1000
-                    logger.error(
-                        f"❌ Pipeline '{self.config.name}' input invalid: {input_errors}"
-                    )
+                    logger.error(f"❌ Pipeline '{self.config.name}' input invalid: {input_errors}")
                     return pipeline_result
                 for err in input_errors:
                     logger.warning(f"  ⚠️ schema: {err}")

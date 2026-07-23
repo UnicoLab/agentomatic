@@ -39,6 +39,7 @@ class LLMSettings(BaseModel):
         ),
     )
 
+
 class EmbeddingSettings(BaseModel):
     """Embedding provider configuration."""
 

@@ -20,6 +20,7 @@ from agentomatic.ingestion.registry import IngestionRegistry
 from agentomatic.ingestion.router import create_ingestion_router
 from agentomatic.plugins.registry import PluginRegistry
 from agentomatic.plugins.router import create_plugin_router
+from agentomatic.storage.base import BaseStore
 
 from .lifespan import configure_logging
 from .manifest import AgentManifest, RegisteredAgent
@@ -31,7 +32,6 @@ if TYPE_CHECKING:
 
     from agentomatic.security.jwt_auth import JWTConfig
     from agentomatic.stacks.manager import StackConfig, StackManager
-    from agentomatic.storage.base import BaseStore
     from agentomatic.tasks.manager import TaskManager
     from agentomatic.tasks.store import TaskStore
 
@@ -104,7 +104,7 @@ def _minimal_openapi_paths(routes: Any) -> dict[str, Any]:
     return paths
 
 
-class _LazyStoreProxy:
+class _LazyStoreProxy(BaseStore):
     """Proxy that resolves ``platform._store`` at call time.
 
     Routers are mounted during ``build()`` before the lifespan may
@@ -122,14 +122,85 @@ class _LazyStoreProxy:
         """Truthy only once the underlying store exists (post-lifespan)."""
         return object.__getattribute__(self, "_platform")._store is not None
 
-    def __getattr__(self, name: str) -> Any:
+    def _delegate(self) -> BaseStore:
         store = object.__getattribute__(self, "_platform")._store
         if store is None:
             raise RuntimeError(
                 "Thread store is not configured. Pass store=... to "
                 "AgentPlatform or declare a MEMORY connection."
             )
-        return getattr(store, name)
+        return store
+
+    def __getattribute__(self, name: str) -> Any:
+        if name in ("_platform", "_delegate"):
+            return object.__getattribute__(self, name)
+        if name.startswith("__") and name.endswith("__"):
+            return object.__getattribute__(self, name)
+        delegate = object.__getattribute__(self, "_delegate")
+        return getattr(delegate(), name)
+
+    async def create_thread(
+        self,
+        thread_id: str,
+        user_id: str,
+        agent_name: str,
+        *,
+        title: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await self._delegate().create_thread(
+            thread_id,
+            user_id,
+            agent_name,
+            title=title,
+            metadata=metadata,
+        )
+
+    async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
+        return await self._delegate().get_thread(thread_id)
+
+    async def list_threads(
+        self,
+        *,
+        agent_name: str | None = None,
+        user_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        return await self._delegate().list_threads(
+            agent_name=agent_name,
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def add_message(
+        self,
+        thread_id: str,
+        role: str,
+        content: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await self._delegate().add_message(
+            thread_id,
+            role,
+            content,
+            metadata=metadata,
+        )
+
+    async def get_messages(
+        self,
+        thread_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        return await self._delegate().get_messages(
+            thread_id,
+            limit=limit,
+            offset=offset,
+        )
 
 
 class AgentPlatform:

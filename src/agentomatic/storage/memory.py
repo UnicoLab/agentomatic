@@ -459,9 +459,7 @@ class MemoryStore(BaseStore):
         if agent_name:
             items = [i for i in items if i.get("agent_name") == agent_name]
         if resource_type:
-            items = [
-                i for i in items if (i.get("resource_type") or "agent") == resource_type
-            ]
+            items = [i for i in items if (i.get("resource_type") or "agent") == resource_type]
         if thread_id:
             items = [i for i in items if i.get("thread_id") == thread_id]
         if status:
@@ -551,9 +549,7 @@ class MemoryStore(BaseStore):
         if agent_name:
             items = [a for a in items if a.get("agent_name") == agent_name]
         if resource_type:
-            items = [
-                a for a in items if (a.get("resource_type") or "agent") == resource_type
-            ]
+            items = [a for a in items if (a.get("resource_type") or "agent") == resource_type]
         items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return items[offset : offset + limit]
 

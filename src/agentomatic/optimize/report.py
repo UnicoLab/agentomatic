@@ -933,19 +933,27 @@ def generate_fit_report(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    extras = {
-        "keras_history": keras_history or {},
-        "eval_scores": eval_scores or {},
-        "dataset_sizes": dataset_sizes or {},
-        "optimizer_name": optimizer_name or "",
-        "stack_name": stack_name or "",
-        "model_name": model_name or "",
-        "run_config": run_config or {},
-    }
+    history = keras_history or {}
+    scores = eval_scores or {}
+    sizes = dataset_sizes or {}
+    config = run_config or {}
+    opt_name = optimizer_name or ""
+    stack = stack_name or ""
+    model = model_name or ""
     try:
         from agentomatic.optimize.holysheet_reports import build_fit_holysheet_report
 
-        path = build_fit_holysheet_report(result, output_path, **extras)
+        path = build_fit_holysheet_report(
+            result,
+            output_path,
+            keras_history=history,
+            eval_scores=scores,
+            dataset_sizes=sizes,
+            optimizer_name=opt_name,
+            stack_name=stack,
+            model_name=model,
+            run_config=config,
+        )
         logger.info("📊 Fit report (holysheet) generated: {}", path)
         return path
     except ImportError:
@@ -955,7 +963,7 @@ def generate_fit_report(
 
     html_content = _build_fit_report_html(
         result,
-        keras_history=extras.get("keras_history") or {},
+        keras_history=history,
     )
     output_path.write_text(html_content, encoding="utf-8")
     logger.info("📊 Fit report generated: {}", output_path)
@@ -1127,15 +1135,16 @@ def _build_fit_report_html(
         """
 
     # Score / loss curve (Keras-style)
-    history_scores = list(getattr(result, "score_history", None) or getattr(result, "history", []) or [])
+    history_scores = list(
+        getattr(result, "score_history", None) or getattr(result, "history", []) or []
+    )
     curve_section = ""
     if history_scores:
         from agentomatic.optimize.config import _score_sparkline
 
         spark = html.escape(_score_sparkline([float(s) for s in history_scores]))
         curve_rows = "".join(
-            f"<tr><td>epoch {i}</td><td>{float(s):.4f}</td>"
-            f"<td>{1.0 - float(s):.4f}</td></tr>"
+            f"<tr><td>epoch {i}</td><td>{float(s):.4f}</td><td>{1.0 - float(s):.4f}</td></tr>"
             for i, s in enumerate(history_scores)
         )
         curve_section = f"""
@@ -1202,10 +1211,10 @@ def _build_fit_report_html(
             body = html.escape(item["diff"] or item["prompt"][:600])
             evo_blocks += f"""
             <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.75rem;margin:0.5rem 0;">
-              <strong>v{item['version']}</strong>
-              score={item['score']:.4f} Δ={item['delta']:+.4f}
-              accepted={'yes' if item['accepted'] else 'no'}
-              candidate=<code>{html.escape(item['candidate'] or '—')}</code>
+              <strong>v{item["version"]}</strong>
+              score={item["score"]:.4f} Δ={item["delta"]:+.4f}
+              accepted={"yes" if item["accepted"] else "no"}
+              candidate=<code>{html.escape(item["candidate"] or "—")}</code>
               <pre style="white-space:pre-wrap;font-size:0.8rem;margin-top:0.5rem;">{body}</pre>
             </div>"""
         prompt_history_section = f"""

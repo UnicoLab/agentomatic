@@ -78,12 +78,7 @@ def _deployment_blocks(rec: Any) -> list[Any]:
     if not isinstance(rollout, dict):
         rollout = {}
 
-    strategy = (
-        rollout.get("strategy")
-        or rollout.get("rollout")
-        or data.get("strategy")
-        or "—"
-    )
+    strategy = rollout.get("strategy") or rollout.get("rollout") or data.get("strategy") or "—"
     weight = rollout.get("weight", rollout.get("initial_weight", None))
     monitor_h = rollout.get("monitoring_hours", "—")
     confidence = str(data.get("confidence") or "—")
@@ -139,9 +134,7 @@ def _deployment_blocks(rec: Any) -> list[Any]:
             )
         )
     elif confidence == "no_improvement":
-        blocks.append(
-            Markdown(content="_No rollout recommended — fit did not beat baseline._")
-        )
+        blocks.append(Markdown(content="_No rollout recommended — fit did not beat baseline._"))
     return blocks
 
 
@@ -318,9 +311,7 @@ def build_fit_holysheet_report(
         cfg_children.append(InfoList(title="Run settings", items=cfg_items))
     criteria = run_config.get("judge_criteria")
     if criteria:
-        cfg_children.append(
-            Markdown(content=f"**Judge criteria**\n\n{criteria}")
-        )
+        cfg_children.append(Markdown(content=f"**Judge criteria**\n\n{criteria}"))
     if not cfg_children:
         cfg_children.append(Markdown(content="_No run configuration captured._"))
     report.add(
@@ -381,8 +372,7 @@ def build_fit_holysheet_report(
             DataTable(
                 title="Metric deltas",
                 data=[
-                    {"metric": k, "delta": round(float(v), 4)}
-                    for k, v in metric_deltas.items()
+                    {"metric": k, "delta": round(float(v), 4)} for k, v in metric_deltas.items()
                 ],
                 columns=["metric", "delta"],
             )
@@ -399,9 +389,7 @@ def build_fit_holysheet_report(
 
     # ── Curves & metrics tabs ──────────────────────────────────────────
     curve_blocks: list[Any] = []
-    scores = list(
-        getattr(result, "score_history", None) or getattr(result, "history", []) or []
-    )
+    scores = list(getattr(result, "score_history", None) or getattr(result, "history", []) or [])
     if scores:
         curve = [
             {
@@ -457,11 +445,7 @@ def build_fit_holysheet_report(
                         height=300,
                     )
                 )
-            score_keys = [
-                k
-                for k in ("f1", "val_f1", "judge", "val_judge")
-                if k in rows[0]
-            ]
+            score_keys = [k for k in ("f1", "val_f1", "judge", "val_judge") if k in rows[0]]
             if score_keys:
                 keras_blocks.append(
                     LineChart(
@@ -472,9 +456,7 @@ def build_fit_holysheet_report(
                         height=300,
                     )
                 )
-            other_keys = [
-                k for k in hist_keys if k not in set(loss_keys) | set(score_keys)
-            ]
+            other_keys = [k for k in hist_keys if k not in set(loss_keys) | set(score_keys)]
             if other_keys:
                 # One multi-series chart instead of one empty-looking chart per metric.
                 keras_blocks.append(
@@ -504,10 +486,7 @@ def build_fit_holysheet_report(
         eval_blocks.append(
             Columns(
                 layout="equal",
-                children=[
-                    KPI(label=str(r["metric"]), value=r["score"])
-                    for r in eval_rows[:8]
-                ],
+                children=[KPI(label=str(r["metric"]), value=r["score"]) for r in eval_rows[:8]],
             )
         )
         eval_blocks.append(
@@ -588,9 +567,7 @@ def build_fit_holysheet_report(
         if meta_parts:
             children.append(Markdown(content="\n\n".join(meta_parts)))
         if item["diff"]:
-            children.append(
-                CodeBlock(code=item["diff"], language="diff", title="Unified diff")
-            )
+            children.append(CodeBlock(code=item["diff"], language="diff", title="Unified diff"))
         else:
             children.append(Markdown(content="_No text change vs previous version._"))
         children.append(
@@ -611,13 +588,9 @@ def build_fit_holysheet_report(
 
     prompt_tab_children: list[Any] = []
     if learn_rows:
-        prompt_tab_children.append(
-            DataTable(title="Epoch learnings (summary)", data=learn_rows)
-        )
+        prompt_tab_children.append(DataTable(title="Epoch learnings (summary)", data=learn_rows))
     if evo_panels:
-        prompt_tab_children.append(
-            Accordion(panels=evo_panels)
-        )
+        prompt_tab_children.append(Accordion(panels=evo_panels))
     else:
         prompt_tab_children.append(Markdown(content="_No prompt history._"))
     if judge_rows:
@@ -712,9 +685,9 @@ def build_fit_holysheet_report(
                 "name": str(t.get("name", "")),
                 "phase": str(t.get("phase", "")),
                 "score": round(float(t.get("score", 0.0)), 4),
-                "notes": str(
-                    t.get("mutation_notes", "") or t.get("accept_reason", "") or ""
-                )[:200],
+                "notes": str(t.get("mutation_notes", "") or t.get("accept_reason", "") or "")[
+                    :200
+                ],
             }
             for t in result.trials
         ]
@@ -917,9 +890,7 @@ def build_eval_holysheet_report(
                 "judge": round(float(er_scores.get("judge", 0.0)), 3)
                 if "judge" in er_scores
                 else "—",
-                "f1": round(float(er_scores.get("f1", 0.0)), 3)
-                if "f1" in er_scores
-                else "—",
+                "f1": round(float(er_scores.get("f1", 0.0)), 3) if "f1" in er_scores else "—",
                 "keywords": round(float(er_scores.get("keywords", 0.0)), 3)
                 if "keywords" in er_scores
                 else "—",
@@ -941,9 +912,7 @@ def build_eval_holysheet_report(
         if err:
             panel_children.append(Callout(content=str(err), variant="highlight"))
         if rationale:
-            panel_children.append(
-                Markdown(content=f"### Judge rationale\n\n{rationale}")
-            )
+            panel_children.append(Markdown(content=f"### Judge rationale\n\n{rationale}"))
         panel_children.append(
             CodeBlock(
                 code=_safe_json(prediction) if prediction else "(no prediction)",
@@ -1027,8 +996,7 @@ def build_eval_holysheet_report(
     failed = [er for er in examples if not getattr(er, "passed", False)]
     if failed:
         tips = [
-            f"- `{getattr(er, 'example_id', '?')}` failed "
-            f"(scores={getattr(er, 'scores', {})})"
+            f"- `{getattr(er, 'example_id', '?')}` failed (scores={getattr(er, 'scores', {})})"
             for er in failed[:8]
         ]
         rec_children.append(

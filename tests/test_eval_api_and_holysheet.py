@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+
 from agentomatic.agents.types import AgentDataset, AgentExample, EvaluationReport, ExampleResult
 from agentomatic.optimize.eval_api import (
     EvalConfig,
@@ -202,9 +203,7 @@ class TestRunEvalOffline:
                     ],
                 )
 
-        monkeypatch.setattr(
-            providers_mod, "apply_stack_defaults", lambda *_a, **_k: None
-        )
+        monkeypatch.setattr(providers_mod, "apply_stack_defaults", lambda *_a, **_k: None)
 
         result = eval_api.run_eval(
             _Agent(),
