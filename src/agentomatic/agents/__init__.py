@@ -54,6 +54,13 @@ from agentomatic.agents.history import (
     MetricLoss,
     resolve_loss,
 )
+from agentomatic.agents.language import (
+    detect_language,
+    language_directive,
+    language_name,
+    output_directive,
+    resolve_language,
+)
 from agentomatic.agents.metrics import (
     CallableMetric,
     ContainsTermsMetric,
@@ -111,4 +118,10 @@ __all__ = [
     "NoOpOptimizer",
     "GridSearchOptimizer",
     "PromptFitterBridge",
+    # Language helpers
+    "detect_language",
+    "language_directive",
+    "language_name",
+    "output_directive",
+    "resolve_language",
 ]

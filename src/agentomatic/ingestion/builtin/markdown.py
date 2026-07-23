@@ -46,7 +46,8 @@ class MarkdownIngestRequest(BaseModel):
         collection: Optional logical collection / index name — forwarded to
             downstream steps via :attr:`IngestionResult.collection`.
         engine: Preferred conversion engine (``"auto"``, ``"pymupdf4llm"``,
-            ``"docling"``, ``"plain"``). ``"auto"`` picks the best available.
+            ``"docling"``, ``"markitdown"``, ``"plain"``). ``"auto"`` picks
+            the best available.
     """
 
     source: str = Field(..., description="Path to the document to convert.")
@@ -61,7 +62,7 @@ class MarkdownIngestRequest(BaseModel):
     collection: str | None = Field(default=None)
     engine: str = Field(
         default="auto",
-        description="Conversion engine: auto | pymupdf4llm | docling | plain.",
+        description="Conversion engine: auto | pymupdf4llm | docling | markitdown | plain.",
     )
 
 
@@ -186,12 +187,29 @@ class MarkdownIngestor(BaseIngestor[MarkdownIngestRequest]):
             if md is not None:
                 return "docling", md
 
+        if chosen in ("auto", "markitdown"):
+            md = self._try_markitdown(source)
+            if md is not None:
+                return "markitdown", md
+
         if chosen == "pymupdf4llm":
             md = self._try_pymupdf4llm(source)
             if md is not None:
                 return "pymupdf4llm", md
 
         return "plain", self._read_plain(source)
+
+    @staticmethod
+    def _try_markitdown(source: Path) -> str | None:
+        """Try to convert with ``markitdown`` (returns ``None`` on failure)."""
+        try:
+            from markitdown import MarkItDown
+
+            result = MarkItDown().convert(str(source))
+            text = getattr(result, "text_content", None) or getattr(result, "markdown", None)
+            return str(text) if text else None
+        except Exception:  # noqa: BLE001 - optional dep
+            return None
 
     @staticmethod
     def _try_pymupdf4llm(source: Path) -> str | None:

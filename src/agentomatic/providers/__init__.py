@@ -18,6 +18,13 @@ from .fallback import (
     normalize_fallback_on,
     should_fallback,
 )
+from .jsonutil import (
+    extract_json,
+    extract_json_array,
+    extract_json_object,
+    loads_repaired,
+    repair_json,
+)
 from .llm import (
     StructuredOutputFallbackWrapper,
     apply_stack_defaults,
@@ -53,6 +60,9 @@ __all__ = [
     "apply_stack_defaults",
     "astream_with_thinking",
     "attach_thinking_metadata",
+    "extract_json",
+    "extract_json_array",
+    "extract_json_object",
     "get_embeddings",
     "get_failover_count",
     "get_llm",
@@ -62,6 +72,7 @@ __all__ = [
     "invoke_with_retry",
     "is_empty_llm_response",
     "llm_result_metadata",
+    "loads_repaired",
     "message_text",
     "message_thinking",
     "model_label",
@@ -69,6 +80,7 @@ __all__ = [
     "record_failover",
     "register_embedding_provider",
     "registered_embedding_providers",
+    "repair_json",
     "reset_embeddings",
     "reset_llm",
     "set_llm",

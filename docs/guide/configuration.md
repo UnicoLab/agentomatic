@@ -131,6 +131,12 @@ These map directly to `AgentPlatform` constructor parameters:
 | `AGENTOMATIC_RATE_LIMIT_WINDOW` | `rate_limit_window` | `60` | Window duration (seconds) |
 | `AGENTOMATIC_ENABLE_METRICS` | `enable_metrics` | `false` | Toggle Prometheus metrics |
 | `AGENTOMATIC_CORS_ORIGINS` | `cors_origins` | `*` | Comma-separated origins |
+| `AGENTOMATIC_ARTIFACT_ROOT` | `artifact_root` | `.local/artifacts` | Versioned plugin/model artifact bundles |
+| `AGENTOMATIC_RUNS_ROOT` | `runs_root` | `.local/runs` | Scratch directory for pipeline/task outputs |
+| `AGENTOMATIC_AUDIT_LOG` | `audit_log` | `""` (disabled) | JSONL op-audit sink path (non-PII metadata only) |
+| `AGENTOMATIC_CHUNK_SIZE_TOKENS` | `chunk_size_tokens` | `1200` | Default ingestion chunk size |
+| `AGENTOMATIC_CHUNK_OVERLAP_TOKENS` | `chunk_overlap_tokens` | `150` | Default ingestion chunk overlap |
+| `AGENTOMATIC_MIN_QUALITY_SCORE` | `min_quality_score` | `0.70` | Ingestion quality warning threshold |
 
 ### `PlatformSettings` Nested Variables
 

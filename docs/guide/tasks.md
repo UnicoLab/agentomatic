@@ -254,6 +254,24 @@ async def dispatcher(target: str, payload, ctx: TaskContext):
     return {"processed": total}
 ```
 
+Nested graph nodes and pipeline step functions often **do not** receive the
+``TaskContext`` argument. The platform installs a ContextVar bridge so you can
+report from anywhere under a task run:
+
+```python
+from agentomatic.tasks import report_stage, report_stage_sync
+
+async def my_node(state):
+    await report_stage("embed", percent=40.0, message="Embedding documents")
+    ...
+
+def sync_node(state):
+    report_stage_sync("encode", percent=20.0)  # schedules on the running loop
+    ...
+```
+
+When no task is bound, both helpers are no-ops.
+
 ## Configuration
 
 ```python

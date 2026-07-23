@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .audit import audit_timer, configure_audit_logging, emit_audit_event
 from .metrics import (
     extract_token_usage,
     llm_identity,
@@ -12,6 +13,9 @@ from .metrics import (
 from .telemetry import get_tracer, setup_telemetry, traced
 
 __all__ = [
+    "audit_timer",
+    "configure_audit_logging",
+    "emit_audit_event",
     "extract_token_usage",
     "get_tracer",
     "llm_identity",

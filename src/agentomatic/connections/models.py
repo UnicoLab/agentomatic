@@ -120,7 +120,7 @@ class VectorConnectionConfig(BaseModel):
         min_length=1,
         description=(
             "Vector backend: qdrant | chroma | weaviate | pinecone | milvus | "
-            "<custom via register_vector_provider>."
+            "local_npz | <custom via register_vector_provider>."
         ),
     )
     url: str = Field(

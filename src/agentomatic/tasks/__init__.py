@@ -39,6 +39,14 @@ from .models import (
     TaskRetryConfig,
     TaskStatus,
 )
+from .progress import (
+    bind_task_context,
+    get_task_context,
+    install_task_progress_bridge,
+    report_stage,
+    report_stage_sync,
+    reset_task_context,
+)
 from .routes import TaskSubmitRequest, create_task_router
 from .store import InMemoryTaskStore, TaskStore
 from .sugar import BatchSubmitRequest, attach_execution_modes, task_links
@@ -62,12 +70,18 @@ __all__ = [
     "TaskStore",
     "TaskSubmitRequest",
     "attach_execution_modes",
+    "bind_task_context",
     "create_task_router",
+    "get_task_context",
+    "install_task_progress_bridge",
     "make_agent_dispatcher",
     "make_endpoint_dispatcher",
     "make_ingestion_dispatcher",
     "make_pipeline_dispatcher",
     "make_plugin_dispatcher",
+    "report_stage",
+    "report_stage_sync",
+    "reset_task_context",
     "task_links",
 ]
 

@@ -137,33 +137,68 @@ You can view these directly in the Swagger UI at `http://localhost:8000/docs`.
 
 ### Reloading after artifact updates
 
-When a pipeline (for example `historical_update`) promotes a new artifact
-bundle and updates the `current` pointer on disk, in-memory plugin weights
-are **not** refreshed automatically. Call reload after promotion:
+Agentomatic ships :class:`~agentomatic.artifacts.ArtifactRegistry` for
+versioned blue/green model bundles. Write a candidate, validate it, promote,
+then reload plugins so in-memory weights pick up the new ``current`` pointer:
+
+```python
+from pathlib import Path
+
+from agentomatic import ArtifactRegistry
+
+registry = ArtifactRegistry()  # or ArtifactRegistry(".local/artifacts")
+version = registry.new_version_id()
+bundle = registry.candidate_dir(version)
+(bundle / "model.pkl").write_bytes(trained_weights)  # your serialize step
+registry.register_candidate(
+    version,
+    model_cards={"sentiment": {"params": 1_000_000}},
+    eval_scores={"accuracy": 0.91},
+)
+# ... run your eval gate ...
+registry.promote(version)  # atomic flip of `current`
+```
+
+In ``load_model`` / ``predict``, read from the active bundle:
+
+```python
+async def load_model(self) -> None:
+    path = self.artifact_dir()  # ArtifactRegistry().current_dir()
+    if path is None:
+        raise RuntimeError("no artifact version promoted yet")
+    self._model = joblib.load(path / "model.pkl")
+    await super().load_model()
+```
+
+In-memory plugin weights are **not** refreshed automatically after promote.
+Call reload:
 
 ```bash
 # All plugins
 curl -X POST http://127.0.0.1:8000/api/v1/plugins/reload
 
 # Single plugin
-curl -X POST http://127.0.0.1:8000/api/v1/plugins/similarity_effort/reload
+curl -X POST http://127.0.0.1:8000/api/v1/plugins/sentiment_analyzer/reload
 ```
 
 Response shape (single plugin):
 
 ```json
 {
-  "name": "similarity_effort",
+  "name": "sentiment_analyzer",
   "description": "...",
   "version": "1.0.0",
   "is_loaded": true,
   "loaded_at": "2026-07-16T10:00:00+00:00",
-  "model_card": { "name": "similarity_effort", "status": "loaded", "...": "..." }
+  "model_card": { "name": "sentiment_analyzer", "status": "loaded", "...": "..." }
 }
 ```
 
 Pipeline `plugin:` steps always resolve the live registry instance, so the
 next predict after reload uses the fresh weights — no process restart.
+
+Set the root via ``AGENTOMATIC_ARTIFACT_ROOT`` (default ``.local/artifacts``).
+Rollback is one call: ``registry.rollback(prior_version)``.
 
 Optional future flag: `AGENTOMATIC_PLUGIN_AUTORELOAD=1` (mtime watch of the
 artifact `current` pointer). Prefer the explicit REST reload for deterministic

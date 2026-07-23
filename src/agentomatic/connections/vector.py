@@ -495,3 +495,11 @@ register_vector_provider("chroma", _build_chroma)
 register_vector_provider("weaviate", _build_weaviate)
 register_vector_provider("pinecone", _build_pinecone)
 register_vector_provider("milvus", _build_milvus)
+
+# Zero-infra local .npz backend (soft-deps on numpy).
+try:
+    from agentomatic.connections.local_npz import register_local_npz_backends
+
+    register_local_npz_backends()
+except Exception:  # noqa: BLE001 - optional; ImportError if numpy missing later at use
+    pass
