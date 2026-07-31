@@ -260,9 +260,9 @@ class AgentRegistry:
             try:
                 from agentomatic.prompts.manager import PromptManager
 
-                pm = PromptManager(agent_name)
-                pm.load_from_file(prompts_file)
-                return pm
+                # Pass the path so PromptManager remembers the source for
+                # live reload after Studio / prompt-editor writes.
+                return PromptManager(agent_name, prompts_file=prompts_file)
             except Exception as exc:
                 logger.warning(f"  ⚠️ Failed to load prompts for {agent_name}: {exc}")
         return None

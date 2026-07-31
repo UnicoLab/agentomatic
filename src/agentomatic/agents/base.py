@@ -173,6 +173,8 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         3. ``compiled_config["system_prompt"]`` from a successful ``fit()``
         4. Instance ``system_prompt`` attribute (if set)
         5. ``prompt_manager.get_prompt(version)`` from ``prompts.json``
+           (reloaded from disk when a source path is known, so Studio /
+           prompt-editor saves apply without restarting the process)
         6. ``default``
 
         Args:
@@ -198,6 +200,9 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         prompt_manager = getattr(self, "prompt_manager", None)
         if prompt_manager is not None:
             try:
+                reload_from_disk = getattr(prompt_manager, "reload_from_disk", None)
+                if callable(reload_from_disk):
+                    reload_from_disk()
                 prompt = prompt_manager.get_prompt(version, prompt_type="system")
                 if prompt:
                     return str(prompt)

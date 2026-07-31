@@ -40,10 +40,51 @@ def _gemini_configured() -> bool:
     )
 
 
+def _gemini_location_blocked(exc: BaseException | str) -> bool:
+    """True when Gemini rejects the caller region (FAILED_PRECONDITION)."""
+    text = str(exc).lower()
+    return "failed_precondition" in text or "location is not supported" in text
+
+
 pytestmark = [
     pytest.mark.live,
     pytest.mark.skipif(not _gemini_configured(), reason="GEMINI_API_KEY not set"),
 ]
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _skip_if_gemini_geo_blocked() -> None:
+    """Skip the module when Gemini rejects this network region."""
+    if not _gemini_configured():
+        return
+    import httpx
+
+    key = (
+        os.getenv("GEMINI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+        or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
+        or ""
+    )
+    model = MODEL.split("/", 1)[-1]
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={key}"
+    )
+    try:
+        response = httpx.post(
+            url,
+            json={
+                "contents": [{"parts": [{"text": "OK"}]}],
+                "generationConfig": {"maxOutputTokens": 4},
+            },
+            timeout=20.0,
+        )
+    except Exception as exc:  # noqa: BLE001
+        if _gemini_location_blocked(exc):
+            pytest.skip(f"Gemini geo-blocked: {exc}")
+        return
+    if response.status_code >= 400 and _gemini_location_blocked(response.text):
+        pytest.skip("Gemini geo-blocked: User location is not supported for the API use")
 
 
 @dataclass
