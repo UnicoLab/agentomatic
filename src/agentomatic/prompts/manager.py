@@ -15,14 +15,22 @@ class PromptManager:
     def __init__(self, agent_name: str, prompts_file: Path | str | None = None) -> None:
         self.agent_name = agent_name
         self._prompts: dict[str, dict[str, Any]] = {}
+        self._source_path: Path | None = None
         if prompts_file:
             self.load_from_file(Path(prompts_file))
 
+    @property
+    def source_path(self) -> Path | None:
+        """Path of the last successfully loaded ``prompts.json``, if any."""
+        return self._source_path
+
     def load_from_file(self, path: Path) -> None:
-        """Load prompts from a JSON file."""
+        """Load prompts from a JSON file and remember the source path."""
         try:
-            with open(path) as f:
+            resolved = Path(path)
+            with open(resolved) as f:
                 self._prompts = json.load(f)
+            self._source_path = resolved
             count = len(self._prompts)
             logger.debug(f"Loaded {count} prompt version(s) for '{self.agent_name}'")
         except Exception as exc:
@@ -54,9 +62,32 @@ class PromptManager:
         """List available prompt versions."""
         return list(self._prompts.keys())
 
-    def reload(self, path: Path) -> None:
-        """Reload prompts from disk."""
-        self.load_from_file(path)
+    def reload(self, path: Path | None = None) -> None:
+        """Reload prompts from disk.
+
+        Args:
+            path: Explicit prompts file. When omitted, reloads from the
+                remembered :attr:`source_path` if available.
+        """
+        target = Path(path) if path is not None else self._source_path
+        if target is None:
+            logger.warning(
+                "Cannot reload prompts for '{}': no source path recorded",
+                self.agent_name,
+            )
+            return
+        self.load_from_file(target)
+
+    def reload_from_disk(self) -> bool:
+        """Reload from the remembered source path.
+
+        Returns:
+            ``True`` when a reload was attempted from a known path.
+        """
+        if self._source_path is None:
+            return False
+        self.load_from_file(self._source_path)
+        return True
 
     # -----------------------------------------------------------------
     # LangChain integration
