@@ -20,6 +20,7 @@ from agentomatic.providers import (
     split_thinking_text,
     strip_thinking_for_json,
 )
+from agentomatic.providers.llm import _openai_compat_kwargs
 
 
 class _Out(BaseModel):
@@ -76,6 +77,19 @@ def test_strip_thinking_for_json() -> None:
     raw = 'Thinking Process:\n1. foo\n\n```json\n{"ok": true}\n```'
     cleaned = strip_thinking_for_json(raw)
     assert cleaned.strip().startswith("{") or "ok" in cleaned
+
+
+def test_openai_compat_mirrors_enable_thinking_into_chat_template() -> None:
+    """oMLX/Qwen need chat_template_kwargs.enable_thinking, not only the flat key."""
+    out = _openai_compat_kwargs({"extra": {"enable_thinking": False}})
+    body = out["extra_body"]
+    assert body["enable_thinking"] is False
+    assert body["chat_template_kwargs"]["enable_thinking"] is False
+    # Must be a first-class ChatOpenAI arg, not buried under model_kwargs.
+    assert "extra_body" not in (out.get("model_kwargs") or {})
+
+    out_flat = _openai_compat_kwargs({"enable_thinking": False})
+    assert out_flat["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
 
 
 @pytest.mark.asyncio

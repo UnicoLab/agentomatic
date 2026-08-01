@@ -290,10 +290,24 @@ def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         model_kwargs["response_format"] = response_format
 
     enable_thinking = extra.pop("enable_thinking", None)
-    if enable_thinking is not None:
-        extra_body["enable_thinking"] = enable_thinking
-
     chat_template_kwargs = extra.pop("chat_template_kwargs", None)
+    if chat_template_kwargs is not None and not isinstance(chat_template_kwargs, dict):
+        chat_template_kwargs = None
+    if chat_template_kwargs is None and enable_thinking is not None:
+        # oMLX / Qwen chat templates read thinking via chat_template_kwargs;
+        # also keep the flat key for servers that accept it at the root.
+        chat_template_kwargs = {"enable_thinking": bool(enable_thinking)}
+    elif (
+        isinstance(chat_template_kwargs, dict)
+        and enable_thinking is not None
+        and "enable_thinking" not in chat_template_kwargs
+    ):
+        chat_template_kwargs = {
+            **chat_template_kwargs,
+            "enable_thinking": bool(enable_thinking),
+        }
+    if enable_thinking is not None:
+        extra_body["enable_thinking"] = bool(enable_thinking)
     if chat_template_kwargs is not None:
         extra_body["chat_template_kwargs"] = chat_template_kwargs
 
@@ -331,8 +345,20 @@ def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     if "default_headers" in kwargs or "default_headers" in extra:
         out["default_headers"] = kwargs.get("default_headers") or extra.get("default_headers")
 
-    sig = inspect.signature(ChatOpenAI.__init__)
-    supports_extra_body = "extra_body" in sig.parameters
+    # ChatOpenAI is a Pydantic model: ``__init__`` signature is often just
+    # ``*args, **kwargs``, so inspect alone misses first-class fields like
+    # ``extra_body``. Prefer model_fields / annotations, then signature.
+    supports_extra_body = False
+    model_fields = getattr(ChatOpenAI, "model_fields", None)
+    if isinstance(model_fields, dict) and "extra_body" in model_fields:
+        supports_extra_body = True
+    else:
+        try:
+            supports_extra_body = "extra_body" in inspect.signature(
+                ChatOpenAI.__init__
+            ).parameters
+        except (TypeError, ValueError):
+            supports_extra_body = False
 
     if extra_body:
         if supports_extra_body:
