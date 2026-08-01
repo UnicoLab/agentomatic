@@ -9,6 +9,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Agent Lightning–inspired optimize foundations** (no VERL/agentlightning
+  dependency): `OptimizationAlgorithm` / `FitterAlgorithm`, versioned
+  `ResourceBundle` registry, `Rollout` + `RolloutTraceStore`,
+  `TraceToMessages` / APO critique context, `RewardProtocol`, feedback→dataset
+  helpers, `APOOptimizer` (`--mode apo`) with textual gradients + beam search,
+  TPE/`grid`/`random` param search (`--search-method`), selective
+  `node_match` / `optimize_nodes`, parallel `--n-runners`, and HolySheet trial
+  critiques. See `docs/guide/optimization.md`.
 - **Generic `ai_core` batteries migrated into Agentomatic**:
   `ArtifactRegistry` (blue/green promote/rollback), task-progress
   `report_stage` ContextVar bridge, public `extract_json` /

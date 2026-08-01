@@ -283,6 +283,8 @@ class PromptCandidate:
     mutation_notes: str = ""
     scores: dict[str, float] = field(default_factory=dict)
     composite_score: float = 0.0
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Optional extras (e.g. APO critique text, resource_id)."""
 
 
 # =====================================================================

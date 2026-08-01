@@ -354,9 +354,7 @@ def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         supports_extra_body = True
     else:
         try:
-            supports_extra_body = "extra_body" in inspect.signature(
-                ChatOpenAI.__init__
-            ).parameters
+            supports_extra_body = "extra_body" in inspect.signature(ChatOpenAI.__init__).parameters
         except (TypeError, ValueError):
             supports_extra_body = False
 

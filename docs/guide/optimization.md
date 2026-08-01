@@ -188,7 +188,7 @@ AGENTOMATIC_STACK=gemini uv run python agents/assistant/eval.py \
 | Knob | Env / CLI | Purpose |
 |---|---|---|
 | `stack` | `AGENTOMATIC_STACK` / `--stack` | Stack YAML to load |
-| `optimizer` | `AGENTOMATIC_OPTIMIZER` / `--optimizer` | Fitter strategy: `rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search` |
+| `optimizer` | `AGENTOMATIC_OPTIMIZER` / `--optimizer` | Fitter strategy: `rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search`, `apo` |
 | `epochs` / `trials` / `patience` | `AGENTOMATIC_EPOCHS` etc. / `--epochs` `--trials` `--patience` | Outer Keras epochs, inner trial budget (`max_trials`), EarlyStopping on `val_loss` |
 | `augment` / `n_examples` / `persist` | train | LLM-augment seed data, target size, write `all.augmented.jsonl` |
 | `apply` / `apply_as` | train | Persist best prompt to `prompts.json` when improved (guards refuse zero/overfit) |
@@ -709,13 +709,18 @@ space = PromptSearchSpace(
 | `model_param_space` | `dict` | Grid of parameter values to search |
 | `optimize_rag_params` | `bool` | Tune RAG retrieval settings |
 | `rag_param_space` | `dict` | Grid of RAG parameter values |
+| `search_method` | `str` | Param sampler: `grid`, `random`, or `tpe` |
+| `optimize_nodes` | `list[str]` | Scope prompt updates to named graph nodes |
+| `node_match` | `str \| None` | Regex for selective multi-agent / node traces |
 
 ---
 
-### The 5 Fitter Optimizers
+### The Fitter Optimizers
 
-Agentomatic includes five optimizer strategies, each suited to different optimization
-scenarios:
+Agentomatic includes six optimizer strategies, each suited to different optimization
+scenarios. Ideas from Microsoft Agent Lightning (textual gradients, beam search,
+versioned resources, selective node traces) are integrated natively — without a
+VERL/GPU RL dependency.
 
 | Strategy | CLI ID | How It Works | Best For |
 |---|---|---|---|
@@ -723,7 +728,54 @@ scenarios:
 | **FewShotBootstrapOptimizer** | `few_shot_bootstrap` | Runs the agent on the training set, scores every trace, selects the top examples using Score²-weighted sampling with diversity scoring, and injects them as few-shot demonstrations. | Tasks where showing the right examples matters more than instruction tuning. |
 | **MIPROLikeOptimizer** | `mipro_like` | Generates multiple instruction variants from different perspectives (clarity, brevity, domain expertise), creates few-shot example sets, and performs a cross-product search over all combinations. | Complex pipelines where both instructions and examples interact. |
 | **GEPALikeOptimizer** | `gepa_like` | Uses evaluation feedback to identify specific weaknesses, applies targeted mutations to the relevant prompt sections, and validates each mutation against the failure cases. Most sample-efficient strategy. | Iterative refinement when you have a decent baseline and want targeted improvements. |
-| **ParamSearchOptimizer** | `param_search` | Performs a structured grid search over model parameters (temperature, top_p), RAG settings (top_k, rerank), and tool policies. Evaluates each configuration on a minibatch for speed. | Finding the optimal operating point for model/RAG/tool configuration. |
+| **APOOptimizer** | `apo` | Agent Lightning–style APO: textual gradient (critique over rollout traces/messages) → apply-edit rewrite → beam of candidates. Critiques appear in HolySheet trial history. | Trace-aware prompt search when tool/step context matters; beam exploration. |
+| **ParamSearchOptimizer** | `param_search` | Structured search over model/RAG/tool params. Supports `search_method`: `grid`, `random`, or lightweight `tpe` (Tree-structured Parzen Estimator) using prior trial scores. | Finding the optimal operating point for model/RAG/tool configuration. |
+
+!!! tip "When to use APO vs GEPA vs rewrite"
+    - **rewrite** — fast full-prompt rewrite from failure I/O (good default).
+    - **gepa_like** — targeted mutations per failure category (efficient once you have judge feedback).
+    - **apo** — critique→edit beam search that reads **message-level traces** (steps/tools/reasoning), closest to Lightning APO.
+
+```bash
+# APO with parallel rollouts and node-scoped traces
+agentomatic optimize my_agent --dataset data.jsonl --mode apo --n-runners 4 \
+  --node-match 'respond|planner'
+
+# Param search with TPE
+agentomatic optimize my_agent --dataset data.jsonl --mode param_search \
+  --search-method tpe --param temperature=0.0,0.3,0.7
+```
+
+#### Unified algorithm surface
+
+Prefer the Lightning-inspired `OptimizationAlgorithm` ABC when scripting:
+
+```python
+from agentomatic.optimize import PromptFitter, as_algorithm, ExactMatchMetric
+
+fitter = PromptFitter(agent="hello", optimizer="apo", n_runners=4, local_agent=agent)
+algo = as_algorithm(fitter)  # shares ResourceRegistry + RolloutTraceStore
+result = await algo.run(train_ds, val_ds, metric=ExactMatchMetric())
+# Inspect versioned resources / rollouts:
+# algo.resources.history(), algo.trace_store.list()
+```
+
+#### Feedback → fit
+
+Production thumbs / corrections can become a training set:
+
+```python
+from agentomatic.optimize import feedback_records_to_dataset, dataset_from_feedback_jsonl
+
+ds = feedback_records_to_dataset(await collector.get_feedback("my_agent"))
+# or: ds = dataset_from_feedback_jsonl("feedback.jsonl")
+```
+
+#### Selective node optimization
+
+Set `PromptSearchSpace.optimize_nodes` and/or `node_match` (regex) to scope
+prompt overrides and APO critique traces to specific LangGraph nodes /
+subagents — analogous to Lightning's `agent_match`.
 
 You can combine strategies by running multiple fit passes:
 
