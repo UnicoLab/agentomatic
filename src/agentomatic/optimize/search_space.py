@@ -44,6 +44,8 @@ _VALID_FEW_SHOT_STRATEGIES = frozenset(
     {"top_k", "diversity_weighted", "random_search"},
 )
 
+_VALID_SEARCH_METHODS = frozenset({"grid", "random", "tpe"})
+
 
 # =====================================================================
 # Search Space
@@ -98,6 +100,14 @@ class PromptSearchSpace:
     max_few_shot_examples: int = 5
     few_shot_selection_strategy: str = "diversity_weighted"
 
+    # -- search method + selective scope ---------------------------------
+    search_method: str = "random"
+    """Parameter proposal method: ``grid``, ``random``, or ``tpe``."""
+    optimize_nodes: list[str] = field(default_factory=list)
+    """Optional node / subagent names to scope prompt updates to."""
+    node_match: str | None = None
+    """Optional regex for selective multi-agent / node trace filtering."""
+
     # -- internal helpers ------------------------------------------------
 
     def __post_init__(self) -> None:
@@ -108,6 +118,14 @@ class PromptSearchSpace:
                 f"Choose from {sorted(_VALID_FEW_SHOT_STRATEGIES)}."
             )
             raise ValueError(msg)
+        method = (self.search_method or "random").strip().lower()
+        if method not in _VALID_SEARCH_METHODS:
+            msg = (
+                f"Invalid search_method '{self.search_method}'. "
+                f"Choose from {sorted(_VALID_SEARCH_METHODS)}."
+            )
+            raise ValueError(msg)
+        self.search_method = method
 
     def _resolve_space(self, space_name: str) -> dict[str, list[Any]]:
         """Return the param-space dict for *space_name*."""
@@ -148,22 +166,110 @@ class PromptSearchSpace:
         self,
         n: int,
         space_name: str = "model",
+        *,
+        method: str | None = None,
+        observed: list[tuple[dict[str, Any], float]] | None = None,
     ) -> list[dict[str, Any]]:
-        """Return a random sample of *n* combinations from *space_name*.
+        """Return *n* parameter combinations from *space_name*.
 
-        If *n* >= total combinations the full grid is returned (shuffled).
+        Args:
+            n: Number of samples.
+            space_name: ``model`` / ``rag`` / ``tool`` / ``routing``.
+            method: Override ``search_method`` (``grid`` / ``random`` / ``tpe``).
+            observed: Optional ``(params, score)`` history for TPE proposals.
+
+        Returns:
+            List of parameter dicts.
+        """
+        strategy = (method or self.search_method or "random").strip().lower()
+        all_combos = self.param_combinations(space_name)
+        if not all_combos:
+            return [{}]
+        if strategy == "grid" or n >= len(all_combos):
+            shuffled = list(all_combos)
+            random.shuffle(shuffled)
+            return shuffled[:n] if strategy != "grid" else shuffled
+        if strategy == "tpe":
+            return self.sample_params_tpe(n, space_name, observed=observed)
+        return random.sample(all_combos, min(n, len(all_combos)))
+
+    def sample_params_tpe(
+        self,
+        n: int,
+        space_name: str = "model",
+        *,
+        observed: list[tuple[dict[str, Any], float]] | None = None,
+        gamma: float = 0.25,
+    ) -> list[dict[str, Any]]:
+        """Sample combinations with a lightweight TPE-style bias.
+
+        Splits observed trials into good/bad by quantile ``gamma`` and
+        samples more often from parameter values that appear in good
+        trials. Falls back to uniform random when history is thin.
+
+        This is a zero-dependency approximation of Optuna's TPE — good
+        enough for discrete grids without pulling in optuna.
         """
         all_combos = self.param_combinations(space_name)
+        if not all_combos:
+            return [{}]
         if n >= len(all_combos):
-            logger.debug(
-                "Requested {} samples but only {} available — returning all.",
-                n,
-                len(all_combos),
-            )
             shuffled = list(all_combos)
             random.shuffle(shuffled)
             return shuffled
-        return random.sample(all_combos, n)
+        history = list(observed or [])
+        if len(history) < 4:
+            return random.sample(all_combos, n)
+
+        scores = sorted(s for _, s in history)
+        cutoff_idx = max(1, int(len(scores) * (1.0 - gamma)) - 1)
+        threshold = scores[min(cutoff_idx, len(scores) - 1)]
+        good = [p for p, s in history if s >= threshold]
+        if not good:
+            return random.sample(all_combos, n)
+
+        # Build per-key value weights from good trials
+        space = self._resolve_space(space_name)
+        value_weights: dict[str, dict[Any, float]] = {}
+        for key, choices in space.items():
+            counts: dict[Any, float] = {c: 1.0 for c in choices}  # Laplace smooth
+            for params in good:
+                if key in params and params[key] in counts:
+                    counts[params[key]] += 1.0
+            value_weights[key] = counts
+
+        def _weighted_choice(key: str) -> Any:
+            weights_map = value_weights[key]
+            choices = list(weights_map.keys())
+            weights = [weights_map[c] for c in choices]
+            total = sum(weights) or 1.0
+            pick = random.random() * total
+            acc = 0.0
+            for choice, weight in zip(choices, weights):
+                acc += weight
+                if pick <= acc:
+                    return choice
+            return choices[-1]
+
+        sampled: list[dict[str, Any]] = []
+        seen: set[tuple[tuple[str, Any], ...]] = set()
+        attempts = 0
+        max_attempts = n * 20
+        while len(sampled) < n and attempts < max_attempts:
+            attempts += 1
+            combo = {key: _weighted_choice(key) for key in space}
+            key_t = tuple(sorted(combo.items()))
+            if key_t in seen:
+                continue
+            seen.add(key_t)
+            # Only keep combos that exist on the discrete grid
+            if combo in all_combos:
+                sampled.append(combo)
+        if len(sampled) < n:
+            remaining = [c for c in all_combos if tuple(sorted(c.items())) not in seen]
+            random.shuffle(remaining)
+            sampled.extend(remaining[: n - len(sampled)])
+        return sampled
 
     def n_combinations(self, space_name: str = "model") -> int:
         """Return the total number of combinations for *space_name*.
@@ -238,6 +344,9 @@ class PromptSearchSpace:
             "routing_weight_space": self.routing_weight_space,
             "max_few_shot_examples": self.max_few_shot_examples,
             "few_shot_selection_strategy": self.few_shot_selection_strategy,
+            "search_method": self.search_method,
+            "optimize_nodes": list(self.optimize_nodes),
+            "node_match": self.node_match,
         }
 
     @classmethod

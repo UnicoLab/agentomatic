@@ -688,10 +688,20 @@ def build_fit_holysheet_report(
                 "notes": str(t.get("mutation_notes", "") or t.get("accept_reason", "") or "")[
                     :200
                 ],
+                "critique": str(t.get("critique", "") or "")[:240],
             }
             for t in result.trials
         ]
         trial_children.append(DataTable(title="Candidates", data=trial_rows))
+        apo_critiques = [t for t in result.trials if str(t.get("critique") or "").strip()]
+        if apo_critiques:
+            critique_md = "\n\n".join(
+                f"**{t.get('name')}** (round {t.get('round')}):\n\n{str(t.get('critique'))[:800]}"
+                for t in apo_critiques[:8]
+            )
+            trial_children.append(
+                Markdown(content=("### Textual gradients / APO critiques\n\n" + critique_md))
+            )
     else:
         trial_children.append(Markdown(content="_No trials recorded._"))
 

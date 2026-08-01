@@ -83,6 +83,8 @@ class AgentRunner:
         timeout: float = 60.0,
         use_optimize_endpoint: bool = True,
         agent_callable: Callable[..., str | Awaitable[str]] | None = None,
+        concurrency: int = 5,
+        n_runners: int | None = None,
     ):
         self.agent = agent
         self.api_base = api_base
@@ -91,6 +93,9 @@ class AgentRunner:
         self.use_optimize_endpoint = use_optimize_endpoint
         self.agent_callable = agent_callable
         self._optimize_available: bool | None = None  # Auto-detect
+        # n_runners is an Agent Lightning–style alias for concurrency.
+        self.concurrency = max(1, int(n_runners if n_runners is not None else concurrency))
+        self.n_runners = self.concurrency
 
     async def run_single(
         self,
@@ -305,7 +310,8 @@ class AgentRunner:
         self,
         points: list[dict[str, Any]],
         prompt_override: str | None = None,
-        concurrency: int = 5,
+        concurrency: int | None = None,
+        n_runners: int | None = None,
     ) -> list[RunResult]:
         """Run a list of data points through the agent.
 
@@ -313,14 +319,20 @@ class AgentRunner:
             points: List of dicts with 'query', optionally 'expected_answer',
                 'context', and ``metadata.invoke`` for agent-specific fields.
             prompt_override: Optional system prompt to inject.
-            concurrency: Max concurrent requests.
+            concurrency: Max concurrent requests (defaults to instance value).
+            n_runners: Alias for *concurrency* (Agent Lightning naming).
 
         Returns:
             List of RunResult objects.
         """
         import asyncio
 
-        semaphore = asyncio.Semaphore(concurrency)
+        limit = concurrency
+        if n_runners is not None:
+            limit = n_runners
+        if limit is None:
+            limit = self.concurrency
+        semaphore = asyncio.Semaphore(max(1, int(limit)))
 
         async def _run_one(point: dict[str, Any]) -> RunResult:
             async with semaphore:

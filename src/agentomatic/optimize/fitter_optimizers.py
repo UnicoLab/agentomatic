@@ -1299,33 +1299,39 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
 
 @dataclass(slots=True)
 class ParamSearchOptimizer(BaseFitterOptimizer):
-    """Pure parameter-grid search without LLM calls.
+    """Parameter search without LLM calls (grid / random / TPE).
 
     Generates candidates by sampling from the parameter search space.
     System prompts and few-shot examples are inherited unchanged from the
     baseline — only model, RAG, and tool parameters are varied.
 
+    ``search_space.search_method`` selects the sampler:
+
+    - ``grid`` — full Cartesian product (capped)
+    - ``random`` — uniform sample (default)
+    - ``tpe`` — lightweight TPE biased by prior trial scores
+
     This optimizer requires **no LLM calls** and is therefore very fast.
-
-    Examples::
-
-        from agentomatic.optimize.search_space import PromptSearchSpace
-
-        space = PromptSearchSpace(
-            optimize_model_params=True,
-            model_param_space={"temperature": [0.0, 0.3, 0.7]},
-        )
-        opt = ParamSearchOptimizer()
-        candidates = await opt.propose(
-            baseline=cfg, eval_results=[],
-            dataset_sample=[], search_space=space,
-        )
-        # Each candidate has a different temperature value
-        temps = [c.config.model_params["temperature"] for c in candidates]
-        assert len(set(temps)) == len(temps)
     """
 
     name: str = "param_search"
+    n_samples: int = 10
+    _observations: list[tuple[dict[str, Any], float]] = field(
+        default_factory=list,
+        repr=False,
+    )
+
+    def observe(self, params: dict[str, Any], score: float) -> None:
+        """Record a scored trial for TPE proposals."""
+        self._observations.append((dict(params), float(score)))
+
+    def _sample(self, search_space: PromptSearchSpace, space_name: str) -> list[dict[str, Any]]:
+        return search_space.sample_params(
+            self.n_samples,
+            space_name,
+            method=search_space.search_method,
+            observed=self._observations,
+        )
 
     async def propose(
         self,
@@ -1336,22 +1342,19 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
         iteration: int = 0,
         context: OptimizationContext | None = None,
     ) -> list[PromptCandidate]:
-        """Generate candidates by sampling parameter combinations.
+        """Generate candidates by sampling parameter combinations."""
+        del dataset_sample, context
+        # Feed composite scores from prior evals when available
+        for row in eval_results:
+            params = row.get("model_params") or row.get("params")
+            score = row.get("avg_score", row.get("score"))
+            if isinstance(params, dict) and isinstance(score, (int, float)):
+                self.observe(params, float(score))
 
-        Workflow:
-        1. Identify active parameter spaces (model, rag, tool).
-        2. Sample up to 10 combinations from each active space.
-        3. Create a ``PromptCandidate`` for each combination with the
-           baseline prompt/few-shot unchanged.
-
-        Returns
-        -------
-        list[PromptCandidate]
-            One candidate per sampled parameter combination.
-        """
         logger.info(
-            "ParamSearchOptimizer: iter={}, active spaces={}",
+            "ParamSearchOptimizer: iter={}, method={}, active spaces={}",
             iteration,
+            search_space.search_method,
             search_space.active_spaces(),
         )
 
@@ -1360,7 +1363,7 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
 
         # -- model params ------------------------------------------------
         if search_space.optimize_model_params:
-            combos = search_space.sample_params(10, "model")
+            combos = self._sample(search_space, "model")
             for combo in combos:
                 merged = {**current_config.model_params, **combo}
                 changes = {
@@ -1382,15 +1385,17 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     ),
                     source="param_search",
                     mutation_notes=(
-                        "Model param change: " + ", ".join(f"{k}={v}" for k, v in changes.items())
+                        f"Model param change ({search_space.search_method}): "
+                        + ", ".join(f"{k}={v}" for k, v in changes.items())
                     ),
+                    metadata={"params": changes, "space": "model"},
                 )
                 candidates.append(candidate)
                 candidate_idx += 1
 
         # -- rag params --------------------------------------------------
         if search_space.optimize_rag_params:
-            combos = search_space.sample_params(10, "rag")
+            combos = self._sample(search_space, "rag")
             for combo in combos:
                 merged = {**current_config.rag_params, **combo}
                 changes = {k: v for k, v in combo.items() if current_config.rag_params.get(k) != v}
@@ -1410,15 +1415,17 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     ),
                     source="param_search",
                     mutation_notes=(
-                        "RAG param change: " + ", ".join(f"{k}={v}" for k, v in changes.items())
+                        f"RAG param change ({search_space.search_method}): "
+                        + ", ".join(f"{k}={v}" for k, v in changes.items())
                     ),
+                    metadata={"params": changes, "space": "rag"},
                 )
                 candidates.append(candidate)
                 candidate_idx += 1
 
         # -- tool params -------------------------------------------------
         if search_space.optimize_tool_params:
-            combos = search_space.sample_params(10, "tool")
+            combos = self._sample(search_space, "tool")
             for combo in combos:
                 merged = {**current_config.tool_params, **combo}
                 changes = {
@@ -1440,8 +1447,10 @@ class ParamSearchOptimizer(BaseFitterOptimizer):
                     ),
                     source="param_search",
                     mutation_notes=(
-                        "Tool param change: " + ", ".join(f"{k}={v}" for k, v in changes.items())
+                        f"Tool param change ({search_space.search_method}): "
+                        + ", ".join(f"{k}={v}" for k, v in changes.items())
                     ),
+                    metadata={"params": changes, "space": "tool"},
                 )
                 candidates.append(candidate)
                 candidate_idx += 1
@@ -1626,12 +1635,13 @@ def resolve_fitter_optimizer(
         ``"gepa_like"``            :class:`GEPALikeOptimizer`
         ``"gepa"``                 :class:`GEPALikeOptimizer`
         ``"param_search"``         :class:`ParamSearchOptimizer`
+        ``"apo"``                  :class:`~agentomatic.optimize.algorithms.apo.APOOptimizer`
         =========================  ================================
 
     model:
         Default LLM model for optimizers that require one.
     rewrite_model:
-        Separate model for rewrite calls (GEPALikeOptimizer).  Falls
+        Separate model for rewrite calls (GEPALikeOptimizer / APO).  Falls
         back to *model* if ``None``.
     **kwargs:
         Extra keyword arguments forwarded to the optimizer constructor.
@@ -1660,6 +1670,8 @@ def resolve_fitter_optimizer(
         existing = ParamSearchOptimizer()
         assert resolve_fitter_optimizer(existing) is existing
     """
+    from agentomatic.optimize.algorithms.apo import APOOptimizer
+
     # -- pass-through for existing instances / duck-typed proposers ------
     if isinstance(name, BaseFitterOptimizer):
         logger.debug("resolve_fitter_optimizer: got existing instance ({})", name.name)
@@ -1681,6 +1693,7 @@ def resolve_fitter_optimizer(
         "gepa_like": GEPALikeOptimizer,
         "gepa": GEPALikeOptimizer,
         "param_search": ParamSearchOptimizer,
+        "apo": APOOptimizer,
     }
 
     if not isinstance(name, str):
@@ -1732,6 +1745,19 @@ def resolve_fitter_optimizer(
 
     if cls is ParamSearchOptimizer:
         return ParamSearchOptimizer(**kwargs)
+
+    if cls is APOOptimizer:
+        apo_kwargs = {
+            k: kwargs.pop(k)
+            for k in ("beam_width", "branch_factor", "gradient_batch_size", "node_match")
+            if k in kwargs
+        }
+        return APOOptimizer(
+            gradient_model=rewrite_model or model,
+            apply_edit_model=rewrite_model or model,
+            **apo_kwargs,
+            **kwargs,
+        )
 
     # Unreachable, but satisfies exhaustiveness checkers
     return cls(**kwargs)  # type: ignore[call-arg]

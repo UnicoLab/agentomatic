@@ -32,6 +32,12 @@ Synthetic data::
 
 from __future__ import annotations
 
+from agentomatic.optimize.algorithm import (
+    FitterAlgorithm,
+    OptimizationAlgorithm,
+    as_algorithm,
+)
+from agentomatic.optimize.algorithms.apo import APOOptimizer
 from agentomatic.optimize.briefing import (
     briefing_limits_for,
     build_full_optimization_briefing,
@@ -73,6 +79,11 @@ from agentomatic.optimize.failure_analysis import (
     DimensionAnalyzer,
     FailureCluster,
     FailureClusterer,
+)
+from agentomatic.optimize.feedback_dataset import (
+    dataset_from_feedback_collector,
+    dataset_from_feedback_jsonl,
+    feedback_records_to_dataset,
 )
 from agentomatic.optimize.fitter import PromptFitter
 from agentomatic.optimize.fitter_optimizers import (
@@ -132,6 +143,20 @@ from agentomatic.optimize.report import (
     generate_fit_report,
     generate_html_report,
 )
+from agentomatic.optimize.resources import ResourceBundle, ResourceRegistry
+from agentomatic.optimize.reward import (
+    FeedbackRewardAdapter,
+    MetricRewardAdapter,
+    RewardProtocol,
+    resolve_reward_adapter,
+)
+from agentomatic.optimize.rollout import (
+    RewardSignal,
+    Rollout,
+    RolloutSpan,
+    RolloutTraceStore,
+    rollout_from_run_result,
+)
 from agentomatic.optimize.search_space import PromptSearchSpace, load_search_space
 from agentomatic.optimize.strategies import (
     MIPRO,
@@ -152,6 +177,11 @@ from agentomatic.optimize.synthesizer import (
     generate_dataset,
     generate_from_docs,
     red_team,
+)
+from agentomatic.optimize.trace_adapter import (
+    CritiqueExperiment,
+    TraceToCritiqueContext,
+    TraceToMessages,
 )
 from agentomatic.optimize.train_api import (
     CompiledAgent,
@@ -252,6 +282,27 @@ __all__ = [
     "ParamDelta",
     "PromptSearchSpace",
     "load_search_space",
+    # Unified algorithm surface (Lightning-inspired)
+    "OptimizationAlgorithm",
+    "FitterAlgorithm",
+    "as_algorithm",
+    "ResourceBundle",
+    "ResourceRegistry",
+    "Rollout",
+    "RolloutSpan",
+    "RewardSignal",
+    "RolloutTraceStore",
+    "rollout_from_run_result",
+    "TraceToMessages",
+    "TraceToCritiqueContext",
+    "CritiqueExperiment",
+    "RewardProtocol",
+    "MetricRewardAdapter",
+    "FeedbackRewardAdapter",
+    "resolve_reward_adapter",
+    "feedback_records_to_dataset",
+    "dataset_from_feedback_collector",
+    "dataset_from_feedback_jsonl",
     # Multi-pass briefing (SLM + LLM)
     "looks_like_slm",
     "refine_style_for",
@@ -277,6 +328,7 @@ __all__ = [
     "MIPROLikeOptimizer",
     "GEPALikeOptimizer",
     "ParamSearchOptimizer",
+    "APOOptimizer",
     # Failure analysis
     "FailureClusterer",
     "FailureCluster",

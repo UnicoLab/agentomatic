@@ -355,6 +355,7 @@ class PromptFitter:
         api_base: str = "http://localhost:8000",
         api_prefix: str = "/api/v1",
         concurrency: int = 1,
+        n_runners: int | None = None,
         experiment_dir: str = ".optimize",
         auto_report: bool = True,
         callbacks: list[OptimizationCallback] | None = None,
@@ -373,6 +374,7 @@ class PromptFitter:
         holdout_fraction: float = 0.2,
         drain_seconds: float = 1.5,
         sequential: bool | None = None,
+        trace_store_path: str | None = None,
     ) -> None:
         # Public configuration
         self.agent = agent
@@ -383,14 +385,19 @@ class PromptFitter:
         self.max_trials = max_trials
         self.min_absolute_improvement = min_absolute_improvement
         self.patience = int(patience) if patience is not None else _EARLY_STOP_PATIENCE
+        # n_runners is an Agent Lightning–style alias for concurrency.
+        effective_concurrency = concurrency
+        if n_runners is not None:
+            effective_concurrency = max(1, int(n_runners))
         # Default concurrency=1 / sequential=True: local SLMs often spawn many
         # idle worker threads when hammered concurrently. Explicit concurrency>1
         # auto-disables sequential unless sequential=True is forced.
         if sequential is None:
-            self.sequential = concurrency <= 1
+            self.sequential = effective_concurrency <= 1
         else:
             self.sequential = sequential
-        self.concurrency = 1 if self.sequential else max(1, concurrency)
+        self.concurrency = 1 if self.sequential else max(1, effective_concurrency)
+        self.n_runners = self.concurrency
         self.experiment_dir = experiment_dir
         self.auto_report = auto_report
         self.rewrite_passes = rewrite_passes
@@ -420,10 +427,20 @@ class PromptFitter:
             api_base=api_base,
             api_prefix=api_prefix,
             agent_callable=agent_callable,
+            concurrency=self.concurrency,
         )
 
         # Search space
         self._search_space = search_space or PromptSearchSpace()
+
+        # Versioned resources + rollout traces (Lightning-inspired, lightweight)
+        from agentomatic.optimize.resources import ResourceRegistry
+        from agentomatic.optimize.reward import MetricRewardAdapter
+        from agentomatic.optimize.rollout import RolloutTraceStore
+
+        self._resource_registry = ResourceRegistry()
+        self._trace_store = RolloutTraceStore(path=trace_store_path)
+        self._reward_adapter = MetricRewardAdapter()
 
         # Fitter optimizer — lazy-imported to avoid circular deps
         from agentomatic.optimize.fitter_optimizers import (
@@ -934,6 +951,9 @@ class PromptFitter:
                             "score": cand_score,
                             "dimensions": dict(cand_dims),
                             "mutation_notes": cand.mutation_notes,
+                            "critique": (cand.metadata or {}).get("critique", ""),
+                            "resource_versions": len(self._resource_registry.history()),
+                            "trace_count": len(self._trace_store),
                         }
                     )
                     await self._callbacks.emit(
@@ -1124,6 +1144,18 @@ class PromptFitter:
                         eval_results = self._build_eval_results(full_details, metric)
                         round_improved = True
                         accepted_name = cand.name
+                        # Keep APO beam / TPE observations in sync with accepts.
+                        opt = self._optimizer
+                        if hasattr(opt, "update_beam"):
+                            try:
+                                opt.update_beam(cand.config.system_prompt, full_score)
+                            except Exception as exc:  # pragma: no cover
+                                logger.debug("APO beam update skipped: {}", exc)
+                        if hasattr(opt, "observe"):
+                            try:
+                                opt.observe(dict(cand.config.model_params or {}), full_score)
+                            except Exception as exc:  # pragma: no cover
+                                logger.debug("Param observe skipped: {}", exc)
                     else:
                         logger.info(
                             "      ❌ Rejected: {} — {}",
@@ -1495,11 +1527,21 @@ class PromptFitter:
         """
         points = [dp.to_dict() for dp in dataset]
 
+        # Publish a versioned resource snapshot for this evaluation.
+        resource_id: str | None = None
+        try:
+            bundle = self._resource_registry.publish(config, label="eval")
+            resource_id = bundle.resource_id
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Resource publish skipped: {}", exc)
+
         # Inject model_params for deterministic eval. Prefer candidate
         # overrides; default temperature=0.0 so scoring does not oscillate
         # from sampling noise (common 0.33↔0.67 judge/agent jitter).
         eval_params = dict(config.model_params or {})
         eval_params.setdefault("temperature", 0.0)
+        node_scope = list(self._search_space.optimize_nodes or [])
+        node_match = self._search_space.node_match
         augmented_points: list[dict[str, Any]] = []
         for point in points:
             p = dict(point)
@@ -1507,6 +1549,14 @@ class PromptFitter:
             invoke = dict(meta.get("invoke") or {})
             invoke.setdefault("model_params", eval_params)
             invoke.setdefault("temperature", eval_params.get("temperature", 0.0))
+            if node_scope:
+                invoke["optimize_nodes"] = node_scope
+                meta["optimize_nodes"] = node_scope
+            if node_match:
+                invoke["node_match"] = node_match
+                meta["node_match"] = node_match
+            if resource_id:
+                meta["resource_id"] = resource_id
             meta["invoke"] = invoke
             meta["model_params"] = eval_params
             p["metadata"] = meta
@@ -1516,6 +1566,13 @@ class PromptFitter:
         # agents (and HTTP runners) that only honour prompt_override still
         # see them during candidate evaluation.
         prompt_override = self._prompt_with_few_shot(config)
+        if node_scope:
+            scope_note = (
+                "\n\n## Optimization scope\n"
+                "Apply the instructions above primarily to these graph "
+                f"nodes/subagents: {', '.join(node_scope)}."
+            )
+            prompt_override = (prompt_override + scope_note).strip()
 
         run_results: list[RunResult] = await self._runner.run_dataset(
             augmented_points,
@@ -1523,23 +1580,43 @@ class PromptFitter:
             concurrency=self.concurrency,
         )
 
+        from agentomatic.optimize.rollout import rollout_from_run_result
+        from agentomatic.optimize.trace_adapter import TraceToMessages
+
+        trace_adapter = TraceToMessages(node_match=node_match)
+
         scores: list[float] = []
         dim_accumulators: dict[str, list[float]] = {}
         eval_details: list[dict[str, Any]] = []
 
         scored_count = 0
         for rr in run_results:
+            messages = trace_adapter.adapt_run_result(rr)
             if rr.error:
                 logger.debug("Skipping errored result for '{}'", rr.query[:50])
-                eval_details.append(
-                    {
-                        "query": rr.query,
-                        "response": rr.response,
-                        "expected": rr.expected,
-                        "avg_score": 0.0,
-                        "error": rr.error,
-                        "details": [],
-                    }
+                detail = {
+                    "query": rr.query,
+                    "response": rr.response,
+                    "expected": rr.expected,
+                    "avg_score": 0.0,
+                    "error": rr.error,
+                    "details": [],
+                    "messages": messages,
+                    "tool_calls": list(rr.tool_calls or []),
+                    "steps_taken": list(rr.steps_taken or []),
+                    "reasoning": rr.reasoning or "",
+                    "retrieval_context": list(rr.retrieval_context or []),
+                    "model_params": dict(eval_params),
+                    "resource_id": resource_id,
+                }
+                eval_details.append(detail)
+                self._trace_store.add(
+                    rollout_from_run_result(
+                        rr,
+                        resource_id=resource_id,
+                        reward=0.0,
+                        messages=messages,
+                    )
                 )
                 continue
 
@@ -1566,6 +1643,12 @@ class PromptFitter:
                             "avg_score": 0.0,
                             "error": eval_result.reason,
                             "details": [],
+                            "messages": messages,
+                            "tool_calls": list(rr.tool_calls or []),
+                            "steps_taken": list(rr.steps_taken or []),
+                            "reasoning": rr.reasoning or "",
+                            "model_params": dict(eval_params),
+                            "resource_id": resource_id,
                         }
                     )
                     continue
@@ -1582,27 +1665,42 @@ class PromptFitter:
                         dim_accumulators.setdefault(dim, []).append(val)
 
                 meta = eval_result.metadata or {}
-                eval_details.append(
-                    {
-                        "query": rr.query,
-                        "response": rr.response,
-                        "expected": rr.expected,
-                        "avg_score": point_score,
-                        "score": point_score,
-                        "dimensions": point_dims or meta.get("dimensions", {}),
-                        "feedback": eval_result.reason,
-                        "motivation": meta.get("motivation", ""),
-                        "what_worked": meta.get("what_worked", []),
-                        "what_failed": meta.get("what_failed", []),
-                        "improvement_hints": meta.get("improvement_hints", []),
-                        "details": [
-                            {
-                                "metric": eval_result.metric_name,
-                                "score": eval_result.score,
-                                "reason": eval_result.reason,
-                            },
-                        ],
-                    }
+                reward = self._reward_adapter.reward_from_eval(eval_result)
+                detail = {
+                    "query": rr.query,
+                    "response": rr.response,
+                    "expected": rr.expected,
+                    "avg_score": point_score,
+                    "score": point_score,
+                    "dimensions": point_dims or meta.get("dimensions", {}),
+                    "feedback": eval_result.reason,
+                    "motivation": meta.get("motivation", ""),
+                    "what_worked": meta.get("what_worked", []),
+                    "what_failed": meta.get("what_failed", []),
+                    "improvement_hints": meta.get("improvement_hints", []),
+                    "messages": messages,
+                    "tool_calls": list(rr.tool_calls or []),
+                    "steps_taken": list(rr.steps_taken or []),
+                    "reasoning": rr.reasoning or "",
+                    "retrieval_context": list(rr.retrieval_context or []),
+                    "model_params": dict(eval_params),
+                    "resource_id": resource_id,
+                    "details": [
+                        {
+                            "metric": eval_result.metric_name,
+                            "score": eval_result.score,
+                            "reason": eval_result.reason,
+                        },
+                    ],
+                }
+                eval_details.append(detail)
+                self._trace_store.add(
+                    rollout_from_run_result(
+                        rr,
+                        resource_id=resource_id,
+                        reward=reward,
+                        messages=messages,
+                    )
                 )
             except Exception as exc:
                 logger.warning("Metric evaluation failed for '{}': {}", rr.query[:50], exc)
@@ -1614,6 +1712,9 @@ class PromptFitter:
                         "avg_score": 0.0,
                         "error": str(exc),
                         "details": [],
+                        "messages": messages,
+                        "model_params": dict(eval_params),
+                        "resource_id": resource_id,
                     }
                 )
 
@@ -1622,6 +1723,8 @@ class PromptFitter:
         per_dim: dict[str, float] = {
             dim: sum(vals) / len(vals) for dim, vals in dim_accumulators.items() if vals
         }
+        if resource_id:
+            self._resource_registry.update_score(resource_id, avg_score)
 
         return avg_score, per_dim, eval_details
 

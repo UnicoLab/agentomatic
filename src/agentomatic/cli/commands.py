@@ -1493,6 +1493,7 @@ _FITTER_MODES: tuple[str, ...] = (
     "gepa_like",
     "mipro_like",
     "few_shot",
+    "apo",
 )
 
 
@@ -1575,8 +1576,8 @@ def _coerce_param_value(token: str) -> Any:
     default="prompt_only",
     help=(
         "Optimization mode. 'prompt_only' uses the legacy PromptOptimizer; "
-        "'rewrite', 'param_search', 'gepa_like', 'mipro_like', 'few_shot' "
-        "route through PromptFitter with the matching fitter optimizer."
+        "'rewrite', 'param_search', 'gepa_like', 'mipro_like', 'few_shot', "
+        "'apo' route through PromptFitter with the matching fitter optimizer."
     ),
 )
 @click.option(
@@ -1635,6 +1636,23 @@ def _coerce_param_value(token: str) -> Any:
 @click.option("--no-report", is_flag=True, help="Skip HTML report generation")
 @click.option("--apply", "auto_apply", is_flag=True, help="Auto-apply best prompt")
 @click.option("--host", default="http://localhost:8000", help="Platform API base")
+@click.option(
+    "--n-runners",
+    type=int,
+    default=None,
+    help="Parallel rollout workers for fitter eval (alias for concurrency).",
+)
+@click.option(
+    "--search-method",
+    type=click.Choice(["grid", "random", "tpe"]),
+    default=None,
+    help="Parameter search method for param_search mode (grid|random|tpe).",
+)
+@click.option(
+    "--node-match",
+    default=None,
+    help="Regex to scope APO/trace critique to matching graph nodes/subagents.",
+)
 def optimize(
     agent: str,
     dataset: str,
@@ -1658,6 +1676,9 @@ def optimize(
     no_report: bool,
     auto_apply: bool,
     host: str,
+    n_runners: int | None,
+    search_method: str | None,
+    node_match: str | None,
 ) -> None:
     """Run prompt / parameter optimization for an agent.
 
@@ -1665,7 +1686,7 @@ def optimize(
 
     - ``--mode prompt_only`` (default) runs the legacy PromptOptimizer
       loop and is backward compatible with previous CLI usage.
-    - ``--mode {rewrite,param_search,gepa_like,mipro_like,few_shot}``
+    - ``--mode {rewrite,param_search,gepa_like,mipro_like,few_shot,apo}``
       routes through PromptFitter with the matching fitter optimizer and
       a PromptSearchSpace loaded from ``--search-space`` (if provided)
       plus any ``--param`` overrides.
@@ -1714,6 +1735,9 @@ def optimize(
         no_report=no_report,
         auto_apply=auto_apply,
         host=host,
+        n_runners=n_runners,
+        search_method=search_method,
+        node_match=node_match,
     )
 
 
@@ -1797,6 +1821,9 @@ def _run_fitter_optimize(
     no_report: bool,
     auto_apply: bool,
     host: str,
+    n_runners: int | None = None,
+    search_method: str | None = None,
+    node_match: str | None = None,
 ) -> None:
     """Run PromptFitter with the selected fitter optimizer mode."""
     import asyncio
@@ -1808,6 +1835,7 @@ def _run_fitter_optimize(
             PromptFitter,
             PromptSearchSpace,
             WeightedMetric,
+            as_algorithm,
             load_search_space,
             resolve_metrics,
         )
@@ -1837,6 +1865,10 @@ def _run_fitter_optimize(
 
     space.optimize_system_prompt = optimize_prompt
     space.optimize_model_params = optimize_params
+    if search_method:
+        space.search_method = search_method
+    if node_match:
+        space.node_match = node_match
 
     overrides = _parse_param_overrides(param_overrides)
     if overrides:
@@ -1847,9 +1879,10 @@ def _run_fitter_optimize(
             ", ".join(overrides),
         )
     logger.info(
-        "Active spaces: {} — total combinations: {}",
+        "Active spaces: {} — total combinations: {} — method: {}",
         space.active_spaces(),
         space.total_search_size(),
+        space.search_method,
     )
 
     resolved = resolve_metrics(metric_names, model=llm)  # type: ignore[arg-type]
@@ -1864,19 +1897,29 @@ def _run_fitter_optimize(
             ],
         )
 
-    fitter = PromptFitter(
-        agent=agent,
-        task_model=llm,
-        rewrite_model=rewrite_llm,
-        optimizer=mode,
-        search_space=space,
-        max_trials=max_trials,
-        api_base=host,
-        auto_report=not no_report,
-    )
+    fitter_kwargs: dict[str, Any] = {
+        "agent": agent,
+        "task_model": llm,
+        "rewrite_model": rewrite_llm,
+        "optimizer": mode,
+        "search_space": space,
+        "max_trials": max_trials,
+        "api_base": host,
+        "auto_report": not no_report,
+    }
+    if n_runners is not None:
+        fitter_kwargs["n_runners"] = n_runners
+
+    fitter = PromptFitter(**fitter_kwargs)
+    algorithm = as_algorithm(fitter)
 
     result = asyncio.run(
-        fitter.fit(trainset=train_ds, valset=val_ds, metric=metric, testset=test_ds),
+        algorithm.run(
+            train_ds,
+            val_ds,
+            metric=metric,
+            test_dataset=test_ds,
+        ),
     )
     click.echo(result.summary())
 
