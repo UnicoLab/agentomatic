@@ -2756,6 +2756,14 @@ This project adheres to <a href="https://semver.org/">Semantic Versioning</a>.</
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Agent Lightning–inspired optimize foundations</strong> (no VERL/agentlightning
+  dependency): <code>OptimizationAlgorithm</code> / <code>FitterAlgorithm</code>, versioned
+  <code>ResourceBundle</code> registry, <code>Rollout</code> + <code>RolloutTraceStore</code>,
+  <code>TraceToMessages</code> / APO critique context, <code>RewardProtocol</code>, feedback→dataset
+  helpers, <code>APOOptimizer</code> (<code>--mode apo</code>) with textual gradients + beam search,
+  TPE/<code>grid</code>/<code>random</code> param search (<code>--search-method</code>), selective
+  <code>node_match</code> / <code>optimize_nodes</code>, parallel <code>--n-runners</code>, and HolySheet trial
+  critiques. See <code>docs/guide/optimization.md</code>.</li>
 <li><strong>Generic <code>ai_core</code> batteries migrated into Agentomatic</strong>:
   <code>ArtifactRegistry</code> (blue/green promote/rollback), task-progress
   <code>report_stage</code> ContextVar bridge, public <code>extract_json</code> /
