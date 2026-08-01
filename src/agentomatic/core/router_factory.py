@@ -1341,32 +1341,37 @@ def create_default_router(
         Unlike /invoke, this endpoint returns retrieval context,
         tool calls, reasoning steps, and citations — everything
         needed for DeepEval metrics (faithfulness, contextual_relevancy, etc.).
+
+        Uses the same state builder as ``/invoke`` so ``context.document``
+        (and other agent inputs) flatten into ``input_to_state`` correctly.
+        Earlier builds buried ``request.context`` under ``metadata`` only,
+        which left class agents with an empty document and heuristic fallback.
         """
         agent = _get_agent()
-        state = {
-            "current_query": request.query,
-            "user_id": request.user_id,
-            "thread_id": f"opt_{uuid.uuid4().hex[:12]}",
-            "messages": [],
-            "metadata": {
-                **request.context,
-                "_optimize": True,
-                "_include_retrieval_context": request.include_retrieval_context,
-                "_include_steps": request.include_steps,
-            },
-            "steps_taken": [],
-            "response": "",
-            "retrieval_context": [],
-            "tool_calls": [],
-            "reasoning": "",
-        }
+        # Same passthrough as /invoke: context.document / extras at top level
+        # after ``_input_from_state``, not nested only under metadata.
+        state = build_invoke_state(
+            request,
+            default_thread_id=f"opt_{uuid.uuid4().hex[:12]}",
+        )
+        metadata = state.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+            state["metadata"] = metadata
+        metadata["_optimize"] = True
+        metadata["_include_retrieval_context"] = request.include_retrieval_context
+        metadata["_include_steps"] = request.include_steps
+        # Optimisation bookkeeping fields (not agent inputs).
+        state.setdefault("retrieval_context", [])
+        state.setdefault("tool_calls", [])
+        state.setdefault("reasoning", "")
 
         # Inject prompt override at top-level + metadata so class agents
         # (``resolve_system_prompt`` / ``_input_from_state``) and folder
         # agents that read metadata both see it.
         if request.system_prompt_override:
             state["system_prompt_override"] = request.system_prompt_override
-            state["metadata"]["system_prompt_override"] = request.system_prompt_override  # type: ignore[index]
+            metadata["system_prompt_override"] = request.system_prompt_override
 
         t0 = time.perf_counter()
         try:
