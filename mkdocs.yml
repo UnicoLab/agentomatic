@@ -128,6 +128,7 @@ nav:
     - Storage Backends: guide/storage.md
     - Middleware: guide/middleware.md
     - LangGraph Integration: guide/langgraph.md
+    - LangChain Adapter: guide/langchain-adapter.md
     - ML Plugins: guide/ml-plugins.md
     - Testing Your Agents: guide/testing.md
   - Advanced:

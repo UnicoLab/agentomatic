@@ -566,6 +566,25 @@ class PromptFitter:
             ),
         )
 
+        # Optional SQLite experiment tracking (best-effort; never breaks fit).
+        tracker: Any | None = None
+        tracker_exp_id: str | None = None
+        try:
+            from agentomatic.optimize.experiment_tracker import ExperimentTracker
+
+            tracker = ExperimentTracker(db_path=str(Path(self.experiment_dir) / "experiments.db"))
+            tracker_exp_id = await tracker.start_experiment(
+                agent_name=self.agent,
+                strategy=getattr(self._optimizer, "name", "") or "",
+                model=str(self.rewrite_model),
+                target_score=0.0,
+                experiment_id=experiment_id,
+            )
+        except Exception as exc:
+            logger.debug("ExperimentTracker unavailable: {}", exc)
+            tracker = None
+            tracker_exp_id = None
+
         metric = self._augment_metric_with_local_judges(metric)
 
         # ── Generalization safety net: always reserve a holdout ──────
@@ -660,9 +679,16 @@ class PromptFitter:
                 experiment_id=experiment_id,
                 score=baseline_score,
                 baseline_score=baseline_score,
+                best_score=baseline_score,
                 dimensions=dict(baseline_dims),
+                prompt=baseline_config.system_prompt,
             ),
         )
+        if tracker is not None and tracker_exp_id is not None:
+            try:
+                await tracker.set_initial_score(tracker_exp_id, baseline_score)
+            except Exception as exc:
+                logger.debug("ExperimentTracker.set_initial_score failed: {}", exc)
 
         # ── Step 3: Cluster failures ─────────────────────────────────
         logger.info("🔍 Step 3/10 — Clustering baseline failures")
@@ -844,8 +870,25 @@ class PromptFitter:
                     best_score=best_score,
                     baseline_score=baseline_score,
                     score_history=[rs.score for rs in score_history],
+                    prompt=best_config.system_prompt,
                 ),
             )
+
+            # Honour ML-style callback side-effects (temperature / prompt restore).
+            cb_temp = self._callbacks.current_temperature()
+            if cb_temp is not None:
+                params = dict(best_config.model_params or {})
+                params["temperature"] = cb_temp
+                best_config.model_params = params
+            cb_prompt = self._callbacks.current_prompt(overrides_only=True)
+            if cb_prompt and cb_prompt != best_config.system_prompt:
+                # Callbacks may restore best_prompt after NaN / early-stop.
+                best_config.system_prompt = cb_prompt
+                # Clear override flags so later rounds can update normally.
+                for cb in self._callbacks.callbacks:
+                    ctx = getattr(cb, "context", None) or getattr(cb, "_ctx", None)
+                    if ctx is not None:
+                        ctx.prompt_override = False
 
             # ── Build OptimizationContext for the optimizer ───────
             opt_context = OptimizationContext(
@@ -1230,8 +1273,47 @@ class PromptFitter:
                     baseline_score=baseline_score,
                     elapsed_seconds=time.perf_counter() - round_t0,
                     score_history=[rs.score for rs in score_history],
+                    prompt=best_config.system_prompt,
                 ),
             )
+
+            if tracker is not None and tracker_exp_id is not None:
+                try:
+                    await tracker.log_iteration(
+                        experiment_id=tracker_exp_id,
+                        iteration=round_num,
+                        score=best_score,
+                        prompt=best_config.system_prompt,
+                        metrics=dict(best_dims),
+                        duration_ms=(time.perf_counter() - round_t0) * 1000.0,
+                    )
+                except Exception as exc:
+                    logger.debug("ExperimentTracker.log_iteration failed: {}", exc)
+
+            # Callback-driven early stop (EarlyStopping / ScoreThreshold / NaNStopping).
+            if self._callbacks.stop_requested():
+                restored = self._callbacks.current_prompt(overrides_only=True)
+                if restored:
+                    best_config.system_prompt = restored
+                early_stop_reason = (
+                    early_stop_reason or f"callback stop_requested at round {round_num}"
+                )
+                logger.warning(
+                    "   ⏹️  Early stop: callback requested stop at round {}",
+                    round_num,
+                )
+                await self._callbacks.emit(
+                    OptimizationEvent.EARLY_STOP,
+                    EventData(
+                        agent=self.agent,
+                        experiment_id=experiment_id,
+                        round_idx=round_idx,
+                        best_score=best_score,
+                        prompt=best_config.system_prompt,
+                    ),
+                )
+                break
+
             if not round_improved and no_improvement_rounds >= effective_patience:
                 early_stop_reason = (
                     f"no improvement for {effective_patience} round(s) "
@@ -1434,8 +1516,21 @@ class PromptFitter:
                 best_score=best_score,
                 improvement=best_score - baseline_score,
                 elapsed_seconds=time.perf_counter() - t0,
+                prompt=best_config.system_prompt,
             ),
         )
+
+        if tracker is not None and tracker_exp_id is not None:
+            try:
+                await tracker.end_experiment(
+                    experiment_id=tracker_exp_id,
+                    final_score=best_score,
+                    best_score=best_score,
+                    total_iterations=len([rs for rs in score_history if rs.round_idx >= 0]),
+                    status="stopped" if early_stop_reason else "completed",
+                )
+            except Exception as exc:
+                logger.debug("ExperimentTracker.end_experiment failed: {}", exc)
 
         # Drain: give local LLM servers / HTTP pools time to release
         # connections after the async optimisation loop (avoids "connection

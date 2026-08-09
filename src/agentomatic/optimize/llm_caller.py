@@ -84,13 +84,25 @@ def parse_model_spec(model: str) -> tuple[str, str]:
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Best-effort JSON object extraction from free-form LLM text.
 
-    Delegates to :func:`agentomatic.providers.jsonutil.extract_json_object`
-    (fence strip, thinking strip, trailing-comma repair). Raises
-    :exc:`ValueError` when nothing parses — matching the previous contract.
+    Tries :func:`agentomatic.providers.jsonutil.extract_json_object` first,
+    then falls back to :class:`~agentomatic.optimize.json_extractor.JSONExtractor`
+    for multi-strategy repair. Raises :exc:`ValueError` when nothing parses.
     """
     from agentomatic.providers.jsonutil import extract_json_object
 
     result = extract_json_object(text)
+    if isinstance(result, dict) and result:
+        return result
+
+    try:
+        from agentomatic.optimize.json_extractor import JSONExtractor
+
+        repaired = JSONExtractor().extract(text)
+        if isinstance(repaired, dict) and repaired:
+            return repaired
+    except Exception:
+        pass
+
     if result is None:
         raise ValueError("No JSON object delimiters found in response")
     return result

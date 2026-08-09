@@ -1322,6 +1322,132 @@ Each command maps to a stage in the optimization lifecycle:
 
 ---
 
+## ML-style callbacks, presets, and experiment tracking
+
+Agentomatic also exposes a Keras-inspired surface for prompt optimisation
+that plugs directly into :class:`~agentomatic.optimize.fitter.PromptFitter`
+(no adapters required).
+
+### Callbacks
+
+```python
+from agentomatic.optimize.callbacks import (
+    EarlyStopping, ModelCheckpoint, NaNStopping,
+    ScoreThreshold, TemperatureScheduler, default_callbacks,
+)
+from agentomatic.optimize import PromptFitter
+
+fitter = PromptFitter(
+    agent="hello",
+    callbacks=[
+        EarlyStopping(patience=3, min_delta=0.01),
+        ModelCheckpoint(save_dir="checkpoints/hello/"),
+        ScoreThreshold(threshold=0.90),
+        TemperatureScheduler(initial_temperature=0.7),
+        NaNStopping(),
+    ],
+)
+# Or: callbacks=default_callbacks(patience=3, target_score=0.9)
+```
+
+`PromptFitter` polls callback side-effects after every round:
+
+- ``stop_requested`` → early exit (EarlyStopping / ScoreThreshold / NaNStopping)
+- ``current_temperature`` → written into ``best_config.model_params``
+- ``current_prompt`` → restores a checkpointed / rolled-back prompt
+
+### Presets
+
+```python
+from agentomatic.optimize.presets import Presets, to_fitter_kwargs
+from agentomatic.optimize import PromptFitter
+
+preset = Presets.for_local()          # Ollama, 5 rounds
+# Presets.for_quality() / Presets.for_quick() / Presets.for_model(...)
+fitter = PromptFitter(agent="hello", **to_fitter_kwargs(preset))
+cfg = preset.to_config(system_prompt="You are helpful.")
+```
+
+### Experiment tracker
+
+Every `PromptFitter.fit()` run auto-logs to SQLite under
+``{experiment_dir}/experiments.db``. You can also drive it manually:
+
+```python
+from agentomatic.optimize.experiment_tracker import ExperimentTracker
+
+tracker = ExperimentTracker()
+eid = await tracker.start_experiment("hello", strategy="gepa_like", model="ollama/mistral:7b")
+await tracker.log_iteration(eid, iteration=1, score=0.72, prompt="...")
+await tracker.end_experiment(eid, final_score=0.91)
+tracker.display_experiments()  # alias: show_experiments()
+```
+
+### ``agent.fit()`` mixin (prompt path)
+
+```python
+from agentomatic.agents import BaseGraphAgent
+from agentomatic.optimize import OptimizerMixin
+
+class HelloAgent(OptimizerMixin, BaseGraphAgent):  # mixin first for fit(test_cases)
+    agent_name = "hello"
+    ...
+
+result = agent.fit(test_cases, max_iterations=5)  # → FitResult
+print(result.summary())
+
+# Keras History path still works via smart dispatch:
+agent.compile(dataset=ds, metrics=[...])
+history = agent.fit(ds, epochs=2)  # → History
+```
+
+!!! tip "MRO + smart dispatch"
+    Put ``OptimizerMixin`` **before** ``BaseGraphAgent`` so
+    ``agent.fit(test_cases)`` is the discoverable one-liner. Keras-style
+    calls (``AgentDataset``, ``epochs=``, ``optimize_mode=``, …) still
+    delegate to :meth:`BaseGraphAgent.fit`. Prefer ``await
+    agent.optimize_prompts(...)`` only when you are already inside an
+    async context.
+
+### Per-agent ``evals.py`` discovery
+
+```python
+# agents/hello/evals.py
+def get_test_cases(): ...
+THRESHOLDS = {"answer_relevancy": 0.8}
+
+from agentomatic.optimize.evals_discovery import discover_agent_evals
+discovered = discover_agent_evals("agents/")
+```
+
+### Per-agent training CLI
+
+```python
+# agents/hello/train.py
+from agentomatic.optimize.train_cli import create_train_cli
+cli = create_train_cli(agent=HelloAgent(), test_cases_fn=get_test_cases)
+if __name__ == "__main__":
+    cli()  # subcommands: train, evaluate, experiments, generate, settings
+```
+
+### Offline end-to-end coverage
+
+The suite in `tests/test_optimize_langchain_e2e.py` exercises the production
+paths offline (local echo agent + `ExactMatchMetric`, no LLM server):
+
+- `OptimizerMixin.fit(test_cases)` → `FitResult`, callbacks, history
+- `PromptFitter` + tracker / checkpoint / temperature scheduling
+- presets → fitter kwargs
+- `create_train_cli` / `_do_train`
+- LangChain adapter + scaffolded `langchain` agent
+- evals discovery, diversity selection, JSON extract, prompt version control
+
+```bash
+uv run pytest tests/test_optimize_langchain_e2e.py -q --override-ini='addopts='
+```
+
+---
+
 ### Vocabulary
 
 To maintain consistency across documentation and code, use deployment-first terminology:

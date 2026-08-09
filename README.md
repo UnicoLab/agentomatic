@@ -399,25 +399,58 @@ sync/async/streaming/task modes. See the
 
 ## ⚙️ Configuration
 
+Agentomatic has **two configuration layers** that work together:
+
+### 1. Pydantic BaseSettings (`.env`-driven)
+
+The platform auto-loads settings via `PlatformSettings` (Pydantic `BaseSettings`):
+
+```bash
+# .env
+LLM__PROVIDER=ollama
+LLM__MODEL=mistral:7b
+FEATURES__ENABLE_METRICS=true
+AGENTOMATIC_ARTIFACT_ROOT=.local/artifacts
+```
+
+```python
+from agentomatic.config.settings import get_settings
+settings = get_settings()
+print(settings.llm.model)  # "mistral:7b"
+```
+
+**Sections:** `llm`, `embedding`, `db`, `features`, `auth`, `rate_limit`,
+plus `app_name`, `log_level`, `artifact_root`, `runs_root`, `audit_log`,
+`chunk_size_tokens`, `min_quality_score`.
+
+### 2. Optimisation Settings (`OPTIMIZER_` prefix)
+
+`OptimizerPydanticSettings` for prompt-optimisation knobs:
+
+```bash
+# .env
+OPTIMIZER_TRAINER_MODEL=ollama/mistral:7b
+OPTIMIZER_MAX_ITERATIONS=10
+OPTIMIZER_STRATEGY=combined
+```
+
+```python
+from agentomatic.optimize.settings import OptimizerPydanticSettings
+opts = OptimizerPydanticSettings()
+opts.display()  # pretty table
+```
+
+### 3. Programmatic (Python API)
+
 ```python
 from agentomatic import AgentPlatform
-from agentomatic.storage import MemoryStore  # or SQLAlchemyStore
+from agentomatic.storage import MemoryStore
 
 platform = AgentPlatform.from_folder(
     "agents/",
-    # Storage
     store=MemoryStore(),
-    # Auth
-    enable_auth=True,
-    auth_api_key="your-secret-key",
-    # Rate limiting
-    enable_rate_limit=True,
-    rate_limit_requests=100,
-    rate_limit_window=60,
-    # Prometheus metrics
+    enable_auth=True, auth_api_key="secret",
     enable_metrics=True,
-    # Custom middleware
-    middleware=[(MyMiddleware, {"arg": "value"})],
 )
 app = platform.build()
 ```
@@ -743,6 +776,70 @@ agentomatic promote scope_agent --version v2_optimized
 | Module | Deployment component |
 | Predictor | Agent version |
 | Compiled artifact | Optimized config version |
+
+### 🧠 Callbacks — No Adapters Needed
+
+```python
+from agentomatic.callbacks import OptimizeEarlyStopping, ModelCheckpoint
+from agentomatic.optimize import PromptFitter
+
+fitter = PromptFitter(..., callbacks=[
+    OptimizeEarlyStopping(patience=3),
+    ModelCheckpoint(save_dir="checkpoints/"),
+])
+```
+
+### 🔍 Agent Type Auto-Detection
+
+```python
+from agentomatic.optimize.agent_detect import detect_agent_type, Evaluator
+type = detect_agent_type(my_agent)  # STATELESS, RAG, TOOL_USING, ...
+evaluator = Evaluator.for_agent(my_agent)  # auto-selects metrics
+```
+
+### 💾 Experiment Tracking
+
+```python
+from agentomatic.optimize.experiment_tracker import ExperimentTracker
+tracker = ExperimentTracker()
+eid = await tracker.start_experiment("my_agent")
+await tracker.log_iteration(eid, 1, 0.72)
+tracker.display_experiments()
+```
+
+### 🔌 LangChain / LangGraph Adapter
+
+```python
+from agentomatic.langchain_adapter import AgentAdapter
+adapted = AgentAdapter(my_langgraph_agent)
+result = await adapted.atransform({"current_query": "Hello"})
+```
+
+### ⚙️ Presets & Settings
+
+```python
+from agentomatic.optimize.presets import Presets
+Presets.for_local()    # free Ollama, 5 rounds
+Presets.for_quality()  # GPT-4o, 10 rounds
+```
+
+### 🎯 agent.fit() One-Liner
+
+```python
+from agentomatic.optimize.optimizer_mixin import OptimizerMixin
+class MyAgent(OptimizerMixin, BaseGraphAgent): ...  # mixin first for fit(test_cases)
+result = agent.fit(test_cases)  # sync → FitResult
+# → "FitResult: 0.52 → 0.84 after 5 rounds"
+# Keras path still works: agent.compile(...).fit(ds, epochs=2) → History
+```
+
+### 🧪 Per-Agent Evaluation Discovery
+
+```python
+# agents/my_agent/evals.py — auto-discovered!
+from agentomatic.optimize.evals_discovery import discover_agent_evals
+discovered = discover_agent_evals()
+```
 
 ## 🛠️ Development
 

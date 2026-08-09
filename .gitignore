@@ -47,3 +47,4 @@ site/
 
 # Poetry (legacy)
 poetry.lock
+inspiration/

@@ -246,3 +246,51 @@ class CallbackManager:
 
     def __bool__(self) -> bool:
         return bool(self._callbacks)
+
+    # ── ML-style callback side-effect polling ────────────────────────
+
+    def stop_requested(self) -> bool:
+        """Return ``True`` if any registered callback requested early stop.
+
+        Compatible with :class:`~agentomatic.optimize.callbacks.Callback`
+        instances that mutate ``context.stop_requested``.
+        """
+        for cb in self._callbacks:
+            ctx = getattr(cb, "context", None) or getattr(cb, "_ctx", None)
+            if ctx is not None and bool(getattr(ctx, "stop_requested", False)):
+                return True
+        return False
+
+    def current_temperature(self, default: float | None = None) -> float | None:
+        """Return the latest temperature suggested by schedulers, if any.
+
+        Only callbacks that explicitly set ``context.current_temperature``
+        (not the default ``None``) contribute.
+        """
+        temp: float | None = None
+        for cb in self._callbacks:
+            ctx = getattr(cb, "context", None) or getattr(cb, "_ctx", None)
+            if ctx is None:
+                continue
+            value = getattr(ctx, "current_temperature", None)
+            if value is not None:
+                temp = float(value)
+        return temp if temp is not None else default
+
+    def current_prompt(self, *, overrides_only: bool = False) -> str | None:
+        """Return a callback prompt, optionally only when explicitly restored.
+
+        Args:
+            overrides_only: When ``True``, only return prompts marked with
+                ``prompt_override`` (NaN / early-stop rollback).
+        """
+        for cb in reversed(self._callbacks):
+            ctx = getattr(cb, "context", None) or getattr(cb, "_ctx", None)
+            if ctx is None:
+                continue
+            if overrides_only and not bool(getattr(ctx, "prompt_override", False)):
+                continue
+            prompt = getattr(ctx, "current_prompt", None)
+            if isinstance(prompt, str) and prompt.strip():
+                return prompt
+        return None

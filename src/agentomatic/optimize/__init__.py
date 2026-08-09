@@ -32,6 +32,34 @@ Synthetic data::
 
 from __future__ import annotations
 
+# ── LangChain adapter (re-exported from core) ────────────────────────
+from agentomatic.langchain_adapter import (  # noqa: F811
+    AgentAdapter,
+    adapt_langgraph_agent,
+    collect_stream,
+    dict_to_messages,
+    extract_system_prompt,
+    inject_config,
+    inject_system_prompt,
+    is_chain,
+    make_config,
+    messages_to_dict,
+    resolve_prompt,
+    serialize_messages,
+    tools_to_names,
+    wrap_chain_as_async_node,
+    wrap_chain_as_node,
+)
+
+# ── New: Agent-type detection ─────────────────────────────────────────
+from agentomatic.optimize.agent_detect import (
+    METRIC_PRESETS,
+    AgentType,
+    Evaluator,
+    detect_agent_type,
+    get_metrics_for_agent_type,
+    list_available_metrics,
+)
 from agentomatic.optimize.algorithm import (
     FitterAlgorithm,
     OptimizationAlgorithm,
@@ -46,6 +74,20 @@ from agentomatic.optimize.briefing import (
     multipass_refine_prompt,
     refine_style_for,
     resolve_rewrite_passes,
+)
+
+# ── New: ML-style callbacks ───────────────────────────────────────────
+from agentomatic.optimize.callbacks import (
+    Callback,
+    CallbackContext,
+    EarlyStopping,
+    ModelCheckpoint,
+    NaNStopping,
+    PlateauStopping,
+    ProgressLogger,
+    ScoreThreshold,
+    TemperatureScheduler,
+    default_callbacks,
 )
 from agentomatic.optimize.cli_settings import EvalCliSettings, TrainCliSettings
 
@@ -64,6 +106,12 @@ from agentomatic.optimize.deployment import (
     RolloutConfig,
     build_deployment_recommendation,
 )
+
+# ── New: Diversity selector ───────────────────────────────────────────
+from agentomatic.optimize.diversity_selector import (
+    DiversityConfig,
+    DiversitySelector,
+)
 from agentomatic.optimize.eval_api import (
     EvalConfig,
     EvaluateResult,
@@ -75,6 +123,23 @@ from agentomatic.optimize.eval_api import (
     select_examples,
 )
 from agentomatic.optimize.eval_contract import EvalContract
+
+# ── New: Evals auto-discovery ──────────────────────────────────────
+from agentomatic.optimize.evals_discovery import (
+    discover_agent_evals,
+    generate_pytest_params,
+    get_agent_metrics,
+    get_agent_test_cases,
+    get_agent_thresholds,
+    list_agents_with_evals,
+)
+
+# ── New: Experiment tracker ───────────────────────────────────────────
+from agentomatic.optimize.experiment_tracker import (
+    ExperimentTracker,
+    get_tracker,
+    reset_tracker,
+)
 from agentomatic.optimize.failure_analysis import (
     DimensionAnalyzer,
     FailureCluster,
@@ -94,6 +159,9 @@ from agentomatic.optimize.fitter_optimizers import (
     ParamSearchOptimizer,
     RewriteOptimizer,
 )
+
+# ── New: JSON extractor ───────────────────────────────────────────────
+from agentomatic.optimize.json_extractor import JSONExtractor, extract_json
 from agentomatic.optimize.judges import (
     JudgeCalibrationSet,
     LocalJudgeMetric,
@@ -138,6 +206,21 @@ from agentomatic.optimize.metrics import (
     resolve_metrics,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
+
+# ── New: OptimizerMixin ──────────────────────────────────────────────
+from agentomatic.optimize.optimizer_mixin import (
+    FitResult,
+    OptimizerMixin,
+)
+
+# ── New: Presets ──────────────────────────────────────────────────────
+from agentomatic.optimize.presets import Preset, Presets, to_fitter_kwargs
+
+# ── New: Prompt version control ───────────────────────────────────────
+from agentomatic.optimize.prompt_version_control import (
+    PromptVersion,
+    PromptVersionControl,
+)
 from agentomatic.optimize.report import (
     generate_eval_report,
     generate_fit_report,
@@ -158,6 +241,22 @@ from agentomatic.optimize.rollout import (
     rollout_from_run_result,
 )
 from agentomatic.optimize.search_space import PromptSearchSpace, load_search_space
+
+# ── New: Pydantic-style settings ──────────────────────────────────────
+from agentomatic.optimize.settings import (
+    AgentTypeEnum,
+    AugmentationMethod,
+    CallbackType,
+    EvalMetric,
+    OptimizerPydanticSettings,
+    OptimizerSettings,
+    generate_env_template,
+    show_available_options,
+    validate_model_string,
+)
+from agentomatic.optimize.settings import (
+    OptimizationStrategy as OptStrategy,
+)
 from agentomatic.optimize.strategies import (
     MIPRO,
     BootstrapRandomSearch,
@@ -200,7 +299,86 @@ from agentomatic.optimize.train_api import (
     train_and_report,
 )
 
+# ── New: Auto-generated training CLI ─────────────────────────────────
+from agentomatic.optimize.train_cli import create_train_cli
+
 __all__ = [
+    # ── Callbacks ────────────────────────────────────────────────
+    "Callback",
+    "CallbackContext",
+    "EarlyStopping",
+    "OptimizeCallback",
+    "OptimizeEarlyStopping",
+    "ModelCheckpoint",
+    "NaNStopping",
+    "PlateauStopping",
+    "ProgressLogger",
+    "ScoreThreshold",
+    "TemperatureScheduler",
+    "default_callbacks",
+    # ── New: Presets ──────────────────────────────────────────────
+    "Preset",
+    "Presets",
+    "to_fitter_kwargs",
+    # ── New: Agent-type detection ─────────────────────────────────
+    "AgentType",
+    "Evaluator",
+    "METRIC_PRESETS",
+    "detect_agent_type",
+    "get_metrics_for_agent_type",
+    "list_available_metrics",
+    # ── New: Experiment tracker ───────────────────────────────────
+    "ExperimentTracker",
+    "get_tracker",
+    "reset_tracker",
+    # ── New: Diversity selector ───────────────────────────────────
+    "DiversityConfig",
+    "DiversitySelector",
+    # ── New: JSON extractor ───────────────────────────────────────
+    "JSONExtractor",
+    "extract_json",
+    # ── New: Prompt version control ───────────────────────────────
+    "PromptVersion",
+    "PromptVersionControl",
+    # ── New: OptimizerMixin ───────────────────────────────────────
+    "FitResult",
+    "OptimizerMixin",
+    # ── New: Auto-generated training CLI ──────────────────────────
+    "create_train_cli",
+    # ── New: Pydantic-style settings ──────────────────────────────
+    "AgentTypeEnum",
+    "AugmentationMethod",
+    "CallbackType",
+    "EvalMetric",
+    "OptimizerPydanticSettings",
+    "OptimizerSettings",
+    "OptStrategy",
+    "generate_env_template",
+    "show_available_options",
+    "validate_model_string",
+    # ── New: Evals auto-discovery ───────────────────────────────
+    "discover_agent_evals",
+    "generate_pytest_params",
+    "get_agent_metrics",
+    "get_agent_test_cases",
+    "get_agent_thresholds",
+    "list_agents_with_evals",
+    # ── LangChain adapter ───────────────────────────────────────
+    "AgentAdapter",
+    "adapt_langgraph_agent",
+    "collect_stream",
+    "dict_to_messages",
+    "extract_system_prompt",
+    "inject_config",
+    "inject_system_prompt",
+    "is_chain",
+    "make_config",
+    "messages_to_dict",
+    "serialize_messages",
+    "resolve_prompt",
+    "tools_to_names",
+    "wrap_chain_as_async_node",
+    "wrap_chain_as_node",
     # ── Pluggable LLM type system ─────────────────────────────────
     "LLMSpec",
     "LLMCallable",
@@ -346,3 +524,7 @@ __all__ = [
     "CostMetric",
     "generate_fit_report",
 ]
+
+# Aliases for Optimize* prefixed names
+OptimizeCallback = Callback
+OptimizeEarlyStopping = EarlyStopping

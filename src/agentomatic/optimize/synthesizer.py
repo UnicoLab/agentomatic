@@ -179,6 +179,10 @@ class DataSynthesizer:
         strategy_map = {
             "paraphrase": self._augment_paraphrase,
             "perturbation": self._augment_perturbation,
+            "add_noise": self._augment_add_noise,
+            "simplify": self._augment_simplify,
+            "complicate": self._augment_complicate,
+            "edge_case": self._augment_edge_case,
             "expansion": self._augment_expansion,
             "adversarial": self._augment_adversarial,
             "formality_shift": self._augment_formality,
@@ -269,6 +273,71 @@ class DataSynthesizer:
                 "- Very long or very short queries\n"
                 "- Questions with negation\n"
                 "Provide the CORRECT expected answer for each."
+            ),
+        )
+        return await self._generate_batch(prompt)
+
+    async def _augment_add_noise(self, points: list[DataPoint], n_per: int) -> list[DataPoint]:
+        """Add typos, grammar issues, and misspellings (robustness testing)."""
+        prompt = self._build_augmentation_prompt(
+            points=points,
+            n_per=n_per,
+            instruction=(
+                "Add realistic NOISE to each query to test robustness:"
+                "- Introduce minor typos and spelling errors\n"
+                "- Use incorrect grammar or sentence fragments\n"
+                "- Add extra whitespace or punctuation errors\n"
+                "- Insert filler words or hesitations\n"
+                "Keep the core intent understandable. The expected answer should remain valid."
+            ),
+        )
+        return await self._generate_batch(prompt)
+
+    async def _augment_simplify(self, points: list[DataPoint], n_per: int) -> list[DataPoint]:
+        """Simplify queries to be shorter and clearer."""
+        prompt = self._build_augmentation_prompt(
+            points=points,
+            n_per=n_per,
+            instruction=(
+                "Simplify each query to make it SHORTER and CLEARER:\n"
+                "- Remove unnecessary details\n"
+                "- Use simpler vocabulary\n"
+                "- Reduce to the core question\n"
+                "- Use more direct phrasing\n"
+                "The expected answer should remain valid for each simplification."
+            ),
+        )
+        return await self._generate_batch(prompt)
+
+    async def _augment_complicate(self, points: list[DataPoint], n_per: int) -> list[DataPoint]:
+        """Make queries more complex with additional context and details."""
+        prompt = self._build_augmentation_prompt(
+            points=points,
+            n_per=n_per,
+            instruction=(
+                "Make each query MORE COMPLEX by adding realistic details:\n"
+                "- Add extra context and backstory\n"
+                "- Include multiple constraints or requirements\n"
+                "- Use more technical or domain-specific language\n"
+                "- Combine multiple related questions into one\n"
+                "The expected answer should remain valid for each complex variant."
+            ),
+        )
+        return await self._generate_batch(prompt)
+
+    async def _augment_edge_case(self, points: list[DataPoint], n_per: int) -> list[DataPoint]:
+        """Generate edge case variants (unusual but valid inputs)."""
+        prompt = self._build_augmentation_prompt(
+            points=points,
+            n_per=n_per,
+            instruction=(
+                "Create EDGE CASE variants of each query:\n"
+                "- Minimal/empty-looking input that is still valid\n"
+                "- Very long or extremely verbose versions\n"
+                "- Queries with special characters or unicode\n"
+                "- Ambiguous requests that need clarification\n"
+                "- Out-of-domain but still answerable questions\n"
+                "Provide the correct expected answer for each edge case."
             ),
         )
         return await self._generate_batch(prompt)

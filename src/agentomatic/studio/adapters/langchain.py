@@ -202,11 +202,19 @@ class LangChainAdapter(StudioAdapter):
 
         duration = round((time.monotonic() - start_time) * 1000, 2)
 
-        # Record state
+        # Record state (normalise LangChain message objects → plain dicts)
+        raw_messages = state.get("messages", [])
+        try:
+            from agentomatic.langchain_adapter import serialize_messages
+
+            messages = serialize_messages(raw_messages) if raw_messages else []
+        except Exception:
+            messages = raw_messages if isinstance(raw_messages, list) else []
+
         self._state_store[thread_id] = {
             "last_input": state,
             "last_output": output,
-            "messages": state.get("messages", []),
+            "messages": messages,
             "updated_at": _now_iso(),
         }
 

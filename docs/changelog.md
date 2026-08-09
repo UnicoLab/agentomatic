@@ -9,6 +9,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **ML-style optimize UX** (ported from the Agents inspiration project):
+  pluggable callbacks (`EarlyStopping`, `ModelCheckpoint`, `NaNStopping`,
+  `TemperatureScheduler`, `PlateauStopping`, `ScoreThreshold`,
+  `ProgressLogger`) wired into `PromptFitter` (stop / temperature /
+  prompt restore); `Presets.for_local/quality/quick` + `to_fitter_kwargs`;
+  SQLite `ExperimentTracker` auto-logged from fit; `OptimizerMixin.fit(test_cases)` (smart-dispatch with Keras `History` path; `optimize_prompts` async alias);
+  agent-type auto-detection + `Evaluator.evaluate`; `evals.py` discovery;
+  `create_train_cli`; `JSONExtractor` fallback in `LLMCaller`; diversity
+  selector + synthesizer augmentations (`add_noise`, `simplify`,
+  `complicate`, `edge_case`). Docs: `docs/guide/optimization.md`.
+- **`agentomatic.langchain_adapter`** for LangChain/LangGraph message,
+  prompt, config, and LCEL bridging, plus a `langchain` CLI scaffold
+  template. Guide: `docs/guide/langchain-adapter.md`.
+
 - **Agent Lightning–inspired optimize foundations** (no VERL/agentlightning
   dependency): `OptimizationAlgorithm` / `FitterAlgorithm`, versioned
   `ResourceBundle` registry, `Rollout` + `RolloutTraceStore`,

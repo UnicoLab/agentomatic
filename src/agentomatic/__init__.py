@@ -68,8 +68,6 @@ from agentomatic.agents import (
     AgentExample,
     AgentGraph,
     BaseGraphAgent,
-    Callback,
-    EarlyStopping,
     ExactKeyMatchMetric,
     GraphBuilder,
     GridSearchOptimizer,
@@ -79,6 +77,22 @@ from agentomatic.agents import (
     PromptFitterBridge,
     WeightedMetric,
     agent_node,
+)
+
+# Unified callbacks (v1.10) — canonical location for all callbacks
+from agentomatic.callbacks import (
+    CallbackContext,
+    ModelCheckpoint,
+    NaNStopping,
+    OptimizeCallback,
+    OptimizeEarlyStopping,
+    PlateauStopping,
+    ProgressLogger,
+    ScoreThreshold,
+    TemperatureScheduler,
+    TrainingCallback,
+    TrainingEarlyStopping,
+    default_callbacks,
 )
 
 # Per-agent connections
@@ -114,6 +128,25 @@ from agentomatic.ingestion import (
     IngestionRegistry,
     IngestionRequest,
     IngestionResult,
+)
+
+# First-class LangChain / LangGraph adapter (v1.10)
+from agentomatic.langchain_adapter import (
+    AgentAdapter,
+    adapt_langgraph_agent,
+    collect_stream,
+    dict_to_messages,
+    extract_system_prompt,
+    inject_config,
+    inject_system_prompt,
+    is_chain,
+    make_config,
+    messages_to_dict,
+    resolve_prompt,
+    serialize_messages,
+    tools_to_names,
+    wrap_chain_as_async_node,
+    wrap_chain_as_node,
 )
 from agentomatic.providers.embeddings import register_embedding_provider
 
@@ -155,6 +188,22 @@ __all__ = [
     "UpstreamAuthConfig",
     "AuthType",
     "AggregationStrategy",
+    # LangChain / LangGraph adapter (v1.10)
+    "AgentAdapter",
+    "adapt_langgraph_agent",
+    "collect_stream",
+    "dict_to_messages",
+    "extract_system_prompt",
+    "inject_config",
+    "inject_system_prompt",
+    "is_chain",
+    "make_config",
+    "messages_to_dict",
+    "resolve_prompt",
+    "serialize_messages",
+    "tools_to_names",
+    "wrap_chain_as_async_node",
+    "wrap_chain_as_node",
     # Ingestion (v0.12)
     "BaseIngestor",
     "IngestionRegistry",
@@ -189,8 +238,19 @@ __all__ = [
     "AgentExample",
     # Training lifecycle (Keras-style)
     "History",
-    "Callback",
-    "EarlyStopping",
+    # Unified callbacks (v1.10)
+    "TrainingCallback",
+    "TrainingEarlyStopping",
+    "OptimizeCallback",
+    "OptimizeEarlyStopping",
+    "ModelCheckpoint",
+    "NaNStopping",
+    "PlateauStopping",
+    "ProgressLogger",
+    "ScoreThreshold",
+    "TemperatureScheduler",
+    "default_callbacks",
+    "CallbackContext",
     "Loss",
     "ExactKeyMatchMetric",
     "WeightedMetric",

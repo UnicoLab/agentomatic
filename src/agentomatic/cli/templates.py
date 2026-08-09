@@ -1234,6 +1234,10 @@ TEMPLATES: dict[str, str] = {
         "Extraction agent — scope-parameterized markdown extractor for parallel "
         "fan-out via map pipeline steps"
     ),
+    "langchain": (
+        "LangChain-native agent — uses ChatPromptTemplate, MessagesPlaceholder, "
+        "RunnableConfig with full agentomatic integration"
+    ),
 }
 
 
@@ -2795,6 +2799,158 @@ etc.).  Each map iteration receives a different `scope` under
 """
 
 
+# =====================================================================
+# LangChain-native agent template (v1.10)
+# =====================================================================
+
+
+def _langchain_init_py(name: str, description: str, keywords: str) -> str:
+    return f'''"""Agent: {name} (LangChain-native agent)."""
+from __future__ import annotations
+
+from agentomatic import AgentManifest
+
+manifest = AgentManifest(
+    name="{name}",
+    slug="agent-{name}",
+    description="{description}",
+    intent_keywords=[{keywords}],
+    framework="langgraph",
+    version="1.0.0",
+)
+
+__all__ = ["manifest"]
+'''
+
+
+def _langchain_agent_py(name: str) -> str:
+    title = name.replace("_", " ").title().replace(" ", "")
+    return f'''"""LangChain-native agent: {name}.
+Uses native LangChain abstractions with agentomatic integration.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from agentomatic.agents import BaseGraphAgent
+from agentomatic.langchain_adapter import dict_to_messages, serialize_messages
+
+
+@dataclass
+class {title}State:
+    request: str = ""
+    messages: list[Any] = field(default_factory=list)
+    response: str = ""
+    output: dict[str, Any] = field(default_factory=dict)
+
+
+class {title}Agent(BaseGraphAgent[{title}State]):
+    """LangChain-native agent for {name}."""
+
+    agent_name = "{name}"
+    agent_description = "LangChain-native agent"
+    # Class agents use GraphAgentAdapter in Studio; langchain_adapter helpers
+    # bridge messages/prompts. Set "langchain" only for LCEL node_fn agents.
+    agent_framework = "graph_agent"
+
+    def __init__(self, *, llm: Any = None, prompt_manager: Any = None) -> None:
+        super().__init__()
+        self.llm = llm
+        self.prompt_manager = prompt_manager
+
+    def _system_prompt(self) -> str:
+        return self.resolve_system_prompt(
+            default="You are a helpful AI assistant. Be concise."
+        )
+
+    def build_graph(self):
+        g = self.new_graph()
+        g.add_node("chat", self.chat)
+        g.set_entry_point("chat")
+        g.set_finish_point("chat")
+        return g.compile()
+
+    def chat(self, state: {title}State) -> {title}State:
+        prompt = self._system_prompt()
+        # Normalise REST/Studio dict messages → LangChain message objects.
+        lc_messages = dict_to_messages(state.messages) if state.messages else []
+        if self.llm is not None:
+            try:
+                if lc_messages:
+                    result = self.llm.invoke(lc_messages)
+                else:
+                    result = self.llm.invoke(
+                        f"{{prompt}}" + "\\n\\nUser: " + f"{{state.request}}"
+                    )
+                text = getattr(result, "content", None) or str(result)
+            except Exception:
+                text = "Response to: " + f"{{state.request}}"
+        else:
+            text = f"{{prompt}}" + ": Response to '" + f"{{state.request}}" + "'"
+        state.response = text
+        state.messages = serialize_messages(lc_messages) if lc_messages else state.messages
+        state.output = {{"response": text, "agent_type": "{name}"}}
+        return state
+
+    def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
+        return {title}State(
+            request=input_data.get("current_query", ""),
+            messages=input_data.get("messages", []),
+        )
+
+    def state_to_output(self, state: {title}State) -> dict[str, Any]:
+        return state.output
+
+
+def get_graph():
+    """Entrypoint for langgraph.json."""
+    return {title}Agent().graph
+'''
+
+
+def _langchain_readme(name: str) -> str:
+    title = name.replace("_", " ").title()
+    return f"""# {title} Agent (LangChain-native)
+
+Generated with `agentomatic init {name} --template langchain`.
+
+Uses LangChain / LangGraph abstractions with Agentomatic's
+`langchain_adapter` helpers so REST invoke payloads (plain dicts) and
+Studio streaming work without boilerplate.
+
+## Quick Start
+
+```bash
+# Start the platform
+agentomatic run
+
+# Test the agent
+curl -X POST http://localhost:8000/api/v1/{name}/invoke \\
+  -H "Content-Type: application/json" \\
+  -d '{{"current_query": "Hello!"}}'
+```
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `agent.py` | `BaseGraphAgent` + LangChain message helpers |
+| `config.py` | Agent-specific configuration |
+| `prompts.json` | Versioned prompt templates |
+| `langgraph.json` | LangGraph Studio config |
+
+## Tips
+
+- Convert dict messages with `dict_to_messages` / `messages_to_dict`
+  from `agentomatic.langchain_adapter`.
+- Declare `agent_framework = "langchain"` if you want Studio's
+  LangChain adapter (SSE / LCEL graph) instead of the graph-agent one.
+- See `docs/guide/langchain-adapter.md` for the full helper API.
+"""
+
+
+
 def get_template_files(template: str, name: str) -> dict[str, str]:
     """Get all files for a given template.
 
@@ -2967,6 +3123,17 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "prompts.json": _prompts_json(),
             ".env.example": _env_example(name),
             "README.md": _extraction_readme(name),
+        }
+
+    elif template == "langchain":
+        return {
+            "__init__.py": _langchain_init_py(name, description, keywords),
+            "agent.py": _langchain_agent_py(name),
+            "llm.py": _llm_py(name),
+            "prompts.json": _prompts_json(),
+            "langgraph.json": _langgraph_json(),
+            ".env.example": _env_example(name),
+            "README.md": _langchain_readme(name),
         }
 
     else:
