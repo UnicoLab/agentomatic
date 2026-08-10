@@ -6,6 +6,8 @@ mirroring how ``router_factory`` works for agents.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException
@@ -13,6 +15,9 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from agentomatic.tasks.sugar import BatchSubmitRequest
+
+from .loader import PipelineLoader, pipeline_to_yaml
+from .validation import validate_pipeline_draft
 
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
@@ -23,6 +28,10 @@ if TYPE_CHECKING:
 
     from .engine import PipelineEngine
     from .models import PipelineConfig
+
+
+# Pipeline names must be safe to use as file names.
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +81,43 @@ class PipelineValidationResponse(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class PipelineDraftRequest(BaseModel):
+    """Payload for the stateless builder endpoints.
+
+    Exactly one of ``pipeline`` / ``yaml`` must be provided.
+    """
+
+    pipeline: dict[str, Any] | None = Field(
+        default=None,
+        description="Pipeline config as a JSON object (same shape as the YAML).",
+    )
+    yaml: str | None = Field(
+        default=None,
+        description="Pipeline config as a YAML string.",
+    )
+
+
+class PipelineDraftValidationResponse(BaseModel):
+    """Result of validating a pipeline draft without saving it."""
+
+    name: str = ""
+    valid: bool
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    step_count: int = 0
+
+
+class PipelineSaveResponse(BaseModel):
+    """Result of creating/updating a pipeline via the builder API."""
+
+    name: str
+    path: str = ""
+    valid: bool = True
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    step_count: int = 0
+
+
 # ---------------------------------------------------------------------------
 # Router creation
 # ---------------------------------------------------------------------------
@@ -87,35 +133,48 @@ def create_pipeline_router(
     task_manager: Any | None = None,
     api_prefix: str = "/api/v1",
     log_recorder: InvocationLogRecorder | None = None,
+    pipelines_dir: Path | None = None,
+    pipeline_paths: dict[str, Path] | None = None,
 ) -> APIRouter:
     """Create REST endpoints for all discovered pipelines.
 
     Generates:
-        GET  /pipelines                    — list all pipelines
-        POST /pipelines/{name}/run         — execute a pipeline
-        GET  /pipelines/{name}/config      — get pipeline config
-        GET  /pipelines/{name}/validate    — pre-flight validation
-        GET  /pipelines/{name}/visualize   — Mermaid diagram
+        GET    /pipelines                  — list all pipelines
+        POST   /pipelines/validate-draft   — stateless validation of a draft
+        POST   /pipelines/{name}           — create/update a pipeline (YAML)
+        DELETE /pipelines/{name}           — delete a pipeline
+        POST   /pipelines/{name}/run       — execute a pipeline
+        GET    /pipelines/{name}/config    — get pipeline config
+        GET    /pipelines/{name}/validate  — pre-flight validation
+        GET    /pipelines/{name}/visualize — Mermaid diagram
 
     Args:
-        pipelines: Dict of pipeline name → config.
+        pipelines: Dict of pipeline name → config.  Kept as a live
+            reference so builder writes are visible to the task dispatcher
+            and status API immediately.
         registry: Agent registry for resolving agents.
         sub_pipelines: Optional dict of sub-pipelines.
+        pipelines_dir: Directory where new pipelines are persisted as
+            ``<name>.yaml``.  When ``None``, save/delete return 400.
+        pipeline_paths: Optional mapping of pipeline name → source file,
+            used to update/delete the exact file a pipeline was discovered
+            from (e.g. ``agents/*/pipeline.yaml``).
 
     Returns:
         A FastAPI ``APIRouter`` with pipeline endpoints.
     """
     router = APIRouter()
-    all_pipelines = dict(pipelines)
+    # Live reference (not a copy): save/delete mutate this dict so the task
+    # dispatcher and status/health APIs see builder changes immediately.
+    all_pipelines = pipelines
     all_sub = dict(sub_pipelines or {})
+    _pipeline_paths: dict[str, Path] = dict(pipeline_paths or {})
+    _pipelines_dir = Path(pipelines_dir) if pipelines_dir is not None else None
 
-    def _get_engine(name: str) -> PipelineEngine:
-        """Resolve a pipeline engine by name."""
+    def _engine_for(config: PipelineConfig) -> PipelineEngine:
+        """Build an engine for an arbitrary (possibly unsaved) config."""
         from .engine import PipelineEngine
 
-        config = all_pipelines.get(name)
-        if config is None:
-            raise HTTPException(404, f"Pipeline '{name}' not found")
         return PipelineEngine(
             config,
             registry,
@@ -124,6 +183,152 @@ def create_pipeline_router(
             ingestors=ingestors,
             plugins=plugins,
         )
+
+    def _get_engine(name: str) -> PipelineEngine:
+        """Resolve a pipeline engine by name."""
+        config = all_pipelines.get(name)
+        if config is None:
+            raise HTTPException(404, f"Pipeline '{name}' not found")
+        return _engine_for(config)
+
+    def _parse_draft(request: PipelineDraftRequest) -> tuple[PipelineConfig | None, list[str]]:
+        """Parse a draft payload into a config, collecting parse errors."""
+        try:
+            if request.pipeline is not None:
+                return PipelineLoader.from_dict(request.pipeline), []
+            if request.yaml is not None:
+                return PipelineLoader.from_yaml_string(request.yaml), []
+            return None, ["Provide exactly one of 'pipeline' (object) or 'yaml' (string)"]
+        except Exception as exc:  # noqa: BLE001
+            return None, [str(exc)]
+
+    def _validate_config(config: PipelineConfig) -> tuple[list[str], list[str]]:
+        """Run engine + draft validation, returning ``(errors, warnings)``."""
+        errors = _engine_for(config).validate()
+        draft_errors, draft_warnings = validate_pipeline_draft(config)
+        return errors + draft_errors, draft_warnings
+
+    @router.post(
+        "/pipelines/validate-draft",
+        response_model=PipelineDraftValidationResponse,
+        summary="Validate a pipeline draft without saving",
+    )
+    async def validate_draft(request: PipelineDraftRequest) -> PipelineDraftValidationResponse:
+        """Stateless validation of an arbitrary pipeline config.
+
+        Accepts either a JSON object (``pipeline``) or a raw YAML string
+        (``yaml``).  Returns registry + structural validation errors and
+        advisory warnings so the builder can give instant feedback without
+        persisting anything.
+        """
+        config, errors = _parse_draft(request)
+        if config is None:
+            return PipelineDraftValidationResponse(valid=False, errors=errors)
+
+        warnings: list[str] = []
+        if config.name in all_pipelines:
+            warnings.append(f"Pipeline '{config.name}' already exists — saving will overwrite it")
+        engine_errors, draft_warnings = _validate_config(config)
+        errors += engine_errors
+        warnings += draft_warnings
+        return PipelineDraftValidationResponse(
+            name=config.name,
+            valid=not errors,
+            errors=errors,
+            warnings=warnings,
+            step_count=len(config.steps),
+        )
+
+    @router.post(
+        "/pipelines/{name}",
+        response_model=PipelineSaveResponse,
+        summary="Create or update a pipeline",
+    )
+    async def save_pipeline(name: str, request: PipelineDraftRequest) -> PipelineSaveResponse:
+        """Create or update a pipeline from a draft payload.
+
+        Validates the draft first; on success writes loader-compatible YAML
+        to the platform's ``pipelines/`` directory (or updates the pipeline's
+        existing source file in place) and makes it immediately available.
+        """
+        config, errors = _parse_draft(request)
+        if config is None:
+            raise HTTPException(422, detail={"message": "Invalid pipeline", "errors": errors})
+        if config.name != name:
+            raise HTTPException(
+                422,
+                detail={
+                    "message": f"Path name '{name}' does not match pipeline name '{config.name}'",
+                    "errors": [],
+                },
+            )
+        if _pipelines_dir is None:
+            raise HTTPException(
+                400,
+                detail={"message": "Pipeline persistence is not configured on this platform"},
+            )
+        if not _NAME_RE.fullmatch(name):
+            raise HTTPException(
+                422,
+                detail={
+                    "message": (
+                        f"Invalid pipeline name '{name}' — use letters, digits, '_', '-', '.'"
+                    ),
+                    "errors": [],
+                },
+            )
+
+        engine_errors, warnings = _validate_config(config)
+        if engine_errors:
+            raise HTTPException(
+                422,
+                detail={
+                    "message": "Pipeline validation failed",
+                    "errors": engine_errors,
+                    "warnings": warnings,
+                },
+            )
+
+        # Update the existing source file in place when known, otherwise
+        # write to the canonical pipelines/ directory.
+        target = _pipeline_paths.get(name) or (_pipelines_dir / f"{name}.yaml")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(pipeline_to_yaml(config), encoding="utf-8")
+
+        all_pipelines[name] = config
+        _pipeline_paths[name] = target.resolve()
+        logger.info(f"💾 Pipeline API: saved '{name}' -> {target}")
+        return PipelineSaveResponse(
+            name=name,
+            path=str(target),
+            warnings=warnings,
+            step_count=len(config.steps),
+        )
+
+    @router.delete(
+        "/pipelines/{name}",
+        summary="Delete a pipeline",
+    )
+    async def delete_pipeline(name: str) -> dict[str, Any]:
+        """Delete a pipeline and its source YAML file."""
+        if _pipelines_dir is None:
+            raise HTTPException(
+                400,
+                detail={"message": "Pipeline persistence is not configured on this platform"},
+            )
+        target = _pipeline_paths.get(name)
+        if target is None:
+            for candidate in (_pipelines_dir / f"{name}.yaml", _pipelines_dir / f"{name}.yml"):
+                if candidate.exists():
+                    target = candidate
+                    break
+        if target is None or not target.exists():
+            raise HTTPException(404, f"Pipeline '{name}' not found")
+        target.unlink()
+        all_pipelines.pop(name, None)
+        _pipeline_paths.pop(name, None)
+        logger.info(f"🗑  Pipeline API: deleted '{name}' ({target})")
+        return {"deleted": True, "name": name, "path": str(target)}
 
     @router.get(
         "/pipelines",

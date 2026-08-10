@@ -7,6 +7,7 @@ YAML strings and validates them against the Pydantic models defined in
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -467,6 +468,61 @@ def _parse_step(data: dict[str, Any]) -> StepConfigUnion:
 
 
 # ---------------------------------------------------------------------------
+# Discovery helpers
+# ---------------------------------------------------------------------------
+
+
+def _iter_pipeline_files(directory: Path) -> Iterator[Path]:
+    """Yield pipeline YAML files in discovery order.
+
+    Mirrors the scan performed by :meth:`PipelineLoader.discover_pipelines`:
+
+    - ``pipeline.yaml`` / ``pipeline.yml`` in *directory* itself.
+    - Every ``*.yaml`` / ``*.yml`` file when *directory* is named
+      ``pipelines`` (flat project layout).
+    - Every ``*.yaml`` / ``*.yml`` file in a ``pipelines/`` subdirectory.
+    - ``pipeline.yaml`` / ``pipeline.yml`` inside each ``agents/*/`` folder.
+
+    Args:
+        directory: Root directory to scan.
+
+    Yields:
+        Candidate pipeline YAML paths (unresolved).
+    """
+    directory = Path(directory)
+
+    # 1. pipeline.yaml / pipeline.yml in the root directory
+    for suffix in ("yaml", "yml"):
+        candidate = directory / f"pipeline.{suffix}"
+        if candidate.is_file():
+            yield candidate
+
+    # 1b. Flat layout: callers often pass the pipelines/ folder itself.
+    if directory.name == "pipelines":
+        for child in sorted(directory.iterdir()):
+            if child.is_file() and child.suffix in _YAML_SUFFIXES:
+                yield child
+
+    # 2. All YAML files under a `pipelines/` subdirectory (project root)
+    pipelines_dir = directory / "pipelines"
+    if pipelines_dir.is_dir():
+        for child in sorted(pipelines_dir.iterdir()):
+            if child.is_file() and child.suffix in _YAML_SUFFIXES:
+                yield child
+
+    # 3. pipeline.yaml inside each `agents/*/` folder
+    agents_dir = directory / "agents"
+    if agents_dir.is_dir():
+        for agent_folder in sorted(agents_dir.iterdir()):
+            if not agent_folder.is_dir():
+                continue
+            for suffix in ("yaml", "yml"):
+                candidate = agent_folder / f"pipeline.{suffix}"
+                if candidate.is_file():
+                    yield candidate
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -609,61 +665,331 @@ class PipelineLoader:
         configs: dict[str, PipelineConfig] = {}
         seen_paths: set[Path] = set()
 
-        def _try_load(path: Path) -> None:
-            """Attempt to load a pipeline file, skipping duplicates."""
+        for path in _iter_pipeline_files(directory):
             resolved = path.resolve()
             if resolved in seen_paths:
-                return
+                continue
             seen_paths.add(resolved)
 
             try:
                 cfg = PipelineLoader.from_yaml(path)
-                if cfg.name in configs:
-                    logger.warning(
-                        "Duplicate pipeline name '{}' – keeping first occurrence, skipping {}",
-                        cfg.name,
-                        path,
-                    )
-                    return
-                configs[cfg.name] = cfg
-                logger.debug("Discovered pipeline '{}' from {}", cfg.name, path)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skipping {} – failed to load: {}", path, exc)
+                continue
 
-        def _load_yaml_files(folder: Path) -> None:
-            """Load every YAML file in *folder* (non-recursive)."""
-            if not folder.is_dir():
-                return
-            for child in sorted(folder.iterdir()):
-                if child.is_file() and child.suffix in _YAML_SUFFIXES:
-                    _try_load(child)
-
-        # 1. pipeline.yaml / pipeline.yml in the root directory
-        for suffix in ("yaml", "yml"):
-            candidate = directory / f"pipeline.{suffix}"
-            if candidate.is_file():
-                _try_load(candidate)
-
-        # 1b. Flat layout: callers often pass the pipelines/ folder itself
-        # (AgentPlatform.build). Load all YAML files in that folder.
-        if directory.name == "pipelines":
-            _load_yaml_files(directory)
-
-        # 2. All YAML files under a `pipelines/` subdirectory (project root)
-        pipelines_dir = directory / "pipelines"
-        if pipelines_dir.is_dir():
-            _load_yaml_files(pipelines_dir)
-
-        # 3. pipeline.yaml inside each `agents/*/` folder
-        agents_dir = directory / "agents"
-        if agents_dir.is_dir():
-            for agent_folder in sorted(agents_dir.iterdir()):
-                if not agent_folder.is_dir():
-                    continue
-                for suffix in ("yaml", "yml"):
-                    candidate = agent_folder / f"pipeline.{suffix}"
-                    if candidate.is_file():
-                        _try_load(candidate)
+            if cfg.name in configs:
+                logger.warning(
+                    "Duplicate pipeline name '{}' – keeping first occurrence, skipping {}",
+                    cfg.name,
+                    path,
+                )
+                continue
+            configs[cfg.name] = cfg
+            logger.debug("Discovered pipeline '{}' from {}", cfg.name, path)
 
         logger.info("Discovered {} pipeline(s) in {}", len(configs), directory)
         return configs
+
+    @staticmethod
+    def discover_pipeline_files(directory: Path) -> dict[str, Path]:
+        """Map each discovered pipeline name to its source YAML file.
+
+        Follows the exact same discovery rules (and duplicate handling) as
+        :meth:`discover_pipelines`, so ``name → path`` pairs are consistent
+        with the configs returned there.  Used by the builder API to update
+        or delete the correct source file.
+
+        Args:
+            directory: Root directory to scan (project root **or** the
+                ``pipelines/`` folder itself).
+
+        Returns:
+            A mapping of ``pipeline_name → Path`` (resolved) for every
+            successfully loaded pipeline.
+        """
+        _ensure_yaml()
+        files: dict[str, Path] = {}
+        for path in _iter_pipeline_files(directory):
+            try:
+                cfg = PipelineLoader.from_yaml(path)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Skipping {} – failed to load: {}", path, exc)
+                continue
+            if cfg.name in files:
+                continue  # first occurrence wins, matching discover_pipelines
+            files[cfg.name] = path.resolve()
+        return files
+
+
+# ---------------------------------------------------------------------------
+# Serialization (config → loader-compatible dict / YAML)
+# ---------------------------------------------------------------------------
+
+
+def _mapping_to_dict(mapping: InputMapping | OutputMapping | None) -> dict[str, Any] | None:
+    """Return a plain dict for a mapping, or ``None`` when empty."""
+    if mapping is None or not mapping.mappings:
+        return None
+    return dict(mapping.mappings)
+
+
+def _retry_to_dict(retry: RetryConfig | None) -> dict[str, Any] | None:
+    """Return a plain dict for a retry config, or ``None``."""
+    if retry is None:
+        return None
+    return {
+        "max_attempts": retry.max_attempts,
+        "backoff": retry.backoff,
+        "base_delay": retry.base_delay,
+    }
+
+
+def _agent_step_to_dict(step: AgentStepConfig) -> dict[str, Any]:
+    """Serialize an agent step to the loader-compatible dict shape."""
+    data: dict[str, Any] = {"name": step.name, "agent": step.agent}
+    for key, value in (
+        ("input", _mapping_to_dict(step.input)),
+        ("output", _mapping_to_dict(step.output)),
+    ):
+        if value:
+            data[key] = value
+    if step.condition is not None:
+        data["condition"] = step.condition
+    if step.on_error != ErrorPolicy.FAIL:
+        data["on_error"] = step.on_error.value
+    if step.fallback_agent is not None:
+        data["fallback_agent"] = step.fallback_agent
+    retry = _retry_to_dict(step.retry)
+    if retry:
+        data["retry"] = retry
+    if step.timeout != 30.0:
+        data["timeout"] = step.timeout
+    if step.metadata:
+        data["metadata"] = dict(step.metadata)
+    if step.rollback is not None:
+        data["rollback"] = step.rollback
+    return data
+
+
+def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
+    """Serialize any step to the loader-compatible dict shape.
+
+    Omitted keys fall back to the same defaults the loader applies when
+    parsing, so ``from_dict(to_dict(c))`` round-trips losslessly.
+    """
+    if isinstance(step, AgentStepConfig):
+        return _agent_step_to_dict(step)
+
+    if isinstance(step, PluginStepConfig):
+        data: dict[str, Any] = {"name": step.name, "plugin": step.plugin}
+        for key, value in (
+            ("input", _mapping_to_dict(step.input)),
+            ("output", _mapping_to_dict(step.output)),
+        ):
+            if value:
+                data[key] = value
+        if step.condition is not None:
+            data["condition"] = step.condition
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        retry = _retry_to_dict(step.retry)
+        if retry:
+            data["retry"] = retry
+        if step.timeout != 30.0:
+            data["timeout"] = step.timeout
+        if step.metadata:
+            data["metadata"] = dict(step.metadata)
+        if step.rollback is not None:
+            data["rollback"] = step.rollback
+        return data
+
+    if isinstance(step, EndpointStepConfig):
+        data = {"name": step.name, "endpoint": step.endpoint}
+        for key, value in (
+            ("input", _mapping_to_dict(step.input)),
+            ("output", _mapping_to_dict(step.output)),
+        ):
+            if value:
+                data[key] = value
+        if step.upstreams is not None:
+            data["upstreams"] = list(step.upstreams)
+        if step.condition is not None:
+            data["condition"] = step.condition
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        retry = _retry_to_dict(step.retry)
+        if retry:
+            data["retry"] = retry
+        if step.timeout != 30.0:
+            data["timeout"] = step.timeout
+        if step.metadata:
+            data["metadata"] = dict(step.metadata)
+        if step.rollback is not None:
+            data["rollback"] = step.rollback
+        return data
+
+    if isinstance(step, IngestionStepConfig):
+        data = {"name": step.name, "ingestion": step.ingestor}
+        for key, value in (
+            ("input", _mapping_to_dict(step.input)),
+            ("output", _mapping_to_dict(step.output)),
+        ):
+            if value:
+                data[key] = value
+        if step.condition is not None:
+            data["condition"] = step.condition
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        retry = _retry_to_dict(step.retry)
+        if retry:
+            data["retry"] = retry
+        if step.timeout != 300.0:
+            data["timeout"] = step.timeout
+        if step.metadata:
+            data["metadata"] = dict(step.metadata)
+        if step.rollback is not None:
+            data["rollback"] = step.rollback
+        return data
+
+    if isinstance(step, TransformStepConfig):
+        data = {"name": step.name, "transform": step.code}
+        if step.condition is not None:
+            data["condition"] = step.condition
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        if step.timeout != 10.0:
+            data["timeout"] = step.timeout
+        return data
+
+    if isinstance(step, ParallelStepConfig):
+        data = {
+            "name": step.name,
+            "parallel": {
+                "steps": [_agent_step_to_dict(s) for s in step.steps],
+            },
+        }
+        if step.strategy != ParallelStrategy.ALL:
+            data["parallel"]["strategy"] = step.strategy.value
+        if step.max_concurrency != 5:
+            data["parallel"]["max_concurrency"] = step.max_concurrency
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        if step.timeout != 60.0:
+            data["timeout"] = step.timeout
+        return data
+
+    if isinstance(step, MapStepConfig):
+        body: dict[str, Any] = {"agent": step.agent, "items": step.items}
+        if step.item_key != "item":
+            body["item_key"] = step.item_key
+        if step.index_key != "index":
+            body["index_key"] = step.index_key
+        for key, value in (
+            ("input", _mapping_to_dict(step.input)),
+            ("output", _mapping_to_dict(step.output)),
+        ):
+            if value:
+                body[key] = value
+        if step.max_concurrency != 4:
+            body["max_concurrency"] = step.max_concurrency
+        if step.strategy != ParallelStrategy.ALL:
+            body["strategy"] = step.strategy.value
+        retry = _retry_to_dict(step.retry)
+        if retry:
+            body["retry"] = retry
+        if step.item_timeout != 60.0:
+            body["item_timeout"] = step.item_timeout
+        if step.fallback_agent is not None:
+            body["fallback_agent"] = step.fallback_agent
+        data = {"name": step.name, "map": body}
+        if step.condition is not None:
+            data["condition"] = step.condition
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        if step.timeout != 120.0:
+            data["timeout"] = step.timeout
+        if step.metadata:
+            data["metadata"] = dict(step.metadata)
+        if step.rollback is not None:
+            data["rollback"] = step.rollback
+        return data
+
+    if isinstance(step, LoopStepConfig):
+        loop: dict[str, Any] = {"step": _agent_step_to_dict(step.step)}
+        if step.max_iterations != 10:
+            loop["max_iterations"] = step.max_iterations
+        if step.until is not None:
+            loop["until"] = step.until
+        data = {"name": step.name, "loop": loop}
+        if step.on_error != ErrorPolicy.FAIL:
+            data["on_error"] = step.on_error.value
+        if step.timeout != 120.0:
+            data["timeout"] = step.timeout
+        return data
+
+    # SubPipelineStepConfig
+    data = {"name": step.name, "sub_pipeline": step.pipeline}
+    for key, value in (
+        ("input", _mapping_to_dict(step.input)),
+        ("output", _mapping_to_dict(step.output)),
+    ):
+        if value:
+            data[key] = value
+    if step.condition is not None:
+        data["condition"] = step.condition
+    if step.on_error != ErrorPolicy.FAIL:
+        data["on_error"] = step.on_error.value
+    if step.timeout != 120.0:
+        data["timeout"] = step.timeout
+    return data
+
+
+def pipeline_to_dict(config: PipelineConfig) -> dict[str, Any]:
+    """Serialize a pipeline config to the loader-compatible dict shape.
+
+    The result is exactly what :meth:`PipelineLoader.from_dict` expects,
+    so ``from_dict(pipeline_to_dict(c))`` is a lossless round-trip.
+    Default-valued fields are omitted and re-derived on parse.
+    """
+    data: dict[str, Any] = {
+        "name": config.name,
+        "steps": [_step_to_dict(s) for s in config.steps],
+    }
+    if config.description:
+        data["description"] = config.description
+    if config.version != "1.0.0":
+        data["version"] = config.version
+    if config.input_schema:
+        data["input_schema"] = config.input_schema
+    if config.output_schema:
+        data["output_schema"] = config.output_schema
+    if config.defaults:
+        data["defaults"] = dict(config.defaults)
+    if config.on_error != "fail_fast":
+        data["on_error"] = config.on_error
+    if config.strict_schema:
+        data["strict_schema"] = True
+    if config.timeout != 300.0:
+        data["timeout"] = config.timeout
+    if config.metadata:
+        data["metadata"] = dict(config.metadata)
+    return data
+
+
+def pipeline_to_yaml(config: PipelineConfig) -> str:
+    """Serialize a pipeline config to a YAML string (loader-compatible).
+
+    Args:
+        config: The pipeline configuration to serialize.
+
+    Returns:
+        YAML text that :meth:`PipelineLoader.from_yaml_string` can parse
+        back into an equivalent config.
+    """
+    _ensure_yaml()
+    return yaml.safe_dump(
+        pipeline_to_dict(config),
+        sort_keys=False,
+        allow_unicode=True,
+        default_flow_style=False,
+    )

@@ -1421,38 +1421,41 @@ class AgentPlatform:
             from agentomatic.pipelines.router import create_pipeline_router
 
             pipelines: dict[str, Any] = {}
+            pipeline_paths: dict[str, Path] = {}
 
             # Discover from pipelines/ directory
             pipelines_dir = self.agents_dir.parent / "pipelines"
             if pipelines_dir.exists():
                 pipelines.update(PipelineLoader.discover_pipelines(pipelines_dir))
+                pipeline_paths.update(PipelineLoader.discover_pipeline_files(pipelines_dir))
 
             # Discover from agents/*/pipeline.yaml
-            agents_pipelines = PipelineLoader.discover_pipelines(self.agents_dir)
-            pipelines.update(agents_pipelines)
+            pipelines.update(PipelineLoader.discover_pipelines(self.agents_dir))
+            pipeline_paths.update(PipelineLoader.discover_pipeline_files(self.agents_dir))
 
             # Update in place so the task dispatcher's reference stays valid.
             self._pipelines.update(pipelines)
 
-            if pipelines:
-                pipeline_router = create_pipeline_router(
-                    pipelines,
-                    self._registry,
-                    endpoints=self._endpoint_registry,
-                    ingestors=self._ingestion_registry,
-                    plugins=self._plugin_registry,
-                    task_manager=self._task_manager,
-                    api_prefix=self.api_prefix,
-                    log_recorder=log_recorder,
-                )
-                app.include_router(
-                    pipeline_router,
-                    prefix=self.api_prefix,
-                    tags=["Pipelines"],
-                )
-                logger.info(
-                    f"🔁 Mounted {len(pipelines)} pipeline(s): {', '.join(pipelines.keys())}"
-                )
+            # Always mount the router — the builder API (validate-draft,
+            # save, delete) must work even before the first pipeline exists.
+            pipeline_router = create_pipeline_router(
+                self._pipelines,
+                self._registry,
+                endpoints=self._endpoint_registry,
+                ingestors=self._ingestion_registry,
+                plugins=self._plugin_registry,
+                task_manager=self._task_manager,
+                api_prefix=self.api_prefix,
+                log_recorder=log_recorder,
+                pipelines_dir=pipelines_dir,
+                pipeline_paths=pipeline_paths,
+            )
+            app.include_router(
+                pipeline_router,
+                prefix=self.api_prefix,
+                tags=["Pipelines"],
+            )
+            logger.info(f"🔁 Pipeline API mounted ({len(self._pipelines)} pipeline(s))")
         except ImportError:
             logger.debug("Pipeline module not available — skipping")
         except Exception as exc:
@@ -1602,6 +1605,12 @@ class AgentPlatform:
                     for name, a in self._registry.all().items()
                 }
             }
+
+        # Ingestors list
+        @app.get(f"{self.api_prefix}/ingestors", tags=["Platform"])
+        async def list_ingestors() -> list[dict[str, Any]]:
+            """List all registered ingestors (builder palette)."""
+            return [ing.info() for ing in self._ingestion_registry.list_ingestors().values()]
 
         # Storage stats
         if self._store:
