@@ -14,7 +14,7 @@ and a noop/echo fitter optimizer. Covers the production paths users hit:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -36,7 +36,6 @@ from agentomatic.optimize.metrics import ExactMatchMetric
 from agentomatic.optimize.optimizer_mixin import FitResult, OptimizerMixin
 from agentomatic.optimize.presets import Presets, to_fitter_kwargs
 from agentomatic.optimize.runner import AgentRunner
-
 
 # =====================================================================
 # Shared fixtures / helpers
@@ -255,6 +254,73 @@ class TestPromptFitterCallbacksTrackerE2E:
         # Without TemperatureScheduler, fitter must not inject 0.7.
         assert echo_fn.last_temp != 0.7  # type: ignore[attr-defined]
 
+    @pytest.mark.asyncio
+    async def test_temperature_scheduler_does_not_override_eval_temp(self, tmp_path: Path) -> None:
+        """TemperatureScheduler must not break deterministic eval (temp=0.0)."""
+        temps: list[float | None] = []
+
+        async def echo_fn(query, *, prompt_override, context, invoke):
+            params = (invoke or {}).get("model_params") or {}
+            temps.append(params.get("temperature"))
+            return query.upper()
+
+        sched = TemperatureScheduler(initial_temperature=0.8, decay_rate=0.5)
+        fitter = PromptFitter(
+            agent="e2e_temp_sched",
+            optimizer=NoopOptimizer(),
+            max_trials=4,
+            patience=1,
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+            drain_seconds=0,
+            callbacks=[sched],
+            baseline_system_prompt="p",
+        )
+        fitter._runner = AgentRunner(agent="e2e_temp_sched", agent_callable=echo_fn)
+        await fitter.fit(_dataset(), _dataset(), ExactMatchMetric(fuzzy=False))
+
+        assert sched.context.current_temperature is not None
+        assert temps, "agent should have been invoked"
+        assert all(t == 0.0 for t in temps), temps
+
+    @pytest.mark.asyncio
+    async def test_completed_fit_marks_experiment_completed(self, tmp_path: Path) -> None:
+        """Full-budget runs must be status=completed, not stopped.
+
+        Baseline returns wrong answers; EchoOptimizer's longer prompt unlocks
+        correct answers so the final round improves and the loop exits
+        naturally (not via patience early-stop).
+        """
+        fitter = PromptFitter(
+            agent="e2e_complete",
+            optimizer=EchoOptimizer(),
+            max_trials=4,  # 1 round
+            patience=5,
+            experiment_dir=str(tmp_path),
+            auto_report=False,
+            drain_seconds=0,
+            callbacks=[],
+            baseline_system_prompt="baseline",
+        )
+
+        async def gated_echo(query, *, prompt_override, context, invoke):
+            # EchoOptimizer appends " #N" — only then return the exact answer.
+            if prompt_override and "#" in prompt_override:
+                return query.upper()
+            return "WRONG"
+
+        fitter._runner = AgentRunner(agent="e2e_complete", agent_callable=gated_echo)
+        result = await fitter.fit(_dataset(), _dataset(), ExactMatchMetric(fuzzy=False))
+        assert result.improved
+        assert "completed all" in (result.early_stop_reason or "")
+
+        from agentomatic.optimize.experiment_tracker import ExperimentTracker
+
+        tracker = ExperimentTracker(db_path=str(tmp_path / "experiments.db"))
+        rows = tracker.get_experiments(agent_name="e2e_complete")
+        assert rows
+        assert rows[0]["status"] == "completed"
+
 
 # =====================================================================
 # 3. Presets → real PromptFitter
@@ -272,7 +338,8 @@ class TestPresetsE2E:
             auto_report=False,
             drain_seconds=0,
         )
-        assert kwargs["max_trials"] == 2
+        # for_quick max_iterations=2 rounds → 8 trial budget
+        assert kwargs["max_trials"] == 8
         assert kwargs["optimizer"]  # echo optimizer instance
 
         async def echo_fn(query, *, prompt_override, context, invoke):
@@ -293,7 +360,9 @@ class TestPresetsE2E:
 
 
 class TestTrainCliE2E:
-    def test_click_train_group_and_do_train(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_click_train_group_and_do_train(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from agentomatic.optimize.train_cli import _do_train, create_train_cli
 
         agent = EchoAgent()
@@ -315,9 +384,9 @@ class TestTrainCliE2E:
                 super().__init__(*a, **kw)
                 self._runner = AgentRunner(
                     agent=kw.get("agent") or a[0] if a else "x",
-                    agent_callable=lambda q, **_: asyncio.sleep(0, result=str(q).upper())
-                    if False
-                    else None,
+                    agent_callable=lambda q, **_: (
+                        asyncio.sleep(0, result=str(q).upper()) if False else None
+                    ),
                 )
 
                 async def _echo(query, *, prompt_override=None, context=None, invoke=None):
@@ -461,7 +530,9 @@ class TestDiscoveryAndDiversityE2E:
         assert len(selected) == 3
 
     @pytest.mark.asyncio
-    async def test_evaluator_evaluate_offline(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_evaluator_evaluate_offline(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from agentomatic.optimize.agent_detect import Evaluator
 
         agent = EchoAgent()

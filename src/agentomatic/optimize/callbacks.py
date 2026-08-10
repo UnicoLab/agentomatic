@@ -401,8 +401,11 @@ class NaNStopping(Callback):
 
         if is_nan:
             self._nan_count += 1
+            score_repr = (
+                "nan" if math.isnan(score) else ("inf" if math.isinf(score) else f"{score:.4f}")
+            )
             logger.warning(
-                f"⚠ NaNStopping: invalid score {score:.4f} "
+                f"⚠ NaNStopping: invalid score {score_repr} "
                 f"({self._nan_count}/{self.max_consecutive_nan})"
             )
 
@@ -509,7 +512,8 @@ class ProgressLogger(Callback):
 
     def on_iteration_end(self, ctx: CallbackContext) -> None:
         self._prev_scores.append(ctx.current_score)
-        delta = ctx.current_score - ctx.best_score if ctx.best_score else 0.0
+        # Use ``is not None`` — a legitimate best_score of 0.0 is falsy.
+        delta = ctx.current_score - ctx.best_score if ctx.best_score is not None else 0.0
         arrow = "▲" if delta > 0 else "▼" if delta < 0 else "─"
         spark = (
             _spark(self._prev_scores, width=self.show_delta_chars) if self.show_delta_chars else ""

@@ -232,20 +232,36 @@ def to_fitter_kwargs(preset: Preset, **overrides: Any) -> dict[str, Any]:
             ``eval_llm``, ``max_iterations``, and ``strategy`` are mapped
             automatically. Extra non-fitter keys are ignored.
 
+            * ``max_iterations`` / preset field → optimisation **rounds**.
+              Converted to ``max_trials`` using PromptFitter's candidates-
+              per-round budget so ``Presets.for_local()`` (5 iters) actually
+              runs ~5 rounds.
+            * ``max_trials`` (explicit) → raw candidate-evaluation budget
+              (PromptFitter semantics); not multiplied.
+
     Returns:
         Dictionary suitable for ``PromptFitter(agent=..., **kwargs)``.
     """
+    # Keep in sync with ``agentomatic.optimize.fitter._CANDIDATES_PER_ROUND``.
+    candidates_per_round = 4
+
     strategy = overrides.pop("strategy", preset.strategy)
     optimizer = overrides.pop(
         "optimizer",
         _STRATEGY_TO_OPTIMIZER.get(strategy, strategy),
     )
-    max_iterations = int(
-        overrides.pop(
-            "max_iterations",
-            overrides.pop("max_trials", preset.max_iterations),
-        )
-    )
+    # Prefer explicit max_trials (budget) over max_iterations (rounds).
+    explicit_trials = overrides.pop("max_trials", None)
+    explicit_iters = overrides.pop("max_iterations", None)
+    if explicit_trials is not None:
+        max_trials = max(1, int(explicit_trials))
+        derived_rounds = max(1, max_trials // candidates_per_round)
+    elif explicit_iters is not None:
+        derived_rounds = max(1, int(explicit_iters))
+        max_trials = derived_rounds * candidates_per_round
+    else:
+        derived_rounds = max(1, int(preset.max_iterations))
+        max_trials = derived_rounds * candidates_per_round
     parallel = int(
         overrides.pop(
             "parallel_evals",
@@ -266,8 +282,8 @@ def to_fitter_kwargs(preset: Preset, **overrides: Any) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "task_model": overrides.pop("task_model", model),
         "rewrite_model": overrides.pop("rewrite_model", model),
-        "max_trials": max_iterations,
-        "patience": overrides.pop("patience", max(1, max_iterations // 2)),
+        "max_trials": max_trials,
+        "patience": overrides.pop("patience", max(1, derived_rounds // 2)),
         "optimizer": optimizer,
         "concurrency": max(1, parallel),
     }

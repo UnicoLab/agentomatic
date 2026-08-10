@@ -2874,7 +2874,14 @@ class {title}Agent(BaseGraphAgent[{title}State]):
     def chat(self, state: {title}State) -> {title}State:
         prompt = self._system_prompt()
         # Normalise REST/Studio dict messages → LangChain message objects.
-        lc_messages = dict_to_messages(state.messages) if state.messages else []
+        # Fall back to current_query/request so optimize/invoke paths work
+        # when the payload has no prior message history.
+        if state.messages:
+            lc_messages = dict_to_messages(state.messages)
+        elif state.request:
+            lc_messages = dict_to_messages({{"current_query": state.request}})
+        else:
+            lc_messages = []
         if self.llm is not None:
             try:
                 if lc_messages:
@@ -2948,7 +2955,6 @@ curl -X POST http://localhost:8000/api/v1/{name}/invoke \\
   LangChain adapter (SSE / LCEL graph) instead of the graph-agent one.
 - See `docs/guide/langchain-adapter.md` for the full helper API.
 """
-
 
 
 def get_template_files(template: str, name: str) -> dict[str, str]:

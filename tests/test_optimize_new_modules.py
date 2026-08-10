@@ -302,8 +302,12 @@ def test_to_fitter_kwargs() -> None:
     kwargs = to_fitter_kwargs(preset)
     assert kwargs["task_model"] == "ollama/mistral:7b"
     assert kwargs["rewrite_model"] == "ollama/mistral:7b"
-    assert kwargs["max_trials"] == 5
+    # max_iterations=5 rounds × 4 candidates/round → trial budget 20
+    assert kwargs["max_trials"] == 20
+    assert kwargs["patience"] == 2
     assert kwargs["optimizer"] == "gepa_like"
+    # Explicit max_trials keeps PromptFitter budget semantics (no multiply).
+    assert to_fitter_kwargs(preset, max_trials=7)["max_trials"] == 7
     # Must be safe for PromptFitter(**kwargs)
     from agentomatic.optimize.fitter import PromptFitter
 
@@ -908,6 +912,53 @@ def test_fit_result_from_prompt_fit_result() -> None:
     assert wrapped.strategy == "gepa_like"
 
 
+def test_fit_result_iterations_prefer_prompt_history() -> None:
+    """Baseline-seeded score_history must not inflate round count."""
+    from agentomatic.optimize.config import PromptFitResult, PromptRuntimeConfig
+    from agentomatic.optimize.optimizer_mixin import FitResult
+
+    result = PromptFitResult(
+        best_config=PromptRuntimeConfig(system_prompt="best"),
+        baseline_config=PromptRuntimeConfig(system_prompt="base"),
+        best_score=0.9,
+        baseline_score=0.4,
+        score_history=[0.4, 0.7, 0.9],  # baseline + 2 rounds
+        prompt_history=[
+            {"round_idx": 0, "score": 0.7},
+            {"round_idx": 1, "score": 0.9},
+        ],
+        agent="bot",
+    )
+    wrapped = FitResult.from_prompt_fit_result(result)
+    assert wrapped.iterations == 2
+
+
+@pytest.mark.asyncio
+async def test_wrap_local_agent_restores_none_system_prompt() -> None:
+    """Prompt override must not stick when the agent started with None."""
+    from agentomatic.optimize.fitter import _wrap_local_agent
+
+    class Agent:
+        system_prompt = None
+
+        def transform(self, data):
+            return {"response": data.get("current_query", "")}
+
+    agent = Agent()
+    fn = _wrap_local_agent(agent)
+    await fn("hello", prompt_override="OVERRIDE")
+    assert agent.system_prompt is None
+
+
+def test_progress_logger_delta_with_zero_best_score() -> None:
+    from agentomatic.optimize.callbacks import CallbackContext, ProgressLogger
+
+    pl = ProgressLogger()
+    ctx = CallbackContext(agent_name="t", best_score=0.0, current_score=0.5, current_iteration=1)
+    pl.on_train_begin(ctx)
+    pl.on_iteration_end(ctx)  # must not treat best_score=0.0 as missing
+
+
 # =====================================================================
 # train_cli
 # =====================================================================
@@ -977,7 +1028,8 @@ def test_train_cli_do_train_builds_valid_fitter() -> None:
         kwargs = Fitter.call_args.kwargs
         assert "verbose" not in kwargs
         assert kwargs["optimizer"] == "few_shot"
-        assert kwargs["max_trials"] == 3
+        # iterations=3 rounds × 4 candidates/round
+        assert kwargs["max_trials"] == 12
         assert result.final_score == 0.9
 
 

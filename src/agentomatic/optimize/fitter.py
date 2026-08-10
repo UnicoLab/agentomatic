@@ -178,24 +178,30 @@ def _wrap_local_agent(agent: Any) -> Any:
 
         # Temporarily override the agent's system_prompt attribute so that
         # nodes which read self.system_prompt pick up the candidate prompt.
+        # Track whether we successfully mutated so we restore even when the
+        # original value was ``None`` / empty (otherwise the override sticks).
         original_prompt: str | None = None
-        has_prompt_attr = hasattr(agent, "system_prompt") and prompt_override is not None
-        if has_prompt_attr:
+        prompt_overridden = False
+        if prompt_override is not None and hasattr(agent, "system_prompt"):
             original_prompt = agent.system_prompt  # type: ignore[union-attr]
             try:
                 agent.system_prompt = prompt_override  # type: ignore[union-attr]
+                prompt_overridden = True
             except (AttributeError, TypeError):
-                has_prompt_attr = False
+                prompt_overridden = False
 
         original_compiled: dict[str, Any] | None = None
+        compiled_overridden = False
         if isinstance(model_params, dict) and model_params and hasattr(agent, "compiled_config"):
             try:
                 original_compiled = dict(getattr(agent, "compiled_config") or {})
                 merged = dict(original_compiled)
                 merged.update(model_params)
                 agent.compiled_config = merged  # type: ignore[union-attr]
+                compiled_overridden = True
             except (AttributeError, TypeError):
                 original_compiled = None
+                compiled_overridden = False
 
         try:
             if hasattr(agent, "atransform") and inspect.iscoroutinefunction(agent.atransform):
@@ -207,12 +213,12 @@ def _wrap_local_agent(agent: Any) -> Any:
             else:
                 raise TypeError(f"Agent {type(agent)} has no transform/invoke method")
         finally:
-            if has_prompt_attr and original_prompt is not None:
+            if prompt_overridden:
                 try:
                     agent.system_prompt = original_prompt  # type: ignore[union-attr]
                 except (AttributeError, TypeError):
                     pass
-            if original_compiled is not None:
+            if compiled_overridden and original_compiled is not None:
                 try:
                     agent.compiled_config = original_compiled  # type: ignore[union-attr]
                 except (AttributeError, TypeError):
@@ -546,6 +552,10 @@ class PromptFitter:
         score_history: list[RoundStats] = []
         learnings_history: list[Any] = []
         early_stop_reason: str | None = None
+        # Distinct from ``early_stop_reason`` text: True only when the loop
+        # aborted early (patience / callback / threshold). Used for tracker
+        # status so completed runs are not mislabeled as ``stopped``.
+        was_early_stopped = False
 
         logger.info(
             "🚀 PromptFitter.fit — experiment={} agent={} max_trials={} "
@@ -874,12 +884,11 @@ class PromptFitter:
                 ),
             )
 
-            # Honour ML-style callback side-effects (temperature / prompt restore).
-            cb_temp = self._callbacks.current_temperature()
-            if cb_temp is not None:
-                params = dict(best_config.model_params or {})
-                params["temperature"] = cb_temp
-                best_config.model_params = params
+            # Honour ML-style callback prompt restore (NaN / early-stop rollback).
+            # Do NOT apply TemperatureScheduler / PlateauStopping temperatures to
+            # evaluation configs — scoring must stay deterministic (temp=0.0
+            # default in ``_evaluate_config``). Schedulers remain observable via
+            # ``CallbackManager.current_temperature()`` for rewrite/search wiring.
             cb_prompt = self._callbacks.current_prompt(overrides_only=True)
             if cb_prompt and cb_prompt != best_config.system_prompt:
                 # Callbacks may restore best_prompt after NaN / early-stop.
@@ -948,6 +957,12 @@ class PromptFitter:
                     n_candidates=0,
                 )
                 if no_improvement_rounds >= effective_patience:
+                    was_early_stopped = True
+                    early_stop_reason = (
+                        f"no improvement for {effective_patience} round(s) "
+                        f"(patience={effective_patience}, monitor=best_score; "
+                        f"last error: candidate proposal failed)"
+                    )
                     logger.warning(
                         "   ⏹️  Early stop: {} rounds without improvement", effective_patience
                     )
@@ -965,6 +980,12 @@ class PromptFitter:
                     n_candidates=0,
                 )
                 if no_improvement_rounds >= effective_patience:
+                    was_early_stopped = True
+                    early_stop_reason = (
+                        f"no improvement for {effective_patience} round(s) "
+                        f"(patience={effective_patience}, monitor=best_score; "
+                        f"no candidates produced)"
+                    )
                     break
                 continue
 
@@ -1036,6 +1057,12 @@ class PromptFitter:
                     n_candidates=len(candidates),
                 )
                 if no_improvement_rounds >= effective_patience:
+                    was_early_stopped = True
+                    early_stop_reason = (
+                        f"no improvement for {effective_patience} round(s) "
+                        f"(patience={effective_patience}, monitor=best_score; "
+                        f"all candidates failed evaluation)"
+                    )
                     break
                 continue
 
@@ -1056,6 +1083,11 @@ class PromptFitter:
                     n_candidates=len(candidates),
                 )
                 if no_improvement_rounds >= effective_patience:
+                    was_early_stopped = True
+                    early_stop_reason = (
+                        f"no improvement for {effective_patience} round(s) "
+                        f"(patience={effective_patience}, monitor=best_score)"
+                    )
                     logger.warning(
                         "   ⏹️  Early stop: {} rounds without improvement",
                         effective_patience,
@@ -1295,6 +1327,7 @@ class PromptFitter:
                 restored = self._callbacks.current_prompt(overrides_only=True)
                 if restored:
                     best_config.system_prompt = restored
+                was_early_stopped = True
                 early_stop_reason = (
                     early_stop_reason or f"callback stop_requested at round {round_num}"
                 )
@@ -1315,6 +1348,7 @@ class PromptFitter:
                 break
 
             if not round_improved and no_improvement_rounds >= effective_patience:
+                was_early_stopped = True
                 early_stop_reason = (
                     f"no improvement for {effective_patience} round(s) "
                     f"(patience={effective_patience}, monitor=best_score)"
@@ -1388,6 +1422,9 @@ class PromptFitter:
         if best_holdout_score is not None:
             gen_gap = best_score - best_holdout_score
 
+        # ``early_stop_reason`` doubles as a stop-summary for reports. Keep a
+        # human-readable completed message, but track ``was_early_stopped``
+        # separately so the experiment tracker status stays accurate.
         if early_stop_reason is None:
             early_stop_reason = (
                 f"completed all {max_rounds} optimize round(s) (max_trials={self.max_trials})"
@@ -1527,7 +1564,7 @@ class PromptFitter:
                     final_score=best_score,
                     best_score=best_score,
                     total_iterations=len([rs for rs in score_history if rs.round_idx >= 0]),
-                    status="stopped" if early_stop_reason else "completed",
+                    status="stopped" if was_early_stopped else "completed",
                 )
             except Exception as exc:
                 logger.debug("ExperimentTracker.end_experiment failed: {}", exc)

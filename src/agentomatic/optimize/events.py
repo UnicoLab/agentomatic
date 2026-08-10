@@ -232,7 +232,9 @@ class CallbackManager:
             try:
                 await cb.on_event(event, data)
             except Exception as exc:
-                logger.debug(
+                # Warning (not debug): silent callback failures hide EarlyStopping /
+                # ScoreThreshold / checkpoint bugs during long fit runs.
+                logger.warning(
                     "Callback {} raised on {}: {}",
                     type(cb).__name__,
                     event.value,

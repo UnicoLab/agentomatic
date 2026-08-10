@@ -301,7 +301,10 @@ def _generate_cases(
     """Generate synthetic test cases for an agent."""
     try:
         return asyncio.run(_generate_cases_async(agent, num, model, existing))
-    except Exception:
+    except Exception as exc:
+        from loguru import logger
+
+        logger.warning("Synthetic case generation failed: {}", exc)
         return list(existing or [])
 
 
@@ -325,7 +328,10 @@ def _augment_cases(cases: list[Any], model: str = "ollama/mistral:7b") -> list[A
     """Augment existing test cases."""
     try:
         return asyncio.run(_augment_cases_async(cases, model))
-    except Exception:
+    except Exception as exc:
+        from loguru import logger
+
+        logger.warning("Dataset augmentation failed: {}", exc)
         return cases
 
 

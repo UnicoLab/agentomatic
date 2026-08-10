@@ -93,12 +93,20 @@ class FitResult:
             if getattr(result, "best_score", None) is not None
             else (float(history[-1]) if history else 0.0)
         )
+        # Prefer prompt_history (actual optimize rounds). ``score_history`` from
+        # PromptFitter seeds the baseline as the first point, which would
+        # over-count "rounds" by one if used directly.
+        prompt_hist = getattr(result, "prompt_history", None) or []
+        if prompt_hist:
+            iterations = len(prompt_hist)
+        else:
+            iterations = len(history)
         return cls(
             agent_name=str(getattr(result, "agent", "") or ""),
             initial_score=initial,
             final_score=final,
             improvement=final - initial,
-            iterations=len(history),
+            iterations=iterations,
             improved=bool(result.improved),
             best_prompt=str(result.best_prompt or ""),
             strategy=str(getattr(result, "optimizer_name", "") or ""),
@@ -289,8 +297,7 @@ class OptimizerMixin:
             metric = LLMJudgeMetric(
                 name=metric_name,
                 criteria=(
-                    "Evaluate if the response is accurate, helpful, "
-                    "and addresses the query."
+                    "Evaluate if the response is accurate, helpful, and addresses the query."
                 ),
                 model=trainer_model,
             )

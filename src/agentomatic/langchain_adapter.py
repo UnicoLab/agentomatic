@@ -860,10 +860,22 @@ class AgentAdapter:
         config = input_data.get("runnable_config") or make_config(thread_id=thread_id)
 
         if self._has_ainvoke:
-            state = dict_to_messages(input_data)
-            result = await self._agent.ainvoke({"messages": state}, config=config)
+            # Preserve agentomatic keys (current_query, metadata, …) while
+            # ensuring a LangChain-style ``messages`` list is present.
+            payload = dict(input_data)
+            existing = payload.get("messages")
+            if not existing:
+                payload["messages"] = dict_to_messages(input_data)
+            result = await self._agent.ainvoke(payload, config=config)
             if isinstance(result, dict) and "messages" in result:
-                return messages_to_dict(result["messages"], input_data)
+                merged = messages_to_dict(result["messages"], input_data)
+                # Preserve non-message keys from the agent result (e.g. response).
+                for key, value in result.items():
+                    if key == "messages":
+                        continue
+                    if value is not None:
+                        merged[key] = value
+                return merged
             if isinstance(result, dict):
                 return {**input_data, **result}
             return {**input_data, "response": str(result)}

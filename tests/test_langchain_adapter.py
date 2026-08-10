@@ -80,6 +80,24 @@ async def test_agent_adapter_callable_agent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_agent_adapter_ainvoke_preserves_current_query() -> None:
+    """ainvoke payload must keep agentomatic keys, not only messages."""
+    from agentomatic.langchain_adapter import AgentAdapter
+
+    class Bot:
+        agent_name = "preserve"
+
+        async def ainvoke(self, state, config=None):
+            assert state.get("current_query") == "hello"
+            assert state.get("messages")
+            return {"response": state["current_query"].upper(), "messages": state["messages"]}
+
+    adapted = AgentAdapter(Bot())
+    result = await adapted.atransform({"current_query": "hello"})
+    assert result["response"] == "HELLO"
+
+
+@pytest.mark.asyncio
 async def test_agent_adapter_sync_invoke() -> None:
     """Agent with only sync invoke."""
     from agentomatic.langchain_adapter import AgentAdapter
