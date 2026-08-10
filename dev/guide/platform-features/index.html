@@ -1016,6 +1016,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../langchain-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangChain Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ml-plugins/" class="md-nav__link">
         
   
@@ -1845,6 +1873,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#invocation-log-history-llm-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invocation log history &amp; LLM analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1889,6 +1928,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks & Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ingestion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingestion & RAG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../connections/" class="md-nav__link">
         
   
@@ -1897,6 +2020,34 @@
     
   
     Per-Agent Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom DB & Vector Connections
   
 
     
@@ -3278,6 +3429,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#invocation-log-history-llm-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invocation log history &amp; LLM analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3590,18 +3752,27 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 </blockquote>
 <hr />
 <h2 id="6-llm-failover-fallbacks">🛡️ 6. LLM Failover &amp; Fallbacks<a class="headerlink" href="#6-llm-failover-fallbacks" title="Permanent link">&para;</a></h2>
-<p>LLM APIs can suffer from outages, rate limiting (HTTP 429), or transient network errors. To ensure high availability, Agentomatic lets you define chainable fallback providers.</p>
+<p>LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
+transient network errors. Agentomatic lets you define an <strong>ordered</strong> fallback
+chain of models/providers (requires <strong>agentomatic &gt;= 1.8.0</strong>).</p>
 <h3 id="configuration_1">Configuration<a class="headerlink" href="#configuration_1" title="Permanent link">&para;</a></h3>
-<p>Pass a list of provider slugs in the <code>fallbacks</code> parameter of <code>get_llm()</code>:</p>
+<p><strong>Python</strong> — pass specs to <code>get_llm()</code> / <code>get_named_llm()</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">get_llm</span><span class="p">(</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span>
 </span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;ollama&quot;</span><span class="p">]</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">)</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">fallbacks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;provider&quot;</span><span class="p">:</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;mistral:7b&quot;</span><span class="p">}],</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">fallback_on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;timeout&quot;</span><span class="p">,</span> <span class="s2">&quot;connection&quot;</span><span class="p">,</span> <span class="s2">&quot;rate_limit&quot;</span><span class="p">,</span> <span class="s2">&quot;empty_response&quot;</span><span class="p">],</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">)</span>
 </span></code></pre></div>
-<p>If the primary provider (<code>openai</code>) raises an exception during execution, LangChain's fallback mechanism automatically routes the request to the next available backup in the list (<code>azure</code>, then <code>ollama</code>), shielding clients from upstream downtime.</p>
+<p><strong>Stack YAML</strong> — set <code>fallbacks</code> / <code>fallback_on</code> on any LLM profile (see
+<a href="../stacks/">Stacks</a> and <a href="../llm-providers/">LLM Providers</a>). Profiles without
+<code>fallbacks</code> keep single-model behaviour.</p>
+<p>Default triggers: <code>timeout</code>, <code>connection</code>, <code>rate_limit</code>, <code>empty_response</code>.
+Opt in to <code>any_error</code> when every exception should advance the chain.</p>
+<p>If the primary model fails for a configured trigger, the next backup is tried.
+<code>record_failover</code> logs each hop; a success log names the model that answered.</p>
 <hr />
 <h2 id="7-state-level-hook-middleware-interceptors">🔌 7. State-Level Hook Middleware (Interceptors)<a class="headerlink" href="#7-state-level-hook-middleware-interceptors" title="Permanent link">&para;</a></h2>
 <p>For custom telemetry, audit logging, or real-time security scanning, you can register <strong>state-level node hooks</strong>. These are run instantly before and after every agent node invocation.</p>
@@ -3714,7 +3885,9 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 </span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="c1"># Reset (typically in tests)</span>
 </span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="n">reset_llm</span><span class="p">()</span>  <span class="c1"># Also resets failover counter</span>
 </span></code></pre></div>
-<p>The failover chain now also passes <code>exceptions_to_handle=(Exception,)</code> to <code>with_fallbacks()</code>, ensuring <strong>any</strong> exception triggers the fallback chain, not just specific ones.</p>
+<p>By default the chain advances only on configured triggers (<code>timeout</code>,
+<code>connection</code>, <code>rate_limit</code>, <code>empty_response</code>). Add <code>any_error</code> to
+<code>fallback_on</code> when every exception should advance the chain.</p>
 <hr />
 <h2 id="12-conversation-memory-session-management">🧠 12. Conversation Memory &amp; Session Management<a class="headerlink" href="#12-conversation-memory-session-management" title="Permanent link">&para;</a></h2>
 <p>Agentomatic provides <strong>automatic conversation memory</strong> for all deployed agents. When a thread store is configured, every <code>/chat</code> and <code>/invoke</code> call automatically:</p>
@@ -4374,6 +4547,114 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 <li><a href="../studio/">Studio Guide</a> — Studio debugging UI guide</li>
 <li><a href="../storage/">Storage Guide</a> — Storage backend configuration</li>
 </ul>
+<h2 id="invocation-log-history-llm-analysis">Invocation log history &amp; LLM analysis<a class="headerlink" href="#invocation-log-history-llm-analysis" title="Permanent link">&para;</a></h2>
+<p>Persist full I/O + metadata for <strong>agents, plugins, pipelines, ingestion, and
+custom endpoints</strong> when <code>logs_history</code> is on. Pipeline agent/plugin/endpoint/
+ingestion steps that run in-process (bypassing HTTP) are also recorded with
+<code>endpoint=pipeline_step</code> and <code>metadata.pipeline</code> set.</p>
+<p>When <code>logs_history</code> is on, the platform derives a durable <code>SQLAlchemyStore</code>
+from <code>AGENTOMATIC_DB_URL</code> / <code>DATABASE_URL</code> / stack <code>database.url</code> (Postgres,
+SQLite, …) — it does <strong>not</strong> eagerly install <code>MemoryStore</code> (that would
+preempt DB auto-derive). If a DB URL is set but init fails, MemoryStore
+fallback is refused.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyStore</span>  <span class="c1"># or MemoryStore</span>
+</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>
+</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
+</span><span id="__span-47-5"><a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
+</span><span id="__span-47-6"><a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;sqlite+aiosqlite:///./agentomatic.db&quot;</span><span class="p">),</span>
+</span><span id="__span-47-7"><a id="__codelineno-47-7" name="__codelineno-47-7" href="#__codelineno-47-7"></a>    <span class="n">logs_history</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-47-8"><a id="__codelineno-47-8" name="__codelineno-47-8" href="#__codelineno-47-8"></a>    <span class="n">allow_logsllm_analysis</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Env equivalents: <code>AGENTOMATIC_LOGS_HISTORY=1</code>,
+<code>AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1</code>, plus <code>DATABASE_URL</code> /
+<code>AGENTOMATIC_DB_URL</code> for multi-backend persistence.</p>
+<p>Cross-resource endpoints:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logs?resource=plugin&amp;name=…</code></td>
+<td>List logs (filter by type/name)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logs/{id}</code></td>
+<td>Fetch one log</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/logs/analyze</code></td>
+<td>LLM/heuristic analysis (<code>resource</code> + <code>name</code> in body)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/logs/analysis?resource=…&amp;name=…</code></td>
+<td>Latest analysis</td>
+</tr>
+</tbody>
+</table>
+<p><code>resource</code> is one of: <code>agent</code> | <code>plugin</code> | <code>pipeline</code> | <code>ingestion</code> | <code>endpoint</code>.</p>
+<p>Per-agent routes remain for backward compatibility:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/{agent}/logs</code></td>
+<td>List agent logs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/{agent}/logs/{id}</code></td>
+<td>Fetch one log</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/{agent}/logs/analyze</code></td>
+<td>LLM/heuristic analysis</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/{agent}/logs/analysis</code></td>
+<td>Latest analysis</td>
+</tr>
+</tbody>
+</table>
+<p>Each log entry includes <code>resource_type</code>, <code>resource_name</code> (and BC
+<code>agent_name</code>), <code>endpoint</code>, <code>input</code>, <code>output</code>, <code>metadata</code>, <code>duration_ms</code>,
+<code>status</code>. Analysis returns <code>score</code>, <code>summary</code>, <code>status</code>, and
+<code>recommendations</code>. Offline train can also audit retrain runs with
+<code>TrainConfig.persist_fit_store</code> / <code>fit_store_url</code> →
+<code>AGENTOMATIC_FIT_STORE_URL</code> / <code>DATABASE_URL</code> (<code>OptimizationRunStore</code>).
+See <a href="../optimization/">Prompt Optimization</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Current gaps</p>
+<ul>
+<li><strong>Async tasks are not recorded</strong> in invocation logs. Synchronous
+  <code>invoke</code> / <code>chat</code> / <code>invoke/stream</code> (and the equivalent sync plugin /
+  pipeline / ingestion / endpoint routes) are logged; work submitted via
+  <code>/invoke/async</code>, <code>/invoke/batch</code>, or the task board is not.</li>
+<li><strong>No per-plugin (or per-pipeline / ingestion / endpoint) convenience
+  routes</strong> like <code>/{plugin}/logs</code>. Query the cross-resource API with
+  <code>?resource=</code> + <code>name=</code> (or use the agent-scoped <code>/{agent}/logs</code> routes
+  for agents only).</li>
+</ul>
+</div>
 
 
 
