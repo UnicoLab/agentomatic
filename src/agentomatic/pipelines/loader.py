@@ -155,6 +155,7 @@ def _parse_agent_step(data: dict[str, Any]) -> AgentStepConfig:
     return AgentStepConfig(
         name=name,
         agent=agent,
+        upstreams=data.get("upstreams"),
         input=_coerce_input_mapping(data.get("input")),
         output=_coerce_output_mapping(data.get("output")),
         condition=data.get("condition"),
@@ -185,6 +186,7 @@ def _parse_plugin_step(data: dict[str, Any]) -> PluginStepConfig:
     return PluginStepConfig(
         name=name,
         plugin=plugin,
+        upstreams=data.get("upstreams"),
         input=_coerce_input_mapping(data.get("input")),
         output=_coerce_output_mapping(data.get("output")),
         condition=data.get("condition"),
@@ -244,6 +246,7 @@ def _parse_ingestion_step(data: dict[str, Any]) -> IngestionStepConfig:
     return IngestionStepConfig(
         name=name,
         ingestor=ingestor,
+        upstreams=data.get("upstreams"),
         input=_coerce_input_mapping(data.get("input")),
         output=_coerce_output_mapping(data.get("output")),
         condition=data.get("condition"),
@@ -273,6 +276,7 @@ def _parse_transform_step(data: dict[str, Any]) -> TransformStepConfig:
 
     return TransformStepConfig(
         name=data["name"],
+        upstreams=data.get("upstreams"),
         code=data["transform"],
         condition=data.get("condition"),
         on_error=ErrorPolicy(data["on_error"]) if "on_error" in data else ErrorPolicy.FAIL,
@@ -309,6 +313,7 @@ def _parse_parallel_step(data: dict[str, Any]) -> ParallelStepConfig:
 
     return ParallelStepConfig(
         name=data["name"],
+        upstreams=data.get("upstreams"),
         steps=sub_steps,
         strategy=strategy,
         max_concurrency=par.get("max_concurrency", 5),
@@ -351,6 +356,7 @@ def _parse_map_step(data: dict[str, Any]) -> MapStepConfig:
 
     return MapStepConfig(
         name=data["name"],
+        upstreams=data.get("upstreams"),
         agent=body["agent"],
         items=body["items"],
         item_key=body.get("item_key", "item"),
@@ -393,6 +399,7 @@ def _parse_loop_step(data: dict[str, Any]) -> LoopStepConfig:
 
     return LoopStepConfig(
         name=data["name"],
+        upstreams=data.get("upstreams"),
         step=inner_step,
         max_iterations=loop.get("max_iterations", 10),
         until=loop.get("until"),
@@ -418,6 +425,7 @@ def _parse_sub_pipeline_step(
     return SubPipelineStepConfig(
         name=name,
         pipeline=pipeline_name,
+        upstreams=data.get("upstreams"),
         input=_coerce_input_mapping(data.get("input")),
         output=_coerce_output_mapping(data.get("output")),
         condition=data.get("condition"),
@@ -747,6 +755,8 @@ def _retry_to_dict(retry: RetryConfig | None) -> dict[str, Any] | None:
 def _agent_step_to_dict(step: AgentStepConfig) -> dict[str, Any]:
     """Serialize an agent step to the loader-compatible dict shape."""
     data: dict[str, Any] = {"name": step.name, "agent": step.agent}
+    if step.upstreams:
+        data["upstreams"] = list(step.upstreams)
     for key, value in (
         ("input", _mapping_to_dict(step.input)),
         ("output", _mapping_to_dict(step.output)),
@@ -782,6 +792,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
 
     if isinstance(step, PluginStepConfig):
         data: dict[str, Any] = {"name": step.name, "plugin": step.plugin}
+        if step.upstreams:
+            data["upstreams"] = list(step.upstreams)
         for key, value in (
             ("input", _mapping_to_dict(step.input)),
             ("output", _mapping_to_dict(step.output)),
@@ -830,6 +842,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
 
     if isinstance(step, IngestionStepConfig):
         data = {"name": step.name, "ingestion": step.ingestor}
+        if step.upstreams:
+            data["upstreams"] = list(step.upstreams)
         for key, value in (
             ("input", _mapping_to_dict(step.input)),
             ("output", _mapping_to_dict(step.output)),
@@ -853,6 +867,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
 
     if isinstance(step, TransformStepConfig):
         data = {"name": step.name, "transform": step.code}
+        if step.upstreams:
+            data["upstreams"] = list(step.upstreams)
         if step.condition is not None:
             data["condition"] = step.condition
         if step.on_error != ErrorPolicy.FAIL:
@@ -868,6 +884,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
                 "steps": [_agent_step_to_dict(s) for s in step.steps],
             },
         }
+        if step.upstreams:
+            data["upstreams"] = list(step.upstreams)
         if step.strategy != ParallelStrategy.ALL:
             data["parallel"]["strategy"] = step.strategy.value
         if step.max_concurrency != 5:
@@ -902,6 +920,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
         if step.fallback_agent is not None:
             body["fallback_agent"] = step.fallback_agent
         data = {"name": step.name, "map": body}
+        if step.upstreams:
+            data["upstreams"] = list(step.upstreams)
         if step.condition is not None:
             data["condition"] = step.condition
         if step.on_error != ErrorPolicy.FAIL:
@@ -921,6 +941,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
         if step.until is not None:
             loop["until"] = step.until
         data = {"name": step.name, "loop": loop}
+        if step.upstreams:
+            data["upstreams"] = list(step.upstreams)
         if step.on_error != ErrorPolicy.FAIL:
             data["on_error"] = step.on_error.value
         if step.timeout != 120.0:
@@ -929,6 +951,8 @@ def _step_to_dict(step: StepConfigUnion) -> dict[str, Any]:
 
     # SubPipelineStepConfig
     data = {"name": step.name, "sub_pipeline": step.pipeline}
+    if step.upstreams:
+        data["upstreams"] = list(step.upstreams)
     for key, value in (
         ("input", _mapping_to_dict(step.input)),
         ("output", _mapping_to_dict(step.output)),

@@ -114,6 +114,14 @@ class PipelineEngine:
                 errors.append(f"Duplicate step name: '{name}'")
             seen.add(name)
 
+        # Check upstream dependencies (unknown refs, self-refs, cycles)
+        from .ordering import compute_execution_order
+
+        try:
+            compute_execution_order(self.config.steps)
+        except ValueError as exc:
+            errors.append(str(exc))
+
         # Check agent references
         required_agents = self.config.get_agent_names()
         for agent_name in required_agents:
@@ -298,9 +306,26 @@ class PipelineEngine:
         ctx: PipelineContext,
         pipeline_result: PipelineResult,
     ) -> None:
-        """Execute pipeline steps sequentially."""
-        total_steps = len(self.config.steps)
-        for idx, step_config in enumerate(self.config.steps):
+        """Execute pipeline steps in execution order.
+
+        Without ``upstreams`` this is the classic list order.  When any
+        step declares ``upstreams``, steps are scheduled topologically
+        (each step runs after all of its declared upstreams), tie-broken
+        by list index for determinism.
+        """
+        from .ordering import compute_execution_order
+
+        try:
+            order = compute_execution_order(self.config.steps)
+        except ValueError as exc:
+            logger.error(f"Pipeline '{self.config.name}' has invalid ordering: {exc}")
+            pipeline_result.status = PipelineStatus.FAILED
+            pipeline_result.error = str(exc)
+            return
+
+        ordered_steps = [self.config.steps[i] for i in order]
+        total_steps = len(ordered_steps)
+        for exec_pos, step_config in enumerate(ordered_steps):
             # Evaluate condition if present
             condition = getattr(step_config, "condition", None)
             if condition and not self._evaluate_condition(condition, ctx):
@@ -309,11 +334,13 @@ class PipelineEngine:
                     name=step_config.name,
                     status=StepStatus.SKIPPED,
                 )
-                await self._report_step_progress(idx + 1, total_steps, step_config.name, "skipped")
+                await self._report_step_progress(
+                    exec_pos + 1, total_steps, step_config.name, "skipped"
+                )
                 continue
 
             logger.info(f"  ▶️ Executing step '{step_config.name}'")
-            await self._report_step_progress(idx, total_steps, step_config.name, "running")
+            await self._report_step_progress(exec_pos, total_steps, step_config.name, "running")
 
             # Execute based on step type
             result = await self._execute_single_step(step_config, ctx)
@@ -328,7 +355,7 @@ class PipelineEngine:
                 self._apply_output_mapping(output_map.mappings, result, ctx)
 
             await self._report_step_progress(
-                idx + 1, total_steps, step_config.name, result.status.value
+                exec_pos + 1, total_steps, step_config.name, result.status.value
             )
 
             # Handle failure
@@ -658,9 +685,18 @@ class PipelineEngine:
         # Include shared context values
         output.update(ctx.shared)
 
-        # Include last successful step's output
+        # Include last successful step's output (in execution order, so
+        # DAG-scheduled pipelines surface the step that actually ran last).
+        from .ordering import compute_execution_order
+
+        try:
+            order = compute_execution_order(self.config.steps)
+        except ValueError:
+            order = list(range(len(self.config.steps)))
+
         last_output: dict[str, Any] = {}
-        for step in reversed(self.config.steps):
+        for idx in reversed(order):
+            step = self.config.steps[idx]
             step_result = pipeline_result.steps.get(step.name)
             if step_result and step_result.status == StepStatus.SUCCESS:
                 last_output = dict(step_result.output)
@@ -676,15 +712,24 @@ class PipelineEngine:
     def visualize(self) -> str:
         """Generate a Mermaid diagram of the pipeline.
 
+        The main flow follows list order as a chain; ``upstreams``
+        dependencies are drawn as dotted edges.
+
         Returns:
             Mermaid graph definition string.
         """
         lines = ["graph TD"]
         lines.append(f'    START(["🚀 {self.config.name}"])')
 
+        # Map each step name to its primary Mermaid node id.
+        from .ordering import upstreams_of
+
+        def node_id_for(name: str) -> str:
+            return name.replace(" ", "_")
+
         prev = "START"
         for step in self.config.steps:
-            node_id = step.name.replace(" ", "_")
+            node_id = node_id_for(step.name)
 
             if isinstance(step, ParallelStepConfig):
                 # Fork node
@@ -748,6 +793,13 @@ class PipelineEngine:
                     lines.append(f'    {node_id}["{step.name}\\n({agent_name})"]')
                 lines.append(f"    {prev} --> {node_id}")
                 prev = node_id
+
+        # Explicit upstream edges (dotted, so the main chain stays dominant).
+        for step in self.config.steps:
+            for upstream in upstreams_of(step):
+                lines.append(
+                    f"    {node_id_for(upstream)} -.->|upstream| {node_id_for(step.name)}"
+                )
 
         lines.append('    END(["✅ Done"])')
         lines.append(f"    {prev} --> END")

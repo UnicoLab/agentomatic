@@ -131,6 +131,11 @@ class AgentStepConfig(BaseModel):
     step_type: Literal[StepType.AGENT] = StepType.AGENT
     name: str
     agent: str  # Agent name in registry
+    upstreams: list[str] | None = Field(
+        default=None,
+        description="Explicit dependencies: step names that must complete "
+        "before this step runs (DAG scheduling).",
+    )
     input: InputMapping = Field(default_factory=InputMapping)
     output: OutputMapping = Field(default_factory=OutputMapping)
     condition: str | None = None
@@ -156,6 +161,7 @@ class PluginStepConfig(BaseModel):
     step_type: Literal[StepType.PLUGIN] = StepType.PLUGIN
     name: str
     plugin: str  # Plugin name in the plugin registry
+    upstreams: list[str] | None = None
     input: InputMapping = Field(default_factory=InputMapping)
     output: OutputMapping = Field(default_factory=OutputMapping)
     condition: str | None = None
@@ -200,6 +206,7 @@ class IngestionStepConfig(BaseModel):
     step_type: Literal[StepType.INGESTION] = StepType.INGESTION
     name: str
     ingestor: str  # Ingestor name in the ingestion registry
+    upstreams: list[str] | None = None
     input: InputMapping = Field(default_factory=InputMapping)
     output: OutputMapping = Field(default_factory=OutputMapping)
     condition: str | None = None
@@ -219,6 +226,7 @@ class TransformStepConfig(BaseModel):
 
     step_type: Literal[StepType.TRANSFORM] = StepType.TRANSFORM
     name: str
+    upstreams: list[str] | None = None
     code: str
     condition: str | None = None
     on_error: ErrorPolicy = ErrorPolicy.FAIL
@@ -230,6 +238,7 @@ class ParallelStepConfig(BaseModel):
 
     step_type: Literal[StepType.PARALLEL] = StepType.PARALLEL
     name: str
+    upstreams: list[str] | None = None
     steps: list[AgentStepConfig]
     strategy: ParallelStrategy = ParallelStrategy.ALL
     max_concurrency: int = Field(5, ge=1, le=20)
@@ -258,6 +267,7 @@ class MapStepConfig(BaseModel):
 
     step_type: Literal[StepType.MAP] = StepType.MAP
     name: str
+    upstreams: list[str] | None = None
     agent: str = Field(..., description="Agent name to invoke per item.")
     items: str = Field(
         ...,
@@ -296,6 +306,7 @@ class LoopStepConfig(BaseModel):
 
     step_type: Literal[StepType.LOOP] = StepType.LOOP
     name: str
+    upstreams: list[str] | None = None
     step: AgentStepConfig
     max_iterations: int = Field(10, ge=1, le=100)
     until: str | None = None  # Python expression evaluated against ctx
@@ -309,6 +320,7 @@ class SubPipelineStepConfig(BaseModel):
     step_type: Literal[StepType.SUB_PIPELINE] = StepType.SUB_PIPELINE
     name: str
     pipeline: str  # Pipeline name to invoke
+    upstreams: list[str] | None = None
     input: InputMapping = Field(default_factory=InputMapping)
     output: OutputMapping = Field(default_factory=OutputMapping)
     condition: str | None = None

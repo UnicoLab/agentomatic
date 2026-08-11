@@ -145,6 +145,7 @@ def _check_input_expr(
     label: str,
     current_index: int,
     step_index: dict[str, int],
+    upstreams: set[str],
     input_schema: dict[str, Any] | None,
     errors: list[str],
     warnings: list[str],
@@ -177,11 +178,11 @@ def _check_input_expr(
                     f"{label}: '{expr}' references step '{ref}' which does not "
                     "exist in the pipeline"
                 )
-            elif step_index[ref] >= current_index:
+            elif step_index[ref] >= current_index and ref not in upstreams:
                 errors.append(
                     f"{label}: '{expr}' references step '{ref}' which runs after "
-                    "this step — steps execute in order, so its output is not "
-                    "available yet"
+                    "this step — move it earlier in the list or declare it in "
+                    "upstreams"
                 )
     elif root == "input" and input_schema and len(parts) >= 2:
         field = parts[1].split("[", 1)[0]
@@ -228,6 +229,7 @@ def _check_step_mappings(
     label: str,
     current_index: int,
     step_index: dict[str, int],
+    upstreams: set[str],
     input_schema: dict[str, Any] | None,
     errors: list[str],
     warnings: list[str],
@@ -241,6 +243,7 @@ def _check_step_mappings(
                 f"{label} input mapping '{key}'",
                 current_index,
                 step_index,
+                upstreams,
                 input_schema,
                 errors,
                 warnings,
@@ -282,8 +285,17 @@ def validate_pipeline_draft(config: PipelineConfig) -> tuple[list[str], list[str
     step_index = {name: i for i, name in enumerate(config.step_names)}
     input_schema = config.input_schema
 
+    # Upstream dependency graph: unknown refs, self-refs, cycles.
+    from .ordering import compute_execution_order
+
+    try:
+        compute_execution_order(config.steps)
+    except ValueError as exc:
+        errors.append(str(exc))
+
     for index, step in enumerate(config.steps):
         label = f"Step '{step.name}'"
+        upstreams = set(getattr(step, "upstreams", None) or [])
 
         if isinstance(
             step,
@@ -295,7 +307,9 @@ def validate_pipeline_draft(config: PipelineConfig) -> tuple[list[str], list[str
                 SubPipelineStepConfig,
             ),
         ):
-            _check_step_mappings(step, label, index, step_index, input_schema, errors, warnings)
+            _check_step_mappings(
+                step, label, index, step_index, upstreams, input_schema, errors, warnings
+            )
 
         elif isinstance(step, TransformStepConfig):
             _check_transform_code(step.code, f"{label} transform code", errors)
@@ -310,11 +324,18 @@ def validate_pipeline_draft(config: PipelineConfig) -> tuple[list[str], list[str
 
         elif isinstance(step, ParallelStepConfig):
             for sub in step.steps:
+                if getattr(sub, "upstreams", None):
+                    warnings.append(
+                        f"Step '{sub.name}' (inside parallel '{step.name}') declares "
+                        "upstreams — nested steps are not independently scheduled; "
+                        "declare the dependency on the container step instead"
+                    )
                 _check_step_mappings(
                     sub,
                     f"Step '{sub.name}' (inside parallel '{step.name}')",
                     index,
                     step_index,
+                    upstreams,
                     input_schema,
                     errors,
                     warnings,
@@ -327,18 +348,28 @@ def validate_pipeline_draft(config: PipelineConfig) -> tuple[list[str], list[str
                 f"{label} items",
                 index,
                 step_index,
+                upstreams,
                 input_schema,
                 errors,
                 warnings,
             )
-            _check_step_mappings(step, label, index, step_index, input_schema, errors, warnings)
+            _check_step_mappings(
+                step, label, index, step_index, upstreams, input_schema, errors, warnings
+            )
 
         elif isinstance(step, LoopStepConfig):
+            if getattr(step.step, "upstreams", None):
+                warnings.append(
+                    f"Step '{step.step.name}' (inside loop '{step.name}') declares "
+                    "upstreams — nested steps are not independently scheduled; "
+                    "declare the dependency on the container step instead"
+                )
             _check_step_mappings(
                 step.step,
                 f"Step '{step.step.name}' (inside loop '{step.name}')",
                 index,
                 step_index,
+                upstreams,
                 input_schema,
                 errors,
                 warnings,
