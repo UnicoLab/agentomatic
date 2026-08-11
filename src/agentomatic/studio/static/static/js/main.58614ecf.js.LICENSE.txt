@@ -5,6 +5,8 @@
  * @license  MIT
  */
 
+/*! js-yaml 5.2.3 https://github.com/nodeca/js-yaml @license MIT */
+
 /**
  * @license React
  * react-dom.production.min.js
