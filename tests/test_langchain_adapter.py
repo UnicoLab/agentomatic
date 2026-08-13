@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Comprehensive tests for agentomatic.langchain_adapter — covers ALL agent patterns."""
 
 from __future__ import annotations
@@ -466,6 +470,8 @@ def test_bind_tools_available() -> None:
     from agentomatic.langchain_adapter import bind_tools
 
     class LLM:
+        _bound = None
+
         def bind_tools(self, tools):
             self._bound = tools
             return self

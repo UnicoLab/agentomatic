@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the visual-builder REST API (validate-draft, save, delete).
 
 Covers the stateless draft validation endpoint, YAML persistence
@@ -25,6 +29,7 @@ from agentomatic.pipelines.router import create_pipeline_router
 
 class _DocsIngestor(BaseIngestor):
     ingestor_name = "docs_ingestor"
+    ready = False
 
     async def setup(self) -> None:
         self.ready = True

@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the ML Model Plugins system."""
 
 from __future__ import annotations
@@ -66,7 +70,9 @@ def test_plugin_registry_and_router(tmp_path):
 
     with TestClient(app) as client:
         # Lifespan should load the model
-        assert platform._plugin_registry.get_plugin("sentiment_analyzer").is_loaded
+        plugin = platform._plugin_registry.get_plugin("sentiment_analyzer")
+        assert plugin is not None
+        assert plugin.is_loaded
 
         # Test Health
         resp = client.get("/api/v1/plugins/sentiment_analyzer/health")

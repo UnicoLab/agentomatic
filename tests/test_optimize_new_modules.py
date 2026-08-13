@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the new optimisation modules added from the Agents inspiration project."""
 
 from __future__ import annotations
@@ -1258,11 +1262,6 @@ def test_inject_system_prompt_plain() -> None:
 def test_pydantic_settings_defaults() -> None:
     from agentomatic.optimize.settings import OptimizerPydanticSettings
 
-    if OptimizerPydanticSettings is None:
-        import pytest
-
-        pytest.skip("pydantic-settings not installed")
-
     s = OptimizerPydanticSettings()
     assert s.trainer_model == "ollama/mistral:7b"
     assert s.max_iterations == 5
@@ -1271,11 +1270,6 @@ def test_pydantic_settings_defaults() -> None:
 
 def test_pydantic_settings_presets() -> None:
     from agentomatic.optimize.settings import OptimizerPydanticSettings
-
-    if OptimizerPydanticSettings is None:
-        import pytest
-
-        pytest.skip("pydantic-settings not installed")
 
     local = OptimizerPydanticSettings.for_local()
     assert local.max_iterations == 5
@@ -1294,11 +1288,6 @@ def test_pydantic_settings_presets() -> None:
 def test_pydantic_settings_properties() -> None:
     from agentomatic.optimize.settings import OptimizerPydanticSettings
 
-    if OptimizerPydanticSettings is None:
-        import pytest
-
-        pytest.skip("pydantic-settings not installed")
-
     s = OptimizerPydanticSettings(eval_metrics="relevancy,geval,faithfulness")
     assert s.eval_metrics_list == ["relevancy", "geval", "faithfulness"]
 
@@ -1309,11 +1298,6 @@ def test_pydantic_settings_properties() -> None:
 def test_pydantic_settings_display(capsys) -> None:
     from agentomatic.optimize.settings import OptimizerPydanticSettings
 
-    if OptimizerPydanticSettings is None:
-        import pytest
-
-        pytest.skip("pydantic-settings not installed")
-
     s = OptimizerPydanticSettings.for_local()
     s.display()
     captured = capsys.readouterr()
@@ -1322,11 +1306,6 @@ def test_pydantic_settings_display(capsys) -> None:
 
 def test_pydantic_settings_to_dict() -> None:
     from agentomatic.optimize.settings import OptimizerPydanticSettings
-
-    if OptimizerPydanticSettings is None:
-        import pytest
-
-        pytest.skip("pydantic-settings not installed")
 
     s = OptimizerPydanticSettings(trainer_model="test/model")
     d = s.to_dict()

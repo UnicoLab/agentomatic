@@ -279,7 +279,7 @@ class OptimizerSettings:
 
     def _parse_metrics(self, raw: list[EvalMetric | str] | None) -> list[EvalMetric]:
         if raw:
-            return [EvalMetric(r) if isinstance(r, str) else r for r in raw]
+            return [EvalMetric(r) for r in raw]
         env_val = _env_list("EVAL_METRICS")
         if env_val:
             return [EvalMetric(m) for m in env_val]
@@ -289,7 +289,7 @@ class OptimizerSettings:
         self, raw: list[AugmentationMethod | str] | None
     ) -> list[AugmentationMethod]:
         if raw:
-            return [AugmentationMethod(r) if isinstance(r, str) else r for r in raw]
+            return [AugmentationMethod(r) for r in raw]
         env_val = _env_list("AUGMENTATION_METHODS")
         if env_val:
             return [AugmentationMethod(m) for m in env_val]
@@ -297,7 +297,7 @@ class OptimizerSettings:
 
     def _parse_callbacks(self, raw: list[CallbackType | str] | None) -> list[CallbackType]:
         if raw:
-            return [CallbackType(r) if isinstance(r, str) else r for r in raw]
+            return [CallbackType(r) for r in raw]
         env_val = _env_list("CALLBACKS")
         if env_val:
             return [CallbackType(c) for c in env_val]

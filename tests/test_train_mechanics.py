@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """End-to-end mechanics that ``train.py`` / ``optimize.py`` templates rely on.
 
 Does **not** rewrite the scaffold scripts — it exercises the same compile →
@@ -76,9 +80,9 @@ class _TrainDemoAgent(BaseGraphAgent[_TrainState]):
         }
         return state
 
-    def input_to_state(self, data: dict[str, Any]) -> _TrainState:
+    def input_to_state(self, input_data: dict[str, Any]) -> _TrainState:
         return _TrainState(
-            request=data.get("current_query") or data.get("query") or "",
+            request=input_data.get("current_query") or input_data.get("query") or "",
         )
 
     def state_to_output(self, state: _TrainState) -> dict[str, Any]:

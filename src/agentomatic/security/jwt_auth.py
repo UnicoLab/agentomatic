@@ -1,3 +1,4 @@
+# mypy: disable-error-code="misc"
 """JWT / OAuth2 authentication middleware.
 
 Validates bearer tokens from the ``Authorization`` header using PyJWT.
@@ -13,7 +14,7 @@ by passing all requests through and logging a warning on first use.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -34,7 +35,9 @@ try:
 
     _HAS_PYJWT = True
 except ImportError:  # pragma: no cover
-    _jwt_lib = None  # type: ignore[assignment]
+    _jwt_lib = cast(Any, None)
+    ExpiredSignatureError = cast(Any, None)
+    InvalidTokenError = cast(Any, None)
     _HAS_PYJWT = False
 
 
@@ -137,7 +140,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     def _get_jwks_client(self) -> Any:
         """Lazily create and cache the :class:`jwt.PyJWKClient`."""
         if self._jwks_client is None and self._config.jwks_url:
-            self._jwks_client = _jwt_lib.PyJWKClient(self._config.jwks_url)  # type: ignore[union-attr]
+            self._jwks_client = _jwt_lib.PyJWKClient(self._config.jwks_url)
         return self._jwks_client
 
     @staticmethod
@@ -225,7 +228,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 opts["verify_aud"] = False
                 decode_kwargs["options"] = opts
 
-            claims: dict[str, Any] = _jwt_lib.decode(token, **decode_kwargs)  # type: ignore[union-attr]
+            claims: dict[str, Any] = _jwt_lib.decode(token, **decode_kwargs)
         except ExpiredSignatureError:
             logger.debug("JWT token expired")
             return self._json_401("Token has expired")

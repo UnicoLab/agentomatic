@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -50,7 +50,15 @@ try:
 
     _HAS_TEXTUAL = True
 except ImportError:  # pragma: no cover
-    pass
+    # Bind optional-import names so the guarded usages below stay type-safe.
+    App = cast(Any, None)
+    ComposeResult = cast(Any, None)
+    Horizontal = cast(Any, None)
+    Vertical = cast(Any, None)
+    DataTable = cast(Any, None)
+    ProgressBar = cast(Any, None)
+    RichLog = cast(Any, None)
+    Static = cast(Any, None)
 
 # ------------------------------------------------------------------
 # Constants
@@ -142,7 +150,7 @@ if _HAS_TEXTUAL:
     }
     """
 
-    class OptimizationDashboard(App):  # type: ignore[type-arg]
+    class OptimizationDashboard(App):
         """Textual application for live optimisation observability.
 
         The dashboard renders:
@@ -183,7 +191,7 @@ if _HAS_TEXTUAL:
 
         # ── compose ─────────────────────────────────────────
 
-        def compose(self) -> ComposeResult:
+        def compose(self) -> Any:
             """Build the widget tree."""
             yield Static("", id="header-bar")
             with Vertical(id="progress-box"):
@@ -202,7 +210,7 @@ if _HAS_TEXTUAL:
 
         def on_mount(self) -> None:
             """Initialise the candidates DataTable columns."""
-            table: DataTable = self.query_one(  # type: ignore[type-arg]
+            table: Any = self.query_one(
                 "#candidates-pane", DataTable
             )
             table.add_columns("Round", "Name", "Source", "Score", "Status")
@@ -289,7 +297,7 @@ if _HAS_TEXTUAL:
                 return
 
             try:
-                table: DataTable = self.query_one(  # type: ignore[type-arg]
+                table: Any = self.query_one(
                     "#candidates-pane", DataTable
                 )
                 score_str = f"{data.score:.4f}" if data.score is not None else "—"
@@ -331,7 +339,7 @@ if _HAS_TEXTUAL:
         def _refresh_progress(self) -> None:
             pct = int(self._round_idx / self._total_rounds * 100)
             try:
-                bar: ProgressBar = self.query_one("#main-progress", ProgressBar)
+                bar: Any = self.query_one("#main-progress", ProgressBar)
                 bar.update(progress=pct)
             except Exception:  # noqa: BLE001
                 pass
@@ -398,7 +406,7 @@ if _HAS_TEXTUAL:
                 parts.append(f"notes={notes}")
             line = "  ".join(parts)
             try:
-                log: RichLog = self.query_one("#log-pane", RichLog)
+                log: Any = self.query_one("#log-pane", RichLog)
                 log.write(line)
             except Exception:  # noqa: BLE001
                 pass

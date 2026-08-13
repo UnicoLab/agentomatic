@@ -22,7 +22,7 @@ Usage::
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from loguru import logger
 from sqlalchemy import delete, func, select
@@ -250,7 +250,7 @@ class SQLAlchemyStore(BaseStore):
             thread.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(thread)
-            return cast(dict[str, Any], thread.to_dict())
+            return thread.to_dict()
 
     # ------------------------------------------------------------------
     # Message operations

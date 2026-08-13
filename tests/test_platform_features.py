@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for core platform features: HITL, Structured Output, Thread Forking, and A/B Test Routing."""
 
 from __future__ import annotations
@@ -317,12 +321,12 @@ async def test_agentomatic_checkpointer_memory(store):
     retrieved = await checkpointer.aget_tuple(config)
     assert retrieved is not None
     assert retrieved.checkpoint["channel_values"]["my_key"] == "my_val"
-    assert retrieved.metadata["step"] == 1
+    assert retrieved.metadata.get("step") == 1
 
     # List checkpoints
     cps = await checkpointer._alist_list(config)
     assert len(cps) == 1
-    assert cps[0].config["configurable"]["checkpoint_id"] == "cp1"
+    assert cps[0].config.get("configurable", {}).get("checkpoint_id") == "cp1"
 
 
 @pytest.mark.asyncio
@@ -356,7 +360,7 @@ async def test_agentomatic_checkpointer_db():
         # List checkpoints
         cps = await checkpointer._alist_list(config)
         assert len(cps) == 1
-        assert cps[0].config["configurable"]["checkpoint_id"] == "cp2"
+        assert cps[0].config.get("configurable", {}).get("checkpoint_id") == "cp2"
     finally:
         await db_store.close()
 
@@ -510,7 +514,7 @@ async def test_agentomatic_checkpointer_sync_wrappers_and_errors(store):
     assert t_res is not None
     assert t_res.checkpoint["channel_values"]["x"] == 10
     assert len(t_list) == 1
-    assert t_list[0].config["configurable"]["checkpoint_id"] == "cp_sync_1"
+    assert t_list[0].config.get("configurable", {}).get("checkpoint_id") == "cp_sync_1"
 
 
 @pytest.mark.asyncio
@@ -522,6 +526,7 @@ async def test_sqlalchemy_store_all_features_edge_cases():
         # 1. Thread update and delete
         await db_store.create_thread("thread_sqla", "user_sqla", "test_agent", title="Old Title")
         thread = await db_store.get_thread("thread_sqla")
+        assert thread is not None
         assert thread["title"] == "Old Title"
 
         updated = await db_store.update_thread(
@@ -602,6 +607,7 @@ async def test_sqlalchemy_store_all_features_edge_cases():
             metadata={"source": "test_update"},
         )
         updated_cp = await db_store.get_checkpoint("thread_sqla", "ns_sqla", "cp_sqla_1")
+        assert updated_cp is not None
         assert updated_cp["parent_checkpoint_id"] == "parent_id"
         assert updated_cp["checkpoint"]["step"] == 1.1
 
@@ -821,6 +827,7 @@ async def test_thread_lineage_sqlalchemy():
 
         # Fork
         forked = await db_store.fork_thread("root_sql", 0, "child_sql", title="Child SQL")
+        assert forked is not None
         assert forked["parent_thread_id"] == "root_sql"
         assert forked["fork_message_index"] == 0
 

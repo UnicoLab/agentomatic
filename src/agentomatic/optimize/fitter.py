@@ -96,6 +96,28 @@ _MINIBATCH_MIN: int = 5
 _TOP_K_CANDIDATES: int = 3
 """How many top minibatch candidates get promoted to full evaluation."""
 
+# Candidate ``source`` values ordered by preference for tie-breaks. When two
+# candidates score identically on the minibatch, deterministic candidates
+# derived from the dataset / gold labels (expected-tips, few-shot) win over
+# free-form LLM rewrites — local SLMs sometimes echo demo text verbatim, and
+# grounded candidates stay readable and auditable.
+_CANDIDATE_SOURCE_PRIORITY: dict[str, int] = {
+    "expected_tips": 0,
+    "few_shot": 1,
+    "few_shot_bootstrap": 1,
+    "rewrite+few_shot": 2,
+    "mipro_like": 3,
+    "gepa_like": 3,
+    "param_search": 3,
+    "apo": 4,
+    "rewrite": 4,
+}
+
+
+def _candidate_source_rank(source: str) -> int:
+    """Return the tie-break rank for a candidate ``source`` label."""
+    return _CANDIDATE_SOURCE_PRIORITY.get(source, 3)
+
 _EARLY_STOP_PATIENCE: int = 3
 """Stop if no improvement for this many consecutive rounds."""
 
@@ -183,9 +205,9 @@ def _wrap_local_agent(agent: Any) -> Any:
         original_prompt: str | None = None
         prompt_overridden = False
         if prompt_override is not None and hasattr(agent, "system_prompt"):
-            original_prompt = agent.system_prompt  # type: ignore[union-attr]
+            original_prompt = agent.system_prompt
             try:
-                agent.system_prompt = prompt_override  # type: ignore[union-attr]
+                agent.system_prompt = prompt_override
                 prompt_overridden = True
             except (AttributeError, TypeError):
                 prompt_overridden = False
@@ -197,7 +219,7 @@ def _wrap_local_agent(agent: Any) -> Any:
                 original_compiled = dict(getattr(agent, "compiled_config") or {})
                 merged = dict(original_compiled)
                 merged.update(model_params)
-                agent.compiled_config = merged  # type: ignore[union-attr]
+                agent.compiled_config = merged
                 compiled_overridden = True
             except (AttributeError, TypeError):
                 original_compiled = None
@@ -215,12 +237,12 @@ def _wrap_local_agent(agent: Any) -> Any:
         finally:
             if prompt_overridden:
                 try:
-                    agent.system_prompt = original_prompt  # type: ignore[union-attr]
+                    agent.system_prompt = original_prompt
                 except (AttributeError, TypeError):
                     pass
             if compiled_overridden and original_compiled is not None:
                 try:
-                    agent.compiled_config = original_compiled  # type: ignore[union-attr]
+                    agent.compiled_config = original_compiled
                 except (AttributeError, TypeError):
                     pass
 
@@ -376,6 +398,8 @@ class PromptFitter:
         slm_default_passes: int = 3,
         llm_default_passes: int = 2,
         baseline_system_prompt: str | None = None,
+        baseline_model_params: dict[str, Any] | None = None,
+        baseline_few_shot_examples: list[dict[str, Any]] | None = None,
         max_generalization_gap: float = 0.15,
         holdout_fraction: float = 0.2,
         drain_seconds: float = 1.5,
@@ -418,6 +442,15 @@ class PromptFitter:
         # Optional pre-set baseline: overrides prompts.json on first step.
         # Used by PromptFitterBridge to compound improvements across epochs.
         self._baseline_system_prompt: str | None = baseline_system_prompt
+        # Optional pre-set model params: compound tuned hyper-parameters
+        # (e.g. temperature) across epochs instead of restarting from the
+        # search-space first value every time.
+        self._baseline_model_params: dict[str, Any] = dict(baseline_model_params or {})
+        # Optional pre-set few-shot examples: compound a previous epoch's
+        # accepted few-shot config so later epochs cannot regress it.
+        self._baseline_few_shot_examples: list[dict[str, Any]] = list(
+            baseline_few_shot_examples or []
+        )
 
         # Configure LLMCaller for OpenAI-compatible local servers if requested.
         # This propagates base_url/api_key to all optimizer LLM calls automatically.
@@ -619,7 +652,7 @@ class PromptFitter:
             holdout_source = "valset"
             # Tiny valsets: borrow holdout from train so generalization
             # safety stays always-on (never silently skip).
-            if not hold_pts and trainset is not None and len(trainset) >= 2:
+            if not hold_pts and len(trainset) >= 2:
                 _fit_train, hold_pts = split_holdout(
                     list(trainset),
                     fraction=self.holdout_fraction,
@@ -997,7 +1030,7 @@ class PromptFitter:
 
             for cand in candidates:
                 try:
-                    cand_score, cand_dims, cand_details = await self._evaluate_config(
+                    cand_score, cand_dims, _ = await self._evaluate_config(
                         cand.config,
                         minibatch_dataset,
                         metric,
@@ -1067,7 +1100,12 @@ class PromptFitter:
                 continue
 
             # ── Step 6: Promote top candidates to full valset ────────
-            candidate_scores.sort(key=lambda t: t[1], reverse=True)
+            # Stable sort: score first, then source preference so grounded
+            # (tips / few-shot) candidates win score ties over LLM rewrites.
+            candidate_scores.sort(
+                key=lambda t: (t[1], -_candidate_source_rank(t[0].source or "")),
+                reverse=True,
+            )
             promotable = [
                 (cand, sc, dims) for cand, sc, dims in candidate_scores if sc > best_score
             ][:_TOP_K_CANDIDATES]
@@ -1223,12 +1261,12 @@ class PromptFitter:
                         opt = self._optimizer
                         if hasattr(opt, "update_beam"):
                             try:
-                                opt.update_beam(cand.config.system_prompt, full_score)
+                                getattr(opt, "update_beam")(cand.config.system_prompt, full_score)
                             except Exception as exc:  # pragma: no cover
                                 logger.debug("APO beam update skipped: {}", exc)
                         if hasattr(opt, "observe"):
                             try:
-                                opt.observe(dict(cand.config.model_params or {}), full_score)
+                                getattr(opt, "observe")(dict(cand.config.model_params or {}), full_score)
                             except Exception as exc:  # pragma: no cover
                                 logger.debug("Param observe skipped: {}", exc)
                     else:
@@ -1869,8 +1907,6 @@ class PromptFitter:
             return prompt
         blocks = ["## Few-shot examples (follow this style and grounding)"]
         for idx, ex in enumerate(examples[:6], 1):
-            if not isinstance(ex, dict):
-                continue
             q = str(ex.get("query") or ex.get("input") or "").strip()
             r = str(ex.get("response") or ex.get("output") or "").strip()
             if not q and not r:
@@ -1903,16 +1939,24 @@ class PromptFitter:
             system_prompt = self._load_prompt_text()
 
         # Build default model_params from search space (first value of each).
-        # Always default temperature to 0.0 for reproducible fit evaluation
-        # unless the search space (or an explicit candidate) overrides it.
-        model_params: dict[str, Any] = {"temperature": 0.0}
+        # Only when the search space enables model params: prompt-only fits
+        # must NOT carry/apply hyper-parameters (e.g. temperature) — the
+        # eval-time 0.0 default in ``_evaluate_config`` still keeps scoring
+        # deterministic without leaking params into the best config.
+        model_params: dict[str, Any] = {}
         if self._search_space.optimize_model_params:
+            model_params = {"temperature": 0.0}
             for param, values in self._search_space.model_param_space.items():
                 if values:
                     model_params[param] = values[0]
+            # Compound previously-applied params (from an earlier epoch's
+            # fit) so a flat later epoch cannot regress tuned values.
+            for param, value in self._baseline_model_params.items():
+                model_params[param] = value
 
         return PromptRuntimeConfig(
             system_prompt=system_prompt,
+            few_shot_examples=list(self._baseline_few_shot_examples or []),
             model_params=model_params,
         )
 

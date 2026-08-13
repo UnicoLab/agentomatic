@@ -230,4 +230,4 @@ def get_settings_from_dict(overrides: dict[str, Any]) -> PlatformSettings:
     Returns:
         A fresh ``PlatformSettings`` instance.
     """
-    return PlatformSettings(**overrides)  # type: ignore[call-arg]
+    return PlatformSettings(**overrides)

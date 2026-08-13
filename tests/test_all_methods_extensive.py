@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Extensive coverage of train / optimize / execution mechanics.
 
 Exercises every public method the scaffold ``train.py`` / ``optimize.py`` /
@@ -111,8 +115,8 @@ class _DemoAgent(BaseGraphAgent[_State]):
         }
         return state
 
-    def input_to_state(self, data: dict[str, Any]) -> _State:
-        return _State(request=data.get("current_query") or data.get("query") or "")
+    def input_to_state(self, input_data: dict[str, Any]) -> _State:
+        return _State(request=input_data.get("current_query") or input_data.get("query") or "")
 
     def state_to_output(self, state: _State) -> dict[str, Any]:
         return state.output
@@ -778,7 +782,7 @@ class TestPromptFitterHelpers:
 
         metric = ExactMatchMetric()
         monkeypatch.setattr(metric, "evaluate", _eval)
-        avg, dims, details = await f._evaluate_config(  # noqa: SLF001
+        avg, _dims, details = await f._evaluate_config(  # noqa: SLF001
             PromptRuntimeConfig(system_prompt="You are precise."),
             Dataset.from_list(
                 [
@@ -968,7 +972,9 @@ class TestScaffoldScriptsExecute:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from agents.scaffold_bot.optimize import main as opt_main
+            from agents.scaffold_bot.optimize import (  # pyright: ignore[reportMissingImports]
+                main as opt_main,
+            )
 
             monkeypatch.setattr(
                 "sys.argv",

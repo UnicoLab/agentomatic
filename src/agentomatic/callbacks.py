@@ -44,6 +44,7 @@ from __future__ import annotations
 
 from agentomatic.agents.history import Callback as _TrainingCallback
 from agentomatic.agents.history import EarlyStopping as _TrainingEarlyStopping
+from agentomatic.agents.history import EpochDiffCallback as _EpochDiffCallback
 from agentomatic.optimize.callbacks import Callback as _OptimizeCallback
 from agentomatic.optimize.callbacks import CallbackContext
 from agentomatic.optimize.callbacks import EarlyStopping as _OptimizeEarlyStopping
@@ -57,6 +58,7 @@ from agentomatic.optimize.callbacks import default_callbacks as _default_callbac
 
 TrainingCallback = _TrainingCallback
 TrainingEarlyStopping = _TrainingEarlyStopping
+EpochDiffCallback = _EpochDiffCallback
 OptimizeCallback = _OptimizeCallback
 OptimizeEarlyStopping = _OptimizeEarlyStopping
 ModelCheckpoint = _ModelCheckpoint
@@ -70,6 +72,7 @@ default_callbacks = _default_callbacks
 __all__ = [
     "TrainingCallback",
     "TrainingEarlyStopping",
+    "EpochDiffCallback",
     "OptimizeCallback",
     "OptimizeEarlyStopping",
     "ModelCheckpoint",

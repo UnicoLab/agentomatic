@@ -7,7 +7,7 @@ import sys
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -452,7 +452,7 @@ class AgentPlatform:
                 stack = stack_name
 
         if stack is not None:
-            from agentomatic.stacks.manager import StackConfig, StackManager
+            from agentomatic.stacks.manager import StackManager
 
             if isinstance(stack, str):
                 self._stack_manager = StackManager(stacks_dir=stacks_dir)
@@ -462,7 +462,7 @@ class AgentPlatform:
                 except Exception as exc:
                     logger.warning(f"Failed to load stack '{stack}': {exc}")
                     self._stack_manager = None
-            elif isinstance(stack, StackConfig):
+            else:
                 self._stack_manager = StackManager(stacks_dir=stacks_dir)
                 self._stack_manager.apply_dotenv(stack.env_file)
                 for key, value in stack.environment.items():
@@ -1278,7 +1278,7 @@ class AgentPlatform:
 
         # Custom middleware
         for mw_cls, mw_kwargs in self._custom_middleware:
-            app.add_middleware(mw_cls, **mw_kwargs)  # type: ignore[arg-type]
+            app.add_middleware(cast(Any, mw_cls), **mw_kwargs)
 
         # Feedback collector
         if self._enable_feedback:
@@ -1771,7 +1771,7 @@ class AgentPlatform:
                 }
             return app.openapi_schema
 
-        app.openapi = custom_openapi  # type: ignore[method-assign]
+        setattr(app, "openapi", custom_openapi)
         return app
 
     # ------------------------------------------------------------------

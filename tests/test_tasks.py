@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the unified task/execution subsystem.
 
 Covers models, the in-memory store, the task manager (async/batch/cancel/
@@ -155,6 +159,7 @@ class TestManager:
         assert await mgr.cancel(rec.id) is True
         await asyncio.sleep(0.1)
         refreshed = await mgr.get(rec.id)
+        assert refreshed is not None
         assert refreshed.status == TaskStatus.CANCELLED
 
     async def test_progress_reporting(self):
@@ -207,7 +212,7 @@ class TestManager:
         # Wait for all to finish.
         for _ in range(100):
             done = [await mgr.get(r.id) for r in recs]
-            if all(d.status.is_terminal for d in done):
+            if all(d is not None and d.status.is_terminal for d in done):
                 break
             await asyncio.sleep(0.02)
         assert peak <= 2

@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Comprehensive tests for the pipeline composition DSL.
 
 Covers: models, context, steps, engine, builder, loader, and integration.
@@ -59,6 +63,7 @@ class TestModels:
             timeout=60.0,
         )
         assert step.condition is not None
+        assert step.retry is not None
         assert step.retry.max_attempts == 5
 
     def test_transform_step_config(self):
@@ -108,8 +113,9 @@ class TestModels:
                 AgentStepConfig(name="b", agent="y"),
             ],
         )
-        assert config.get_step("a") is not None
-        assert config.get_step("a").agent == "x"
+        step = config.get_step("a")
+        assert step is not None
+        assert step.agent == "x"
         assert config.get_step("z") is None
 
     def test_pipeline_result(self):
@@ -354,8 +360,8 @@ class TestSteps:
                 g.set_finish_point("run")
                 return g.compile()
 
-            def input_to_state(self, data):
-                return _State(query=data.get("query", ""))
+            def input_to_state(self, input_data):
+                return _State(query=input_data.get("query", ""))
 
             def state_to_output(self, state):
                 return {"response": state.response}
@@ -380,6 +386,7 @@ class TestSteps:
         result = await execute_agent_step(config, ctx, registry)
 
         assert result.status == StepStatus.FAILED
+        assert result.error is not None
         assert "not found" in result.error
 
     @pytest.mark.asyncio
@@ -445,6 +452,7 @@ class TestSteps:
         result = await execute_transform_step(config, ctx)
 
         assert result.status == StepStatus.FAILED
+        assert result.error is not None
         assert "oops" in result.error
 
     @pytest.mark.asyncio
@@ -1142,7 +1150,7 @@ class TestEndpointStep:
         class _Ep(BaseEndpoint):
             endpoint_name = "scorer"
 
-            async def handle(self, request):  # type: ignore[override]
+            async def handle(self, request):
                 return {"score": 0.9, "payload": request.payload}
 
         reg = EndpointRegistry()

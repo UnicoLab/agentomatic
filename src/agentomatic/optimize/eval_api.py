@@ -260,6 +260,8 @@ def run_eval(
             llm_api_key=entry.api_key or "local",
         )
 
+    assert dataset is not None
+
     sizes = {
         "train": len(dataset.train),
         "validation": len(dataset.validation),

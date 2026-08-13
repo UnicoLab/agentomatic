@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Regression tests for the six confirmed optimization bugs.
 
 All bugs were found via source inspection and fixed in:
@@ -173,6 +177,11 @@ class TestBug1AgentRunnerLocalCallable:
 
 class TestBug2LLMCallerBaseUrl:
     """LLMCaller.configure() and per-call base_url/api_key are forwarded."""
+
+    # Class-level defaults keep pytest collectible (no __init__) while
+    # satisfying the type checker; setup_method snapshots the real values.
+    _orig_url: str | None = None
+    _orig_key: str | None = None
 
     def setup_method(self):
         from agentomatic.optimize.llm_caller import LLMCaller
@@ -1035,7 +1044,7 @@ class TestEndToEndLocalTraining:
 
         # The metric was actually called with proper string args (not RunResult)
         assert len(score_calls) == 2
-        for query_arg, response_arg, expected_arg in score_calls:
+        for query_arg, response_arg, _expected_arg in score_calls:
             assert isinstance(query_arg, str)
             assert isinstance(response_arg, str)
 

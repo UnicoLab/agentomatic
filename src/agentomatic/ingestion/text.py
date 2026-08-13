@@ -69,7 +69,7 @@ def convert_to_markdown(source: str, *, is_path: bool) -> str:
     if not path.exists():
         return source
     try:
-        from markitdown import MarkItDown
+        from markitdown import MarkItDown  # pyright: ignore[reportMissingImports]
 
         result = MarkItDown().convert(str(path))
         return getattr(result, "text_content", "") or getattr(result, "markdown", "") or ""

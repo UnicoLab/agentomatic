@@ -202,8 +202,6 @@ class JSONExtractor:
     # ------------------------------------------------------------------
 
     def _validate(self, data: dict[str, Any]) -> bool:
-        if not isinstance(data, dict):
-            return False
         if not self.required_keys:
             return True
         return all(k in data for k in self.required_keys)

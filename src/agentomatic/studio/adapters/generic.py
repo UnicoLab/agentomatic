@@ -259,9 +259,9 @@ class GenericAdapter(StudioAdapter):
         # If user provided a custom state function, use it
         if self._custom_state_fn is not None:
             try:
-                import asyncio
+                import inspect
 
-                if asyncio.iscoroutinefunction(self._custom_state_fn):
+                if inspect.iscoroutinefunction(self._custom_state_fn):
                     state_data = await self._custom_state_fn(thread_id)
                 else:
                     state_data = self._custom_state_fn(thread_id)

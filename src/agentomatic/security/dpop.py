@@ -1,3 +1,4 @@
+# mypy: disable-error-code="misc"
 """DPoP (RFC 9449) proof-of-possession validation for access tokens.
 
 In-memory ``jti`` replay cache is suitable for single-instance deployments.
@@ -13,7 +14,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from loguru import logger
@@ -25,9 +26,11 @@ try:
 
     _HAS_PYJWT = True
 except ImportError:  # pragma: no cover
-    _jwt_lib = None  # type: ignore[assignment]
-    InvalidTokenError = Exception  # type: ignore[misc, assignment]
-    ECAlgorithm = OKPAlgorithm = RSAAlgorithm = None  # type: ignore[misc, assignment]
+    _jwt_lib = cast(Any, None)
+    InvalidTokenError = cast(Any, None)
+    ECAlgorithm = cast(Any, None)
+    OKPAlgorithm = cast(Any, None)
+    RSAAlgorithm = cast(Any, None)
     _HAS_PYJWT = False
 
 
@@ -190,7 +193,7 @@ def validate_dpop(
         raise DPoPError("PyJWT is required for DPoP validation")
 
     try:
-        header = _jwt_lib.get_unverified_header(proof)  # type: ignore[union-attr]
+        header = _jwt_lib.get_unverified_header(proof)
     except Exception as exc:  # noqa: BLE001
         raise DPoPError(f"Invalid DPoP header: {exc}") from exc
 
@@ -207,7 +210,7 @@ def validate_dpop(
 
     try:
         key = _public_key_from_jwk(jwk)
-        proof_claims = _jwt_lib.decode(  # type: ignore[union-attr]
+        proof_claims = _jwt_lib.decode(
             proof,
             key=key,
             algorithms=[header.get("alg") or "ES256"],

@@ -25,8 +25,17 @@ Usage::
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .base import BaseStore
 from .memory import MemoryStore
+
+if TYPE_CHECKING:
+    # Lazily imported at runtime via __getattr__ below; importing here
+    # lets the type checker see the names exported in __all__.
+    from .checkpointer import AgentomaticCheckpointer
+    from .document import MinimalDocumentStore
+    from .sqlalchemy import SQLAlchemyStore
 
 __all__ = [
     "AgentomaticCheckpointer",

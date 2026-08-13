@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for DAG scheduling via ``upstreams`` (Phase 2).
 
 Covers the ordering algorithm (topological order with list-index

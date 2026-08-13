@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for middleware, decorators, config defaults, providers, and storage.
 
 Targets low-coverage modules to boost overall test coverage above 55%.
@@ -299,9 +303,11 @@ class TestRateLimitMiddleware:
 
     def test_allowed_within_limit(self):
         client = TestClient(self._make_app(max_requests=5))
+        resp = None
         for _ in range(5):
             resp = client.get("/api/test")
             assert resp.status_code == 200
+        assert resp is not None
         assert "X-RateLimit-Limit" in resp.headers
         assert "X-RateLimit-Remaining" in resp.headers
 
@@ -376,7 +382,7 @@ class TestStudioDecorators:
         def my_graph():
             return {"nodes": [], "edges": []}
 
-        assert my_graph._is_studio_graph is True
+        assert getattr(my_graph, "_is_studio_graph") is True
         result = my_graph()
         assert "nodes" in result
 
@@ -387,7 +393,7 @@ class TestStudioDecorators:
         def my_state(thread_id):
             return {"messages": []}
 
-        assert my_state._is_studio_state is True
+        assert getattr(my_state, "_is_studio_state") is True
         result = my_state("t1")
         assert "messages" in result
 
@@ -398,7 +404,7 @@ class TestStudioDecorators:
         async def my_stream(state, config, breakpoints):
             yield {"event": "start"}
 
-        assert my_stream._is_studio_stream is True
+        assert getattr(my_stream, "_is_studio_stream") is True
 
 
 class TestRegisterStudioHooks:

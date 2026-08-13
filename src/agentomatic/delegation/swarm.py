@@ -154,7 +154,7 @@ class SwarmOrchestrator:
         """
         try:
             from langgraph_swarm import (
-                create_swarm as _create_swarm,  # type: ignore[import-untyped]
+                create_swarm as _create_swarm,
             )
         except ImportError:
             raise ImportError(

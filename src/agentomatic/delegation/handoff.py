@@ -61,7 +61,7 @@ def create_agent_handoff(
     """
     if use_swarm:
         try:
-            from langgraph_swarm import create_handoff_tool  # type: ignore[import-untyped]
+            from langgraph_swarm import create_handoff_tool
 
             logger.debug("Using langgraph-swarm handoff for '{}'", target_agent)
             return create_handoff_tool(
@@ -99,7 +99,7 @@ def _create_http_handoff(
     tool_description = description or f"Delegate task to {target_agent} agent"
 
     try:
-        from langchain_core.tools import tool  # type: ignore[import-untyped]
+        from langchain_core.tools import tool
 
         @tool(f"delegate_to_{target_agent}", description=tool_description)
         def delegate(query: str) -> str:

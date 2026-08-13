@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """End-to-end integration tests for arbitrary custom DB / vector-store clients.
 
 These prove that a fully custom Python client package integrates through the

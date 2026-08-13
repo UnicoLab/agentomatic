@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import inspect
 from collections import deque
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Generic
+from typing import Any, Generic, cast
 
 from loguru import logger
 
@@ -198,6 +198,7 @@ class AgentGraph(Generic[StateT]):
 
             try:
                 logger.debug(f"🔄 Executing node: {current_node_name}")
+                result: Any = None
                 if inspect.iscoroutinefunction(node.handler):
                     result = _run_coro_sync(node.handler(state))
                 else:
@@ -285,7 +286,7 @@ class AgentGraph(Generic[StateT]):
             else:
                 result_name = edge(state)
                 if inspect.iscoroutine(result_name):
-                    result_name = await result_name
+                    result_name = await cast(Awaitable[str], result_name)
                 if result_name == END:
                     break
                 current_node_name = result_name
@@ -354,7 +355,7 @@ class AgentGraph(Generic[StateT]):
             else:
                 result_name = edge(state)
                 if inspect.iscoroutine(result_name):
-                    result_name = await result_name
+                    result_name = await cast(Awaitable[str], result_name)
                 if result_name == END:
                     break
                 current_node_name = result_name
@@ -470,7 +471,7 @@ class AgentGraph(Generic[StateT]):
             else:
                 result_name = edge(state)
                 if inspect.iscoroutine(result_name):
-                    result_name = await result_name
+                    result_name = await cast(Awaitable[str], result_name)
                 if result_name == END:
                     break
                 current_node_name = result_name

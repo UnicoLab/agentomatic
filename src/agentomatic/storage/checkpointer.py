@@ -54,13 +54,14 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
 
             with ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(lambda: asyncio.run(self.aget_tuple(config)))
-                return future.result()  # type: ignore[no-any-return]
+                return future.result()
         return asyncio.run(self.aget_tuple(config))
 
     async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
-        thread_id = config["configurable"].get("thread_id")
-        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
-        checkpoint_id = config["configurable"].get("checkpoint_id", "")
+        configurable = config.get("configurable", {})
+        thread_id = configurable.get("thread_id")
+        checkpoint_ns = configurable.get("checkpoint_ns", "")
+        checkpoint_id = configurable.get("checkpoint_id", "")
 
         if not thread_id:
             return None
@@ -127,17 +128,16 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
         metadata: CheckpointMetadata,
         new_versions: ChannelVersions,
     ) -> RunnableConfig:
-        thread_id = config["configurable"].get("thread_id")
-        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
-        checkpoint_id = config["configurable"].get("checkpoint_id")
+        configurable = config.get("configurable", {})
+        thread_id = configurable.get("thread_id")
+        checkpoint_ns = configurable.get("checkpoint_ns", "")
+        checkpoint_id = configurable.get("checkpoint_id")
 
         if not thread_id:
             raise ValueError("thread_id is required in config['configurable']")
 
         checkpoint_id_str = str(checkpoint_id) if checkpoint_id is not None else ""
-        parent_id = metadata.get("parent_checkpoint_id") or config["configurable"].get(
-            "checkpoint_id"
-        )
+        parent_id = metadata.get("parent_checkpoint_id") or configurable.get("checkpoint_id")
         parent_id_str = str(parent_id) if parent_id is not None else None
 
         await self.store.save_checkpoint(
@@ -203,12 +203,13 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
         if not config:
             return []
 
-        thread_id = config["configurable"].get("thread_id")
-        checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
+        configurable = config.get("configurable", {})
+        thread_id = configurable.get("thread_id")
+        checkpoint_ns = configurable.get("checkpoint_ns", "")
         if not thread_id:
             return []
 
-        before_id = before["configurable"].get("checkpoint_id") if before else None
+        before_id = before.get("configurable", {}).get("checkpoint_id") if before else None
         cps_data = await self.store.list_checkpoints(
             thread_id, checkpoint_ns, before=before_id, limit=limit
         )

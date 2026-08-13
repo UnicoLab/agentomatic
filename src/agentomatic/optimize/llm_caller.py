@@ -98,7 +98,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
         from agentomatic.optimize.json_extractor import JSONExtractor
 
         repaired = JSONExtractor().extract(text)
-        if isinstance(repaired, dict) and repaired:
+        if repaired:
             return repaired
     except Exception:
         pass
@@ -705,7 +705,7 @@ async def _call_litellm(
     timeout: float = 120.0,
 ) -> str:
     """Call any supported model via litellm (lazy import)."""
-    import litellm
+    import litellm  # pyright: ignore[reportMissingImports]
 
     messages: list[dict[str, str]] = []
     if system_prompt:

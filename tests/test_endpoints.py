@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the custom endpoints subsystem."""
 
 from __future__ import annotations
@@ -129,7 +133,7 @@ async def test_fan_out_subset(monkeypatch):
         return UpstreamResult(upstream=self.name, ok=True, data=self.name)
 
     monkeypatch.setattr("agentomatic.endpoints.client.UpstreamClient.request", fake_request)
-    ok, aggregated, results = await client.fan_out({"x": 1}, upstreams=["a"])
+    _ok, aggregated, results = await client.fan_out({"x": 1}, upstreams=["a"])
     assert len(results) == 1
     assert aggregated == {"a": "a"}
 
@@ -152,7 +156,7 @@ class EchoEndpoint(BaseEndpoint[_In, _Out]):
     endpoint_description = "Echoes text back."
     path = "/echo"
 
-    async def handle(self, request):  # type: ignore[override]
+    async def handle(self, request):
         return _Out(echoed=request.text)
 
 

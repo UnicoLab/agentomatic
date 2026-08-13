@@ -149,8 +149,8 @@ class Rollout:
             query=str(data.get("query") or ""),
             response=str(data.get("response") or ""),
             expected=data.get("expected"),
-            mode=data.get("mode") or "val",  # type: ignore[arg-type]
-            status=data.get("status") or "succeeded",  # type: ignore[arg-type]
+            mode=data.get("mode") or "val",
+            status=data.get("status") or "succeeded",
             resource_id=data.get("resource_id"),
             reward=RewardSignal.from_dict(reward_data) if reward_data else None,
             spans=[RolloutSpan.from_dict(s) for s in (data.get("spans") or [])],

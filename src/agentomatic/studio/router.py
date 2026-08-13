@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json as json_mod
 import uuid
 from collections.abc import AsyncGenerator
@@ -14,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from agentomatic.core.schemas import SchemaValidator, load_schema_models
 from agentomatic.studio.adapters import resolve_adapter
 from agentomatic.studio.models import (
     StudioAgentInfo,
@@ -22,6 +22,7 @@ from agentomatic.studio.models import (
     StudioGraphTopology,
     StudioRunInfo,
     StudioRunRequest,
+    StudioSchemaSource,
     StudioServerInfo,
     StudioStateSnapshot,
     StudioStateUpdate,
@@ -46,11 +47,77 @@ class StudioResumeRequest(BaseModel):
     :func:`create_studio_router` previously blanked the full schema).
     """
 
-    value: Any = Field(None, description="Human response or approval value")
+    value: Any = Field(default=None, description="Human response or approval value")
     action: str = Field("approve", description="'approve' or 'reject'")
 
 
 StudioResumeRequest.model_rebuild()
+
+
+def _resolve_agent_schemas(
+    agent: Any,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, StudioSchemaSource]]:
+    """Resolve JSON Schemas and their provenance for an agent.
+
+    Priority:
+      1. :class:`SchemaValidator` discovered at registration time (runtime
+         validation is active for these models).
+      2. Pydantic models declared in the agent's ``schemas.py`` module
+         (discovered here on demand — covers any naming convention).
+      3. Default platform models (``AgentInvokeRequest`` /
+         ``AgentInvokeResponse``).
+
+    Returns:
+        ``(input_schema, output_schema, schema_source)``.
+    """
+    from agentomatic.core.router_factory import AgentInvokeRequest, AgentInvokeResponse
+
+    def _schema_for(
+        model: type[BaseModel] | None,
+        default_model: type[BaseModel],
+    ) -> tuple[dict[str, Any], StudioSchemaSource]:
+        if model is None:
+            default_schema = default_model.model_json_schema()
+            return default_schema, StudioSchemaSource(
+                source="default",
+                model=default_model.__name__,
+                convention="default",
+            )
+        return model.model_json_schema(), StudioSchemaSource(
+            source="custom",
+            model=model.__name__,
+            convention=f"schemas.{model.__module__}.{model.__name__}",
+        )
+
+    # Priority 1: SchemaValidator from registry discovery.
+    validator: SchemaValidator | None = getattr(agent, "schema_validator", None)
+    if isinstance(validator, SchemaValidator):
+        input_model = validator.request_model
+        output_model = validator.response_model
+        input_schema, input_source = _schema_for(input_model, AgentInvokeRequest)
+        output_schema, output_source = _schema_for(output_model, AgentInvokeResponse)
+        if input_model is not None:
+            input_source.convention = f"schema_validator.{input_model.__name__}"
+        if output_model is not None:
+            output_source.convention = f"schema_validator.{output_model.__name__}"
+        return (
+            input_schema,
+            output_schema,
+            {"input": input_source, "output": output_source},
+        )
+
+    # Priority 2: scan the agent's schemas.py module on demand.
+    input_model, output_model = load_schema_models(
+        getattr(agent, "module_path", "") or "",
+        agent.name,
+    )
+    input_schema, input_source = _schema_for(input_model, AgentInvokeRequest)
+    output_schema, output_source = _schema_for(output_model, AgentInvokeResponse)
+    return (
+        input_schema,
+        output_schema,
+        {"input": input_source, "output": output_source},
+    )
 
 
 def create_studio_router(
@@ -170,57 +237,18 @@ def create_studio_router(
     async def get_schemas(name: str) -> StudioAgentSchemas:
         """Return JSON schemas for agent input and output models.
 
-        Attempts to discover custom schemas from the agent's ``schemas``
-        module, falling back to the default platform request/response
-        models.
+        Custom schemas come from the agent's ``schemas.py`` module (any of the
+        supported naming conventions) or its registered
+        ``SchemaValidator``. Agents without custom schemas fall back to the
+        default platform request/response models — the response's
+        ``schema_source`` tells clients which model was used.
         """
         agent = _resolve_agent(name)
-        input_schema: dict[str, Any] = {}
-        output_schema: dict[str, Any] = {}
-
-        # Try to find custom schemas from the agent module
-        if agent.module_path:
-            try:
-                schemas_mod = importlib.import_module(f"{agent.module_path}.schemas")
-                title_camel = name.title().replace("_", "")
-
-                # Input schema
-                for candidate in [
-                    "CustomInvokeRequest",
-                    f"{title_camel}Request",
-                    "AgentInvokeRequest",
-                ]:
-                    cls = getattr(schemas_mod, candidate, None)
-                    if cls and hasattr(cls, "model_json_schema"):
-                        input_schema = cls.model_json_schema()
-                        break
-
-                # Output schema
-                for candidate in [
-                    "CustomInvokeResponse",
-                    f"{title_camel}Response",
-                    "AgentInvokeResponse",
-                ]:
-                    cls = getattr(schemas_mod, candidate, None)
-                    if cls and hasattr(cls, "model_json_schema"):
-                        output_schema = cls.model_json_schema()
-                        break
-            except ImportError:
-                pass
-
-        # Fall back to default models
-        if not input_schema:
-            from agentomatic.core.router_factory import AgentInvokeRequest
-
-            input_schema = AgentInvokeRequest.model_json_schema()
-        if not output_schema:
-            from agentomatic.core.router_factory import AgentInvokeResponse
-
-            output_schema = AgentInvokeResponse.model_json_schema()
-
+        input_schema, output_schema, schema_source = _resolve_agent_schemas(agent)
         return StudioAgentSchemas(
             input_schema=input_schema,
             output_schema=output_schema,
+            schema_source=schema_source,
         )
 
     @router.get(
@@ -414,6 +442,10 @@ def create_studio_router(
 
         async def _stream() -> AsyncGenerator[str, None]:
             try:
+                # Guard re-check for the closure (the route already 400s above).
+                if agent.graph_fn is None:
+                    yield 'data: {"event": "run_error", "data": {"error": "no graph_fn"}}\n\n'
+                    return
                 graph = agent.graph_fn()
                 config = {"configurable": {"thread_id": thread_id}}
 

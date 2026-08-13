@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for pluggable vector providers (user-owned integrations).
 
 Agentomatic ships ops (``register_vector_provider``, ``VectorStore`` Protocol)

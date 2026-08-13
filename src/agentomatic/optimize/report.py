@@ -1158,7 +1158,7 @@ def _build_fit_report_html(
 
     keras_section = ""
     if keras_history:
-        keys = [k for k, v in keras_history.items() if isinstance(v, list) and v]
+        keys = [k for k, v in keras_history.items() if v]
         n = max((len(keras_history[k]) for k in keys), default=0)
         if n and keys:
             header = "".join(f"<th>{html.escape(k)}</th>" for k in keys)

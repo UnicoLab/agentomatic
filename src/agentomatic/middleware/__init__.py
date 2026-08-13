@@ -26,6 +26,16 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ConnectionsMiddleware": (".connections", "ConnectionsMiddleware"),
 }
 
+# Declare the lazily-resolved attributes so static checkers can see them;
+# runtime resolution still goes through __getattr__ above.
+LoggingMiddleware: Any
+RateLimitMiddleware: Any
+AuthMiddleware: Any
+MetricsMiddleware: Any
+FeedbackCollector: Any
+collect_feedback: Any
+ConnectionsMiddleware: Any
+
 
 def __getattr__(name: str) -> Any:
     if name in _LAZY_IMPORTS:

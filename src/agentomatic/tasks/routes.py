@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, Query, Response
@@ -168,7 +169,7 @@ def create_task_router(manager: TaskManager) -> APIRouter:
         if record is None:
             raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
 
-        async def event_stream() -> Any:
+        async def event_stream() -> AsyncIterator[str]:
             queue = await manager.subscribe(task_id)
             try:
                 # Emit the current snapshot immediately.

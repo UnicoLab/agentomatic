@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 
 from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -16,7 +17,9 @@ _SKIP_PATHS = {"/health", "/healthz", "/readiness", "/metrics", "/favicon.ico"}
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Logs every request with timing and request ID."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Process request with logging and timing."""
         if request.url.path in _SKIP_PATHS:
             response: Response = await call_next(request)

@@ -1,14 +1,17 @@
 """Beta Agent - Simplified implementation with reasoning focus."""
 
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, cast
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
-from ...common.base_agent import BaseAgent
-from ...common.llm_factory import LLMConfig, LLMFactory, LLMProvider
-from ...common.prompt_manager import PromptManager
+from src.common.base_agent import BaseAgent
+from src.common.llm_factory import LLMConfig, LLMFactory, LLMProvider
+from src.common.prompt_manager import PromptManager
+
 from .config import BetaConfig
 from .schemas import BetaOutput
 from .state import AgentState  # Use local state
@@ -37,7 +40,7 @@ class BetaAgent(BaseAgent):
 
         self.config = agent_config
 
-    def build_graph(self) -> StateGraph:
+    def build_graph(self) -> CompiledStateGraph:
         """Build the Beta agent workflow graph with classification."""
         graph = StateGraph(AgentState)
 
@@ -62,14 +65,14 @@ class BetaAgent(BaseAgent):
 
         return graph.compile()
 
-    async def _classify_node(self, state: dict[str, Any]) -> Command:
+    async def _classify_node(self, state: AgentState) -> Command:
         """Classify input complexity."""
         try:
             messages = state.get("messages", [])
             if not messages:
                 return Command(update={"error": "No input provided"}, goto=END)
 
-            user_input = messages[-1].content
+            user_input = cast(str, messages[-1].content)
 
             # Simple classification logic
             complexity = (
@@ -87,7 +90,7 @@ class BetaAgent(BaseAgent):
         """Route based on classification."""
         return state.get("classification", "simple")
 
-    async def _process_simple_node(self, state: dict[str, Any]) -> Command:
+    async def _process_simple_node(self, state: AgentState) -> Command:
         """Process simple inputs."""
         try:
             messages = state.get("messages", [])
@@ -106,7 +109,7 @@ class BetaAgent(BaseAgent):
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
 
-    async def _process_complex_node(self, state: dict[str, Any]) -> Command:
+    async def _process_complex_node(self, state: AgentState) -> Command:
         """Process complex inputs with detailed analysis."""
         try:
             messages = state.get("messages", [])
@@ -134,7 +137,7 @@ class BetaAgent(BaseAgent):
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
 
-    async def run(self, input_data, streaming: bool = False):
+    async def run(self, input_data: Any, streaming: bool = False) -> BetaOutput | AsyncGenerator[str, None]:
         """Run the Beta agent."""
         # Convert input to proper format
         if hasattr(input_data, "problem"):
@@ -161,6 +164,8 @@ class BetaAgent(BaseAgent):
 
         try:
             # Run synchronously
+            if self.graph is None:
+                raise RuntimeError("Agent graph not initialized")
             result = await self.graph.ainvoke(initial_state)
 
             # Handle case where result might be None or missing output
@@ -191,8 +196,10 @@ class BetaAgent(BaseAgent):
                 processing_time=0.0,
             )
 
-    async def _stream_response(self, initial_state):
+    async def _stream_response(self, initial_state: AgentState) -> AsyncGenerator[str, None]:
         """Stream response chunks."""
+        if self.graph is None:
+            raise RuntimeError("Agent graph not initialized")
         async for chunk in self.graph.astream(initial_state):
             if "output" in chunk:
                 yield f"data: {chunk['output']}\n\n"

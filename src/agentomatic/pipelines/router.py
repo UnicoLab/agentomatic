@@ -338,7 +338,7 @@ def create_pipeline_router(
     async def list_pipelines() -> list[PipelineInfo]:
         """List all discovered pipelines."""
         infos = []
-        for name, config in sorted(all_pipelines.items()):
+        for _, config in sorted(all_pipelines.items()):
             infos.append(
                 PipelineInfo(
                     name=config.name,

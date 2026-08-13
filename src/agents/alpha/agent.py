@@ -1,14 +1,17 @@
 """Alpha Agent - Simplified implementation."""
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
-from ...common.base_agent import BaseAgent
-from ...common.llm_factory import LLMConfig, LLMFactory, LLMProvider
-from ...common.prompt_manager import PromptManager
+from src.common.base_agent import BaseAgent
+from src.common.llm_factory import LLMConfig, LLMFactory, LLMProvider
+from src.common.prompt_manager import PromptManager
+
 from .config import AlphaConfig
 from .schemas import AlphaOutput
 from .state import AgentState  # Use local state
@@ -37,7 +40,7 @@ class AlphaAgent(BaseAgent):
 
         self.config = agent_config
 
-    def build_graph(self) -> StateGraph:
+    def build_graph(self) -> CompiledStateGraph:
         """Build the Alpha agent workflow graph."""
         graph = StateGraph(AgentState)
 
@@ -50,7 +53,7 @@ class AlphaAgent(BaseAgent):
 
         return graph.compile()
 
-    async def _process_node(self, state: dict[str, Any]) -> Command:
+    async def _process_node(self, state: AgentState) -> Command:
         """Main processing node for Alpha agent."""
         try:
             messages = state.get("messages", [])
@@ -72,7 +75,7 @@ class AlphaAgent(BaseAgent):
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
 
-    async def run(self, input_data, streaming: bool = False) -> AlphaOutput:
+    async def run(self, input_data: Any, streaming: bool = False) -> AlphaOutput | AsyncGenerator[str, None]:
         """Run the Alpha agent."""
         # Convert input to proper format
         if hasattr(input_data, "query"):
@@ -99,6 +102,8 @@ class AlphaAgent(BaseAgent):
 
         try:
             # Run synchronously
+            if self.graph is None:
+                raise RuntimeError("Agent graph not initialized")
             result = await self.graph.ainvoke(initial_state)
 
             # Handle case where result might be None or missing output
@@ -125,8 +130,10 @@ class AlphaAgent(BaseAgent):
                 prompt_version="v1",
             )
 
-    async def _stream_response(self, initial_state):
+    async def _stream_response(self, initial_state: AgentState) -> AsyncGenerator[str, None]:
         """Stream response chunks."""
+        if self.graph is None:
+            raise RuntimeError("Agent graph not initialized")
         async for chunk in self.graph.astream(initial_state):
             if "output" in chunk:
                 yield f"data: {chunk['output']}\n\n"

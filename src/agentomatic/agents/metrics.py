@@ -62,13 +62,11 @@ class ResponseSimilarityMetric:
             return ""
         if isinstance(expected, str):
             return expected.strip()
-        if isinstance(expected, dict):
-            for key in ("response", "answer", "output", "text"):
-                val = expected.get(key)
-                if isinstance(val, str) and val.strip():
-                    return val.strip()
-            return ""
-        return str(expected).strip()
+        for key in ("response", "answer", "output", "text"):
+            val = expected.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -431,14 +429,11 @@ class OptimizeMetricAdapter:
                 context = [str(c) for c in raw_ctx if c]
 
         # --- serialise prediction as response string ---
-        if isinstance(prediction, dict):
-            response = str(
-                prediction.get("response")
-                or prediction.get("answer")
-                or _json.dumps(prediction, ensure_ascii=False)
-            )
-        else:
-            response = str(prediction)
+        response = str(
+            prediction.get("response")
+            or prediction.get("answer")
+            or _json.dumps(prediction, ensure_ascii=False)
+        )
 
         # --- run evaluate() synchronously ---
         # Wrap the entire call (including coro creation) so that metrics whose

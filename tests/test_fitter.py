@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the PromptFitter system (agentomatic.optimize.fitter and friends).
 
 Covers data models, search space, metrics, judges, LLM caller,
@@ -243,7 +247,7 @@ class TestPromptFitResult:
             agent="test_agent",
         )
         defaults.update(overrides)
-        return PromptFitResult(**defaults)  # type: ignore[arg-type]
+        return PromptFitResult(**defaults)
 
     def test_absolute_improvement(self):
         result = self._make_result()

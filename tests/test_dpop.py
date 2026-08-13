@@ -162,9 +162,9 @@ class TestValidateDpop:
             "http_method": "GET",
             "http_uri": "https://api.example.com/v1/agents",
         }
-        validate_dpop(**kwargs)  # type: ignore[arg-type]
+        validate_dpop(**kwargs)
         with pytest.raises(DPoPError, match="replay"):
-            validate_dpop(**kwargs)  # type: ignore[arg-type]
+            validate_dpop(**kwargs)
 
     def test_expired_iat(self) -> None:
         private_key, jwk = _ec_keypair()

@@ -78,7 +78,7 @@ def coverage(terms: list[str], text: str) -> float:
 
 def schema_quality(prediction: dict[str, Any], required_keys: list[str]) -> float:
     """Keys present with non-empty string values (not just JSON validity)."""
-    if not isinstance(prediction, dict) or not prediction:
+    if not prediction:
         return 0.0
     scores: list[float] = []
     for key in required_keys:

@@ -36,7 +36,7 @@ class EvaluationMixin:
         print(report.summary())
     """
 
-    evaluation_history: list[EvaluationReport]
+    evaluation_history: list[EvaluationReport] | None = None
 
     def evaluate(
         self,
@@ -68,7 +68,7 @@ class EvaluationMixin:
         )
 
         # Resolve examples list
-        examples: Sequence[AgentExample]
+        examples: Sequence[AgentExample] | AgentDataset
         dataset_name = "dataset"
         if hasattr(dataset, "examples"):
             examples = dataset.examples  # type: ignore[union-attr]
@@ -143,7 +143,7 @@ class EvaluationMixin:
         )
 
         # Persist to history
-        if not hasattr(self, "evaluation_history"):
+        if self.evaluation_history is None:
             self.evaluation_history = []
         self.evaluation_history.append(report)
 

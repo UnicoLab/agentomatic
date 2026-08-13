@@ -83,7 +83,9 @@ class HttpConnectionConfig(BaseModel):
     )
     base_url: str = Field(..., description="Base URL of the service (supports ${ENV}).")
     headers: dict[str, str] = Field(default_factory=dict)
-    auth: UpstreamAuthConfig = Field(default_factory=UpstreamAuthConfig)
+    auth: UpstreamAuthConfig = Field(
+        default_factory=lambda: UpstreamAuthConfig.model_construct()
+    )
     timeout: float = Field(30.0, gt=0)
     max_retries: int = Field(2, ge=0, le=10)
     verify_ssl: bool = Field(True)
@@ -132,7 +134,7 @@ class VectorConnectionConfig(BaseModel):
         "",
         description="Default collection / index / class / container name.",
     )
-    dimension: int | None = Field(None, ge=1, description="Embedding dimension, if fixed.")
+    dimension: int | None = Field(default=None, ge=1, description="Embedding dimension, if fixed.")
     distance: str = Field("cosine", description="Distance metric (cosine, euclid, dot…).")
     namespace: str = Field("", description="Optional namespace / tenant.")
     options: dict[str, Any] = Field(

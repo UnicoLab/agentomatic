@@ -29,18 +29,17 @@ from agentomatic.storage.base import BaseStore
 # so the module can be imported without it.  The real classes are used when
 # langchain_core is installed; the fallbacks store role + content only.
 try:
-    from langchain_core.messages import (
-        AIMessage,
-        BaseMessage,
-        HumanMessage,
-        SystemMessage,
-    )
+    from langchain_core import messages as _lc_messages
 
     HAS_LANGCHAIN = True
+    BaseMessage: type[Any] = _lc_messages.BaseMessage
+    HumanMessage: type[Any] = _lc_messages.HumanMessage
+    AIMessage: type[Any] = _lc_messages.AIMessage
+    SystemMessage: type[Any] = _lc_messages.SystemMessage
 except ImportError:
     HAS_LANGCHAIN = False
 
-    class BaseMessage:  # type: ignore[no-redef]
+    class _BaseMessage:
         """Minimal stand-in when langchain_core is not installed."""
 
         def __init__(self, content: str = "", **kwargs: Any) -> None:
@@ -50,17 +49,25 @@ except ImportError:
         def __repr__(self) -> str:
             return f"{self.__class__.__name__}(content={self.content!r})"
 
-    class HumanMessage(BaseMessage):  # type: ignore[no-redef]
+    class _HumanMessage(_BaseMessage):
         def __init__(self, content: str = "", **kwargs: Any) -> None:
             super().__init__(content=content, type="human", **kwargs)
 
-    class AIMessage(BaseMessage):  # type: ignore[no-redef]
+    class _AIMessage(_BaseMessage):
         def __init__(self, content: str = "", **kwargs: Any) -> None:
             super().__init__(content=content, type="ai", **kwargs)
 
-    class SystemMessage(BaseMessage):  # type: ignore[no-redef]
+    class _SystemMessage(_BaseMessage):
         def __init__(self, content: str = "", **kwargs: Any) -> None:
             super().__init__(content=content, type="system", **kwargs)
+
+    # Rebind the public names so the rest of this module (and callers) can
+    # use ``HumanMessage`` / ``AIMessage`` / ``SystemMessage`` uniformly
+    # whether or not langchain_core is installed.
+    BaseMessage = _BaseMessage
+    HumanMessage = _HumanMessage
+    AIMessage = _AIMessage
+    SystemMessage = _SystemMessage
 
 
 # Default summary system prompt
@@ -158,7 +165,7 @@ class ConversationMemoryManager:
         *,
         max_messages: int | None = None,
         include_summary: bool = True,
-    ) -> list[BaseMessage]:
+    ) -> list[Any]:
         """Load conversation history as LangChain messages.
 
         Retrieves stored messages, applies windowing, and optionally
@@ -174,7 +181,7 @@ class ConversationMemoryManager:
             List of :class:`BaseMessage` ready for LangGraph state.
         """
         limit = max_messages or self.max_messages
-        result: list[BaseMessage] = []
+        result: list[Any] = []
 
         try:
             # Load all messages to check if summarization is needed
@@ -354,9 +361,9 @@ class ConversationMemoryManager:
     @staticmethod
     def _convert_to_langchain_messages(
         messages: list[dict[str, Any]],
-    ) -> list[BaseMessage]:
+    ) -> list[Any]:
         """Convert stored message dicts to LangChain BaseMessage objects."""
-        result: list[BaseMessage] = []
+        result: list[Any] = []
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")

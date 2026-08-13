@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the durable SQLAlchemy-backed TaskStore."""
 
 from __future__ import annotations
@@ -66,6 +70,7 @@ class TestCrud:
         await store.save(rec)
 
         loaded = await store.get("t")
+        assert loaded is not None
         assert loaded.status == TaskStatus.SUCCEEDED
         assert loaded.result == {"answer": 42}
         assert await store.count() == 1

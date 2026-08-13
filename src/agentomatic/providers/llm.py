@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -235,9 +235,9 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
         return ChatOpenAI(**ctor_kwargs)
 
     elif provider == "vertex":
-        from langchain_google_vertexai import ChatVertexAI
+        from langchain_google_vertexai import ChatVertexAI  # pyright: ignore[reportDeprecated]
 
-        return ChatVertexAI(
+        return ChatVertexAI(  # pyright: ignore[reportDeprecated]
             model_name=kwargs.get("model", "gemini-2.0-flash"),
             project=kwargs.get("project", ""),
             location=kwargs.get("location", "us-central1"),
@@ -626,7 +626,8 @@ def apply_stack_defaults(stack_manager: StackManager | None) -> Any:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to resolve stack LLM fallbacks: {}", exc)
             fallbacks = [
-                fb.model_dump() if hasattr(fb, "model_dump") else fb for fb in entry.fallbacks
+                fb.model_dump() if hasattr(fb, "model_dump") else fb
+                for fb in cast(list[Any], entry.fallbacks)
             ]
 
     try:
@@ -700,7 +701,8 @@ def get_llm_for_agent(
                 exc,
             )
             fallbacks = [
-                fb.model_dump() if hasattr(fb, "model_dump") else fb for fb in entry.fallbacks
+                fb.model_dump() if hasattr(fb, "model_dump") else fb
+                for fb in cast(list[Any], entry.fallbacks)
             ]
 
     return get_named_llm(

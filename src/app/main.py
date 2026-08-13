@@ -139,6 +139,8 @@ def create_app() -> FastAPI:
             for agent_name in agents_info.keys():
                 try:
                     agent = agent_registry.get_agent(agent_name)
+                    if not agent:
+                        continue
                     health_info = await agent.health_check()
                     agent_health[agent_name] = health_info
                 except Exception as e:

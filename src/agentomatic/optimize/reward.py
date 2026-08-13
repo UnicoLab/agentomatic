@@ -27,12 +27,11 @@ class MetricRewardAdapter:
     def reward_from_eval(self, result: EvalResult) -> RewardSignal:
         """Build a reward from score / reason / dimensional metadata."""
         dims = {}
-        if isinstance(result.metadata, dict):
-            raw_dims = result.metadata.get("dimensions") or {}
-            if isinstance(raw_dims, dict):
-                dims = {
-                    str(k): float(v) for k, v in raw_dims.items() if isinstance(v, (int, float))
-                }
+        raw_dims = result.metadata.get("dimensions") or {}
+        if isinstance(raw_dims, dict):
+            dims = {
+                str(k): float(v) for k, v in raw_dims.items() if isinstance(v, (int, float))
+            }
         return RewardSignal(
             value=float(result.score),
             dimensions=dims,

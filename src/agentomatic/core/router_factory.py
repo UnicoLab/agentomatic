@@ -55,10 +55,10 @@ class AgentInvokeRequest(BaseModel):
     query: str = Field(..., description="User query or input")
     user_id: str = Field("default-user", description="User identifier")
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
-    thread_id: str | None = Field(None, description="Thread ID for conversation continuity")
+    thread_id: str | None = Field(default=None, description="Thread ID for conversation continuity")
     prompt_version: str = Field("v1", description="Prompt version to use")
-    temperature: float | None = Field(None, ge=0.0, le=2.0, description="Temperature override")
-    max_tokens: int | None = Field(None, ge=1, description="Max tokens override")
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0, description="Temperature override")
+    max_tokens: int | None = Field(default=None, ge=1, description="Max tokens override")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
 
 
@@ -76,7 +76,7 @@ class AgentInvokeResponse(BaseModel):
         description="Structured agent output (state_to_output) when available",
     )
     agent_type: str = Field("", description="Agent slug")
-    thread_id: str | None = Field(None, description="Thread ID")
+    thread_id: str | None = Field(default=None, description="Thread ID")
     suggestions: list[str] = Field(default_factory=list)
     citations: list[dict[str, Any]] = Field(default_factory=list)
     steps_taken: list[str] = Field(default_factory=list)
@@ -176,7 +176,7 @@ class AgentChatRequest(BaseModel):
 
     content: str = Field(..., description="User message")
     user_id: str = Field("default-user", description="User identifier")
-    thread_id: str | None = Field(None, description="Existing thread ID")
+    thread_id: str | None = Field(default=None, description="Existing thread ID")
     context: dict[str, Any] = Field(
         default_factory=dict,
         description="Arbitrary context dict passed into state for agent code to consume",
@@ -205,9 +205,9 @@ class AgentChatRequest(BaseModel):
 class CreateThreadRequest(BaseModel):
     """Request to explicitly create a thread."""
 
-    thread_id: str | None = Field(None, description="Custom thread ID (auto-generated if omitted)")
+    thread_id: str | None = Field(default=None, description="Custom thread ID (auto-generated if omitted)")
     user_id: str = Field("default-user", description="User identifier")
-    title: str | None = Field(None, description="Thread title")
+    title: str | None = Field(default=None, description="Thread title")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -231,7 +231,7 @@ class OptimizeInvokeRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     query: str = Field(..., description="User query")
-    system_prompt_override: str | None = Field(None, description="System prompt to inject")
+    system_prompt_override: str | None = Field(default=None, description="System prompt to inject")
     user_id: str = Field("optimizer", description="User ID")
     context: dict[str, Any] = Field(default_factory=dict)
     include_retrieval_context: bool = Field(True, description="Return RAG context")
@@ -255,13 +255,13 @@ class FeedbackRequest(BaseModel):
     """User feedback on an agent response."""
 
     user_id: str = Field("anonymous")
-    rating: int | None = Field(None, ge=1, le=5, description="1-5 star rating")
-    comment: str | None = Field(None)
-    correction: str | None = Field(None, description="Correct answer")
+    rating: int | None = Field(default=None, ge=1, le=5, description="1-5 star rating")
+    comment: str | None = Field(default=None)
+    correction: str | None = Field(default=None, description="Correct answer")
     feedback_type: str = Field("thumbs", description="thumbs|rating|correction|comment")
     query: str = Field("", description="Original query")
     response: str = Field("", description="Agent response being rated")
-    thread_id: str | None = Field(None)
+    thread_id: str | None = Field(default=None)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -483,7 +483,7 @@ def create_default_router(
         return build_invoke_state(request, prompt_version=chosen_version)
 
     def _extract_response(
-        result: dict[str, Any],
+        result: Any,
         agent_slug: str,
         duration_ms: float,
         prompt_version: str | None = None,
@@ -504,9 +504,10 @@ def create_default_router(
             if hasattr(output_model, "metadata") or "metadata" in output_model.model_fields:
                 if isinstance(result, dict):
                     result = {**result, "metadata": res_metadata}
-            return output_model(
-                **(result if isinstance(result, dict) else {"response": str(result)})
+            payload: dict[str, Any] = (
+                result if isinstance(result, dict) else {"response": str(result)}
             )
+            return output_model(**payload)
         response_text, structured_output, context = coerce_agent_invoke_payload(result)
         return AgentInvokeResponse(
             response=response_text,
@@ -713,9 +714,8 @@ def create_default_router(
                     finally:
                         class_agent._end_request_prompt()
                     yield f"data: {json.dumps(result, default=str)}\n\n"
-                    if isinstance(result, dict):
-                        collected_response = result.get("response", "")
-                        collected_output = result
+                    collected_response = result.get("response", "")
+                    collected_output = result
                 elif agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
@@ -1219,7 +1219,7 @@ def create_default_router(
             title=request.title,
             metadata=request.metadata,
         )
-        return thread  # type: ignore[no-any-return]
+        return thread
 
     # ── GET /threads ──────────────────────────────────────────────
     @router.get("/threads")
@@ -1554,7 +1554,7 @@ def create_default_router(
         if thread_store is None:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
 
-        opts = request or AnalyzeLogsRequest()
+        opts = request or AnalyzeLogsRequest(sample_limit=20, persist=True)
         from agentomatic.logs.analyser import LogAnalyser
 
         analyser = LogAnalyser(
@@ -1726,7 +1726,7 @@ def create_default_router(
             raise HTTPException(500, f"Failed to fork thread: {exc}") from exc
         if not forked:
             raise HTTPException(404, f"Thread '{thread_id}' not found")
-        return forked  # type: ignore[no-any-return]
+        return forked
 
     # ── GET /threads/{thread_id}/lineage ──────────────────────────
     @router.get("/threads/{thread_id}/lineage")
@@ -1736,7 +1736,7 @@ def create_default_router(
             raise HTTPException(400, "Thread storage not configured")
         try:
             lineage = await thread_store.get_thread_lineage(thread_id)
-            return lineage  # type: ignore[no-any-return]
+            return lineage
         except Exception as exc:
             raise HTTPException(500, f"Failed to retrieve lineage: {exc}") from exc
 

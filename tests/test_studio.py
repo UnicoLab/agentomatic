@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the Agentomatic Studio Debug API.
 
 Tests cover:
@@ -269,6 +273,7 @@ class TestRunTracker:
         tracker.complete_run(run.id, {"response": "done"}, 1234.5)
 
         completed = tracker.get_run(run.id)
+        assert completed is not None
         assert completed.status == "completed"
         assert completed.output == {"response": "done"}
         assert completed.duration_ms == 1234.5
@@ -283,6 +288,7 @@ class TestRunTracker:
         tracker.fail_run(run.id, "Something went wrong")
 
         failed = tracker.get_run(run.id)
+        assert failed is not None
         assert failed.status == "failed"
         assert failed.error == "Something went wrong"
 
@@ -302,6 +308,7 @@ class TestRunTracker:
         tracker.add_event(run.id, event)
 
         updated = tracker.get_run(run.id)
+        assert updated is not None
         assert len(updated.events) == 1
         assert updated.events[0].event == "node_start"
         assert updated.events[0].node == "research"
@@ -562,6 +569,209 @@ class TestRouterIntegration:
 
 
 # =====================================================================
+# Schema Discovery
+# =====================================================================
+
+
+class TestSchemaDiscovery:
+    """Schema resolution conventions and schema_source metadata."""
+
+    @pytest.fixture
+    def default_client(self):
+        """Client with an agent that has no custom schemas."""
+        from agentomatic.studio.router import create_studio_router
+
+        test_agent = MagicMock()
+        test_agent.name = "plain"
+        test_agent.slug = "plain"
+        test_agent.manifest = MagicMock()
+        test_agent.manifest.name = "Plain"
+        test_agent.manifest.description = ""
+        test_agent.manifest.version = "1.0.0"
+        test_agent.manifest.framework = "custom"
+        test_agent.module_path = None
+        test_agent.schema_validator = None
+        test_agent.config = None
+        test_agent.prompt_manager = None
+        test_agent.graph_fn = None
+        test_agent.node_fn = None
+        del test_agent._studio_adapter
+        del test_agent._studio_graph_fn
+        del test_agent._studio_state_fn
+        del test_agent._studio_stream_fn
+
+        registry = MagicMock()
+        registry.count = 1
+        registry.get.side_effect = lambda name: test_agent if name == "plain" else None
+        registry.all.return_value = {"plain": test_agent}
+
+        app = FastAPI()
+        app.include_router(
+            create_studio_router(
+                registry=registry,
+                store=None,
+                platform_title="Test",
+                platform_version="0.1.0",
+            )
+        )
+        return TestClient(app)
+
+    @pytest.fixture
+    def custom_client(self):
+        """Client with the alpha agent (custom Input/Output schemas)."""
+        from agentomatic.studio.router import create_studio_router
+
+        alpha_agent = MagicMock()
+        alpha_agent.name = "alpha"
+        alpha_agent.slug = "alpha"
+        alpha_agent.manifest = MagicMock()
+        alpha_agent.manifest.name = "Alpha"
+        alpha_agent.manifest.description = ""
+        alpha_agent.manifest.version = "1.0.0"
+        alpha_agent.manifest.framework = "langgraph"
+        alpha_agent.module_path = "src.agents.alpha"
+        alpha_agent.schema_validator = None
+        alpha_agent.config = None
+        alpha_agent.prompt_manager = None
+        alpha_agent.graph_fn = None
+        alpha_agent.node_fn = None
+        del alpha_agent._studio_adapter
+        del alpha_agent._studio_graph_fn
+        del alpha_agent._studio_state_fn
+        del alpha_agent._studio_stream_fn
+
+        registry = MagicMock()
+        registry.count = 1
+        registry.get.side_effect = lambda name: alpha_agent if name == "alpha" else None
+        registry.all.return_value = {"alpha": alpha_agent}
+
+        app = FastAPI()
+        app.include_router(
+            create_studio_router(
+                registry=registry,
+                store=None,
+                platform_title="Test",
+                platform_version="0.1.0",
+            )
+        )
+        return TestClient(app)
+
+    def _make_agent(self, name="alpha", module_path="", schema_validator=None):
+        agent = MagicMock()
+        agent.name = name
+        agent.module_path = module_path
+        agent.schema_validator = schema_validator
+        return agent
+
+    def test_candidates_support_input_output_conventions(self):
+        from agentomatic.core.schemas import schema_model_candidates
+
+        input_candidates, output_candidates = schema_model_candidates("weather_bot")
+        assert "CustomInvokeRequest" in input_candidates
+        assert "WeatherBotRequest" in input_candidates
+        assert "WeatherBotInput" in input_candidates
+        assert "AgentInvokeRequest" in input_candidates
+        assert "CustomInvokeResponse" in output_candidates
+        assert "WeatherBotResponse" in output_candidates
+        assert "WeatherBotOutput" in output_candidates
+
+    def test_load_schema_models_input_output_convention(self):
+        """{Title}Input / {Title}Output classes are discovered (alpha/beta)."""
+        from agentomatic.core.schemas import load_schema_models
+
+        input_model, output_model = load_schema_models("src.agents.alpha", "alpha")
+        assert input_model is not None
+        assert input_model.__name__ == "AlphaInput"
+        assert output_model is not None
+        assert output_model.__name__ == "AlphaOutput"
+
+    def test_load_schema_models_request_response_convention(self):
+        """{Title}Request / {Title}Response remain the top custom convention."""
+        from agentomatic.core.schemas import load_schema_models
+
+        input_model, output_model = load_schema_models("src.agents.beta", "beta")
+        assert input_model is not None
+        assert input_model.__name__ == "BetaInput"
+        assert output_model is not None
+        assert output_model.__name__ == "BetaOutput"
+
+    def test_load_schema_models_missing_module(self):
+        from agentomatic.core.schemas import load_schema_models
+
+        assert load_schema_models("nonexistent_pkg", "alpha") == (None, None)
+        assert load_schema_models("", "alpha") == (None, None)
+
+    def test_resolve_agent_schemas_custom_module(self):
+        """Schemas from the agent's schemas.py are used with provenance."""
+        from agentomatic.studio.router import _resolve_agent_schemas
+
+        agent = self._make_agent(name="alpha", module_path="src.agents.alpha")
+        input_schema, output_schema, source = _resolve_agent_schemas(agent)
+
+        assert "query" in input_schema["properties"]
+        assert "context" in input_schema["properties"]
+        assert "response" in output_schema["properties"]
+        assert "confidence" in output_schema["properties"]
+
+        assert source["input"].source == "custom"
+        assert source["input"].model == "AlphaInput"
+        assert source["output"].source == "custom"
+        assert source["output"].model == "AlphaOutput"
+
+    def test_resolve_agent_schemas_fallback_default(self):
+        """Agents without schemas get default models + source='default'."""
+        from agentomatic.studio.router import _resolve_agent_schemas
+
+        agent = self._make_agent(name="plain", module_path="")
+        input_schema, _output_schema, source = _resolve_agent_schemas(agent)
+
+        assert "query" in input_schema["properties"]
+        assert "user_id" in input_schema["properties"]
+        assert source["input"].source == "default"
+        assert source["input"].model == "AgentInvokeRequest"
+        assert source["output"].model == "AgentInvokeResponse"
+
+    def test_resolve_agent_schemas_prefers_schema_validator(self):
+        """Registry SchemaValidator wins over module scanning."""
+        from agentomatic.core.schemas import SchemaValidator
+        from agentomatic.studio.router import _resolve_agent_schemas
+        from src.agents.alpha.schemas import AlphaInput
+
+        validator = SchemaValidator(request_model=AlphaInput)
+        agent = self._make_agent(
+            name="alpha", module_path="src.agents.alpha", schema_validator=validator
+        )
+        _input_schema, _output_schema, source = _resolve_agent_schemas(agent)
+
+        assert source["input"].convention == "schema_validator.AlphaInput"
+        # Output falls back to default because validator has no response model
+        assert source["output"].source == "default"
+        assert source["output"].model == "AgentInvokeResponse"
+
+    def test_get_schemas_endpoint_schema_source(self, default_client):
+        """The /schemas endpoint returns schema_source metadata."""
+        response = default_client.get("/studio/agents/plain/schemas")
+        assert response.status_code == 200
+        data = response.json()
+        assert "input_schema" in data
+        assert "output_schema" in data
+        assert data["schema_source"]["input"]["source"] == "default"
+        assert data["schema_source"]["input"]["model"] == "AgentInvokeRequest"
+        assert data["schema_source"]["output"]["model"] == "AgentInvokeResponse"
+
+    def test_get_schemas_endpoint_custom(self, custom_client):
+        """Custom schemas from an agent's module are returned as custom."""
+        response = custom_client.get("/studio/agents/alpha/schemas")
+        assert response.status_code == 200
+        data = response.json()
+        assert "query" in data["input_schema"]["properties"]
+        assert "context" in data["input_schema"]["properties"]
+        assert data["schema_source"]["input"]["source"] == "custom"
+        assert data["schema_source"]["input"]["model"] == "AlphaInput"
+        assert data["schema_source"]["output"]["model"] == "AlphaOutput"
+
+
+# =====================================================================
 # Universal Adapter Architecture
 # =====================================================================
 
@@ -800,7 +1010,7 @@ class TestDecorators:
             return {"nodes": [], "edges": []}
 
         assert hasattr(my_graph, "_is_studio_graph")
-        assert my_graph._is_studio_graph is True
+        assert getattr(my_graph, "_is_studio_graph") is True
 
     def test_studio_state_marks_function(self):
         from agentomatic.studio.decorators import studio_state
@@ -810,7 +1020,7 @@ class TestDecorators:
             return {}
 
         assert hasattr(my_state, "_is_studio_state")
-        assert my_state._is_studio_state is True
+        assert getattr(my_state, "_is_studio_state") is True
 
     def test_studio_stream_marks_function(self):
         from agentomatic.studio.decorators import studio_stream
@@ -820,7 +1030,7 @@ class TestDecorators:
             yield  # pragma: no cover
 
         assert hasattr(my_stream, "_is_studio_stream")
-        assert my_stream._is_studio_stream is True
+        assert getattr(my_stream, "_is_studio_stream") is True
 
 
 class TestLangChainAdapter:

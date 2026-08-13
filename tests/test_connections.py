@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the per-agent connections subsystem."""
 
 from __future__ import annotations
@@ -168,7 +172,9 @@ def test_manager_by_purpose_and_for_purpose():
     assert set(mgr.by_purpose(ConnectionPurpose.RAG)) == {"kb", "docs"}
     assert set(mgr.by_purpose("rag")) == {"kb", "docs"}
     assert [c.name for c in mgr.for_purpose(ConnectionPurpose.MEMORY)] == ["memory_db"]
-    assert mgr.first_for_purpose(ConnectionPurpose.MEMORY).name == "memory_db"
+    memory_conn = mgr.first_for_purpose(ConnectionPurpose.MEMORY)
+    assert memory_conn is not None
+    assert memory_conn.name == "memory_db"
     assert mgr.first_for_purpose(ConnectionPurpose.CACHE) is None
 
 

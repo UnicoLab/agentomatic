@@ -1,3 +1,4 @@
+# mypy: disable-error-code="misc"
 """Prometheus metrics middleware.
 
 Enabled via ``FEATURES__ENABLE_METRICS=true``.
@@ -7,6 +8,8 @@ Automatically tracks request count, latency histogram, and active requests.
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -18,6 +21,11 @@ try:
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
+    Counter = cast(Any, None)
+    Gauge = cast(Any, None)
+    Histogram = cast(Any, None)
+    generate_latest = cast(Any, None)
+    CONTENT_TYPE_LATEST = cast(Any, None)
 
 _SKIP_PATHS = {"/health", "/healthz", "/readiness", "/metrics"}
 
@@ -25,11 +33,13 @@ _SKIP_PATHS = {"/health", "/healthz", "/readiness", "/metrics"}
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Prometheus metrics collection per request."""
 
-    def __init__(self, app, *, prefix: str = "agentomatic") -> None:
+    def __init__(
+        self, app: Any, *, prefix: str = "agentomatic"
+    ) -> None:
         super().__init__(app)
-        self._requests: Counter | None = None
-        self._duration: Histogram | None = None
-        self._active: Gauge | None = None
+        self._requests: Any | None = None
+        self._duration: Any | None = None
+        self._active: Any | None = None
         if HAS_PROMETHEUS:
             self._requests = Counter(
                 f"{prefix}_http_requests_total",
@@ -47,7 +57,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 "Active HTTP requests",
             )
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         if request.url.path in _SKIP_PATHS:
             # Serve /metrics endpoint
             if request.url.path == "/metrics" and HAS_PROMETHEUS:

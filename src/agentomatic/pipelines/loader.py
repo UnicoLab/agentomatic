@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
@@ -35,7 +35,7 @@ from agentomatic.pipelines.models import (
 try:
     import yaml
 except ImportError:  # pragma: no cover
-    yaml = None  # type: ignore[assignment]
+    yaml = cast(Any, None)
 
 # Keys used to discriminate the step type from a raw dict.
 _STEP_TYPE_KEYS = (

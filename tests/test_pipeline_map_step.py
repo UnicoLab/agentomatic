@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the dynamic ``MapStepConfig`` fan-out step.
 
 Covers:
@@ -33,7 +37,7 @@ from agentomatic.pipelines.models import (
 from agentomatic.pipelines.steps import execute_map_step
 
 
-def _make_registry(node_fn):  # type: ignore[no-untyped-def]
+def _make_registry(node_fn):
     """Build a mock registry that returns one agent with the supplied ``node_fn``."""
     registry = MagicMock()
     agent = MagicMock()
@@ -58,7 +62,7 @@ class TestMapFanOut:
         """One agent invocation per item, all successes aggregated."""
         seen: list[str] = []
 
-        async def node_fn(state):  # type: ignore[no-untyped-def]
+        async def node_fn(state):
             seen.append(state["scope"])
             return {"response": f"ok_{state['scope']}", "scope": state["scope"]}
 
@@ -136,7 +140,7 @@ class TestMapConcurrency:
         max_seen = 0
         lock = asyncio.Lock()
 
-        async def node_fn(state):  # type: ignore[no-untyped-def]
+        async def node_fn(state):
             nonlocal inflight, max_seen
             async with lock:
                 inflight += 1
@@ -177,7 +181,7 @@ class TestMapRetryAndProgress:
     async def test_per_item_retry_recovers(self):
         attempts: dict[str, int] = {}
 
-        async def node_fn(state):  # type: ignore[no-untyped-def]
+        async def node_fn(state):
             scope = state["scope"]
             attempts[scope] = attempts.get(scope, 0) + 1
             if scope == "flaky" and attempts[scope] < 3:
@@ -202,7 +206,7 @@ class TestMapRetryAndProgress:
 
     @pytest.mark.asyncio
     async def test_progress_and_checkpoint_callbacks(self):
-        async def node_fn(state):  # type: ignore[no-untyped-def]
+        async def node_fn(state):
             return {"response": "ok", "scope": state["scope"]}
 
         registry = _make_registry(AsyncMock(side_effect=node_fn))
@@ -211,10 +215,10 @@ class TestMapRetryAndProgress:
         progress_events: list[tuple[int, int]] = []
         checkpoint_events: list[int] = []
 
-        async def progress_cb(current, total, message):  # type: ignore[no-untyped-def]
+        async def progress_cb(current, total, message):
             progress_events.append((current, total))
 
-        async def checkpoint_cb(index, sub_result):  # type: ignore[no-untyped-def]
+        async def checkpoint_cb(index, sub_result):
             checkpoint_events.append(index)
 
         config = MapStepConfig(
@@ -286,7 +290,7 @@ class TestMapPipelineEngine:
 
     @pytest.mark.asyncio
     async def test_engine_runs_map_step(self):
-        async def node_fn(state):  # type: ignore[no-untyped-def]
+        async def node_fn(state):
             return {"response": "ok", "scope": state["scope"]}
 
         registry = _make_registry(AsyncMock(side_effect=node_fn))
@@ -308,10 +312,10 @@ class TestMapPipelineEngine:
         progress_events: list[dict] = []
         checkpoint_events: list[tuple[str, int]] = []
 
-        async def progress_cb(**kwargs):  # type: ignore[no-untyped-def]
+        async def progress_cb(**kwargs):
             progress_events.append(kwargs)
 
-        async def checkpoint_cb(step_name, index, sub_result):  # type: ignore[no-untyped-def]
+        async def checkpoint_cb(step_name, index, sub_result):
             checkpoint_events.append((step_name, index))
 
         result = await engine.run(

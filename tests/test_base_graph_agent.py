@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for BaseGraphAgent lifecycle and integration."""
 
 from __future__ import annotations
@@ -421,8 +425,8 @@ class BuildGraphAgent(BaseGraphAgent[BuildGraphState]):
         state.result["response"] = f"Answer: {state.query}"
         return state
 
-    def input_to_state(self, data: dict[str, Any]) -> BuildGraphState:
-        return BuildGraphState(query=data.get("query", ""))
+    def input_to_state(self, input_data: dict[str, Any]) -> BuildGraphState:
+        return BuildGraphState(query=input_data.get("query", ""))
 
     def state_to_output(self, state: BuildGraphState) -> dict[str, Any]:
         return state.result
@@ -554,10 +558,10 @@ class TestBuildGraphWithConditional:
                 state.output = "needs review"
                 return state
 
-            def input_to_state(self, data):
+            def input_to_state(self, input_data):
                 return RoutingState(
-                    query=data.get("query", ""),
-                    needs_review=data.get("needs_review", False),
+                    query=input_data.get("query", ""),
+                    needs_review=input_data.get("needs_review", False),
                 )
 
             def state_to_output(self, state):
@@ -581,7 +585,7 @@ class TestBuildGraphNotImplemented:
         class EmptyAgent(BaseGraphAgent[EmptyState]):
             agent_name = "empty"
 
-            def input_to_state(self, data):
+            def input_to_state(self, input_data):
                 return EmptyState()
 
             def state_to_output(self, state):

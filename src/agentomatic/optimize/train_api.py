@@ -911,6 +911,7 @@ def run_train(
     )
     if dataset is None:
         dataset = load_data(ds_path, name=config.agent_name)
+    assert dataset is not None
 
     sizes_before = {
         "train": len(dataset.train),
@@ -933,6 +934,8 @@ def run_train(
             llm_base_url=entry.base_url,
             llm_api_key=entry.api_key or "local",
         )
+
+    assert dataset is not None
 
     sizes = {
         "train": len(dataset.train),

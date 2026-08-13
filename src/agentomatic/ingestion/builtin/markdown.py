@@ -203,7 +203,7 @@ class MarkdownIngestor(BaseIngestor[MarkdownIngestRequest]):
     def _try_markitdown(source: Path) -> str | None:
         """Try to convert with ``markitdown`` (returns ``None`` on failure)."""
         try:
-            from markitdown import MarkItDown
+            from markitdown import MarkItDown  # pyright: ignore[reportMissingImports]
 
             result = MarkItDown().convert(str(source))
             text = getattr(result, "text_content", None) or getattr(result, "markdown", None)

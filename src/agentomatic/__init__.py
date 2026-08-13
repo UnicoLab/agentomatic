@@ -35,6 +35,8 @@ With stacks (v0.6)::
 
 from __future__ import annotations
 
+from typing import Any
+
 # Version
 from agentomatic._version import __version__
 
@@ -58,9 +60,7 @@ from agentomatic.studio import GraphInspector, RunTracker
 try:
     from agentomatic.pipelines import Pipeline, PipelineConfig, PipelineResult
 except ImportError:
-    Pipeline = None  # type: ignore[assignment,misc]
-    PipelineConfig = None  # type: ignore[assignment,misc]
-    PipelineResult = None  # type: ignore[assignment,misc]
+    pass  # exposed as None via module __getattr__ below
 
 # Class-owned graph agents + Keras-style training (v0.7 / v1.2)
 from agentomatic.agents import (
@@ -68,13 +68,17 @@ from agentomatic.agents import (
     AgentExample,
     AgentGraph,
     BaseGraphAgent,
+    CallableMetric,
+    ContainsTermsMetric,
     ExactKeyMatchMetric,
     GraphBuilder,
     GridSearchOptimizer,
     History,
     Loss,
+    MetricLoss,
     NoOpOptimizer,
     PromptFitterBridge,
+    ResponseSimilarityMetric,
     WeightedMetric,
     agent_node,
 )
@@ -82,6 +86,7 @@ from agentomatic.agents import (
 # Unified callbacks (v1.10) — canonical location for all callbacks
 from agentomatic.callbacks import (
     CallbackContext,
+    EpochDiffCallback,
     ModelCheckpoint,
     NaNStopping,
     OptimizeCallback,
@@ -241,6 +246,12 @@ __all__ = [
     # Unified callbacks (v1.10)
     "TrainingCallback",
     "TrainingEarlyStopping",
+    "EarlyStopping",
+    "EpochDiffCallback",
+    "CallableMetric",
+    "ContainsTermsMetric",
+    "ResponseSimilarityMetric",
+    "MetricLoss",
     "OptimizeCallback",
     "OptimizeEarlyStopping",
     "ModelCheckpoint",
@@ -260,3 +271,13 @@ __all__ = [
     # Version
     "__version__",
 ]
+
+# Keras-style canonical name for the training early-stopping callback.
+EarlyStopping = TrainingEarlyStopping
+
+
+def __getattr__(name: str) -> Any:
+    """Return ``None`` for optional pipeline exports when pipelines are unavailable."""
+    if name in ("Pipeline", "PipelineConfig", "PipelineResult"):
+        return None
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

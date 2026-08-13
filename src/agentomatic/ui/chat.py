@@ -13,7 +13,11 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    import chainlit as cl
+    from chainlit.input_widget import InputWidget
 
 try:
     import chainlit as cl
@@ -77,16 +81,15 @@ if HAS_CHAINLIT:
         cl.user_session.set("agent_names", agent_names)
 
         # Let user pick an agent
-        settings = await cl.ChatSettings(
-            [  # type: ignore[arg-type]
-                cl.input_widget.Select(
-                    id="agent",
-                    label="🤖 Agent",
-                    values=agent_names,
-                    initial_value=agent_names[0],
-                ),
-            ]
-        ).send()
+        widgets: list[InputWidget] = [
+            cl.input_widget.Select(
+                id="agent",
+                label="🤖 Agent",
+                values=agent_names,
+                initial_value=agent_names[0],
+            ),
+        ]
+        settings = await cl.ChatSettings(widgets).send()
 
         selected = settings.get("agent", agent_names[0])
         cl.user_session.set("selected_agent", selected)
@@ -109,7 +112,7 @@ if HAS_CHAINLIT:
         selected = settings.get("agent")
         if selected:
             cl.user_session.set("selected_agent", selected)
-            agents = cl.user_session.get("agents", {})
+            agents = cast(dict[str, Any], cl.user_session.get("agents", {}))
             info = agents.get(selected, {})
             await cl.Message(
                 content=f"Switched to **{selected}** — {info.get('description', '')}",

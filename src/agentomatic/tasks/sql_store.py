@@ -28,12 +28,23 @@ Install with::
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from .models import TargetType, TaskRecord, TaskStatus
 from .store import TaskStore
+
+if TYPE_CHECKING:
+    # Resolve SQLAlchemy symbols for annotations/bases even when the optional
+    # ``db`` extra is not installed (runtime imports below handle actual use).
+    from sqlalchemy import JSON, Float, String, delete, func, select
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+    from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 try:  # Optional dependency — only needed to *use* this store.
     from sqlalchemy import JSON, Float, String, delete, func, select

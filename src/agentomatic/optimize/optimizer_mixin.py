@@ -157,6 +157,9 @@ class OptimizerMixin:
 
     _optimized_prompt: str | None = None
     _last_fit_result: FitResult | None = None
+    # Declared (not initialized) at class level so instances create their
+    # own list on first use; avoids sharing mutable state across instances.
+    _optimization_history: list[dict[str, Any]]  # pyright: ignore[reportUninitializedInstanceVariable]
 
     def fit(
         self,

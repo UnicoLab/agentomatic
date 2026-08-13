@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the graph builder and runtime (AgentGraph, GraphBuilder)."""
 
 from __future__ import annotations
@@ -498,7 +502,7 @@ class TestGraphNode:
         """GraphNode should be immutable (frozen dataclass)."""
         node = GraphNode("test", _node_fn("test"))
         with pytest.raises(AttributeError):
-            node.name = "changed"  # type: ignore[misc]
+            node.name = "changed"
 
     def test_node_names(self):
         """AgentGraph.node_names should return all node names."""

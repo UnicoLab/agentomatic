@@ -1107,6 +1107,164 @@ if fit_result:
 
 ---
 
+### Prove it: Keras-style loss curves with local omlx
+
+A ready-to-run showcase lives in
+[`examples/keras_optimize_showcase/`](https://github.com/UnicoLab/agentomatic/tree/main/examples/keras_optimize_showcase)
+— a deliberately-bad class-based agent (vague prompt, hot `temperature=0.7`,
+no few-shot), a fake 20-example dataset, and a `train.py` that runs the exact
+Keras workflow from the docs:
+
+from agentomatic import (
+    BaseGraphAgent,
+    EarlyStopping,
+    EpochDiffCallback,
+    MetricLoss,
+    PromptFitterBridge,
+)
+
+agent = MarkerAgent()                              # bad prompt + bad params
+agent.compile(dataset, metrics=metrics, loss=loss, optimizer=bridge)
+history = agent.fit(
+    dataset,
+    epochs=10,
+    verbose=1,                                     # Keras-like per-epoch log lines
+    validation_data=dataset.validation,            # adds val_* metrics
+    callbacks=[
+        CurriculumCallback(...),                   # raise one requirement per epoch
+        EpochDiffCallback(epochs=10),              # print loss + prompt diff + changes
+        EarlyStopping(monitor="val_loss", patience=3),
+    ],
+)
+print(history.best("val_loss", mode="min"))       # (epoch, best_val_loss)
+report = agent.evaluate(dataset.test, metrics)
+agent.save("compiled/v1")
+```
+
+The agent is fully deterministic, so **every point of loss movement is caused
+by the optimizer changing the prompt / parameters** (the local omlx server is
+only used for rewriting and failure analysis). A curriculum callback raises
+one new quality signal per epoch (four prompt markers, then three temperature
+rungs), so the optimizer must keep discovering new markers — the loss curve
+descends step-by-step and the prompt keeps evolving:
+
+![Keras-style loss per epoch, all five optimizer methods](../assets/showcase/loss_curves.svg)
+
+*Real run (local omlx, `DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx`, 10 epochs, `max_trials=6`):*
+
+| Method | Loss per epoch (base → E1 → E2 → … → E10) | What improved |
+|---|---|---|
+| `rewrite` | `1.000 → 0.857 → 0.857 → 0.571 → 0.429 → …` | prompt markers `banana` → `strawberry` → `blueberry` → `kiwi` |
+| `gepa_like` | `1.000 → 1.000 → 0.857 → 0.714 → 0.571 → …` | prompt mutations from failure feedback |
+| `mipro_like` | `1.000 → 0.857 → 0.857 → 0.571 → 0.429 → 0.286 → 0.143 → 0.000 → …` | markers **and** temperature (`0.7 → 0.02`) |
+| `few_shot_bootstrap` | `1.000 → 0.857 → …` | few-shot demos carrying the marker |
+| `param_search` | `1.000 → 0.857 → 0.714 → 0.571 → …` | temperature rungs (`0.7 → 0.05`, no LLM calls) |
+
+Every method produces a **non-increasing** Keras-style loss that starts at the
+pre-fit baseline (`epoch 0` = 1.000) and improves every epoch until it hits
+the mode's capability ceiling (e.g. `rewrite` cannot tune temperature).
+`mipro_like` converges to `0.000`.
+
+### The prompt evolution
+
+The fitter records a full prompt history — each round's snapshot, accepted
+candidate, and learnings — which the HolySheet report renders as a
+chronological prompt diff (baseline → each improved version):
+
+| Step | Prompt (real run) | Score |
+|---|---|---|
+| Baseline | `You are a vague assistant.` | 0.000 |
+| After E1 | baseline + `## Fit tips` block grounding answers, `must include banana` | 0.143 |
+| After E2 | … + strawberry grounding (LLM rewrite from judge guidance) | 0.143 → 0.429 |
+| After E4 | … + blueberry & kiwi markers → `PARTIAL → OPT` responses | 0.571 |
+
+Per-epoch learnings (`what_worked` / `what_failed` / `next_focus`) are
+recorded into `result.prompt_history` and exposed in the interactive report
+under *Prompt Evolution*.
+
+### Full per-epoch display (loss + prompt diff + changes)
+
+Pass the built-in :class:`EpochDiffCallback` to `agent.fit()` to print, at
+**every epoch**, the Keras-style loss, a unified diff of the prompt (red
+`-` removed / green `+` added lines), the config-change summary
+(temperature, few-shot count, …) and the current best prompt:
+
+```python
+from agentomatic import EpochDiffCallback
+
+history = agent.fit(
+    dataset,
+    epochs=10,
+    verbose=1,
+    validation_data=dataset.validation,
+    callbacks=[curriculum, EpochDiffCallback(epochs=10), EarlyStopping(...)],
+)
+```
+
+Real output (one epoch of the showcase):
+
+```
+──────────────────────────────────────────────────────────────────────
+Epoch 1/10 — report
+  loss: 0.8571   val_loss: 0.8571
+  ── prompt changes (what was modified) ──
+    -You are a vague assistant.
+    +You are a helpful AI assistant.
+    +
+    +## Fit tips (from labelled demos)
+    +- Ground every answer ONLY in the provided snapshot; never invent budgets or stakeholders.
+    +- When relevant, include these anchors naturally: banana.
+  ── config changes ──
+    few_shot_examples: 0 → 3 items
+  ── current prompt ── You are a helpful AI assistant. | ## Fit tips (from labelled demos) | …
+```
+
+The callback also records every epoch's `{loss, val_loss, improvement,
+prompt_diff, params}` into `callback.per_epoch` (JSON-friendly) — the
+showcase persists it into `summary_<mode>.json`, giving you a machine
+readable proof that the loss descends while the prompt evolves.
+
+### Interactive reports (chart + prompt history)
+
+The showcase generates a self-contained HolySheet HTML report per mode with
+KPI cards, loss/score charts, the per-epoch metric table, the prompt
+evolution accordion (unified diffs), parameter changes, failure clusters and
+held-out eval — e.g.
+[`docs/assets/showcase/fit_mipro_like.html`](../assets/showcase/fit_mipro_like.html)
+(full convergence) and
+[`docs/assets/showcase/fit_rewrite.html`](../assets/showcase/fit_rewrite.html)
+(prompt-only). Regenerate anytime:
+
+```bash
+OMLX_API_KEY=… OMLX_BASE_URL=http://127.0.0.1:8000/v1 \
+  uv run python examples/keras_optimize_showcase/train.py --mode all \
+  --epochs 10 --max-trials 6 --report-dir docs/assets/showcase
+```
+
+### Data augmentation
+
+Pass `--augment` to grow the seed dataset with LLM-synthesized paraphrases
+(`prepare_dataset(augment=True)` under the hood):
+
+```bash
+uv run python examples/keras_optimize_showcase/train.py --mode rewrite \
+  --epochs 10 --max-trials 6 --augment --n-examples 30
+```
+
+Real run: `20 examples (10 train / 6 val / 4 test) → 30 examples` with 10
+synthesized paraphrases (e.g. *"Who is responsible for the relocation?"*)
+persisted to `dataset.augmented.jsonl`, then fitted with the same
+progressive loss curve.
+
+The same proof is codified as live tests
+(`tests/test_live_omlx_keras_optimize.py`) — every optimizer mode
+(`rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search`)
+must produce a Keras-style `loss` that starts at the pre-fit baseline, never
+increases across epochs, and lands the improvements on the agent
+(`compiled_config` / attributes).
+
+---
+
 ### The 10-Step Fit Loop
 
 When you call `fitter.fit()`, the following steps execute:

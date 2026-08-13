@@ -17,21 +17,21 @@ class BetaInput(BaseModel):
 
     @field_validator("problem")
     @classmethod
-    def validate_problem(cls, v):
+    def validate_problem(cls, v: str):
         if not v or not v.strip():
             raise ValueError("Problem description cannot be empty")
         return v.strip()
 
     @field_validator("domain")
     @classmethod
-    def validate_domain(cls, v):
+    def validate_domain(cls, v: str | None):
         if v:
             return v.strip()
         return v
 
     @field_validator("requirements")
     @classmethod
-    def validate_requirements(cls, v):
+    def validate_requirements(cls, v: list[str] | None):
         if v:
             # Clean up requirements list
             return [req.strip() for req in v if req and req.strip()]
@@ -39,7 +39,7 @@ class BetaInput(BaseModel):
 
     @field_validator("constraints")
     @classmethod
-    def validate_constraints(cls, v):
+    def validate_constraints(cls, v: str | None):
         if v:
             return v.strip()
         return v

@@ -34,6 +34,9 @@ def get_default_local_stack() -> StackConfig:
                 temperature=0.1,
                 max_tokens=8192,
                 base_url="http://localhost:11434",
+                api_key="",
+                timeout=None,
+                max_retries=None,
             ),
             "fast": LLMStackEntry(
                 provider="ollama",
@@ -41,6 +44,9 @@ def get_default_local_stack() -> StackConfig:
                 temperature=0.0,
                 max_tokens=8192,
                 base_url="http://localhost:11434",
+                api_key="",
+                timeout=None,
+                max_retries=None,
             ),
         },
         embedding=EmbeddingStackEntry(
@@ -61,7 +67,13 @@ def get_default_local_stack() -> StackConfig:
             enable_auth=False,
             enable_db=False,
         ),
-        auth=AuthStackConfig(method="api_key"),
+        auth=AuthStackConfig(
+            method="api_key",
+            api_key="",
+            jwks_url="",
+            issuer="",
+            audience="",
+        ),
     )
 
 
@@ -84,6 +96,9 @@ def get_default_remote_stack() -> StackConfig:
                 temperature=0.1,
                 max_tokens=8192,
                 api_key="${OPENAI_API_KEY}",
+                base_url="",
+                timeout=None,
+                max_retries=None,
             ),
             "fast": LLMStackEntry(
                 provider="openai",
@@ -91,6 +106,9 @@ def get_default_remote_stack() -> StackConfig:
                 temperature=0.0,
                 max_tokens=8192,
                 api_key="${OPENAI_API_KEY}",
+                base_url="",
+                timeout=None,
+                max_retries=None,
             ),
             "judge": LLMStackEntry(
                 provider="openai",
@@ -98,6 +116,9 @@ def get_default_remote_stack() -> StackConfig:
                 temperature=0.0,
                 max_tokens=8192,
                 api_key="${OPENAI_API_KEY}",
+                base_url="",
+                timeout=None,
+                max_retries=None,
             ),
         },
         embedding=EmbeddingStackEntry(
@@ -120,6 +141,7 @@ def get_default_remote_stack() -> StackConfig:
         ),
         auth=AuthStackConfig(
             method="jwt",
+            api_key="",
             jwks_url="${JWKS_URL}",
             issuer="${JWT_ISSUER}",
             audience="${JWT_AUDIENCE}",

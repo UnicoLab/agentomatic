@@ -207,11 +207,11 @@ class StackConfig(BaseModel):
         default_factory=dict,
         description="Named LLM profiles",
     )
-    embedding: EmbeddingStackEntry = Field(default_factory=EmbeddingStackEntry)
-    database: DatabaseStackEntry = Field(default_factory=DatabaseStackEntry)
-    features: FeaturesStackEntry = Field(default_factory=FeaturesStackEntry)
-    auth: AuthStackConfig = Field(default_factory=AuthStackConfig)
-    env_file: str | None = Field(None, description="Path to .env file")
+    embedding: EmbeddingStackEntry = Field(default_factory=EmbeddingStackEntry.model_construct)
+    database: DatabaseStackEntry = Field(default_factory=DatabaseStackEntry.model_construct)
+    features: FeaturesStackEntry = Field(default_factory=FeaturesStackEntry.model_construct)
+    auth: AuthStackConfig = Field(default_factory=AuthStackConfig.model_construct)
+    env_file: str | None = Field(default=None, description="Path to .env file")
     environment: dict[str, str] = Field(
         default_factory=dict,
         description="Inline environment variable overrides",
@@ -460,9 +460,7 @@ class StackManager:
                 resolved.append(_stack_entry_to_build_kwargs(fb_entry, include_fallbacks=False))
                 continue
 
-            spec = (
-                item if isinstance(item, LLMFallbackSpec) else LLMFallbackSpec.model_validate(item)
-            )
+            spec = item
             kwargs: dict[str, Any] = {
                 "provider": spec.provider,
                 "model": spec.model,
@@ -544,11 +542,16 @@ class StackManager:
                 provider=stack.embedding.provider,
                 model=stack.embedding.model,
                 dimension=stack.embedding.dimension,
+                base_url="",
+                api_key="",
+                enabled=True,
             ),
             db=DatabaseSettings(
                 url=stack.database.url,
                 pool_size=stack.database.pool_size,
                 max_overflow=stack.database.max_overflow,
+                pool_timeout=30,
+                echo=False,
             ),
             features=FeatureSettings(
                 enable_streaming=stack.features.enable_streaming,
@@ -557,6 +560,16 @@ class StackManager:
                 enable_rate_limit=stack.features.enable_rate_limit,
                 enable_auth=stack.features.enable_auth,
                 enable_db=stack.features.enable_db,
+                enable_feedback=True,
+                enable_endpoints=True,
+                enable_control_plane=False,
+                enable_zero_trust=False,
+                max_concurrent_agents=10,
+                request_timeout=30.0,
+                llm_retry_count=3,
+                llm_retry_delay=1.0,
+                circuit_breaker_threshold=5,
+                circuit_breaker_timeout=60.0,
             ),
             auth=AuthSettings(api_key=stack.auth.api_key),
         )  # type: ignore[call-arg]

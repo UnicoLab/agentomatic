@@ -7,10 +7,101 @@ layer.
 
 from __future__ import annotations
 
+import importlib
 from typing import Any
 
 from loguru import logger
 from pydantic import BaseModel, ValidationError
+
+# ---------------------------------------------------------------------------
+# Schema discovery conventions
+# ---------------------------------------------------------------------------
+#
+# An agent may declare its input/output models in ``schemas.py`` under any of
+# the following names (checked in priority order):
+#
+#   Input:  CustomInvokeRequest, {Title}Request, {Title}Input,
+#           AgentInput, AgentInvokeRequest, Input
+#   Output: CustomInvokeResponse, {Title}Response, {Title}Output,
+#           AgentOutput, AgentInvokeResponse, Output
+#
+# ``{Title}`` is the agent folder name converted to CamelCase
+# (e.g. ``weather_bot`` -> ``WeatherBot``).
+
+def schema_model_candidates(
+    agent_name: str,
+) -> tuple[list[str], list[str]]:
+    """Return the input/output class-name candidates for an agent.
+
+    Args:
+        agent_name: Agent folder name (e.g. ``"alpha"`` or ``"weather_bot"``).
+
+    Returns:
+        A ``(input_candidates, output_candidates)`` tuple of class names in
+        priority order.
+    """
+    title = agent_name.title().replace("_", "")
+    return (
+        [
+            "CustomInvokeRequest",
+            f"{title}Request",
+            f"{title}Input",
+            "AgentInput",
+            "AgentInvokeRequest",
+            "Input",
+        ],
+        [
+            "CustomInvokeResponse",
+            f"{title}Response",
+            f"{title}Output",
+            "AgentOutput",
+            "AgentInvokeResponse",
+            "Output",
+        ],
+    )
+
+
+def _is_pydantic_model(cls: Any) -> bool:
+    """Whether *cls* looks like a Pydantic model (has JSON Schema output)."""
+    return isinstance(cls, type) and hasattr(cls, "model_json_schema")
+
+
+def _first_model(mod: Any, candidates: list[str]) -> type[BaseModel] | None:
+    """Return the first candidate class that exists in *mod* and is a model."""
+    for candidate in candidates:
+        cls = getattr(mod, candidate, None)
+        if _is_pydantic_model(cls):
+            return cls
+    return None
+
+
+def load_schema_models(
+    module_path: str,
+    agent_name: str,
+) -> tuple[type[BaseModel] | None, type[BaseModel] | None]:
+    """Import an agent's ``schemas.py`` and resolve its input/output models.
+
+    Args:
+        module_path: Python dotted path of the agent package (without
+            ``.schemas``).
+        agent_name: Agent folder name used for CamelCase candidates.
+
+    Returns:
+        ``(input_model, output_model)`` — either may be ``None`` when the
+        module is missing or no candidate class matches.
+    """
+    if not module_path:
+        return None, None
+    try:
+        schemas_mod = importlib.import_module(f"{module_path}.schemas")
+    except ImportError:
+        return None, None
+
+    input_candidates, output_candidates = schema_model_candidates(agent_name)
+    return (
+        _first_model(schemas_mod, input_candidates),
+        _first_model(schemas_mod, output_candidates),
+    )
 
 
 class SchemaValidator:

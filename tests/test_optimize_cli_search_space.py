@@ -201,7 +201,7 @@ class TestWeightedMetric:
 
     def test_bad_entry_raises(self) -> None:
         with pytest.raises(ValueError, match="tuples"):
-            WeightedMetric([(1, 2, 3, 4)])  # type: ignore[list-item]
+            WeightedMetric([(1, 2, 3, 4)])
 
     def test_component_missing_score_raises(self) -> None:
         with pytest.raises(TypeError, match="Metric.score protocol"):

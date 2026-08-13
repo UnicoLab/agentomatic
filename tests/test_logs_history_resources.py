@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Multi-resource logs_history coverage (plugin/pipeline/ingestion/endpoint)."""
 
 from __future__ import annotations
@@ -59,7 +63,7 @@ class _EchoEndpoint(BaseEndpoint[_EpIn, _EpOut]):
     endpoint_description = "echo"
     path = "/echo"
 
-    async def handle(self, request):  # type: ignore[override]
+    async def handle(self, request):
         return _EpOut(echoed=request.text)
 
 

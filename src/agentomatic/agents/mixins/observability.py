@@ -29,7 +29,7 @@ class ObservabilityMixin:
             print(f"{event.node_name}: {event.duration_ms}ms")
     """
 
-    _traces: list[list[TraceEvent]]
+    _traces: list[list[TraceEvent]] | None = None
 
     def get_last_trace(self) -> list[TraceEvent]:
         """Return the most recent execution trace.
@@ -66,6 +66,6 @@ class ObservabilityMixin:
         Returns:
             The internal ``_traces`` list.
         """
-        if not hasattr(self, "_traces") or self._traces is None:
+        if self._traces is None:
             self._traces = []
         return self._traces

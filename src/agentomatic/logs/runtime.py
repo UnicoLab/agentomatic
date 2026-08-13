@@ -7,7 +7,7 @@ across FastAPI request tasks while keeping step wrappers store-agnostic.
 
 from __future__ import annotations
 
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ def bind_pipeline_log_name(name: str | None):
     return _pipeline_name.set(name)
 
 
-def reset_pipeline_log_name(token) -> None:
+def reset_pipeline_log_name(token: Token[str | None]) -> None:
     """Reset the active pipeline name context."""
     _pipeline_name.reset(token)
 

@@ -56,7 +56,8 @@ def test_audit_timer_success() -> None:
 
 def test_audit_timer_error() -> None:
     """audit_timer records error outcome on exception."""
+    timer = audit_timer(agent="a", op="op", request_id="r")
     with pytest.raises(RuntimeError):
-        with audit_timer(agent="a", op="op", request_id="r") as timer:
+        with timer:
             raise RuntimeError("boom")
     assert timer.record["outcome"] == "error"

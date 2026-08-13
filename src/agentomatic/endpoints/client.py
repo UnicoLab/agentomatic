@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -20,12 +20,14 @@ from agentomatic.endpoints.models import (
     UpstreamResult,
 )
 
+if TYPE_CHECKING:
+    import httpx
+
 try:
     import httpx
 
     _HAS_HTTPX = True
 except ImportError:  # pragma: no cover - httpx is a core dependency
-    httpx = None  # type: ignore[assignment]
     _HAS_HTTPX = False
 
 

@@ -44,6 +44,7 @@ Example::
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
@@ -539,7 +540,7 @@ class Flow:
         Returns:
             The method's return value.
         """
-        if asyncio.iscoroutinefunction(method):
+        if inspect.iscoroutinefunction(method):
             return await method(payload)
         # Sync method — call directly (already bound, no I/O expected)
         return method(payload)

@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for per-resource execution-mode sugar (/async and /batch).
 
 Verifies that agents, plugins, pipelines, and ingestors all expose consistent

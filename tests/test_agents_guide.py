@@ -51,7 +51,7 @@ class TestPrimerSource:
 
     def test_write_primer_rejects_unknown_target(self, tmp_path: Path) -> None:
         try:
-            write_primer("README.md", root=tmp_path)  # type: ignore[arg-type]
+            write_primer("README.md", root=tmp_path)
         except ValueError:
             pass
         else:  # pragma: no cover - defensive

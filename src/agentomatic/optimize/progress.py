@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -98,7 +98,6 @@ try:
         MofNCompleteColumn,
         Progress,
         SpinnerColumn,
-        TaskID,
         TextColumn,
         TimeRemainingColumn,
     )
@@ -107,9 +106,15 @@ try:
     _RICH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _RICH_AVAILABLE = False
-    Console = None  # type: ignore[assignment,misc]
-    Progress = None  # type: ignore[assignment,misc]
-    TaskID = None  # type: ignore[assignment,misc]
+    # Bind optional-import names so the guarded usages below stay type-safe.
+    Console = cast(Any, None)
+    Progress = cast(Any, None)
+    SpinnerColumn = cast(Any, None)
+    TextColumn = cast(Any, None)
+    BarColumn = cast(Any, None)
+    MofNCompleteColumn = cast(Any, None)
+    TimeRemainingColumn = cast(Any, None)
+    Table = cast(Any, None)
 
 
 class RichProgressCallback:
@@ -152,10 +157,10 @@ class RichProgressCallback:
         self._baseline_score: float = 0.0
 
         # Rich objects — initialised lazily on FIT_START / RUN_START.
-        self._console: Console | None = None  # type: ignore[assignment]
-        self._progress: Progress | None = None  # type: ignore[assignment]
-        self._overall_task: TaskID | None = None  # type: ignore[assignment]
-        self._round_task: TaskID | None = None  # type: ignore[assignment]
+        self._console: Any = None
+        self._progress: Any = None
+        self._overall_task: Any = None
+        self._round_task: Any = None
 
         if not _RICH_AVAILABLE:
             logger.warning(
@@ -187,7 +192,7 @@ class RichProgressCallback:
 
     def _on_fit_start(self, data: EventData) -> None:
         """Initialise Rich console and progress bars."""
-        self._console = Console()  # type: ignore[assignment]
+        self._console = Console()
         self._start_time = time.monotonic()
         self._scores.clear()
         self._candidates_tried = 0
@@ -197,7 +202,7 @@ class RichProgressCallback:
         self._baseline_score = 0.0
 
         total_rounds = data.total_rounds or 1
-        self._progress = Progress(  # type: ignore[assignment]
+        self._progress = Progress(
             SpinnerColumn(),
             TextColumn("[bold blue]{task.description}"),
             BarColumn(bar_width=20),
@@ -206,13 +211,13 @@ class RichProgressCallback:
             TimeRemainingColumn(),
             console=self._console,
         )
-        self._progress.start()  # type: ignore[union-attr]
-        self._overall_task = self._progress.add_task(  # type: ignore[union-attr]
+        self._progress.start()
+        self._overall_task = self._progress.add_task(
             "Optimising",
             total=total_rounds,
         )
         agent_label = data.agent or "unknown"
-        self._console.print(  # type: ignore[union-attr]
+        self._console.print(
             f"\n🚀 [bold green]Optimisation started[/] "
             f"for agent [cyan]{agent_label}[/]  "
             f"({total_rounds} round(s))\n"
@@ -225,7 +230,7 @@ class RichProgressCallback:
         self._best_score = score
         self._scores.append(score)
         if self._console is not None:
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 f"  📊 Baseline score: [bold]{score:.4f}[/]"
             )
 
@@ -233,7 +238,7 @@ class RichProgressCallback:
         """Start a per-round sub-progress bar."""
         total_cands = data.total_candidates or 1
         if self._progress is not None:
-            self._round_task = self._progress.add_task(  # type: ignore[union-attr]
+            self._round_task = self._progress.add_task(
                 f"Round {(data.round_idx or 0) + 1}",
                 total=total_cands,
             )
@@ -246,7 +251,7 @@ class RichProgressCallback:
         colour = self._score_colour(score)
 
         if self._progress is not None and self._round_task is not None:
-            self._progress.update(  # type: ignore[union-attr]
+            self._progress.update(
                 self._round_task,
                 advance=1,
                 description=(f"  {name}: [{colour}]{score:.4f}[/]"),
@@ -257,7 +262,7 @@ class RichProgressCallback:
         score = data.score if data.score is not None else 0.0
         name = data.candidate_name or "?"
         if self._console is not None:
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 f"  ✅ [green]Accepted[/] {name}: {score:.4f}  ({data.accept_reason})"
             )
 
@@ -266,7 +271,7 @@ class RichProgressCallback:
         score = data.score if data.score is not None else 0.0
         name = data.candidate_name or "?"
         if self._console is not None:
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 f"  ❌ [red]Rejected[/] {name}: {score:.4f}  ({data.accept_reason})"
             )
 
@@ -280,7 +285,7 @@ class RichProgressCallback:
 
         # Remove completed round task.
         if self._progress is not None and self._round_task is not None:
-            self._progress.remove_task(  # type: ignore[union-attr]
+            self._progress.remove_task(
                 self._round_task,
             )
             self._round_task = None
@@ -290,7 +295,7 @@ class RichProgressCallback:
             delta = self._best_score - self._baseline_score
             sign = "+" if delta >= 0 else ""
             colour = self._score_colour(self._best_score)
-            self._progress.update(  # type: ignore[union-attr]
+            self._progress.update(
                 self._overall_task,
                 advance=1,
                 description=(f"Best: [{colour}]{self._best_score:.3f}[/] | Δ {sign}{delta:.3f}"),
@@ -301,21 +306,21 @@ class RichProgressCallback:
             spark = _make_sparkline(self._scores)
             first = self._scores[0]
             last = self._scores[-1]
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 f"  📈 {spark} {first:.2f} → {last:.2f}"
             )
 
     def _on_early_stop(self, data: EventData) -> None:
         """Log early-stop notification."""
         if self._console is not None:
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 "\n  ⏹️  [yellow]Early stop triggered[/]"
             )
 
     def _on_fit_complete(self, data: EventData) -> None:
         """Print final summary table and stop progress bars."""
         if self._progress is not None:
-            self._progress.stop()  # type: ignore[union-attr]
+            self._progress.stop()
 
         if self._console is None:
             return
@@ -332,14 +337,14 @@ class RichProgressCallback:
             return
         s_score = data.sample_score if data.sample_score is not None else 0.0
         query_preview = (data.query or "")[:60]
-        self._console.print(  # type: ignore[union-attr]
+        self._console.print(
             f"    🔹 {s_score:.3f}  {query_preview}"
         )
 
     def _on_rewrite_accepted(self, data: EventData) -> None:
         """Display rewrite acceptance info."""
         if self._console is not None:
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 f"  ✏️  [green]Rewrite accepted[/]  "
                 f"len={data.prompt_length}  "
                 f"Δ {data.improvement:+.4f}"
@@ -348,7 +353,7 @@ class RichProgressCallback:
     def _on_rewrite_rejected(self, data: EventData) -> None:
         """Display rewrite rejection info."""
         if self._console is not None:
-            self._console.print(  # type: ignore[union-attr]
+            self._console.print(
                 f"  ✏️  [red]Rewrite rejected[/]  "
                 f"len={data.prompt_length}  "
                 f"Δ {data.improvement:+.4f}"
@@ -387,7 +392,7 @@ class RichProgressCallback:
         if self._console is None:  # pragma: no cover
             return
 
-        table = Table(  # type: ignore[assignment]
+        table = Table(
             title="Optimisation Summary",
             show_header=False,
             border_style="dim",
@@ -423,9 +428,9 @@ class RichProgressCallback:
                 f"{spark}  {self._scores[0]:.2f} → {self._scores[-1]:.2f}",
             )
 
-        self._console.print()  # type: ignore[union-attr]
-        self._console.print(table)  # type: ignore[union-attr]
-        self._console.print()  # type: ignore[union-attr]
+        self._console.print()
+        self._console.print(table)
+        self._console.print()
 
 
 # Handler dispatch table — avoids a long if/elif chain.
@@ -626,8 +631,8 @@ def auto_progress_callback() -> OptimizationCallback:
         cb = auto_progress_callback()
     """
     if _RICH_AVAILABLE and _is_tty():
-        return RichProgressCallback()  # type: ignore[return-value]
-    return LogProgressCallback()  # type: ignore[return-value]
+        return RichProgressCallback()
+    return LogProgressCallback()
 
 
 def _is_tty() -> bool:

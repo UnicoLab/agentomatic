@@ -1,8 +1,12 @@
 """Simplified FastAPI router for Alpha agent."""
 
+from typing import cast
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from pydantic import ValidationError
+
+from src.common.base_agent import BaseAgent
 
 from ...app.dependencies import agent_registry
 from .schemas import AlphaInput, AlphaOutput
@@ -20,7 +24,7 @@ def get_alpha_agent():
 
 @router.post("/invoke", response_model=AlphaOutput)
 async def invoke_alpha_agent(
-    input_data: AlphaInput, agent=Depends(get_alpha_agent)
+    input_data: AlphaInput, agent: BaseAgent = Depends(get_alpha_agent)
 ) -> AlphaOutput:
     """Invoke Alpha agent with comprehensive validation."""
     try:
@@ -36,7 +40,7 @@ async def invoke_alpha_agent(
 
         result = await agent.run(input_data)
         logger.info("Alpha agent completed successfully")
-        return result
+        return cast(AlphaOutput, result)
 
     except ValidationError as e:
         logger.error(f"Alpha agent validation error: {e}")
@@ -54,7 +58,7 @@ async def invoke_alpha_agent(
 
 
 @router.get("/health")
-async def alpha_health(agent=Depends(get_alpha_agent)):
+async def alpha_health(agent: BaseAgent = Depends(get_alpha_agent)):
     """Check Alpha agent health."""
     try:
         health = await agent.health_check()

@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for agentomatic.pipelines.flow module."""
 
 from __future__ import annotations
@@ -277,7 +281,7 @@ class TestFlowIntrospection:
                 return {}
 
         flow = MyFlow()
-        starts, listeners, routers = flow._introspect()
+        starts, listeners, _routers = flow._introspect()
         assert len(starts) == 1
         assert "entry" in listeners
         assert len(listeners["entry"]) == 1
@@ -307,7 +311,7 @@ class TestFlowIntrospection:
                 return {}
 
         flow = MyFlow()
-        starts, listeners, routers = flow._introspect()
+        _starts, listeners, routers = flow._introspect()
         assert "entry" in routers
         assert "path_a" in listeners
 

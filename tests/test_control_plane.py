@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the production control plane admin API."""
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ from agentomatic.endpoints import BaseEndpoint
 class _PingEndpoint(BaseEndpoint):
     endpoint_name = "ping"
 
-    async def handle(self, request):  # type: ignore[override]
+    async def handle(self, request):
         return {"pong": True}
 
 

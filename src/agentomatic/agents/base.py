@@ -684,8 +684,11 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         Each epoch (optionally) runs the compiled optimizer, applies any config
         changes, then evaluates the agent on the training data (and
         ``validation_data`` if given), recording per-epoch metric and ``loss``
-        values. Callbacks receive ``on_epoch_end(epoch, logs)`` and may set
-        ``agent.stop_training`` to halt early (see :class:`EarlyStopping`).
+        values. When an optimizer is active, the pre-optimization state is
+        additionally recorded as epoch ``-1`` so the History curve starts at
+        the true baseline loss. Callbacks receive ``on_epoch_end(epoch, logs)``
+        and may set ``agent.stop_training`` to halt early (see
+        :class:`EarlyStopping`).
 
         Optimize configuration — optionally override what this ``fit()``
         tunes without recompiling:
@@ -767,7 +770,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                 "loss": loss.name if loss else "none",
                 "train_size": len(train_examples),
                 "val_size": len(val_examples),
-                "optimize": fit_options or {},
+                "optimize": self._json_safe_params(fit_options or {}),
             }
         )
         self.history = history
@@ -784,6 +787,20 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         )
 
         try:
+            # Keras-style baseline: when an optimizer is active, record the
+            # pre-optimization state as epoch -1 so the History curve starts
+            # at the true starting loss and every later epoch shows the
+            # optimizer's compounding improvement.
+            if active_optimizer is not None and dataset is not None:
+                base_logs = self._epoch_logs(train_examples, metrics, loss)
+                if val_examples:
+                    base_val = self._epoch_logs(val_examples, metrics, loss)
+                    base_logs.update({f"val_{k}": v for k, v in base_val.items()})
+                history.record(-1, base_logs)
+                if verbose:
+                    metric_str = " - ".join(f"{k}: {v:.4f}" for k, v in base_logs.items())
+                    logger.info(f"Epoch 0/{epochs} (baseline, before fit) - {metric_str}")
+
             for epoch in range(epochs):
                 for cb in callbacks:
                     cb.on_epoch_begin(epoch)
@@ -824,6 +841,33 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             cb.on_train_end()
 
         return history
+
+    @staticmethod
+    def _json_safe_params(options: dict[str, Any]) -> dict[str, Any]:
+        """Make fit() options JSON-serialisable for ``History.params``.
+
+        ``fit_options`` may hold rich objects (e.g. a ``PromptSearchSpace``)
+        that break ``agent.save()`` (``json.dump`` of ``fit_history.json``).
+        Objects exposing ``to_dict()`` are converted via it; anything else
+        is stringified.
+        """
+
+        def clean(value: Any) -> Any:
+            if value is None or isinstance(value, (bool, int, float, str)):
+                return value
+            if isinstance(value, dict):
+                return {str(k): clean(v) for k, v in value.items()}
+            if isinstance(value, (list, tuple)):
+                return [clean(v) for v in value]
+            to_dict = getattr(value, "to_dict", None)
+            if callable(to_dict):
+                try:
+                    return clean(to_dict())
+                except Exception:  # noqa: BLE001
+                    pass
+            return str(value)
+
+        return clean(options)
 
     def _build_fit_optimize_options(
         self,

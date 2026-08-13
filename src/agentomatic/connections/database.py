@@ -17,7 +17,7 @@ from agentomatic.connections.models import DatabaseConnectionConfig
 from agentomatic.endpoints.auth import resolve_env
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -118,10 +118,15 @@ class DatabaseConnection:
         logger.info(f"🗄️ Database connection '{self.name}' initialized")
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator[AsyncSession]:
+    async def session(self) -> AsyncGenerator[AsyncSession, None]:
         """Yield an ``AsyncSession`` bound to this connection."""
         if self._sessionmaker is None:
             await self.initialize()
+        if self._sessionmaker is None:  # pragma: no cover - initialize() failed
+            raise RuntimeError(
+                f"Database connection '{self.name}' is not initialized. "
+                "Call `await connection.initialize()` first."
+            )
         try:
             session = self._sessionmaker()
         except Exception:

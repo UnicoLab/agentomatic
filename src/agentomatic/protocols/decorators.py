@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,17 +18,17 @@ class APIResponse(BaseModel):
     """Standard JSON response envelope."""
 
     success: bool = Field(True)
-    data: Any = Field(None)
+    data: Any = Field(default=None)
     message: str = Field("")
-    error: str | None = Field(None)
+    error: str | None = Field(default=None)
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
-def handle_api_errors(fn):
+def handle_api_errors(fn: Callable[..., Any]):
     """Decorator that catches unhandled exceptions and wraps them."""
 
     @functools.wraps(fn)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return await fn(*args, **kwargs)
         except HTTPException:
@@ -39,11 +40,11 @@ def handle_api_errors(fn):
     return wrapper
 
 
-def log_api_call(fn):
+def log_api_call(fn: Callable[..., Any]):
     """Decorator that logs function call timing."""
 
     @functools.wraps(fn)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         t0 = time.perf_counter()
         try:
             result = await fn(*args, **kwargs)

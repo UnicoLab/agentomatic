@@ -1,9 +1,10 @@
 """Common utilities for the application."""
 
 import asyncio
+import inspect
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from loguru import logger
 
@@ -27,16 +28,16 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
-        async def async_wrapper(*args, **kwargs) -> T:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
             current_delay = delay
-            last_exception = None
+            last_exception: BaseException | None = None
 
             for attempt in range(max_attempts):
                 try:
-                    if asyncio.iscoroutinefunction(func):
-                        return await func(*args, **kwargs)
+                    if inspect.iscoroutinefunction(func):
+                        return cast(T, await func(*args, **kwargs))
                     else:
-                        return func(*args, **kwargs)
+                        return cast(T, func(*args, **kwargs))
                 except Exception as e:
                     last_exception = e
                     if attempt == max_attempts - 1:
@@ -51,12 +52,14 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
                     await asyncio.sleep(current_delay)
                     current_delay *= backoff
 
+            if last_exception is None:
+                raise RuntimeError(f"Function {func.__name__} failed without an exception")
             raise last_exception
 
         @wraps(func)
-        def sync_wrapper(*args, **kwargs) -> T:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             current_delay = delay
-            last_exception = None
+            last_exception: BaseException | None = None
 
             for attempt in range(max_attempts):
                 try:
@@ -77,12 +80,14 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
                     time.sleep(current_delay)
                     current_delay *= backoff
 
+            if last_exception is None:
+                raise RuntimeError(f"Function {func.__name__} failed without an exception")
             raise last_exception
 
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper
+        if inspect.iscoroutinefunction(func):
+            return cast(Callable[..., T], async_wrapper)
         else:
-            return sync_wrapper
+            return cast(Callable[..., T], sync_wrapper)
 
     return decorator
 

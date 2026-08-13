@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
 
-from langgraph.graph import StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from loguru import logger
 from pydantic import BaseModel
 
-from .llm_factory import BaseLLMWrapper
+from .llm_factory import BaseLLMWrapper, LLMContent
 from .prompt_manager import PromptManager
 
 
@@ -36,7 +36,7 @@ class BaseAgent(ABC):
         self.name = name
         self.llm = llm
         self.prompt_manager = prompt_manager
-        self.graph: StateGraph | None = None
+        self.graph: CompiledStateGraph | None = None
 
         # Build the graph after initialization
         self.graph = self.build_graph()
@@ -53,7 +53,7 @@ class BaseAgent(ABC):
         """
         return self.prompt_manager.get_prompt(version)
 
-    def format_prompt(self, version: str = "v1", **kwargs) -> str | None:
+    def format_prompt(self, version: str = "v1", **kwargs: Any) -> str | None:
         """Format a prompt with given variables.
 
         Args:
@@ -66,8 +66,8 @@ class BaseAgent(ABC):
         return self.prompt_manager.format_prompt(version, **kwargs)
 
     async def generate_response(
-        self, prompt: str, streaming: bool = False, **kwargs
-    ) -> str | AsyncIterator[str]:
+        self, prompt: str, streaming: bool = False, **kwargs: Any
+    ) -> LLMContent | AsyncIterator[LLMContent]:
         """Generate a response using the configured LLM.
 
         Args:
@@ -104,7 +104,7 @@ class BaseAgent(ABC):
             return {"agent": self.name, "status": "unhealthy", "error": str(e)}
 
     @abstractmethod
-    def build_graph(self) -> StateGraph:
+    def build_graph(self) -> CompiledStateGraph:
         """Build the LangGraph StateGraph for this agent.
 
         Returns:

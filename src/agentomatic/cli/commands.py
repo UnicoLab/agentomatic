@@ -1,3 +1,4 @@
+# mypy: disable-error-code="misc"
 """Agentomatic CLI — beautiful terminal experience for agent lifecycle.
 
 Commands:
@@ -17,13 +18,12 @@ Fallback: works with basic output if Rich is not installed.
 from __future__ import annotations
 
 import importlib
-import importlib.util
 import json
 import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import click
 from loguru import logger
@@ -40,6 +40,10 @@ try:
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
+    Console = cast(Any, None)
+    Panel = cast(Any, None)
+    Table = cast(Any, None)
+    Tree = cast(Any, None)
 
 console: Console = Console() if HAS_RICH else None  # type: ignore[assignment]
 

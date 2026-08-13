@@ -5,8 +5,10 @@ from pathlib import Path
 
 from loguru import logger
 
+from src.common.llm_factory import LLMConfig, LLMFactory, LLMProvider
+from src.common.prompt_manager import PromptManager
+
 from ..common.base_agent import BaseAgent
-from ..common.llm_factory import LLMConfig, LLMProvider
 from .settings import config
 
 
@@ -53,7 +55,8 @@ class AgentRegistry:
                     llm_config = self._create_default_llm_config(agent_name)
 
                     # Initialize the agent
-                    agent_instance = agent_class(agent_name, llm_config)
+                    llm = LLMFactory.create_llm_sync(llm_config)
+                    agent_instance = agent_class(agent_name, llm, PromptManager(agent_name))
                     self._agents[agent_name] = agent_instance
                     self._agent_configs[agent_name] = llm_config
 

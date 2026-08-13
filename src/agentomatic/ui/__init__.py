@@ -6,6 +6,7 @@ Install: ``pip install agentomatic[ui]``
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,10 +21,8 @@ _CHAT_MODULE = str(Path(__file__).parent / "chat.py")
 def is_available() -> bool:
     """Check if Chainlit is installed."""
     try:
-        import chainlit  # noqa: F401
-
-        return True
-    except ImportError:
+        return importlib.util.find_spec("chainlit") is not None
+    except (ImportError, ValueError):
         return False
 
 

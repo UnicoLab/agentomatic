@@ -459,8 +459,6 @@ class RewriteOptimizer(BaseFitterOptimizer):
         """Build few-shot demos from dataset expected answers (gold labels)."""
         out: list[dict[str, Any]] = []
         for row in dataset_sample or []:
-            if not isinstance(row, dict):
-                continue
             q = str(
                 row.get("query")
                 or row.get("question")
@@ -489,8 +487,6 @@ class RewriteOptimizer(BaseFitterOptimizer):
         """Append concrete grounding tips mined from expected answers."""
         must_terms: list[str] = []
         for src in list(dataset_sample or []) + list(eval_results or []):
-            if not isinstance(src, dict):
-                continue
             expected = (
                 src.get("expected_answer") or src.get("expected") or src.get("expected_output")
             )
@@ -642,7 +638,7 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
 
         # -- build candidates --------------------------------------------
         candidates: list[PromptCandidate] = []
-        for rank, (quality, subset_idx, subset) in enumerate(top_subsets):
+        for rank, (quality, _, subset) in enumerate(top_subsets):
             few_shot = [
                 {"query": r.get("query", ""), "response": r.get("response", "")} for r in subset
             ]
@@ -1606,7 +1602,7 @@ def _build_failure_summary(
 
 
 def resolve_fitter_optimizer(
-    name: str | BaseFitterOptimizer,
+    name: str | BaseFitterOptimizer | Any,
     model: LLMSpec = "ollama/qwen2.5:7b",
     rewrite_model: LLMSpec | None = None,
     **kwargs: Any,
@@ -1681,7 +1677,7 @@ def resolve_fitter_optimizer(
             "resolve_fitter_optimizer: got duck-typed optimizer ({})",
             getattr(name, "name", type(name).__name__),
         )
-        return name  # type: ignore[return-value]
+        return name
 
     # -- string resolution -----------------------------------------------
     lookup: dict[str, type[BaseFitterOptimizer]] = {
@@ -1760,4 +1756,4 @@ def resolve_fitter_optimizer(
         )
 
     # Unreachable, but satisfies exhaustiveness checkers
-    return cls(**kwargs)  # type: ignore[call-arg]
+    return cls(**kwargs)

@@ -72,7 +72,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from agentomatic.optimize.llm_types import LLMSpec
@@ -89,7 +89,7 @@ try:
 except ImportError:
     import logging as _logging
 
-    _logger = _logging.getLogger("agentomatic.optimize")  # type: ignore[assignment]
+    _logger = cast(Any, _logging.getLogger("agentomatic.optimize"))
 
 
 # =====================================================================

@@ -181,8 +181,8 @@ def get_agent_metrics(agent_name: str, agents_dir: str = "agents") -> list[Any]:
             from deepeval.test_case import LLMTestCaseParams
 
             geval_params: Any = [
-                LLMTestCaseParams.INPUT,
-                LLMTestCaseParams.ACTUAL_OUTPUT,
+                getattr(LLMTestCaseParams, "INPUT"),
+                getattr(LLMTestCaseParams, "ACTUAL_OUTPUT"),
             ]
         except Exception:
             geval_params = ["input", "actual_output"]

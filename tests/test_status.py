@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the unified platform status endpoint + HTML dashboard."""
 
 from __future__ import annotations
@@ -7,6 +11,7 @@ from agentomatic import AgentPlatform, BaseIngestor, IngestionResult
 
 class _StatusDocsIngestor(BaseIngestor):
     ingestor_name = "status_docs"
+    ready = False
 
     async def setup(self) -> None:
         self.ready = True

@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for EvalConfig / evaluate_and_report and eval HolySheet reports."""
 
 from __future__ import annotations

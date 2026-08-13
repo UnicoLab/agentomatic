@@ -209,6 +209,7 @@ class LangGraphAdapter(StudioAdapter):
     async def get_state(self, thread_id: str) -> StudioStateSnapshot | None:
         state_data: dict[str, Any] = {}
         checkpoint_id: str | None = None
+        cp_tuple: Any = None
 
         try:
             if self._agent.graph_fn is not None:

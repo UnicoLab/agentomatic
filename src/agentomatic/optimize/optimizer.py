@@ -83,9 +83,10 @@ class ExperimentLog:
         existing: list[dict] = []
         if path.exists():
             try:
-                existing = json.loads(path.read_text())
-                if not isinstance(existing, list):
-                    existing = [existing]
+                data: Any = json.loads(path.read_text())
+                if not isinstance(data, list):
+                    data = [data]
+                existing = data
             except (json.JSONDecodeError, ValueError):
                 existing = []
 
@@ -731,7 +732,7 @@ class PromptOptimizer:
                     if version in data and "system" in data[version]:
                         return str(data[version]["system"])
                 # Fallback: first entry
-                for key, val in data.items():
+                for val in data.values():
                     if isinstance(val, dict) and "system" in val:
                         return str(val["system"])
 
@@ -793,6 +794,7 @@ class _ProgressDisplay:
         self._table: Any = None
         self._total_points = 0
         self._processed = 0
+        self._prev_score = 0.0
 
         try:
             from rich.console import Console

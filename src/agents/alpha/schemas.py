@@ -13,14 +13,14 @@ class AlphaInput(BaseModel):
 
     @field_validator("query")
     @classmethod
-    def validate_query(cls, v):
+    def validate_query(cls, v: str):
         if not v or not v.strip():
             raise ValueError("Query cannot be empty")
         return v.strip()
 
     @field_validator("context")
     @classmethod
-    def validate_context(cls, v):
+    def validate_context(cls, v: str | None):
         if v:
             return v.strip()
         return v

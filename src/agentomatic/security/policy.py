@@ -36,8 +36,8 @@ class AgentSecurityPolicy(BaseModel):
     require_auth: bool = False
     allowed_roles: list[str] = Field(default_factory=list)
     allowed_scopes: list[str] = Field(default_factory=list)
-    max_execution_time: float = Field(30.0, gt=0)
-    max_tokens_per_request: int = Field(8192, ge=1)
+    max_execution_time: float = Field(default=30.0, gt=0)
+    max_tokens_per_request: int = Field(default=8192, ge=1)
     allowed_tools: list[str] | None = None
     blocked_tools: list[str] = Field(default_factory=list)
     env_vars_whitelist: list[str] | None = None

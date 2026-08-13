@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Regression tests for train/optimize + execution-mode bugfixes.
 
 Covers:
@@ -66,8 +70,8 @@ class _PromptAwareAgent(BaseGraphAgent[_PromptState]):
         }
         return state
 
-    def input_to_state(self, data: dict[str, Any]) -> _PromptState:
-        return _PromptState(request=data.get("current_query") or data.get("query") or "")
+    def input_to_state(self, input_data: dict[str, Any]) -> _PromptState:
+        return _PromptState(request=input_data.get("current_query") or input_data.get("query") or "")
 
     def state_to_output(self, state: _PromptState) -> dict[str, Any]:
         return state.output
@@ -251,7 +255,7 @@ class TestFitterEvalHonesty:
                 RunResult(query="q2", response="r2", expected="e2"),
             ]
 
-        fitter._runner.run_dataset = _fake_run_dataset  # type: ignore[method-assign]
+        fitter._runner.run_dataset = _fake_run_dataset
 
         call_n = {"n": 0}
 

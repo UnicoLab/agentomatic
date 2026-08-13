@@ -102,6 +102,7 @@ class ExperimentTracker:
     def __init__(self, db_path: str = "optimization_results/experiments.db") -> None:
         self._db_path = Path(db_path)
         self._memory_conn: sqlite3.Connection | None = None
+        self._file_conn: sqlite3.Connection | None = None
         if str(db_path) == ":memory:":
             self._memory_conn = self._get_conn()
         else:

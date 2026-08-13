@@ -232,6 +232,13 @@ class PromptFitterBridge:
 
     # Best-config keys we know how to apply back onto an agent.
     _APPLICABLE_KEYS = ("system_prompt", "user_template", "model_choice")
+    # Structured blocks mapped directly (agent-facing attributes).
+    _APPLICABLE_BLOCKS = ("few_shot_examples", "output_contract")
+    # Param dicts flattened into top-level keys so ``compiled_config`` and
+    # ``setattr`` (via ``BaseGraphAgent.fit``) pick them up — e.g.
+    # ``model_params={"temperature": 0.0}`` becomes ``temperature: 0.0``,
+    # matching how :class:`GridSearchOptimizer` applies its configs.
+    _FLATTEN_PARAM_BLOCKS = ("model_params", "rag_params", "tool_params")
 
     def __init__(
         self,
@@ -366,6 +373,31 @@ class PromptFitterBridge:
                 len(baseline_prompt),
             )
 
+        # Same compounding for tuned model params: carry previously-applied
+        # values (e.g. temperature from a param_search epoch) as the fitter's
+        # baseline so flat later epochs cannot regress them.
+        from agentomatic.optimize.search_space import PromptSearchSpace as _Space
+
+        effective_space = overrides.get("search_space") or kwargs.get("search_space") or _Space()
+        baseline_model_params: dict[str, Any] = {}
+        if (
+            isinstance(compiled_cfg, dict)
+            and getattr(effective_space, "optimize_model_params", False)
+        ):
+            param_keys = set(getattr(effective_space, "model_param_space", {}) or {})
+            param_keys.add("temperature")
+            baseline_model_params = {
+                k: v
+                for k, v in compiled_cfg.items()
+                if k in param_keys and v is not None
+            }
+        # Same compounding for few-shot examples accepted by an earlier epoch.
+        baseline_few_shot: list[dict[str, Any]] = []
+        if isinstance(compiled_cfg, dict):
+            raw_few_shot = compiled_cfg.get("few_shot_examples") or []
+            if isinstance(raw_few_shot, list):
+                baseline_few_shot = [fs for fs in raw_few_shot if isinstance(fs, dict)]
+
         return PromptFitter(
             agent=name,
             task_model=kwargs.pop("task_model", self.task_model),
@@ -375,6 +407,8 @@ class PromptFitterBridge:
             llm_base_url=kwargs.pop("llm_base_url", self.llm_base_url),
             llm_api_key=kwargs.pop("llm_api_key", self.llm_api_key),
             baseline_system_prompt=baseline_prompt,
+            baseline_model_params=baseline_model_params,
+            baseline_few_shot_examples=baseline_few_shot,
             **kwargs,
         )
 
@@ -426,13 +460,21 @@ class PromptFitterBridge:
         :meth:`~agentomatic.agents.base.BaseGraphAgent.resolve_system_prompt`
         can pick them up). Attribute assignment is still gated by
         ``hasattr`` inside ``BaseGraphAgent.fit``.
+
+        Besides the plain string keys, structured blocks are returned as-is
+        (``few_shot_examples`` / ``output_contract``) and parameter dicts
+        (``model_params`` / ``rag_params`` / ``tool_params``) are flattened
+        into top-level keys so tuned hyper-parameters (e.g.
+        ``temperature``) are applied back onto the agent — previously only
+        prompt text survived, so ``param_search`` fits never changed agent
+        behaviour.
         """
         best = getattr(result, "best_config", None)
         if best is None:
             return {}
         raw = best.to_dict() if hasattr(best, "to_dict") else dict(getattr(best, "__dict__", {}))
         config: dict[str, Any] = {}
-        for key in cls._APPLICABLE_KEYS:
+        for key in (*cls._APPLICABLE_KEYS, *cls._APPLICABLE_BLOCKS):
             if key not in raw:
                 continue
             value = raw[key]
@@ -441,6 +483,14 @@ class PromptFitterBridge:
             if isinstance(value, str) and not value.strip():
                 continue
             config[key] = value
+        for block in cls._FLATTEN_PARAM_BLOCKS:
+            params = raw.get(block)
+            if not isinstance(params, dict):
+                continue
+            for param_key, param_value in params.items():
+                if param_value is None:
+                    continue
+                config[param_key] = param_value
         return config
 
     @staticmethod

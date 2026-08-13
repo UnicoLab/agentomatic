@@ -22,7 +22,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -237,8 +237,8 @@ class LLMJudgeMetric(BaseMetric):
             name=self.name,
             criteria=self.criteria,
             evaluation_params=[
-                LLMTestCaseParams.INPUT,
-                LLMTestCaseParams.ACTUAL_OUTPUT,
+                getattr(LLMTestCaseParams, "INPUT"),
+                getattr(LLMTestCaseParams, "ACTUAL_OUTPUT"),
             ],
             model=self.model,  # type: ignore[arg-type]
         )
@@ -388,9 +388,9 @@ class GEvalMetric(BaseMetric):
             from deepeval.metrics import GEval
             from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 
-            params = [LLMTestCaseParams.ACTUAL_OUTPUT]
+            params = [getattr(LLMTestCaseParams, "ACTUAL_OUTPUT")]
             if expected:
-                params.append(LLMTestCaseParams.EXPECTED_OUTPUT)
+                params.append(getattr(LLMTestCaseParams, "EXPECTED_OUTPUT"))
 
             metric = GEval(
                 name=self.name,
@@ -719,9 +719,13 @@ def _make_deepeval_metric(name: str, model: LLMSpec, **kwargs: Any) -> BaseMetri
             # Prefer deepeval.evaluate() for richer reporting, fall back
             # to metric.measure() if the top-level function is unavailable.
             try:
-                from deepeval import evaluate as de_evaluate
+                from deepeval import evaluate as _de_evaluate
 
-                results = de_evaluate(  # type: ignore[operator]
+                # mypy resolves ``deepeval.evaluate`` as a module and basedpyright
+                # as a function; cast to Any keeps both happy while preserving
+                # the legacy (<4) kwargs for older deepeval versions.
+                de_evaluate = cast(Any, _de_evaluate)
+                results = de_evaluate(
                     test_cases=[test_case],
                     metrics=[self._metric],
                     print_results=False,
@@ -780,10 +784,11 @@ def resolve_metrics(
     for m in metrics:
         if isinstance(m, BaseMetric):
             resolved.append(m)
-        elif isinstance(m, str):
-            resolved.append(_resolve_single(m, model))
         else:
-            raise TypeError(f"Expected str or BaseMetric, got {type(m)}")
+            m_any: Any = m
+            if not isinstance(m_any, str):
+                raise TypeError(f"Expected str or BaseMetric, got {type(m)}")
+            resolved.append(_resolve_single(m_any, model))
     return resolved
 
 
@@ -1251,7 +1256,7 @@ class LatencyMetric(BaseMetric):
         """Extract latency from context metadata."""
         if context:
             for item in context:
-                if isinstance(item, str) and item.startswith("latency:"):
+                if item.startswith("latency:"):
                     try:
                         return float(item.split(":", 1)[1])
                     except (ValueError, IndexError):
@@ -1331,7 +1336,7 @@ class CostMetric(BaseMetric):
         """Extract token count from context or estimate from response."""
         if context:
             for item in context:
-                if isinstance(item, str) and item.startswith("tokens:"):
+                if item.startswith("tokens:"):
                     try:
                         return int(item.split(":", 1)[1])
                     except (ValueError, IndexError):

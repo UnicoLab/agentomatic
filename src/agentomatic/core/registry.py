@@ -279,16 +279,18 @@ class AgentRegistry:
             return None
 
     def _discover_schemas(self, module_path: str, agent_name: str) -> Any:
-        """Try to import Request/Response schemas from agent's ``schemas.py``."""
-        try:
-            schemas_mod = importlib.import_module(f"{module_path}.schemas")
-            # Convention: {Title}Request and {Title}Response
-            title = agent_name.title().replace("_", "")
-            request_model = getattr(schemas_mod, f"{title}Request", None)
-            response_model = getattr(schemas_mod, f"{title}Response", None)
-            if request_model or response_model:
-                from agentomatic.core.schemas import SchemaValidator
+        """Try to import Request/Response schemas from agent's ``schemas.py``.
 
+        Supports the documented naming conventions (``{Title}Request`` /
+        ``{Title}Response``, ``{Title}Input`` / ``{Title}Output``,
+        ``CustomInvokeRequest`` / ``CustomInvokeResponse``, etc.) via
+        :func:`~agentomatic.core.schemas.load_schema_models`.
+        """
+        try:
+            from agentomatic.core.schemas import SchemaValidator, load_schema_models
+
+            request_model, response_model = load_schema_models(module_path, agent_name)
+            if request_model or response_model:
                 return SchemaValidator(
                     request_model=request_model,
                     response_model=response_model,
@@ -491,7 +493,7 @@ class AgentRegistry:
 
     @staticmethod
     def _instantiate_class_agent(
-        cls: type,
+        agent_class: type,
         *,
         llm: Any = None,
         prompt_manager: Any = None,
@@ -500,7 +502,7 @@ class AgentRegistry:
         import inspect
 
         try:
-            sig = inspect.signature(cls)
+            sig = inspect.signature(agent_class)
             params = dict(sig.parameters)
         except (TypeError, ValueError):
             params = {}
@@ -513,12 +515,12 @@ class AgentRegistry:
             kwargs["prompt_manager"] = prompt_manager
 
         try:
-            return cls(**kwargs)
+            return agent_class(**kwargs)
         except TypeError:
             # Older agents that only take llm=
             if "llm" in kwargs and "prompt_manager" in kwargs:
                 try:
-                    return cls(llm=kwargs["llm"])
+                    return agent_class(llm=kwargs["llm"])
                 except TypeError:
                     pass
-            return cls()
+            return agent_class()

@@ -512,8 +512,7 @@ class ProgressLogger(Callback):
 
     def on_iteration_end(self, ctx: CallbackContext) -> None:
         self._prev_scores.append(ctx.current_score)
-        # Use ``is not None`` — a legitimate best_score of 0.0 is falsy.
-        delta = ctx.current_score - ctx.best_score if ctx.best_score is not None else 0.0
+        delta = ctx.current_score - ctx.best_score
         arrow = "▲" if delta > 0 else "▼" if delta < 0 else "─"
         spark = (
             _spark(self._prev_scores, width=self.show_delta_chars) if self.show_delta_chars else ""

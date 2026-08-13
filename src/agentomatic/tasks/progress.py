@@ -148,8 +148,8 @@ def install_task_progress_bridge(platform_or_manager: Any) -> None:
         def _register_and_wrap(target_type: Any, dispatcher: Any) -> None:
             original_register(target_type, _wrap_dispatcher(dispatcher))
 
-        _register_and_wrap._agentomatic_progress_wrapped = True  # type: ignore[attr-defined]
-        manager.register_dispatcher = _register_and_wrap  # type: ignore[method-assign]
+        setattr(_register_and_wrap, "_agentomatic_progress_wrapped", True)
+        manager.register_dispatcher = _register_and_wrap
 
     manager._agentomatic_task_progress_wrapped = True
     _INSTALLED = True

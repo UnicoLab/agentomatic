@@ -1,7 +1,12 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for ordered LLM fallback chains."""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from types import SimpleNamespace
 
 import pytest
@@ -70,7 +75,7 @@ class _AlwaysEmpty:
 
 
 @pytest.fixture(autouse=True)
-def _reset_llm_singleton() -> None:
+def _reset_llm_singleton() -> Iterator[None]:
     reset_llm()
     yield
     reset_llm()

@@ -21,10 +21,10 @@ class APIResponse(BaseModel):
     success: bool = True
     data: Any = None
     message: str = ""
-    timestamp: float = None
+    timestamp: float | None = None
     request_id: str | None = None
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         if "timestamp" not in kwargs:
             kwargs["timestamp"] = time.time()
         super().__init__(**kwargs)
@@ -59,7 +59,7 @@ def handle_api_errors(func: Callable) -> Callable:
     """Decorator to handle API errors gracefully."""
 
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any):
         try:
             return await func(*args, **kwargs)
         except HTTPException:
@@ -78,7 +78,7 @@ def log_api_call(func: Callable) -> Callable:
     """Decorator to log API calls."""
 
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any):
         start_time = time.time()
         try:
             result = await func(*args, **kwargs)
@@ -99,7 +99,7 @@ def rate_limit(max_calls: int = 100, window_seconds: int = 60) -> Callable:
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any):
             current_time = time.time()
             client_ip = "default"  # Simplified for testing
 
@@ -131,7 +131,7 @@ def validate_streaming_support(func: Callable) -> Callable:
     """Decorator to validate streaming support."""
 
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any):
         return await func(*args, **kwargs)
 
     return wrapper

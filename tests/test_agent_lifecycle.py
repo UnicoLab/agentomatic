@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the Keras-style agent training lifecycle (Phase 6).
 
 Covers the History record, Callback / EarlyStopping hooks, the Loss
@@ -233,7 +237,9 @@ class TestFit:
         agent = EchoAgent()
         agent.compile(_dataset(), metrics=[], optimizer=NoOpOptimizer())
         history = agent.fit(epochs=2, verbose=0)
-        assert len(history.epoch) == 2
+        # Optimizer active → History starts with a pre-fit baseline row (-1).
+        assert len(history.epoch) == 3
+        assert history.epoch[0] == -1
 
 
 # ---------------------------------------------------------------------------

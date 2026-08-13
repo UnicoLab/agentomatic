@@ -1,3 +1,4 @@
+# mypy: disable-error-code="misc"
 """OpenTelemetry auto-instrumentation for agentomatic.
 
 Auto-configures tracing and metrics for all agent invocations.
@@ -25,12 +26,12 @@ Environment variables:
 
 from __future__ import annotations
 
-import asyncio
 import functools
+import inspect
 import os
 import time
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from loguru import logger
 
@@ -65,6 +66,11 @@ try:
     HAS_OTEL = True
 except ImportError:
     HAS_OTEL = False
+    trace = cast(Any, None)
+    Resource = cast(Any, None)
+    TracerProvider = cast(Any, None)
+    BatchSpanProcessor = cast(Any, None)
+    StatusCode = cast(Any, None)
 
 # Module-level tracer singleton
 _tracer: Any | None = None
@@ -284,7 +290,7 @@ def traced(name: str | None = None) -> Callable[[F], F]:
                     span.record_exception(exc)
                     raise
 
-        if asyncio.iscoroutinefunction(fn):
+        if inspect.iscoroutinefunction(fn):
             return _async_wrapper  # type: ignore[return-value]
         return _sync_wrapper  # type: ignore[return-value]
 

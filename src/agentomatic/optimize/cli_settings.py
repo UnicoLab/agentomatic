@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, cast
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -124,7 +124,9 @@ class TrainCliSettings(BaseSettings):
             Parsed settings instance.
         """
         args = list(sys.argv[1:] if argv is None else argv)
-        return cls(_cli_parse_args=args)
+        # ``_cli_parse_args`` is a runtime-only pydantic-settings init kwarg
+        # (not part of the typed signature), so pass it via **kwargs.
+        return cls(**{"_cli_parse_args": cast(Any, args)})
 
     def to_train_config(
         self,
@@ -247,7 +249,9 @@ class EvalCliSettings(BaseSettings):
             Parsed settings instance.
         """
         args = list(sys.argv[1:] if argv is None else argv)
-        return cls(_cli_parse_args=args)
+        # ``_cli_parse_args`` is a runtime-only pydantic-settings init kwarg
+        # (not part of the typed signature), so pass it via **kwargs.
+        return cls(**{"_cli_parse_args": cast(Any, args)})
 
     def to_eval_config(
         self,

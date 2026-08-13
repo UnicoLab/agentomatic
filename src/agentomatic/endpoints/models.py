@@ -38,28 +38,30 @@ class UpstreamAuthConfig(BaseModel):
     type: AuthType = AuthType.NONE
 
     # api_key / bearer
-    api_key: str = Field("", description="API key or token value (supports ${ENV}).")
+    api_key: str = Field(default="", description="API key or token value (supports ${ENV}).")
     header_name: str = Field(
-        "Authorization",
+        default="Authorization",
         description="Header used to carry the credential (api_key/bearer).",
     )
     header_prefix: str = Field(
-        "Bearer",
+        default="Bearer",
         description="Prefix prepended to the credential value (e.g. 'Bearer').",
     )
 
     # basic
-    username: str = Field("", description="Basic-auth username (supports ${ENV}).")
-    password: str = Field("", description="Basic-auth password (supports ${ENV}).")
+    username: str = Field(default="", description="Basic-auth username (supports ${ENV}).")
+    password: str = Field(default="", description="Basic-auth password (supports ${ENV}).")
 
     # oauth2 client credentials
-    token_url: str = Field("", description="OAuth2 token endpoint (supports ${ENV}).")
-    client_id: str = Field("", description="OAuth2 client id (supports ${ENV}).")
-    client_secret: str = Field("", description="OAuth2 client secret (supports ${ENV}).")
-    scope: str = Field("", description="Optional OAuth2 scope(s), space-delimited.")
-    audience: str = Field("", description="Optional OAuth2 audience claim.")
+    token_url: str = Field(default="", description="OAuth2 token endpoint (supports ${ENV}).")
+    client_id: str = Field(default="", description="OAuth2 client id (supports ${ENV}).")
+    client_secret: str = Field(
+        default="", description="OAuth2 client secret (supports ${ENV})."
+    )
+    scope: str = Field(default="", description="Optional OAuth2 scope(s), space-delimited.")
+    audience: str = Field(default="", description="Optional OAuth2 audience claim.")
     token_leeway: int = Field(
-        30,
+        default=30,
         ge=0,
         description="Seconds subtracted from token expiry to trigger early refresh.",
     )

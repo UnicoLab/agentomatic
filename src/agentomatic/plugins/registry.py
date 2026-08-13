@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import types
 from pathlib import Path
 from typing import Any
 
@@ -149,7 +150,7 @@ class PluginRegistry:
         except ImportError as exc:
             logger.warning(f"  ⚠️ Could not import {module_path}: {exc}")
 
-    def _register_subclasses(self, mod) -> None:
+    def _register_subclasses(self, mod: types.ModuleType) -> None:
         """Find and register any BaseMLPlugin subclasses in the module."""
         for attr_name in dir(mod):
             attr = getattr(mod, attr_name)

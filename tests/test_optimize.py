@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for agentomatic.optimize module."""
 
 from __future__ import annotations
@@ -221,7 +225,7 @@ class TestResolveMetrics:
 
     def test_resolve_wrong_type(self):
         with pytest.raises(TypeError):
-            resolve_metrics([123])  # type: ignore
+            resolve_metrics([123])
 
 
 # =====================================================================

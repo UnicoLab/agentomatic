@@ -34,7 +34,7 @@ _STRUCTURAL_KEYS = frozenset(
 
 
 def build_invoke_state(
-    payload: dict[str, Any] | Any,
+    payload: Any,
     *,
     default_thread_id: str | None = None,
     prompt_version: str | None = None,

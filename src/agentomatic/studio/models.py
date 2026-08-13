@@ -69,7 +69,7 @@ class StudioGraphEdge(BaseModel):
     id: str = Field(..., description="Unique edge identifier")
     source: str = Field(..., description="Source node ID")
     target: str = Field(..., description="Target node ID")
-    condition: str | None = Field(None, description="Condition label for conditional edges")
+    condition: str | None = Field(default=None, description="Condition label for conditional edges")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -79,7 +79,7 @@ class StudioGraphTopology(BaseModel):
     agent_name: str = Field(..., description="Agent this topology belongs to")
     nodes: list[StudioGraphNode] = Field(default_factory=list)
     edges: list[StudioGraphEdge] = Field(default_factory=list)
-    entry_point: str | None = Field(None, description="ID of the entry node")
+    entry_point: str | None = Field(default=None, description="ID of the entry node")
     end_points: list[str] = Field(default_factory=list, description="IDs of terminal nodes")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -89,12 +89,36 @@ class StudioGraphTopology(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class StudioSchemaSource(BaseModel):
+    """How an agent's input/output JSON Schema was resolved."""
+
+    source: str = Field(
+        "default",
+        description="'custom' when the agent declares its own schema, else 'default'",
+    )
+    model: str = Field("", description="Pydantic model class name that produced the schema")
+    convention: str = Field(
+        "",
+        description=(
+            "How the schema was discovered, e.g. 'schema_validator', "
+            "'schemas.{Module}.{Model}', or 'default'"
+        ),
+    )
+
+
 class StudioAgentSchemas(BaseModel):
     """JSON Schema definitions for agent input and output models."""
 
     input_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for input")
     output_schema: dict[str, Any] = Field(
         default_factory=dict, description="JSON Schema for output"
+    )
+    schema_source: dict[str, StudioSchemaSource] = Field(
+        default_factory=dict,
+        description=(
+            "Per-side ('input' / 'output') resolution info: custom vs default "
+            "and the Pydantic model name"
+        ),
     )
 
 
@@ -114,7 +138,7 @@ class StudioRunRequest(BaseModel):
 
     query: str = Field(..., description="User query or input text")
     user_id: str = Field("default-user", description="User identifier")
-    thread_id: str | None = Field(None, description="Thread ID for conversation continuity")
+    thread_id: str | None = Field(default=None, description="Thread ID for conversation continuity")
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
     prompt_version: str = Field("v1", description="Prompt version to use")
@@ -145,9 +169,9 @@ class StudioRunEvent(BaseModel):
     )
     run_id: str = Field(..., description="Run this event belongs to")
     timestamp: str = Field(..., description="ISO-8601 timestamp")
-    node: str | None = Field(None, description="Node name (if event is node-scoped)")
+    node: str | None = Field(default=None, description="Node name (if event is node-scoped)")
     data: dict[str, Any] = Field(default_factory=dict, description="Event payload")
-    duration_ms: float | None = Field(None, description="Duration in milliseconds")
+    duration_ms: float | None = Field(default=None, description="Duration in milliseconds")
 
 
 class StudioRunInfo(BaseModel):
@@ -155,18 +179,18 @@ class StudioRunInfo(BaseModel):
 
     id: str = Field(..., description="Unique run identifier")
     agent_name: str = Field(..., description="Agent that was executed")
-    thread_id: str | None = Field(None, description="Conversation thread ID")
+    thread_id: str | None = Field(default=None, description="Conversation thread ID")
     status: str = Field(
         "pending",
         description="Run status: 'pending', 'running', 'completed', 'failed', 'cancelled', 'paused'",
     )
     created_at: str = Field(..., description="ISO-8601 creation timestamp")
-    completed_at: str | None = Field(None, description="ISO-8601 completion timestamp")
-    duration_ms: float | None = Field(None, description="Total duration in milliseconds")
+    completed_at: str | None = Field(default=None, description="ISO-8601 completion timestamp")
+    duration_ms: float | None = Field(default=None, description="Total duration in milliseconds")
     events: list[StudioRunEvent] = Field(default_factory=list)
     input: dict[str, Any] = Field(default_factory=dict)
     output: dict[str, Any] = Field(default_factory=dict)
-    error: str | None = Field(None, description="Error message if status is 'failed'")
+    error: str | None = Field(default=None, description="Error message if status is 'failed'")
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +202,7 @@ class StudioBreakpoint(BaseModel):
     """A breakpoint definition on a graph node."""
 
     node: str = Field(..., description="Node name to break at")
-    condition: str | None = Field(None, description="Optional condition expression")
+    condition: str | None = Field(default=None, description="Optional condition expression")
     enabled: bool = Field(True, description="Whether the breakpoint is active")
 
 
@@ -194,7 +218,7 @@ class StudioStateSnapshot(BaseModel):
     agent_name: str = Field(..., description="Agent name")
     state: dict[str, Any] = Field(default_factory=dict, description="Full state dict")
     timestamp: str = Field(..., description="ISO-8601 snapshot timestamp")
-    checkpoint_id: str | None = Field(None, description="Checkpoint ID if backed by storage")
+    checkpoint_id: str | None = Field(default=None, description="Checkpoint ID if backed by storage")
 
 
 class StudioStateUpdate(BaseModel):
@@ -216,5 +240,5 @@ class StudioCheckpoint(BaseModel):
     step: int = Field(0, description="Step number in the execution")
     state: dict[str, Any] = Field(default_factory=dict, description="Checkpoint state")
     metadata: dict[str, Any] = Field(default_factory=dict)
-    parent_id: str | None = Field(None, description="Parent checkpoint ID")
+    parent_id: str | None = Field(default=None, description="Parent checkpoint ID")
     timestamp: str = Field(..., description="ISO-8601 timestamp")

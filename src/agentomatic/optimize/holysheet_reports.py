@@ -424,7 +424,7 @@ def build_fit_holysheet_report(
         hist_keys = [k for k in preferred if k in keras_history] + [
             k for k in keras_history if k not in preferred
         ]
-        n = max((len(v) for v in keras_history.values() if isinstance(v, list)), default=0)
+        n = max((len(v) for v in keras_history.values()), default=0)
         if n:
             rows = []
             for i in range(n):

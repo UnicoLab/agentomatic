@@ -49,7 +49,7 @@ class PromptManager:
             return prompt_data.get("template")
         return None
 
-    def format_prompt(self, version: str = "v1", **kwargs) -> str | None:
+    def format_prompt(self, version: str = "v1", **kwargs: Any) -> str | None:
         """Format prompt with context variables.
 
         Args:
@@ -68,6 +68,21 @@ class PromptManager:
         except Exception as e:
             logger.error(f"Failed to format prompt {self.agent_name}/{version}: {e}")
             return None
+
+    def get_prompt_info(self, version: str) -> dict[str, Any] | None:
+        """Get metadata for a prompt version, or None if not found.
+
+        Args:
+            version: Prompt version to inspect
+
+        Returns:
+            The raw prompt data dict (e.g. ``{"description": ..., "template": ...}``)
+            or None if the version does not exist.
+        """
+        prompt_data = self._prompts.get(version)
+        if isinstance(prompt_data, dict):
+            return prompt_data
+        return None
 
     def list_versions(self) -> list[str]:
         """List all available prompt versions."""

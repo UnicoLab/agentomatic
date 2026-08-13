@@ -12,7 +12,7 @@ try:
 except ImportError:
     HAS_LANGGRAPH = False
 
-    def add_messages(left, right):  # type: ignore[misc]
+    def add_messages(left: Any, right: Any, /) -> Any:
         """Fallback: simple list concatenation."""
         if left is None:
             return right if right is not None else []
@@ -21,8 +21,12 @@ except ImportError:
         return left + right
 
 
-def _merge_dicts(left: dict, right: dict) -> dict:
-    """Merge two dicts (last-writer-wins per key)."""
+def _merge_dicts(left: dict | None, right: dict | None) -> dict:
+    """Merge two dicts (last-writer-wins per key).
+
+    ``None`` values (e.g. when a reducer runs before any writer produced
+    a dict) are treated as empty dicts.
+    """
     if left is None:
         return right or {}
     if right is None:

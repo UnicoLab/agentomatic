@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for LLM ``_build_llm`` base_url / api_base / openai_compatible support."""
 
 from __future__ import annotations
@@ -43,8 +47,8 @@ def _patch_langchain_openai(monkeypatch):
     import types
 
     fake_module = types.ModuleType("langchain_openai")
-    fake_module.ChatOpenAI = _FakeChatOpenAI  # type: ignore[attr-defined]
-    fake_module.AzureChatOpenAI = _FakeAzureChatOpenAI  # type: ignore[attr-defined]
+    fake_module.ChatOpenAI = _FakeChatOpenAI
+    fake_module.AzureChatOpenAI = _FakeAzureChatOpenAI
     monkeypatch.setitem(sys.modules, "langchain_openai", fake_module)
     return fake_module
 

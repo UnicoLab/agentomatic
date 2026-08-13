@@ -117,8 +117,8 @@ class _EchoAgent(BaseGraphAgent[_State]):
         }
         return state
 
-    def input_to_state(self, data: dict[str, Any]) -> _State:
-        return _State(request=data.get("current_query") or data.get("query") or "")
+    def input_to_state(self, input_data: dict[str, Any]) -> _State:
+        return _State(request=input_data.get("current_query") or input_data.get("query") or "")
 
     def state_to_output(self, state: _State) -> dict[str, Any]:
         return state.output

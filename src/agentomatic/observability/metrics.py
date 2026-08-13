@@ -1,10 +1,11 @@
+# mypy: disable-error-code="misc"
 """Prometheus metrics with graceful fallback."""
 
 from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 try:
@@ -13,6 +14,9 @@ try:
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
+    Counter = cast(Any, None)
+    Gauge = cast(Any, None)
+    Histogram = cast(Any, None)
 
 
 class _DummyMetric:

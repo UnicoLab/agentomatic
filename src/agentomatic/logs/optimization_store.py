@@ -95,11 +95,10 @@ class OptimizationRunStore:
         if not learnings:
             learnings = list(result.suggestions or [])
             for cluster in result.failure_clusters or []:
-                if isinstance(cluster, dict):
-                    label = cluster.get("label") or cluster.get("pattern")
-                    fix = cluster.get("fix") or cluster.get("recommendation")
-                    if label or fix:
-                        learnings.append(f"{label}: {fix}" if fix else str(label))
+                label = cluster.get("label") or cluster.get("pattern")
+                fix = cluster.get("fix") or cluster.get("recommendation")
+                if label or fix:
+                    learnings.append(f"{label}: {fix}" if fix else str(label))
 
         artefacts: dict[str, Any] = {
             "metric_deltas": result.metric_deltas,

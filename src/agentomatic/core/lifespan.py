@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -44,7 +44,7 @@ async def create_lifespan(
     settings: Any,
     on_startup: list[Callable[..., Any]] | None = None,
     on_shutdown: list[Callable[..., Any]] | None = None,
-) -> AsyncIterator[Callable[[FastAPI], Any]]:
+) -> AsyncGenerator[Callable[[FastAPI], Any], None]:
     """Create a FastAPI lifespan context manager.
 
     .. deprecated::

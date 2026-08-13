@@ -1,8 +1,12 @@
 """Simplified FastAPI router for Beta agent."""
 
+from typing import cast
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from pydantic import ValidationError
+
+from src.common.base_agent import BaseAgent
 
 from ...app.dependencies import agent_registry
 from .schemas import BetaInput, BetaOutput
@@ -19,7 +23,9 @@ def get_beta_agent():
 
 
 @router.post("/invoke", response_model=BetaOutput)
-async def invoke_beta_agent(input_data: BetaInput, agent=Depends(get_beta_agent)) -> BetaOutput:
+async def invoke_beta_agent(
+    input_data: BetaInput, agent: BaseAgent = Depends(get_beta_agent)
+) -> BetaOutput:
     """Invoke Beta agent with comprehensive validation."""
     try:
         # Validate input data (Pydantic does this automatically)
@@ -41,7 +47,7 @@ async def invoke_beta_agent(input_data: BetaInput, agent=Depends(get_beta_agent)
 
         result = await agent.run(input_data)
         logger.info("Beta agent completed analysis successfully")
-        return result
+        return cast(BetaOutput, result)
 
     except ValidationError as e:
         logger.error(f"Beta agent validation error: {e}")
@@ -59,7 +65,7 @@ async def invoke_beta_agent(input_data: BetaInput, agent=Depends(get_beta_agent)
 
 
 @router.get("/health")
-async def beta_health(agent=Depends(get_beta_agent)):
+async def beta_health(agent: BaseAgent = Depends(get_beta_agent)):
     """Check Beta agent health."""
     try:
         health = await agent.health_check()

@@ -178,7 +178,7 @@ def collect_feedback(
 
     def decorator(fn: F) -> F:
         @functools.wraps(fn)
-        async def wrapper(state: dict, *args, **kwargs):
+        async def wrapper(state: dict, *args: Any, **kwargs: Any):
             result = await fn(state, *args, **kwargs)
             if log:
                 query = state.get("current_query", "")

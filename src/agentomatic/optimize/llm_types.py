@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 # =====================================================================
 # Protocol / Type Alias
@@ -175,7 +175,7 @@ async def call_llm(
         # ── Sync callable ────────────────────────────────────────
         if callable(model):
             result = await asyncio.to_thread(
-                model,  # type: ignore[arg-type]
+                cast(Any, model),
                 prompt,
                 system_prompt=system_prompt,
             )
@@ -266,7 +266,7 @@ async def call_llm_json(
             end = text.rfind("}")
             if start == -1 or end == -1 or end <= start:
                 raise ValueError("No JSON object delimiters found")
-            return json.loads(text[start : end + 1])  # type: ignore[no-any-return]
+            return json.loads(text[start : end + 1])
         except (json.JSONDecodeError, ValueError) as exc:
             last_error = str(exc)
             logger.debug(f"JSON parse attempt {attempt + 1} failed: {exc}")

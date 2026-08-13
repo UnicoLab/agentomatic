@@ -25,8 +25,10 @@ def test_promote_and_current_dir(tmp_path: Path) -> None:
 
     registry.promote(version)
     assert registry.current_version() == version
-    assert registry.current_dir() == cand
-    assert (registry.current_dir() / "model.bin").read_bytes() == b"weights-v1"
+    cur_dir = registry.current_dir()
+    assert cur_dir == cand
+    assert cur_dir is not None
+    assert (cur_dir / "model.bin").read_bytes() == b"weights-v1"
 
     manifest = registry.manifest()
     assert manifest is not None
@@ -46,12 +48,18 @@ def test_rollback_retires_previous_active(tmp_path: Path) -> None:
     registry.promote(v1)
     registry.promote(v2)
     assert registry.current_version() == v2
-    assert registry.manifest(v1)["status"] == "retired"
+    v1_manifest = registry.manifest(v1)
+    assert v1_manifest is not None
+    assert v1_manifest["status"] == "retired"
 
     registry.rollback(v1)
     assert registry.current_version() == v1
-    assert registry.manifest(v1)["status"] == "active"
-    assert registry.manifest(v2)["status"] == "retired"
+    v1_active = registry.manifest(v1)
+    v2_manifest = registry.manifest(v2)
+    assert v1_active is not None
+    assert v1_active["status"] == "active"
+    assert v2_manifest is not None
+    assert v2_manifest["status"] == "retired"
 
 
 def test_promote_unknown_raises(tmp_path: Path) -> None:

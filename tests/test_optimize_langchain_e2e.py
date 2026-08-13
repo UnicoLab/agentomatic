@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """End-to-end tests proving the new optimize + LangChain stack works.
 
 Runs fully offline (no HTTP LLM server): local echo agents, ExactMatchMetric,
@@ -375,7 +379,7 @@ class TestTrainCliE2E:
         # Patch PromptFitter inside _do_train to use echo optimizer + exact match.
         real_fitter_cls = PromptFitter
 
-        class PatchedFitter(real_fitter_cls):  # type: ignore[misc,valid-type]
+        class PatchedFitter(real_fitter_cls):
             def __init__(self, *a: Any, **kw: Any) -> None:
                 kw["optimizer"] = EchoOptimizer()
                 kw["auto_report"] = False
@@ -394,7 +398,7 @@ class TestTrainCliE2E:
 
                 self._runner = AgentRunner(agent=self.agent, agent_callable=_echo)
 
-            async def fit(self, trainset, valset, metric, testset=None):  # type: ignore[override]
+            async def fit(self, trainset, valset, metric, testset=None):
                 # Force ExactMatchMetric so no LLM judge is needed.
                 return await super().fit(trainset, valset, ExactMatchMetric(fuzzy=False), testset)
 
@@ -541,7 +545,7 @@ class TestDiscoveryAndDiversityE2E:
         # Patch PromptFitter used inside evaluate to avoid LLM judge.
         real = PromptFitter
 
-        class OfflineFitter(real):  # type: ignore[misc,valid-type]
+        class OfflineFitter(real):
             def __init__(self, *a: Any, **kw: Any) -> None:
                 kw["optimizer"] = NoopOptimizer()
                 kw["auto_report"] = False
@@ -555,7 +559,7 @@ class TestDiscoveryAndDiversityE2E:
 
                 self._runner = AgentRunner(agent=self.agent, agent_callable=_echo)
 
-            async def _evaluate_config(self, config, dataset, metric):  # type: ignore[override]
+            async def _evaluate_config(self, config, dataset, metric):
                 return await super()._evaluate_config(
                     config, dataset, ExactMatchMetric(fuzzy=False)
                 )

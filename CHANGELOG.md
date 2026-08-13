@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- **Studio schema discovery**: agent input/output schemas now resolve for all
+  supported naming conventions (``{Title}Request``/``{Title}Response``,
+  ``{Title}Input``/``{Title}Output``, ``CustomInvoke*``, ``AgentInput``/``AgentOutput``,
+  etc.) in both the registry ``SchemaValidator`` and the Studio
+  ``GET /studio/agents/{name}/schemas`` endpoint. The schemas response now
+  includes ``schema_source`` metadata (custom vs default, Pydantic model name,
+  convention) so the UI can badge which contract a run executes against.
+
+### Bug Fixes
+
+- Studio no longer falls back to the generic ``AgentInvokeRequest`` for agents
+  that declare ``{Title}Input``/``{Title}Output`` models (e.g. ``alpha``/``beta``),
+  so the debug UI now renders the real per-agent input fields.
+
+
 ## v1.10.0 (2026-07-23)
 
 ### Features

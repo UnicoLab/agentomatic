@@ -341,7 +341,7 @@ class TestVerifyRequest:
         enforcer = ZeroTrustEnforcer(require_auth_globally=True)
         request = _mock_request(claims={"sub": "user1", "roles": [], "scopes": []})
 
-        ok, reason = enforcer.verify_request(request, "agent")
+        ok, _reason = enforcer.verify_request(request, "agent")
         assert ok is True
 
     def test_role_check_passes(self) -> None:

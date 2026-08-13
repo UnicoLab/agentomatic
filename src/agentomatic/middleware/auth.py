@@ -6,6 +6,9 @@ Skips health/readiness probes. Supports both header and query param.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -37,7 +40,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: Any,
         *,
         api_key: str,
         header_name: str = "X-API-Key",
@@ -50,7 +53,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self._query = query_param
         self._skip_paths = skip_paths if skip_paths is not None else _SKIP_PATHS
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         if request.method == "OPTIONS":
             return await call_next(request)
 

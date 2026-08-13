@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the first-class ingestion / RAG ops layer.
 
 Verifies that Agentomatic provides the *packaging* (base class, registry, REST,
@@ -32,8 +36,12 @@ class DocsIngestor(BaseIngestor):
     ingestor_name = "docs"
     ingestor_description = "Reads docs to markdown and 'upserts' them."
 
-    async def setup(self) -> None:
+    def __init__(self) -> None:
+        super().__init__()
         self.store: list[str] = []
+
+    async def setup(self) -> None:
+        self.store = []
 
     async def ingest(self, request, ctx) -> IngestionResult:
         md = _fake_pdf_to_markdown(request.source or "unknown")
@@ -224,11 +232,13 @@ class TestIngestionRoutes:
             task_id = resp.json()["id"]
 
             # Poll the unified task API until terminal.
+            got = None
             for _ in range(50):
                 got = client.get(f"/api/v1/tasks/{task_id}").json()
                 if got["status"] in {"succeeded", "failed"}:
                     break
                 time.sleep(0.02)
+            assert got is not None
             assert got["status"] == "succeeded"
             result = client.get(f"/api/v1/tasks/{task_id}/result").json()
             assert result["result"]["chunks"] > 0
@@ -338,9 +348,11 @@ class TestPlatformIntegration:
             )
             assert submitted.status_code == 202
             task_id = submitted.json()["id"]
+            got = None
             for _ in range(50):
                 got = client.get(f"/api/v1/tasks/{task_id}").json()
                 if got["status"] in {"succeeded", "failed"}:
                     break
                 time.sleep(0.02)
+            assert got is not None
             assert got["status"] == "succeeded"

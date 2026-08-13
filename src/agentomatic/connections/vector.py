@@ -252,10 +252,11 @@ class VectorConnection:
             self._client = self._build_client()
         adapter = _VECTOR_STORE_ADAPTERS.get(str(self.config.provider or "").strip().lower())
         if adapter is not None:
-            self._store = adapter(self.config, self._client)
+            store = adapter(self.config, self._client)
         else:
-            self._store = _GenericVectorStoreAdapter(self.config, self._client)
-        return self._store
+            store = _GenericVectorStoreAdapter(self.config, self._client)
+        self._store = store
+        return store
 
     async def as_store(self) -> VectorStore:
         """Async variant of :meth:`store` that also awaits initialisation."""
@@ -425,7 +426,7 @@ def _host_port(url: str, default_port: int) -> tuple[str, int]:
 
 def _build_qdrant(cfg: VectorConnectionConfig) -> Any:
     try:
-        from qdrant_client import AsyncQdrantClient
+        from qdrant_client import AsyncQdrantClient  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
             "qdrant-client is required for the 'qdrant' provider. "
@@ -440,7 +441,7 @@ def _build_qdrant(cfg: VectorConnectionConfig) -> Any:
 
 def _build_chroma(cfg: VectorConnectionConfig) -> Any:
     try:
-        import chromadb
+        import chromadb  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
             "chromadb is required for the 'chroma' provider. Install with: pip install chromadb"
@@ -454,13 +455,13 @@ def _build_chroma(cfg: VectorConnectionConfig) -> Any:
 
 def _build_weaviate(cfg: VectorConnectionConfig) -> Any:
     try:
-        import weaviate
+        import weaviate  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
             "weaviate-client is required for the 'weaviate' provider. "
             "Install with: pip install weaviate-client"
         ) from exc
-    return weaviate.connect_to_custom(  # type: ignore[attr-defined]
+    return weaviate.connect_to_custom(
         http_host=resolve_env(cfg.url) or "localhost",
         **cfg.options,
     )
@@ -468,7 +469,7 @@ def _build_weaviate(cfg: VectorConnectionConfig) -> Any:
 
 def _build_pinecone(cfg: VectorConnectionConfig) -> Any:
     try:
-        from pinecone import Pinecone
+        from pinecone import Pinecone  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
             "pinecone is required for the 'pinecone' provider. Install with: pip install pinecone"
@@ -478,7 +479,7 @@ def _build_pinecone(cfg: VectorConnectionConfig) -> Any:
 
 def _build_milvus(cfg: VectorConnectionConfig) -> Any:
     try:
-        from pymilvus import MilvusClient
+        from pymilvus import MilvusClient  # pyright: ignore[reportMissingImports]
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
             "pymilvus is required for the 'milvus' provider. Install with: pip install pymilvus"

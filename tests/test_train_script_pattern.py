@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for every API surface used by the train_next.py script pattern.
 
 Covers all imports, helper functions, metric composition, PromptFitterBridge
@@ -86,7 +90,7 @@ def _keyword_score(example: Any, prediction: dict[str, Any]) -> float:
     return sum(1 for t in terms if t.lower() in text) / len(terms)
 
 
-def _json_valid(example: Any, prediction: dict[str, Any]) -> float:
+def _json_valid(example: Any, prediction: Any) -> float:
     return 1.0 if isinstance(prediction, dict) and prediction else 0.0
 
 
@@ -177,35 +181,39 @@ class TestImports:
 
     def test_agents_imports(self):
         from agentomatic.agents import (  # noqa: F401
-            AgentDataset,
-            CallableMetric,
-            EarlyStopping,
-            ExactKeyMatchMetric,
-            MetricLoss,
-            OptimizeMetricAdapter,
-            PromptFitterBridge,
-            WeightedMetric,
+            AgentDataset,  # pyright: ignore[reportUnusedImport]
+            CallableMetric,  # pyright: ignore[reportUnusedImport]
+            EarlyStopping,  # pyright: ignore[reportUnusedImport]
+            ExactKeyMatchMetric,  # pyright: ignore[reportUnusedImport]
+            MetricLoss,  # pyright: ignore[reportUnusedImport]
+            OptimizeMetricAdapter,  # pyright: ignore[reportUnusedImport]
+            PromptFitterBridge,  # pyright: ignore[reportUnusedImport]
+            WeightedMetric,  # pyright: ignore[reportUnusedImport]
         )
 
     def test_optimize_imports(self):
         from agentomatic.optimize import (  # noqa: F401
-            CustomMetric,
-            LocalJudgeMetric,
-            PromptSearchSpace,
-            generate_fit_report,
+            CustomMetric,  # pyright: ignore[reportUnusedImport]
+            LocalJudgeMetric,  # pyright: ignore[reportUnusedImport]
+            PromptSearchSpace,  # pyright: ignore[reportUnusedImport]
+            generate_fit_report,  # pyright: ignore[reportUnusedImport]
         )
 
     def test_stack_imports(self):
-        from agentomatic.stacks.manager import StackManager  # noqa: F401
+        from agentomatic.stacks.manager import (
+            StackManager,  # noqa: F401  # pyright: ignore[reportUnusedImport]
+        )
 
     def test_providers_imports(self):
         from agentomatic.providers import (  # noqa: F401
-            apply_stack_defaults,
-            get_llm_for_agent,
+            apply_stack_defaults,  # pyright: ignore[reportUnusedImport]
+            get_llm_for_agent,  # pyright: ignore[reportUnusedImport]
         )
 
     def test_config_settings_import(self):
-        from agentomatic.config.settings import load_environment  # noqa: F401
+        from agentomatic.config.settings import (
+            load_environment,  # noqa: F401  # pyright: ignore[reportUnusedImport]
+        )
 
 
 # ===========================================================================
@@ -232,7 +240,7 @@ class TestHelperFunctions:
         assert _json_valid(self._ex(), {}) == 0.0
 
     def test_json_valid_non_dict(self):
-        assert _json_valid(self._ex(), "string") == 0.0  # type: ignore[arg-type]
+        assert _json_valid(self._ex(), "string") == 0.0
 
     # --- _keyword_score -----------------------------------------------------
 
@@ -574,11 +582,11 @@ class TestBaseGraphAgentFitInterface:
         from agentomatic.agents.base import BaseGraphAgent
 
         class _Agent(BaseGraphAgent):
-            def input_to_state(self, d):
-                return d
+            def input_to_state(self, input_data):
+                return input_data
 
-            def state_to_output(self, s):
-                return {"content": s.get("current_query", "").upper(), "next_action": "done"}
+            def state_to_output(self, state):
+                return {"content": state.get("current_query", "").upper(), "next_action": "done"}
 
         return _Agent()
 
@@ -782,7 +790,7 @@ class TestFullScriptPatternEndToEnd:
         return AgentDataset(examples=examples, name="test")
 
     def test_metric_loss_computes_without_crash(self):
-        metrics, loss_metric = self._build_metrics_and_loss()
+        _metrics, loss_metric = self._build_metrics_and_loss()
         loss = MetricLoss(loss_metric)
         ex = AgentExample(
             id="e1",
@@ -798,12 +806,12 @@ class TestFullScriptPatternEndToEnd:
         from agentomatic.agents.base import BaseGraphAgent
 
         class EchoAgent(BaseGraphAgent):
-            def input_to_state(self, d):
-                return d
+            def input_to_state(self, input_data):
+                return input_data
 
-            def state_to_output(self, s):
+            def state_to_output(self, state):
                 return {
-                    "content": s.get("current_query", "").upper(),
+                    "content": state.get("current_query", "").upper(),
                     "next_action": "done",
                 }
 

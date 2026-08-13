@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Comprehensive integration tests for agentomatic platform.
 
 Tests the full stack: platform → router → agent → storage → middleware.
@@ -279,6 +283,7 @@ class TestA2ATasks:
     def _poll(self, client, task_id, target="completed", tries=50):
         import time
 
+        data = None
         for _ in range(tries):
             resp = client.get(f"/api/v1/echo/a2a/tasks/{task_id}")
             assert resp.status_code == 200
@@ -286,6 +291,7 @@ class TestA2ATasks:
             if data["status"] in {target, "failed", "canceled"}:
                 return data
             time.sleep(0.02)
+        assert data is not None
         return data
 
     def test_submit_task(self, client):
@@ -470,6 +476,7 @@ class TestPlatformFactory:
             node_fn=fn,
         )
         agent = p._registry.get("schema_test")
+        assert agent is not None
         # Manually inject module path to route builder
         agent.module_path = "tests.test_agent_schemas"
 

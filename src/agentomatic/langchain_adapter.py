@@ -116,7 +116,7 @@ def extract_system_prompt(template: Any, *, default: str = "") -> str:
 
     # ChatPromptTemplate with .messages attribute
     if hasattr(template, "messages"):
-        for msg in template.messages:  # type: ignore[union-attr]
+        for msg in template.messages:
             if _is_system(msg):
                 return _render_text(msg)
 
@@ -164,14 +164,14 @@ def inject_system_prompt(
         return template
 
     try:
-        from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
+        from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
     except ImportError:
         return template
 
     new_messages: list[Any] = []
     replaced = False
 
-    for msg in template.messages:  # type: ignore[union-attr]
+    for msg in template.messages:
         if _is_system(msg) and not replaced:
             try:
                 new_messages.append(SystemMessagePromptTemplate.from_template(new_prompt))

@@ -1,6 +1,12 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the agentomatic.stacks module."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 import yaml
@@ -142,7 +148,7 @@ class TestInterpolateEnv:
 class TestStackManagerLoad:
     """Tests for StackManager.load()."""
 
-    def test_load_from_yaml(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_load_from_yaml(self, tmp_path: Path) -> None:
         stack_data = {
             "name": "test-stack",
             "description": "A test stack",
@@ -167,19 +173,19 @@ class TestStackManagerLoad:
         assert stack.llm["default"].temperature == 0.2
 
     def test_load_missing_file_falls_back_to_builtin(
-        self, tmp_path: pytest.TempPathFactory
+        self, tmp_path: Path
     ) -> None:
         mgr = StackManager(stacks_dir=tmp_path)
         stack = mgr.load("local")
         assert stack.name == "local"
         assert "default" in stack.llm
 
-    def test_load_unknown_stack_returns_minimal(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_load_unknown_stack_returns_minimal(self, tmp_path: Path) -> None:
         mgr = StackManager(stacks_dir=tmp_path)
         stack = mgr.load("totally_unknown")
         assert stack.name == "totally_unknown"
 
-    def test_from_file(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_from_file(self, tmp_path: Path) -> None:
         stack_data = {
             "name": "from-file",
             "llm": {
@@ -202,7 +208,7 @@ class TestStackManagerLoad:
 class TestGetLLMConfig:
     """Tests for StackManager.get_llm_config()."""
 
-    def test_happy_path(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_happy_path(self, tmp_path: Path) -> None:
         stack_data = {
             "name": "llm-test",
             "llm": {
@@ -222,7 +228,7 @@ class TestGetLLMConfig:
         fast = mgr.get_llm_config("fast")
         assert fast.model == "gpt-4o-mini"
 
-    def test_missing_profile_raises(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_missing_profile_raises(self, tmp_path: Path) -> None:
         stack_data = {
             "name": "llm-test",
             "llm": {"default": {"provider": "openai", "model": "gpt-4o"}},
@@ -251,7 +257,7 @@ class TestResolve:
     """Tests for StackManager.resolve()."""
 
     def test_resolve_interpolates_env_vars(
-        self, tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("TEST_API_KEY", "resolved-key-123")
         stack_data = {
@@ -287,7 +293,7 @@ class TestResolve:
 class TestGetAgentLLMConfig:
     """Tests for StackManager.get_agent_llm_config()."""
 
-    def test_returns_override(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_returns_override(self, tmp_path: Path) -> None:
         stack_data = {
             "name": "agent-test",
             "llm": {"default": {"provider": "openai", "model": "gpt-4o"}},
@@ -305,7 +311,7 @@ class TestGetAgentLLMConfig:
         assert override is not None
         assert override.model == "o1-preview"
 
-    def test_returns_none_for_unknown_agent(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_returns_none_for_unknown_agent(self, tmp_path: Path) -> None:
         stack_data = {
             "name": "agent-test",
             "llm": {"default": {"provider": "openai", "model": "gpt-4o"}},

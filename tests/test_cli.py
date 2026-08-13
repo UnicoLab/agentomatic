@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for agentomatic CLI and template engine."""
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ class TestTemplateRegistry:
         assert "custom" in TEMPLATES
 
     def test_template_descriptions(self):
-        for name, desc in TEMPLATES.items():
+        for _name, desc in TEMPLATES.items():
             assert isinstance(desc, str)
             assert len(desc) > 5
 

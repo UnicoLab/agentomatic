@@ -24,7 +24,6 @@ from .models import (
     EndpointStepConfig,
     ErrorPolicy,
     IngestionStepConfig,
-    LoopStepConfig,
     MapStepConfig,
     ParallelStepConfig,
     PipelineConfig,
@@ -357,7 +356,7 @@ def validate_pipeline_draft(config: PipelineConfig) -> tuple[list[str], list[str
                 step, label, index, step_index, upstreams, input_schema, errors, warnings
             )
 
-        elif isinstance(step, LoopStepConfig):
+        else:
             if getattr(step.step, "upstreams", None):
                 warnings.append(
                     f"Step '{step.step.name}' (inside loop '{step.name}') declares "

@@ -91,7 +91,7 @@ class TestInvocationLogRecorder:
     @pytest.mark.asyncio
     async def test_swallows_store_errors(self) -> None:
         store = MemoryStore()
-        store.create_invocation_log = AsyncMock(side_effect=RuntimeError("boom"))  # type: ignore[method-assign]
+        store.create_invocation_log = AsyncMock(side_effect=RuntimeError("boom"))
         recorder = InvocationLogRecorder(store)
         assert await recorder.record(agent_name="x", endpoint="chat") is None
 

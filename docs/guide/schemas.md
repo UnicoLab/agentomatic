@@ -30,16 +30,46 @@ To override these schemas, create a `schemas.py` file inside your agent's direct
 Agentomatic searches `schemas.py` for class definitions matching one of these names (in order):
 1. **`CustomInvokeRequest`**
 2. **`{AgentNameCamel}Request`** (e.g. `SearchBotRequest` for an agent named `search_bot`)
-3. **`AgentInvokeRequest`**
+3. **`{AgentNameCamel}Input`** (e.g. `SearchBotInput`)
+4. **`AgentInput`**
+5. **`AgentInvokeRequest`**
+6. **`Input`**
 
 ### Output Schema Resolution
 Agentomatic searches `schemas.py` for class definitions matching one of these names (in order):
 1. **`CustomInvokeResponse`**
-2. **`{AgentNameCamel}Response`** (e.g. `SearchBotResponse` for an agent named `search_bot`)
-3. **`AgentInvokeResponse`**
+2. **`{AgentNameCamel}Response`** (e.g. `SearchBotResponse`)
+3. **`{AgentNameCamel}Output`** (e.g. `SearchBotOutput`)
+4. **`AgentOutput`**
+5. **`AgentInvokeResponse`**
+6. **`Output`**
+
+> [!TIP]
+> The `Input` / `Output` conventions are fully supported — both `WeatherBotRequest`/`WeatherBotResponse` and `WeatherBotInput`/`WeatherBotOutput` work. The first matching class wins, so pick one convention and stay consistent.
 
 > [!NOTE]
 > If no matching classes are found in `schemas.py`, or if the file does not exist, Agentomatic falls back to the default `AgentInvokeRequest` and `AgentInvokeResponse` models.
+
+### Studio schema provenance
+
+The Studio debug API (`GET /studio/agents/{name}/schemas`) returns each JSON Schema together with a `schema_source` object that tells the UI how it was resolved:
+
+```json
+{
+  "input_schema": { "type": "object", "properties": { ... } },
+  "output_schema": { "type": "object", "properties": { ... } },
+  "schema_source": {
+    "input":  { "source": "custom", "model": "WeatherBotInput",  "convention": "schemas.src.agents.weather_bot.schemas.WeatherBotInput" },
+    "output": { "source": "custom", "model": "WeatherBotOutput", "convention": "schemas.src.agents.weather_bot.schemas.WeatherBotOutput" }
+  }
+}
+```
+
+* `source` is `"custom"` when the agent declares its own schema and `"default"` otherwise.
+* `model` is the Pydantic class name that produced the schema.
+* When a `SchemaValidator` was registered at discovery time, its models take priority and `convention` starts with `schema_validator.` — meaning runtime input validation is active.
+
+Agentomatic Studio uses this metadata to badge the input form and the expected-output panel (`Custom schema · WeatherBotInput` vs `Default schema · AgentInvokeRequest`) so you always know which contract a run is executed against. The input form additionally offers three views — **Form** (typed fields from the schema), **Dict** (generic key/type/value rows for passing any extra fields), and **Raw JSON** — so agents without custom schemas can still receive arbitrary structured input.
 
 ---
 

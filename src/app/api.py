@@ -2,11 +2,13 @@
 
 import importlib
 import pkgutil
-from typing import Any
+from typing import Any, cast
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, status
+from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Path, status
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
+
+from src.common.base_agent import BaseAgent
 
 from ..common.api_decorators import (
     APIResponse,
@@ -230,11 +232,11 @@ def create_api_router() -> APIRouter:
             if prompt_info:
                 prompts_info.append(
                     PromptInfo(
-                        version=prompt_info.version,
-                        description=prompt_info.description,
-                        author=prompt_info.author,
-                        tags=prompt_info.tags,
-                        created_at=prompt_info.created_at.isoformat(),
+                        version=prompt_info.get("version", version),
+                        description=prompt_info.get("description", ""),
+                        author=prompt_info.get("author", ""),
+                        tags=prompt_info.get("tags", []),
+                        created_at=prompt_info.get("created_at", ""),
                     )
                 )
 
@@ -270,11 +272,11 @@ def create_api_router() -> APIRouter:
             data={
                 "content": prompt_content,
                 "info": PromptInfo(
-                    version=prompt_info.version,
-                    description=prompt_info.description,
-                    author=prompt_info.author,
-                    tags=prompt_info.tags,
-                    created_at=prompt_info.created_at.isoformat(),
+                    version=prompt_info.get("version", version),
+                    description=prompt_info.get("description", ""),
+                    author=prompt_info.get("author", ""),
+                    tags=prompt_info.get("tags", []),
+                    created_at=prompt_info.get("created_at", ""),
                 )
                 if prompt_info
                 else None,
@@ -294,7 +296,7 @@ def create_api_router() -> APIRouter:
     @log_api_call
     @rate_limit(max_calls=config.rate_limit_calls, window_seconds=config.rate_limit_window)
     async def invoke_agent_universal(
-        agent_name: str = Path(..., description="Agent name"), request: UniversalAgentInput = ...
+        agent_name: str = Path(..., description="Agent name"), request: UniversalAgentInput = Body(...)
     ):
         """Universal endpoint that can invoke any agent with proper input validation."""
         agent = agent_registry.get_agent(agent_name)
@@ -396,7 +398,7 @@ def create_api_router() -> APIRouter:
 
                 return APIResponse(
                     data=AgentResponse(
-                        output=response_content,
+                        output=cast(str, response_content),
                         agent=agent_name,
                         prompt_version=request.prompt_version,
                         streaming=False,
@@ -426,8 +428,7 @@ def create_api_router() -> APIRouter:
         capabilities = {
             "name": agent_name,
             "type": type(agent).__name__,
-            "streaming_supported": hasattr(agent, "supports_streaming")
-            and agent.supports_streaming,
+            "streaming_supported": bool(getattr(agent, "supports_streaming", False)),
             "prompt_versions": [],
             "input_schema": get_agent_schema_info(agent_name),
             "features": {
@@ -449,7 +450,7 @@ def create_api_router() -> APIRouter:
 
     # === UTILITY FUNCTIONS ===
 
-    async def _process_queued_request(agent, request: AgentRequest, request_id: str):
+    async def _process_queued_request(agent: BaseAgent, request: AgentRequest, request_id: str):
         """Process a queued agent request."""
         try:
             logger.info(f"Processing queued request {request_id}")

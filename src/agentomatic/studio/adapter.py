@@ -68,6 +68,15 @@ class StudioAdapter(ABC):
         """Whether this adapter supports conditional breakpoints."""
         return "breakpoints" in self.capabilities
 
+    @staticmethod
+    def _map_event(lg_event: dict[str, Any]) -> StudioRunEvent | None:
+        """Map a raw framework event to a Studio event.
+
+        Framework adapters (e.g. LangGraph) override this to translate
+        framework-specific events; the default returns ``None`` (not mapped).
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Graph topology
     # ------------------------------------------------------------------
@@ -106,7 +115,8 @@ class StudioAdapter(ABC):
         Yields:
             :class:`StudioRunEvent` instances for each notable step.
         """
-        ...
+        if False:  # pragma: no cover - abstract stub; keeps this an async generator
+            yield
 
     # ------------------------------------------------------------------
     # State inspection

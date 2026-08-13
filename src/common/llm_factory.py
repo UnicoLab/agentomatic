@@ -8,12 +8,25 @@ from typing import Any
 
 from loguru import logger
 
-try:
-    from langchain_core.messages import HumanMessage
-    from langchain_google_vertexai import ChatVertexAI
-    from langchain_ollama import ChatOllama
-except ImportError as e:
-    logger.warning(f"Some LLM dependencies not installed: {e}")
+
+def _import_llm_classes() -> tuple[Any, Any, Any]:
+    """Import optional LLM classes, falling back to ``None`` placeholders."""
+    try:
+        from langchain_core.messages import HumanMessage
+        from langchain_google_vertexai import (
+            ChatVertexAI,  # pyright: ignore[reportDeprecated]  # replacement (langchain_google_genai) not installed yet
+        )
+        from langchain_ollama import ChatOllama
+    except ImportError as e:
+        logger.warning(f"Some LLM dependencies not installed: {e}")
+        return None, None, None
+    return HumanMessage, ChatVertexAI, ChatOllama  # pyright: ignore[reportDeprecated]  # replacement (langchain_google_genai) not installed yet
+
+
+HumanMessage, ChatVertexAI, ChatOllama = _import_llm_classes()
+
+# Union of what langchain chat models can return for a single response.
+LLMContent = str | list[str | dict[Any, Any]]
 
 
 class LLMProvider(Enum):
@@ -32,7 +45,7 @@ class LLMConfig:
     temperature: float = 0.7
     max_tokens: int = 1000
     streaming: bool = False
-    timeout: int = 30
+    timeout: float = 30.0
 
     # Provider-specific configs
     base_url: str | None = None  # For Ollama
@@ -61,7 +74,7 @@ class BaseLLMWrapper(ABC):
 
     def __init__(self, config: LLMConfig):
         self.config = config
-        self._llm = None
+        self._llm: Any = None
         self._initialized = False
 
     @abstractmethod
@@ -71,8 +84,8 @@ class BaseLLMWrapper(ABC):
 
     @abstractmethod
     async def generate(
-        self, prompt: str, streaming: bool = False, **kwargs
-    ) -> str | AsyncGenerator[str, None]:
+        self, prompt: str, streaming: bool = False, **kwargs: Any
+    ) -> LLMContent | AsyncGenerator[LLMContent, None]:
         """Generate response from the LLM."""
         pass
 
@@ -98,7 +111,6 @@ class OllamaWrapper(BaseLLMWrapper):
                 base_url=self.config.base_url or "http://localhost:11434",
                 temperature=self.config.temperature,
                 num_predict=self.config.max_tokens,
-                timeout=self.config.timeout,
             )
             self._initialized = True
             logger.info(f"Initialized Ollama with model: {self.config.model_name}")
@@ -107,8 +119,8 @@ class OllamaWrapper(BaseLLMWrapper):
             raise
 
     async def generate(
-        self, prompt: str, streaming: bool = False, **kwargs
-    ) -> str | AsyncGenerator[str, None]:
+        self, prompt: str, streaming: bool = False, **kwargs: Any
+    ) -> LLMContent | AsyncGenerator[LLMContent, None]:
         """Generate response from Ollama."""
         await self.ensure_initialized()
 
@@ -125,7 +137,7 @@ class OllamaWrapper(BaseLLMWrapper):
             logger.error(f"Ollama generation failed: {e}")
             raise
 
-    async def _stream_generate(self, message) -> AsyncGenerator[str, None]:
+    async def _stream_generate(self, message: Any) -> AsyncGenerator[LLMContent, None]:
         """Stream generate responses from Ollama."""
         try:
             async for chunk in self._llm.astream([message]):
@@ -167,8 +179,8 @@ class GeminiWrapper(BaseLLMWrapper):
             raise
 
     async def generate(
-        self, prompt: str, streaming: bool = False, **kwargs
-    ) -> str | AsyncGenerator[str, None]:
+        self, prompt: str, streaming: bool = False, **kwargs: Any
+    ) -> LLMContent | AsyncGenerator[LLMContent, None]:
         """Generate response from Gemini."""
         await self.ensure_initialized()
 
@@ -185,7 +197,7 @@ class GeminiWrapper(BaseLLMWrapper):
             logger.error(f"Gemini generation failed: {e}")
             raise
 
-    async def _stream_generate(self, message) -> AsyncGenerator[str, None]:
+    async def _stream_generate(self, message: Any) -> AsyncGenerator[LLMContent, None]:
         """Stream generate responses from Gemini."""
         try:
             async for chunk in self._llm.astream([message]):
@@ -222,7 +234,7 @@ class LLMFactory:
 
         # Create new instance
         if config.provider == LLMProvider.OLLAMA:
-            instance = OllamaWrapper(config)
+            instance: BaseLLMWrapper = OllamaWrapper(config)
         elif config.provider == LLMProvider.GEMINI:
             instance = GeminiWrapper(config)
         else:
@@ -245,7 +257,7 @@ class LLMFactory:
 
         # Create new instance without initializing
         if config.provider == LLMProvider.OLLAMA:
-            instance = OllamaWrapper(config)
+            instance: BaseLLMWrapper = OllamaWrapper(config)
         elif config.provider == LLMProvider.GEMINI:
             instance = GeminiWrapper(config)
         else:

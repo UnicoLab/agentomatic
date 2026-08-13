@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for agentomatic v0.6 core module enhancements.
 
 Covers:
@@ -97,13 +101,13 @@ class TestAgentManifestV06:
         m = AgentManifest(name="demo", slug="demo-agent")
 
         with pytest.raises((FrozenInstanceError, AttributeError)):
-            m.name = "changed"  # type: ignore[misc]
+            m.name = "changed"
 
         with pytest.raises((FrozenInstanceError, AttributeError)):
-            m.llm_config = {}  # type: ignore[misc]
+            m.llm_config = {}
 
         with pytest.raises((FrozenInstanceError, AttributeError)):
-            m.delegation_targets = ["x"]  # type: ignore[misc]
+            m.delegation_targets = ["x"]
 
 
 # ===================================================================

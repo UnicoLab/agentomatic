@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Matrix coverage for fitter optimizers + LLM-as-judge metrics.
 
 Proves every registered PromptFitter optimizer name resolves and can run a

@@ -32,11 +32,14 @@ class HttpConnection:
             UpstreamConfig(
                 name=config.name,
                 base_url=config.base_url,
+                path="",
+                method="POST",
                 headers=config.headers,
                 auth=config.auth,
                 timeout=config.timeout,
                 max_retries=config.max_retries,
                 verify_ssl=config.verify_ssl,
+                weight=1.0,
             )
         )
 

@@ -14,14 +14,16 @@ training by flipping ``agent.stop_training``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import difflib
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from .types import AgentExample
 
-    from .types import AgentExample, Metric
+if TYPE_CHECKING:
+    from .types import Metric
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +212,198 @@ class EarlyStopping(Callback):
             )
 
 
+class EpochDiffCallback(Callback):
+    """Print a full per-epoch report: loss + prompt diff + config changes.
+
+    Snapshots the agent's compiled configuration at ``on_epoch_begin``
+    (before the optimizer runs) and, at ``on_epoch_end``, renders a
+    Keras-style report with:
+
+    - the epoch's ``loss`` / ``val_loss`` (and improvement vs. previous epoch)
+    - a unified diff of the system prompt (``-`` removed / ``+`` added lines)
+    - a summary of config changes (temperature, few-shot count, …)
+    - the current best prompt (first lines)
+
+    Every epoch record is also stored in :attr:`per_epoch` (JSON-friendly)
+    so scripts can persist the full change history — the proof that loss
+    descends while the prompt evolves.
+
+    Example::
+
+        from agentomatic import EpochDiffCallback
+        agent.fit(..., callbacks=[EpochDiffCallback(epochs=10)])
+    """
+
+    # Config keys tracked for the changes summary (order matters).
+    _TRACKED_KEYS = (
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "model_choice",
+        "output_contract",
+        "few_shot_examples",
+    )
+    _DEFAULT_LINE = ""
+
+    def __init__(self, epochs: int = 1, prompt_key: str = "system_prompt") -> None:
+        super().__init__()
+        self.epochs = epochs
+        self.prompt_key = prompt_key
+        self.per_epoch: list[dict[str, Any]] = []
+        self._snapshot: dict[str, Any] = {}
+        self._previous_loss: float | None = None
+
+    # ------------------------------------------------------------------
+    # hooks
+    # ------------------------------------------------------------------
+
+    def on_epoch_begin(self, epoch: int, logs: dict[str, float] | None = None) -> None:
+        self._snapshot = self._config_snapshot()
+
+    def on_epoch_end(self, epoch: int, logs: dict[str, float] | None = None) -> None:
+        logs = logs or {}
+        current = self._config_snapshot()
+        changes = self._diff_snapshot(self._snapshot, current)
+        loss = logs.get("loss")
+        val_loss = logs.get("val_loss")
+
+        improvement: float | None = None
+        if loss is not None and self._previous_loss is not None:
+            improvement = float(self._previous_loss) - float(loss)
+        self._previous_loss = float(loss) if loss is not None else self._previous_loss
+
+        self._render(epoch, logs, changes, current, loss, val_loss, improvement)
+        self.per_epoch.append(
+            {
+                "epoch": epoch,
+                "loss": round(float(loss), 6) if loss is not None else None,
+                "val_loss": round(float(val_loss), 6) if val_loss is not None else None,
+                "improvement": round(improvement, 6) if improvement is not None else None,
+                "changes": changes,
+                "prompt": current.get(self.prompt_key, ""),
+            }
+        )
+
+    def on_train_end(self, logs: dict[str, float] | None = None) -> None:
+        self._snapshot = {}
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _config_snapshot(self) -> dict[str, Any]:
+        """Capture the agent's current prompt + tracked config keys."""
+        agent = self.agent
+        snapshot: dict[str, Any] = {}
+        if agent is None:
+            return snapshot
+        compiled = getattr(agent, "compiled_config", None) or {}
+        if isinstance(compiled, dict):
+            prompt = compiled.get(self.prompt_key)
+            if isinstance(prompt, str) and prompt.strip():
+                snapshot[self.prompt_key] = prompt
+            for key in self._TRACKED_KEYS:
+                if key in compiled:
+                    snapshot[key] = compiled[key]
+        attr_prompt = getattr(agent, self.prompt_key, None)
+        if isinstance(attr_prompt, str) and attr_prompt.strip():
+            snapshot.setdefault(self.prompt_key, attr_prompt)
+        return snapshot
+
+    def _diff_snapshot(
+        self,
+        before: dict[str, Any],
+        after: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Compare two snapshots → prompt diff + scalar/list change summary."""
+        changes: dict[str, Any] = {"prompt_diff": [], "params": {}}
+        old_prompt = str(before.get(self.prompt_key, "") or "")
+        new_prompt = str(after.get(self.prompt_key, "") or "")
+        if old_prompt != new_prompt:
+            changes["prompt_diff"] = list(
+                difflib.unified_diff(
+                    old_prompt.splitlines(),
+                    new_prompt.splitlines(),
+                    fromfile="before",
+                    tofile="after",
+                    lineterm="",
+                    n=1,
+                )
+            )
+        for key in self._TRACKED_KEYS:
+            old_val = before.get(key)
+            new_val = after.get(key)
+            if old_val == new_val:
+                continue
+            changes["params"][key] = {"old": old_val, "new": new_val}
+        return changes
+
+    # ------------------------------------------------------------------
+    # rendering
+    # ------------------------------------------------------------------
+
+    def _render(
+        self,
+        epoch: int,
+        logs: dict[str, float],
+        changes: dict[str, Any],
+        current: dict[str, Any],
+        loss: float | None,
+        val_loss: float | None,
+        improvement: float | None,
+    ) -> None:
+        total = max(1, self.epochs)
+        parts: list[str] = [f"\n{'─' * 70}", f"Epoch {epoch + 1}/{total} — report"]
+
+        # Keras-style loss line
+        loss_bits = []
+        if loss is not None:
+            loss_bits.append(f"loss: {loss:.4f}")
+        if val_loss is not None:
+            loss_bits.append(f"val_loss: {val_loss:.4f}")
+        if improvement is not None:
+            arrow = "↓" if improvement > 1e-9 else ("↑" if improvement < -1e-9 else "→")
+            loss_bits.append(f"improvement: {improvement:+.4f} {arrow}")
+        parts.append("  " + "   ".join(loss_bits) if loss_bits else "  (no loss recorded)")
+
+        # Prompt diff (added / removed lines)
+        diff = changes.get("prompt_diff") or []
+        if diff:
+            parts.append("  ── prompt changes (what was modified) ──")
+            for line in diff[:40]:
+                if line.startswith("+") and not line.startswith("+++"):
+                    parts.append(f"    \033[32m{line[:160]}\033[0m")
+                elif line.startswith("-") and not line.startswith("---"):
+                    parts.append(f"    \033[31m{line[:160]}\033[0m")
+                elif line.startswith("@@"):
+                    parts.append(f"    \033[90m{line[:160]}\033[0m")
+                else:
+                    parts.append(f"    {line[:160]}")
+        else:
+            parts.append("  ── prompt changes ── (unchanged)")
+
+        # Config change summary
+        params = changes.get("params") or {}
+        if params:
+            parts.append("  ── config changes ──")
+            for key, delta in params.items():
+                old_v, new_v = delta["old"], delta["new"]
+                if isinstance(old_v, list) or isinstance(new_v, list):
+                    parts.append(
+                        f"    {key}: {len(old_v or [])} → {len(new_v or [])} items"
+                    )
+                else:
+                    parts.append(f"    {key}: {old_v!r} → {new_v!r}")
+
+        # Current best prompt (first lines)
+        prompt = current.get(self.prompt_key, "")
+        if prompt:
+            first_lines = " | ".join(str(prompt).splitlines()[:2])[:200]
+            parts.append(f"  ── current prompt ── {first_lines}")
+
+        logger.info("\n".join(parts))
+
+
 # ---------------------------------------------------------------------------
 # Loss
 # ---------------------------------------------------------------------------
@@ -270,5 +464,8 @@ def resolve_loss(obj: Any) -> Loss | None:
     if hasattr(obj, "score"):
         return MetricLoss(obj)
     if callable(obj):
-        return CallableLoss(obj, name=getattr(obj, "__name__", "loss"))
+        return CallableLoss(
+            cast(Callable[[AgentExample, dict[str, Any]], float], obj),
+            name=getattr(obj, "__name__", "loss"),
+        )
     raise TypeError(f"Cannot interpret {type(obj).__name__} as a Loss")

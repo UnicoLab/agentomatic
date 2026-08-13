@@ -231,7 +231,7 @@ class LogAnalyser:
                 user_prompt,
                 system_prompt=_ANALYSER_SYSTEM,
             )
-            if isinstance(data, dict) and data:
+            if data:
                 return data
             logger.warning("Log analyser LLM returned empty/invalid JSON; using heuristic")
         except Exception as exc:  # noqa: BLE001

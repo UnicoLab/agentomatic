@@ -392,7 +392,7 @@ class Pipeline:
         Returns:
             ``self`` for method chaining.
         """
-        if isinstance(strategy, str):
+        if not isinstance(strategy, ParallelStrategy):
             strategy = ParallelStrategy(strategy)
 
         step_cfg = ParallelStepConfig(

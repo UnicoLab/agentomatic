@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for agentomatic core modules."""
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ class TestAgentManifest:
 
         m = AgentManifest(name="test", slug="test-agent")
         with pytest.raises(AttributeError):
-            m.name = "changed"  # type: ignore
+            m.name = "changed"
 
     def test_full_creation(self):
         from agentomatic.core.manifest import AgentManifest
@@ -92,8 +96,9 @@ class TestAgentRegistry:
         reg._agents["test"] = agent
 
         assert reg.count == 1
-        assert reg.get("test") is not None
-        assert reg.get("test").name == "test"
+        registered = reg.get("test")
+        assert registered is not None
+        assert registered.name == "test"
 
     def test_list_names(self):
         from agentomatic.core.manifest import AgentManifest, RegisteredAgent
@@ -344,6 +349,7 @@ class AgentBConfig(BaseModel):
 
             assert agent_b is not None
             assert agent_b.manifest.is_subagent is True
+            assert agent_b.graph_fn is not None
             assert agent_b.graph_fn() == "mock_graph"
             assert agent_b.router is not None
             assert agent_b.config is not None
@@ -387,11 +393,11 @@ class TestStateReducers:
         pytest.importorskip("langchain_core")
         from langchain_core.messages import AIMessage, HumanMessage
 
-        from agentomatic.core.state import add_messages
+        from agentomatic.core import state
 
         msg1 = HumanMessage(content="hello")
         msg2 = AIMessage(content="hi")
-        res = add_messages([msg1], [msg2])
+        res = getattr(state, "add_messages")([msg1], [msg2])
         assert len(res) == 2
 
 

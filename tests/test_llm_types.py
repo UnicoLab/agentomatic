@@ -1,3 +1,7 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
 """Tests for the pluggable LLM type system (LLMSpec / LLMCallable).
 
 Verifies that:
@@ -143,7 +147,9 @@ class TestCallLlm:
         model = _LangChainLikeAsync()
         # We need langchain_core for this test
         try:
-            from langchain_core.messages import HumanMessage  # noqa: F401
+            from langchain_core.messages import (
+                HumanMessage,  # noqa: F401  # pyright: ignore[reportUnusedImport]
+            )
 
             result = await call_llm(model, "Test prompt")
             assert "LangChain async" in result
@@ -163,13 +169,13 @@ class TestCallLlm:
     async def test_invalid_model_raises(self):
         """Non-string, non-callable should raise TypeError."""
         with pytest.raises(TypeError, match="must be a string"):
-            await call_llm(42, "Hello")  # type: ignore[arg-type]
+            await call_llm(42, "Hello")
 
     @pytest.mark.asyncio
     async def test_none_model_raises(self):
         """None should raise TypeError."""
         with pytest.raises(TypeError, match="must be a string"):
-            await call_llm(None, "Hello")  # type: ignore[arg-type]
+            await call_llm(None, "Hello")
 
     @pytest.mark.asyncio
     async def test_async_callable_exception_returns_empty(self):
@@ -365,9 +371,9 @@ class TestLLMSpecConsumers:
         # Should not raise
         opt = PromptOptimizer(
             agent="test",
-            llm=_async_llm,  # type: ignore[arg-type]
-            rewrite_llm=_async_llm,  # type: ignore[arg-type]
-            eval_llm=_async_llm,  # type: ignore[arg-type]
+            llm=_async_llm,
+            rewrite_llm=_async_llm,
+            eval_llm=_async_llm,
         )
         assert opt.llm is _async_llm
         assert opt.rewrite_llm is _async_llm
@@ -386,14 +392,14 @@ class TestLLMSpecConsumers:
         """DataSynthesizer should accept callable for model."""
         from agentomatic.optimize.synthesizer import DataSynthesizer
 
-        synth = DataSynthesizer(model=_async_llm)  # type: ignore[arg-type]
+        synth = DataSynthesizer(model=_async_llm)
         assert synth.model is _async_llm
 
     def test_iterative_rewrite_accepts_callable(self):
         """IterativeRewrite strategy should accept callable."""
         from agentomatic.optimize.strategies import IterativeRewrite
 
-        strategy = IterativeRewrite(model=_async_llm)  # type: ignore[arg-type]
+        strategy = IterativeRewrite(model=_async_llm)
         assert strategy.model is _async_llm
 
 

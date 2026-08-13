@@ -40,8 +40,11 @@ class OptimizationMixin:
         agent.fit(dataset)
     """
 
-    compiled_config: dict[str, Any]
-    compiled_metadata: dict[str, Any]
+    compiled_config: dict[str, Any] | None = None
+    compiled_metadata: dict[str, Any] | None = None
+    _compile_dataset: AgentDataset | None = None
+    _compile_metrics: list[Metric] | None = None
+    _compile_optimizer: Optimizer | None = None
 
     def compile(
         self,
@@ -61,9 +64,9 @@ class OptimizationMixin:
         Returns:
             Self for method chaining.
         """
-        if not hasattr(self, "compiled_config"):
+        if self.compiled_config is None:
             self.compiled_config = {}
-        if not hasattr(self, "compiled_metadata"):
+        if self.compiled_metadata is None:
             self.compiled_metadata = {}
 
         self.compiled_metadata = {
@@ -83,7 +86,7 @@ class OptimizationMixin:
             self.compiled_metadata["optimizer"],
         )
 
-        return self  # type: ignore[return-value]
+        return self
 
     def fit(
         self,
@@ -122,7 +125,7 @@ class OptimizationMixin:
         logger.info("Running optimizer: {}", type(optimizer).__name__)
         config = optimizer.optimize(self, resolved_dataset, metrics)
 
-        if not hasattr(self, "compiled_config"):
+        if self.compiled_config is None:
             self.compiled_config = {}
         self.compiled_config.update(config)
 
@@ -135,4 +138,4 @@ class OptimizationMixin:
         if hasattr(self, "invalidate_graph"):
             self.invalidate_graph()  # type: ignore[attr-defined]
 
-        return self  # type: ignore[return-value]
+        return self

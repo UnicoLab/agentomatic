@@ -13,7 +13,7 @@ Classes
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -168,8 +168,8 @@ class FailureClusterer:
         # Handle both dict (wrapped) and list responses
         clusters_data: list[dict[str, Any]] = []
         if isinstance(data, list):
-            clusters_data = data  # type: ignore[assignment]
-        elif isinstance(data, dict):
+            clusters_data = cast(Any, data)
+        else:
             # Might be wrapped: {"clusters": [...]} or single cluster
             if "clusters" in data:
                 clusters_data = data["clusters"]

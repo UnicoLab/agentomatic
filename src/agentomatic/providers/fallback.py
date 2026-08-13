@@ -8,6 +8,7 @@ answered.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from loguru import logger
@@ -289,7 +290,7 @@ class FallbackLLM:
         if callable(llm) and not hasattr(llm, "invoke"):
             result = llm(*args, **kwargs)
         else:
-            result = llm.invoke(*args, **kwargs)
+            result = getattr(llm, "invoke")(*args, **kwargs)
         return self._ensure_non_empty(result, label)
 
     async def _invoke_one_async(self, llm: Any, label: str, *args: Any, **kwargs: Any) -> Any:
@@ -297,7 +298,7 @@ class FallbackLLM:
             result = await llm.ainvoke(*args, **kwargs)
         elif callable(llm):
             result = llm(*args, **kwargs)
-            if hasattr(result, "__await__"):
+            if inspect.isawaitable(result):
                 result = await result
         else:
             result = llm.invoke(*args, **kwargs)
