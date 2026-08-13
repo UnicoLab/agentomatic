@@ -1847,6 +1847,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#prove-it-keras-style-loss-curves-with-local-omlx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prove it: Keras-style loss curves with local omlx
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interactive-reports-chart-prompt-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interactive reports (chart + prompt history)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-augmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data augmentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-10-step-fit-loop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3131,6 +3164,39 @@
     <span class="md-ellipsis">
       
         Local-mode Training: compile → fit → evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prove-it-keras-style-loss-curves-with-local-omlx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prove it: Keras-style loss curves with local omlx
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interactive-reports-chart-prompt-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interactive reports (chart + prompt history)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-augmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data augmentation
       
     </span>
   </a>
@@ -4718,6 +4784,143 @@ is a local OpenAI-compatible LLM server (omlx, Ollama, LM Studio, vLLM).</p>
 <p><code>optimize.CompositeMetric</code> is designed for the <code>PromptFitter</code> pipeline (it takes string query/response args). For training loss, use <code>agents.WeightedMetric</code> wrapping <code>OptimizeMetricAdapter</code>-adapted metrics.</p>
 </div>
 <hr />
+<h3 id="prove-it-keras-style-loss-curves-with-local-omlx">Prove it: Keras-style loss curves with local omlx<a class="headerlink" href="#prove-it-keras-style-loss-curves-with-local-omlx" title="Permanent link">&para;</a></h3>
+<p>A ready-to-run showcase lives in
+<a href="https://github.com/UnicoLab/agentomatic/tree/main/examples/keras_optimize_showcase"><code>examples/keras_optimize_showcase/</code></a>
+— a deliberately-bad class-based agent (vague prompt, hot <code>temperature=0.7</code>,
+no few-shot), a fake 20-example dataset, and a <code>train.py</code> that runs the exact
+Keras workflow from the docs:</p>
+<p>from agentomatic import (
+    BaseGraphAgent,
+    EarlyStopping,
+    EpochDiffCallback,
+    MetricLoss,
+    PromptFitterBridge,
+)</p>
+<p>agent = MarkerAgent()                              # bad prompt + bad params
+agent.compile(dataset, metrics=metrics, loss=loss, optimizer=bridge)
+history = agent.fit(
+    dataset,
+    epochs=10,
+    verbose=1,                                     # Keras-like per-epoch log lines
+    validation_data=dataset.validation,            # adds val_* metrics
+    callbacks=[
+        CurriculumCallback(...),                   # raise one requirement per epoch
+        EpochDiffCallback(epochs=10),              # print loss + prompt diff + changes
+        EarlyStopping(monitor="val_loss", patience=3),
+    ],
+)
+print(history.best("val_loss", mode="min"))       # (epoch, best_val_loss)
+report = agent.evaluate(dataset.test, metrics)
+agent.save("compiled/v1")
+<div class="language-text highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>The agent is fully deterministic, so **every point of loss movement is caused
+</span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>by the optimizer changing the prompt / parameters** (the local omlx server is
+</span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>only used for rewriting and failure analysis). A curriculum callback raises
+</span><span id="__span-37-4"><a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>one new quality signal per epoch (four prompt markers, then three temperature
+</span><span id="__span-37-5"><a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a>rungs), so the optimizer must keep discovering new markers — the loss curve
+</span><span id="__span-37-6"><a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>descends step-by-step and the prompt keeps evolving:
+</span><span id="__span-37-7"><a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a>
+</span><span id="__span-37-8"><a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a>![Keras-style loss per epoch, all five optimizer methods](../assets/showcase/loss_curves.svg)
+</span><span id="__span-37-9"><a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a>
+</span><span id="__span-37-10"><a id="__codelineno-37-10" name="__codelineno-37-10" href="#__codelineno-37-10"></a>*Real run (local omlx, `DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx`, 10 epochs, `max_trials=6`):*
+</span><span id="__span-37-11"><a id="__codelineno-37-11" name="__codelineno-37-11" href="#__codelineno-37-11"></a>
+</span><span id="__span-37-12"><a id="__codelineno-37-12" name="__codelineno-37-12" href="#__codelineno-37-12"></a>| Method | Loss per epoch (base → E1 → E2 → … → E10) | What improved |
+</span><span id="__span-37-13"><a id="__codelineno-37-13" name="__codelineno-37-13" href="#__codelineno-37-13"></a>|---|---|---|
+</span><span id="__span-37-14"><a id="__codelineno-37-14" name="__codelineno-37-14" href="#__codelineno-37-14"></a>| `rewrite` | `1.000 → 0.857 → 0.857 → 0.571 → 0.429 → …` | prompt markers `banana` → `strawberry` → `blueberry` → `kiwi` |
+</span><span id="__span-37-15"><a id="__codelineno-37-15" name="__codelineno-37-15" href="#__codelineno-37-15"></a>| `gepa_like` | `1.000 → 1.000 → 0.857 → 0.714 → 0.571 → …` | prompt mutations from failure feedback |
+</span><span id="__span-37-16"><a id="__codelineno-37-16" name="__codelineno-37-16" href="#__codelineno-37-16"></a>| `mipro_like` | `1.000 → 0.857 → 0.857 → 0.571 → 0.429 → 0.286 → 0.143 → 0.000 → …` | markers **and** temperature (`0.7 → 0.02`) |
+</span><span id="__span-37-17"><a id="__codelineno-37-17" name="__codelineno-37-17" href="#__codelineno-37-17"></a>| `few_shot_bootstrap` | `1.000 → 0.857 → …` | few-shot demos carrying the marker |
+</span><span id="__span-37-18"><a id="__codelineno-37-18" name="__codelineno-37-18" href="#__codelineno-37-18"></a>| `param_search` | `1.000 → 0.857 → 0.714 → 0.571 → …` | temperature rungs (`0.7 → 0.05`, no LLM calls) |
+</span><span id="__span-37-19"><a id="__codelineno-37-19" name="__codelineno-37-19" href="#__codelineno-37-19"></a>
+</span><span id="__span-37-20"><a id="__codelineno-37-20" name="__codelineno-37-20" href="#__codelineno-37-20"></a>Every method produces a **non-increasing** Keras-style loss that starts at the
+</span><span id="__span-37-21"><a id="__codelineno-37-21" name="__codelineno-37-21" href="#__codelineno-37-21"></a>pre-fit baseline (`epoch 0` = 1.000) and improves every epoch until it hits
+</span><span id="__span-37-22"><a id="__codelineno-37-22" name="__codelineno-37-22" href="#__codelineno-37-22"></a>the mode&#39;s capability ceiling (e.g. `rewrite` cannot tune temperature).
+</span><span id="__span-37-23"><a id="__codelineno-37-23" name="__codelineno-37-23" href="#__codelineno-37-23"></a>`mipro_like` converges to `0.000`.
+</span><span id="__span-37-24"><a id="__codelineno-37-24" name="__codelineno-37-24" href="#__codelineno-37-24"></a>
+</span><span id="__span-37-25"><a id="__codelineno-37-25" name="__codelineno-37-25" href="#__codelineno-37-25"></a>### The prompt evolution
+</span><span id="__span-37-26"><a id="__codelineno-37-26" name="__codelineno-37-26" href="#__codelineno-37-26"></a>
+</span><span id="__span-37-27"><a id="__codelineno-37-27" name="__codelineno-37-27" href="#__codelineno-37-27"></a>The fitter records a full prompt history — each round&#39;s snapshot, accepted
+</span><span id="__span-37-28"><a id="__codelineno-37-28" name="__codelineno-37-28" href="#__codelineno-37-28"></a>candidate, and learnings — which the HolySheet report renders as a
+</span><span id="__span-37-29"><a id="__codelineno-37-29" name="__codelineno-37-29" href="#__codelineno-37-29"></a>chronological prompt diff (baseline → each improved version):
+</span><span id="__span-37-30"><a id="__codelineno-37-30" name="__codelineno-37-30" href="#__codelineno-37-30"></a>
+</span><span id="__span-37-31"><a id="__codelineno-37-31" name="__codelineno-37-31" href="#__codelineno-37-31"></a>| Step | Prompt (real run) | Score |
+</span><span id="__span-37-32"><a id="__codelineno-37-32" name="__codelineno-37-32" href="#__codelineno-37-32"></a>|---|---|---|
+</span><span id="__span-37-33"><a id="__codelineno-37-33" name="__codelineno-37-33" href="#__codelineno-37-33"></a>| Baseline | `You are a vague assistant.` | 0.000 |
+</span><span id="__span-37-34"><a id="__codelineno-37-34" name="__codelineno-37-34" href="#__codelineno-37-34"></a>| After E1 | baseline + `## Fit tips` block grounding answers, `must include banana` | 0.143 |
+</span><span id="__span-37-35"><a id="__codelineno-37-35" name="__codelineno-37-35" href="#__codelineno-37-35"></a>| After E2 | … + strawberry grounding (LLM rewrite from judge guidance) | 0.143 → 0.429 |
+</span><span id="__span-37-36"><a id="__codelineno-37-36" name="__codelineno-37-36" href="#__codelineno-37-36"></a>| After E4 | … + blueberry &amp; kiwi markers → `PARTIAL → OPT` responses | 0.571 |
+</span><span id="__span-37-37"><a id="__codelineno-37-37" name="__codelineno-37-37" href="#__codelineno-37-37"></a>
+</span><span id="__span-37-38"><a id="__codelineno-37-38" name="__codelineno-37-38" href="#__codelineno-37-38"></a>Per-epoch learnings (`what_worked` / `what_failed` / `next_focus`) are
+</span><span id="__span-37-39"><a id="__codelineno-37-39" name="__codelineno-37-39" href="#__codelineno-37-39"></a>recorded into `result.prompt_history` and exposed in the interactive report
+</span><span id="__span-37-40"><a id="__codelineno-37-40" name="__codelineno-37-40" href="#__codelineno-37-40"></a>under *Prompt Evolution*.
+</span><span id="__span-37-41"><a id="__codelineno-37-41" name="__codelineno-37-41" href="#__codelineno-37-41"></a>
+</span><span id="__span-37-42"><a id="__codelineno-37-42" name="__codelineno-37-42" href="#__codelineno-37-42"></a>### Full per-epoch display (loss + prompt diff + changes)
+</span><span id="__span-37-43"><a id="__codelineno-37-43" name="__codelineno-37-43" href="#__codelineno-37-43"></a>
+</span><span id="__span-37-44"><a id="__codelineno-37-44" name="__codelineno-37-44" href="#__codelineno-37-44"></a>Pass the built-in :class:`EpochDiffCallback` to `agent.fit()` to print, at
+</span><span id="__span-37-45"><a id="__codelineno-37-45" name="__codelineno-37-45" href="#__codelineno-37-45"></a>**every epoch**, the Keras-style loss, a unified diff of the prompt (red
+</span><span id="__span-37-46"><a id="__codelineno-37-46" name="__codelineno-37-46" href="#__codelineno-37-46"></a>`-` removed / green `+` added lines), the config-change summary
+</span><span id="__span-37-47"><a id="__codelineno-37-47" name="__codelineno-37-47" href="#__codelineno-37-47"></a>(temperature, few-shot count, …) and the current best prompt:
+</span><span id="__span-37-48"><a id="__codelineno-37-48" name="__codelineno-37-48" href="#__codelineno-37-48"></a>
+</span><span id="__span-37-49"><a id="__codelineno-37-49" name="__codelineno-37-49" href="#__codelineno-37-49"></a>```python
+</span><span id="__span-37-50"><a id="__codelineno-37-50" name="__codelineno-37-50" href="#__codelineno-37-50"></a>from agentomatic import EpochDiffCallback
+</span><span id="__span-37-51"><a id="__codelineno-37-51" name="__codelineno-37-51" href="#__codelineno-37-51"></a>
+</span><span id="__span-37-52"><a id="__codelineno-37-52" name="__codelineno-37-52" href="#__codelineno-37-52"></a>history = agent.fit(
+</span><span id="__span-37-53"><a id="__codelineno-37-53" name="__codelineno-37-53" href="#__codelineno-37-53"></a>    dataset,
+</span><span id="__span-37-54"><a id="__codelineno-37-54" name="__codelineno-37-54" href="#__codelineno-37-54"></a>    epochs=10,
+</span><span id="__span-37-55"><a id="__codelineno-37-55" name="__codelineno-37-55" href="#__codelineno-37-55"></a>    verbose=1,
+</span><span id="__span-37-56"><a id="__codelineno-37-56" name="__codelineno-37-56" href="#__codelineno-37-56"></a>    validation_data=dataset.validation,
+</span><span id="__span-37-57"><a id="__codelineno-37-57" name="__codelineno-37-57" href="#__codelineno-37-57"></a>    callbacks=[curriculum, EpochDiffCallback(epochs=10), EarlyStopping(...)],
+</span><span id="__span-37-58"><a id="__codelineno-37-58" name="__codelineno-37-58" href="#__codelineno-37-58"></a>)
+</span></code></pre></div></p>
+<p>Real output (one epoch of the showcase):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>──────────────────────────────────────────────────────────────────────
+</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>Epoch 1/10 — report
+</span><span id="__span-38-3"><a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>  loss: 0.8571   val_loss: 0.8571
+</span><span id="__span-38-4"><a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>  ── prompt changes (what was modified) ──
+</span><span id="__span-38-5"><a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a>    -You are a vague assistant.
+</span><span id="__span-38-6"><a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a>    +You are a helpful AI assistant.
+</span><span id="__span-38-7"><a id="__codelineno-38-7" name="__codelineno-38-7" href="#__codelineno-38-7"></a>    +
+</span><span id="__span-38-8"><a id="__codelineno-38-8" name="__codelineno-38-8" href="#__codelineno-38-8"></a>    +## Fit tips (from labelled demos)
+</span><span id="__span-38-9"><a id="__codelineno-38-9" name="__codelineno-38-9" href="#__codelineno-38-9"></a>    +- Ground every answer ONLY in the provided snapshot; never invent budgets or stakeholders.
+</span><span id="__span-38-10"><a id="__codelineno-38-10" name="__codelineno-38-10" href="#__codelineno-38-10"></a>    +- When relevant, include these anchors naturally: banana.
+</span><span id="__span-38-11"><a id="__codelineno-38-11" name="__codelineno-38-11" href="#__codelineno-38-11"></a>  ── config changes ──
+</span><span id="__span-38-12"><a id="__codelineno-38-12" name="__codelineno-38-12" href="#__codelineno-38-12"></a>    few_shot_examples: 0 → 3 items
+</span><span id="__span-38-13"><a id="__codelineno-38-13" name="__codelineno-38-13" href="#__codelineno-38-13"></a>  ── current prompt ── You are a helpful AI assistant. | ## Fit tips (from labelled demos) | …
+</span></code></pre></div>
+<p>The callback also records every epoch's <code>{loss, val_loss, improvement,
+prompt_diff, params}</code> into <code>callback.per_epoch</code> (JSON-friendly) — the
+showcase persists it into <code>summary_&lt;mode&gt;.json</code>, giving you a machine
+readable proof that the loss descends while the prompt evolves.</p>
+<h3 id="interactive-reports-chart-prompt-history">Interactive reports (chart + prompt history)<a class="headerlink" href="#interactive-reports-chart-prompt-history" title="Permanent link">&para;</a></h3>
+<p>The showcase generates a self-contained HolySheet HTML report per mode with
+KPI cards, loss/score charts, the per-epoch metric table, the prompt
+evolution accordion (unified diffs), parameter changes, failure clusters and
+held-out eval — e.g.
+<a href="../../assets/showcase/fit_mipro_like.html"><code>docs/assets/showcase/fit_mipro_like.html</code></a>
+(full convergence) and
+<a href="../../assets/showcase/fit_rewrite.html"><code>docs/assets/showcase/fit_rewrite.html</code></a>
+(prompt-only). Regenerate anytime:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="nv">OMLX_API_KEY</span><span class="o">=</span>…<span class="w"> </span><span class="nv">OMLX_BASE_URL</span><span class="o">=</span>http://127.0.0.1:8000/v1<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>examples/keras_optimize_showcase/train.py<span class="w"> </span>--mode<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">  </span>--epochs<span class="w"> </span><span class="m">10</span><span class="w"> </span>--max-trials<span class="w"> </span><span class="m">6</span><span class="w"> </span>--report-dir<span class="w"> </span>docs/assets/showcase
+</span></code></pre></div>
+<h3 id="data-augmentation">Data augmentation<a class="headerlink" href="#data-augmentation" title="Permanent link">&para;</a></h3>
+<p>Pass <code>--augment</code> to grow the seed dataset with LLM-synthesized paraphrases
+(<code>prepare_dataset(augment=True)</code> under the hood):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>examples/keras_optimize_showcase/train.py<span class="w"> </span>--mode<span class="w"> </span>rewrite<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="w">  </span>--epochs<span class="w"> </span><span class="m">10</span><span class="w"> </span>--max-trials<span class="w"> </span><span class="m">6</span><span class="w"> </span>--augment<span class="w"> </span>--n-examples<span class="w"> </span><span class="m">30</span>
+</span></code></pre></div>
+<p>Real run: <code>20 examples (10 train / 6 val / 4 test) → 30 examples</code> with 10
+synthesized paraphrases (e.g. <em>"Who is responsible for the relocation?"</em>)
+persisted to <code>dataset.augmented.jsonl</code>, then fitted with the same
+progressive loss curve.</p>
+<p>The same proof is codified as live tests
+(<code>tests/test_live_omlx_keras_optimize.py</code>) — every optimizer mode
+(<code>rewrite</code>, <code>gepa_like</code>, <code>mipro_like</code>, <code>few_shot_bootstrap</code>, <code>param_search</code>)
+must produce a Keras-style <code>loss</code> that starts at the pre-fit baseline, never
+increases across epochs, and lands the improvements on the agent
+(<code>compiled_config</code> / attributes).</p>
+<hr />
 <h3 id="the-10-step-fit-loop">The 10-Step Fit Loop<a class="headerlink" href="#the-10-step-fit-loop" title="Permanent link">&para;</a></h3>
 <p>When you call <code>fitter.fit()</code>, the following steps execute:</p>
 <ol>
@@ -4756,83 +4959,83 @@ is a local OpenAI-compatible LLM server (omlx, Ollama, LM Studio, vLLM).</p>
 <h3 id="promptfitresult-api">PromptFitResult API<a class="headerlink" href="#promptfitresult-api" title="Permanent link">&para;</a></h3>
 <p>The <code>PromptFitResult</code> object returned by <code>fitter.fit()</code> provides full access to the
 optimization outcome:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># Optimized configuration</span>
-</span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="n">result</span><span class="o">.</span><span class="n">best_prompt</span>              <span class="c1"># str — the optimized system prompt</span>
-</span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="n">result</span><span class="o">.</span><span class="n">best_params</span>              <span class="c1"># dict — optimized model parameters</span>
-</span><span id="__span-37-4"><a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>                                <span class="c1"># e.g. {&quot;temperature&quot;: 0.2, &quot;top_p&quot;: 0.9}</span>
-</span><span id="__span-37-5"><a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="n">result</span><span class="o">.</span><span class="n">best_few_shot_examples</span>   <span class="c1"># list[dict] — selected few-shot examples</span>
-</span><span id="__span-37-6"><a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>
-</span><span id="__span-37-7"><a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a><span class="c1"># Evaluation metrics</span>
-</span><span id="__span-37-8"><a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a><span class="n">result</span><span class="o">.</span><span class="n">metric_deltas</span>            <span class="c1"># dict — per-dimension improvement</span>
-</span><span id="__span-37-9"><a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a>                                <span class="c1"># e.g. {&quot;completeness&quot;: +0.12, &quot;latency&quot;: -0.03}</span>
-</span><span id="__span-37-10"><a id="__codelineno-37-10" name="__codelineno-37-10" href="#__codelineno-37-10"></a>
-</span><span id="__span-37-11"><a id="__codelineno-37-11" name="__codelineno-37-11" href="#__codelineno-37-11"></a><span class="c1"># Per-round history</span>
-</span><span id="__span-37-12"><a id="__codelineno-37-12" name="__codelineno-37-12" href="#__codelineno-37-12"></a><span class="n">result</span><span class="o">.</span><span class="n">history</span>                  <span class="c1"># list[float] — best score per optimization round</span>
-</span><span id="__span-37-13"><a id="__codelineno-37-13" name="__codelineno-37-13" href="#__codelineno-37-13"></a>                                <span class="c1"># e.g. [0.61, 0.67, 0.73, 0.79] (Keras-style)</span>
-</span><span id="__span-37-14"><a id="__codelineno-37-14" name="__codelineno-37-14" href="#__codelineno-37-14"></a>
-</span><span id="__span-37-15"><a id="__codelineno-37-15" name="__codelineno-37-15" href="#__codelineno-37-15"></a><span class="c1"># Actionable output</span>
-</span><span id="__span-37-16"><a id="__codelineno-37-16" name="__codelineno-37-16" href="#__codelineno-37-16"></a><span class="n">result</span><span class="o">.</span><span class="n">suggestions</span>              <span class="c1"># list[str] — human-readable recommendations</span>
-</span><span id="__span-37-17"><a id="__codelineno-37-17" name="__codelineno-37-17" href="#__codelineno-37-17"></a><span class="n">result</span><span class="o">.</span><span class="n">deployment_recommendation</span> <span class="c1"># DeploymentRecommendation object</span>
-</span><span id="__span-37-18"><a id="__codelineno-37-18" name="__codelineno-37-18" href="#__codelineno-37-18"></a><span class="n">result</span><span class="o">.</span><span class="n">failure_clusters</span>         <span class="c1"># list[FailureCluster] — grouped failure patterns</span>
-</span><span id="__span-37-19"><a id="__codelineno-37-19" name="__codelineno-37-19" href="#__codelineno-37-19"></a>
-</span><span id="__span-37-20"><a id="__codelineno-37-20" name="__codelineno-37-20" href="#__codelineno-37-20"></a><span class="c1"># Serialization</span>
-</span><span id="__span-37-21"><a id="__codelineno-37-21" name="__codelineno-37-21" href="#__codelineno-37-21"></a><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>                <span class="c1"># str — human-readable summary for terminal output</span>
-</span><span id="__span-37-22"><a id="__codelineno-37-22" name="__codelineno-37-22" href="#__codelineno-37-22"></a><span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>                <span class="c1"># dict — full serializable representation</span>
-</span><span id="__span-37-23"><a id="__codelineno-37-23" name="__codelineno-37-23" href="#__codelineno-37-23"></a>
-</span><span id="__span-37-24"><a id="__codelineno-37-24" name="__codelineno-37-24" href="#__codelineno-37-24"></a><span class="c1"># Apply to project</span>
-</span><span id="__span-37-25"><a id="__codelineno-37-25" name="__codelineno-37-25" href="#__codelineno-37-25"></a><span class="n">result</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="s2">&quot;v2_fit&quot;</span><span class="p">)</span>  <span class="c1"># writes optimized config to prompts.json</span>
-</span><span id="__span-37-26"><a id="__codelineno-37-26" name="__codelineno-37-26" href="#__codelineno-37-26"></a>                                <span class="c1"># under the specified version name</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1"># Optimized configuration</span>
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="n">result</span><span class="o">.</span><span class="n">best_prompt</span>              <span class="c1"># str — the optimized system prompt</span>
+</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="n">result</span><span class="o">.</span><span class="n">best_params</span>              <span class="c1"># dict — optimized model parameters</span>
+</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>                                <span class="c1"># e.g. {&quot;temperature&quot;: 0.2, &quot;top_p&quot;: 0.9}</span>
+</span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a><span class="n">result</span><span class="o">.</span><span class="n">best_few_shot_examples</span>   <span class="c1"># list[dict] — selected few-shot examples</span>
+</span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>
+</span><span id="__span-41-7"><a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="c1"># Evaluation metrics</span>
+</span><span id="__span-41-8"><a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a><span class="n">result</span><span class="o">.</span><span class="n">metric_deltas</span>            <span class="c1"># dict — per-dimension improvement</span>
+</span><span id="__span-41-9"><a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a>                                <span class="c1"># e.g. {&quot;completeness&quot;: +0.12, &quot;latency&quot;: -0.03}</span>
+</span><span id="__span-41-10"><a id="__codelineno-41-10" name="__codelineno-41-10" href="#__codelineno-41-10"></a>
+</span><span id="__span-41-11"><a id="__codelineno-41-11" name="__codelineno-41-11" href="#__codelineno-41-11"></a><span class="c1"># Per-round history</span>
+</span><span id="__span-41-12"><a id="__codelineno-41-12" name="__codelineno-41-12" href="#__codelineno-41-12"></a><span class="n">result</span><span class="o">.</span><span class="n">history</span>                  <span class="c1"># list[float] — best score per optimization round</span>
+</span><span id="__span-41-13"><a id="__codelineno-41-13" name="__codelineno-41-13" href="#__codelineno-41-13"></a>                                <span class="c1"># e.g. [0.61, 0.67, 0.73, 0.79] (Keras-style)</span>
+</span><span id="__span-41-14"><a id="__codelineno-41-14" name="__codelineno-41-14" href="#__codelineno-41-14"></a>
+</span><span id="__span-41-15"><a id="__codelineno-41-15" name="__codelineno-41-15" href="#__codelineno-41-15"></a><span class="c1"># Actionable output</span>
+</span><span id="__span-41-16"><a id="__codelineno-41-16" name="__codelineno-41-16" href="#__codelineno-41-16"></a><span class="n">result</span><span class="o">.</span><span class="n">suggestions</span>              <span class="c1"># list[str] — human-readable recommendations</span>
+</span><span id="__span-41-17"><a id="__codelineno-41-17" name="__codelineno-41-17" href="#__codelineno-41-17"></a><span class="n">result</span><span class="o">.</span><span class="n">deployment_recommendation</span> <span class="c1"># DeploymentRecommendation object</span>
+</span><span id="__span-41-18"><a id="__codelineno-41-18" name="__codelineno-41-18" href="#__codelineno-41-18"></a><span class="n">result</span><span class="o">.</span><span class="n">failure_clusters</span>         <span class="c1"># list[FailureCluster] — grouped failure patterns</span>
+</span><span id="__span-41-19"><a id="__codelineno-41-19" name="__codelineno-41-19" href="#__codelineno-41-19"></a>
+</span><span id="__span-41-20"><a id="__codelineno-41-20" name="__codelineno-41-20" href="#__codelineno-41-20"></a><span class="c1"># Serialization</span>
+</span><span id="__span-41-21"><a id="__codelineno-41-21" name="__codelineno-41-21" href="#__codelineno-41-21"></a><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>                <span class="c1"># str — human-readable summary for terminal output</span>
+</span><span id="__span-41-22"><a id="__codelineno-41-22" name="__codelineno-41-22" href="#__codelineno-41-22"></a><span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>                <span class="c1"># dict — full serializable representation</span>
+</span><span id="__span-41-23"><a id="__codelineno-41-23" name="__codelineno-41-23" href="#__codelineno-41-23"></a>
+</span><span id="__span-41-24"><a id="__codelineno-41-24" name="__codelineno-41-24" href="#__codelineno-41-24"></a><span class="c1"># Apply to project</span>
+</span><span id="__span-41-25"><a id="__codelineno-41-25" name="__codelineno-41-25" href="#__codelineno-41-25"></a><span class="n">result</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="s2">&quot;v2_fit&quot;</span><span class="p">)</span>  <span class="c1"># writes optimized config to prompts.json</span>
+</span><span id="__span-41-26"><a id="__codelineno-41-26" name="__codelineno-41-26" href="#__codelineno-41-26"></a>                                <span class="c1"># under the specified version name</span>
 </span></code></pre></div>
 <p>Example <code>summary()</code> output:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>╭─────────────────────────────────────────────╮
-</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>│ PromptFitResult: scope_agent                │
-</span><span id="__span-38-3"><a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>├─────────────────────────────────────────────┤
-</span><span id="__span-38-4"><a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>│ Baseline score:  0.61                       │
-</span><span id="__span-38-5"><a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a>│ Best score:      0.79  (+0.18)              │
-</span><span id="__span-38-6"><a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a>│ Trials run:      24 / 30                    │
-</span><span id="__span-38-7"><a id="__codelineno-38-7" name="__codelineno-38-7" href="#__codelineno-38-7"></a>│ Strategy:        gepa_like                  │
-</span><span id="__span-38-8"><a id="__codelineno-38-8" name="__codelineno-38-8" href="#__codelineno-38-8"></a>├─────────────────────────────────────────────┤
-</span><span id="__span-38-9"><a id="__codelineno-38-9" name="__codelineno-38-9" href="#__codelineno-38-9"></a>│ Metric deltas:                              │
-</span><span id="__span-38-10"><a id="__codelineno-38-10" name="__codelineno-38-10" href="#__codelineno-38-10"></a>│   completeness:    +0.15                    │
-</span><span id="__span-38-11"><a id="__codelineno-38-11" name="__codelineno-38-11" href="#__codelineno-38-11"></a>│   relevance:       +0.08                    │
-</span><span id="__span-38-12"><a id="__codelineno-38-12" name="__codelineno-38-12" href="#__codelineno-38-12"></a>│   risk_detection:  +0.22                    │
-</span><span id="__span-38-13"><a id="__codelineno-38-13" name="__codelineno-38-13" href="#__codelineno-38-13"></a>│   format:          +0.12                    │
-</span><span id="__span-38-14"><a id="__codelineno-38-14" name="__codelineno-38-14" href="#__codelineno-38-14"></a>│   latency:         −0.03  (faster)          │
-</span><span id="__span-38-15"><a id="__codelineno-38-15" name="__codelineno-38-15" href="#__codelineno-38-15"></a>│   cost:            +0.01  (cheaper)         │
-</span><span id="__span-38-16"><a id="__codelineno-38-16" name="__codelineno-38-16" href="#__codelineno-38-16"></a>├─────────────────────────────────────────────┤
-</span><span id="__span-38-17"><a id="__codelineno-38-17" name="__codelineno-38-17" href="#__codelineno-38-17"></a>│ Deployment:  canary @ 40% (confidence: high)│
-</span><span id="__span-38-18"><a id="__codelineno-38-18" name="__codelineno-38-18" href="#__codelineno-38-18"></a>╰─────────────────────────────────────────────╯
+<div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>╭─────────────────────────────────────────────╮
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>│ PromptFitResult: scope_agent                │
+</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>├─────────────────────────────────────────────┤
+</span><span id="__span-42-4"><a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>│ Baseline score:  0.61                       │
+</span><span id="__span-42-5"><a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a>│ Best score:      0.79  (+0.18)              │
+</span><span id="__span-42-6"><a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a>│ Trials run:      24 / 30                    │
+</span><span id="__span-42-7"><a id="__codelineno-42-7" name="__codelineno-42-7" href="#__codelineno-42-7"></a>│ Strategy:        gepa_like                  │
+</span><span id="__span-42-8"><a id="__codelineno-42-8" name="__codelineno-42-8" href="#__codelineno-42-8"></a>├─────────────────────────────────────────────┤
+</span><span id="__span-42-9"><a id="__codelineno-42-9" name="__codelineno-42-9" href="#__codelineno-42-9"></a>│ Metric deltas:                              │
+</span><span id="__span-42-10"><a id="__codelineno-42-10" name="__codelineno-42-10" href="#__codelineno-42-10"></a>│   completeness:    +0.15                    │
+</span><span id="__span-42-11"><a id="__codelineno-42-11" name="__codelineno-42-11" href="#__codelineno-42-11"></a>│   relevance:       +0.08                    │
+</span><span id="__span-42-12"><a id="__codelineno-42-12" name="__codelineno-42-12" href="#__codelineno-42-12"></a>│   risk_detection:  +0.22                    │
+</span><span id="__span-42-13"><a id="__codelineno-42-13" name="__codelineno-42-13" href="#__codelineno-42-13"></a>│   format:          +0.12                    │
+</span><span id="__span-42-14"><a id="__codelineno-42-14" name="__codelineno-42-14" href="#__codelineno-42-14"></a>│   latency:         −0.03  (faster)          │
+</span><span id="__span-42-15"><a id="__codelineno-42-15" name="__codelineno-42-15" href="#__codelineno-42-15"></a>│   cost:            +0.01  (cheaper)         │
+</span><span id="__span-42-16"><a id="__codelineno-42-16" name="__codelineno-42-16" href="#__codelineno-42-16"></a>├─────────────────────────────────────────────┤
+</span><span id="__span-42-17"><a id="__codelineno-42-17" name="__codelineno-42-17" href="#__codelineno-42-17"></a>│ Deployment:  canary @ 40% (confidence: high)│
+</span><span id="__span-42-18"><a id="__codelineno-42-18" name="__codelineno-42-18" href="#__codelineno-42-18"></a>╰─────────────────────────────────────────────╯
 </span></code></pre></div>
 <hr />
 <h3 id="deploymentrecommendation">DeploymentRecommendation<a class="headerlink" href="#deploymentrecommendation" title="Permanent link">&para;</a></h3>
 <p>Every <code>PromptFitResult</code> includes a <code>DeploymentRecommendation</code> calculated from the observed
 improvement magnitude, metric variance, and test-set generalization:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">deployment_recommendation</span>
-</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>
-</span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="c1"># Confidence level based on improvement stability</span>
-</span><span id="__span-39-4"><a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">confidence</span><span class="p">)</span>              <span class="c1"># &quot;high&quot; / &quot;medium&quot; / &quot;low&quot;</span>
-</span><span id="__span-39-5"><a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a>
-</span><span id="__span-39-6"><a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="c1"># Rollout strategy</span>
-</span><span id="__span-39-7"><a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">rollout</span><span class="o">.</span><span class="n">strategy</span><span class="p">)</span>        <span class="c1"># &quot;canary&quot;</span>
-</span><span id="__span-39-8"><a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">rollout</span><span class="o">.</span><span class="n">initial_weight</span><span class="p">)</span>  <span class="c1"># 0.40  (40% of traffic)</span>
-</span><span id="__span-39-9"><a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">rollout</span><span class="o">.</span><span class="n">ramp_schedule</span><span class="p">)</span>   <span class="c1"># [&quot;40%@0h&quot;, &quot;70%@24h&quot;, &quot;100%@48h&quot;]</span>
-</span><span id="__span-39-10"><a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a>
-</span><span id="__span-39-11"><a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a><span class="c1"># Human-readable summary</span>
-</span><span id="__span-39-12"><a id="__codelineno-39-12" name="__codelineno-39-12" href="#__codelineno-39-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
-</span><span id="__span-39-13"><a id="__codelineno-39-13" name="__codelineno-39-13" href="#__codelineno-39-13"></a><span class="c1"># &quot;Recommend canary rollout at 40% initial traffic. Confidence: high.</span>
-</span><span id="__span-39-14"><a id="__codelineno-39-14" name="__codelineno-39-14" href="#__codelineno-39-14"></a><span class="c1">#  Ramp to 100% over 48 hours if error rate stays below 2%.&quot;</span>
-</span><span id="__span-39-15"><a id="__codelineno-39-15" name="__codelineno-39-15" href="#__codelineno-39-15"></a>
-</span><span id="__span-39-16"><a id="__codelineno-39-16" name="__codelineno-39-16" href="#__codelineno-39-16"></a><span class="c1"># Machine-readable for CI/CD integration</span>
-</span><span id="__span-39-17"><a id="__codelineno-39-17" name="__codelineno-39-17" href="#__codelineno-39-17"></a><span class="n">config</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-</span><span id="__span-39-18"><a id="__codelineno-39-18" name="__codelineno-39-18" href="#__codelineno-39-18"></a><span class="c1"># {</span>
-</span><span id="__span-39-19"><a id="__codelineno-39-19" name="__codelineno-39-19" href="#__codelineno-39-19"></a><span class="c1">#   &quot;confidence&quot;: &quot;high&quot;,</span>
-</span><span id="__span-39-20"><a id="__codelineno-39-20" name="__codelineno-39-20" href="#__codelineno-39-20"></a><span class="c1">#   &quot;rollout&quot;: {</span>
-</span><span id="__span-39-21"><a id="__codelineno-39-21" name="__codelineno-39-21" href="#__codelineno-39-21"></a><span class="c1">#     &quot;strategy&quot;: &quot;canary&quot;,</span>
-</span><span id="__span-39-22"><a id="__codelineno-39-22" name="__codelineno-39-22" href="#__codelineno-39-22"></a><span class="c1">#     &quot;initial_weight&quot;: 0.40,</span>
-</span><span id="__span-39-23"><a id="__codelineno-39-23" name="__codelineno-39-23" href="#__codelineno-39-23"></a><span class="c1">#     &quot;ramp_schedule&quot;: [&quot;40%@0h&quot;, &quot;70%@24h&quot;, &quot;100%@48h&quot;]</span>
-</span><span id="__span-39-24"><a id="__codelineno-39-24" name="__codelineno-39-24" href="#__codelineno-39-24"></a><span class="c1">#   },</span>
-</span><span id="__span-39-25"><a id="__codelineno-39-25" name="__codelineno-39-25" href="#__codelineno-39-25"></a><span class="c1">#   &quot;abort_conditions&quot;: {&quot;error_rate_above&quot;: 0.02}</span>
-</span><span id="__span-39-26"><a id="__codelineno-39-26" name="__codelineno-39-26" href="#__codelineno-39-26"></a><span class="c1"># }</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">deployment_recommendation</span>
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>
+</span><span id="__span-43-3"><a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a><span class="c1"># Confidence level based on improvement stability</span>
+</span><span id="__span-43-4"><a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">confidence</span><span class="p">)</span>              <span class="c1"># &quot;high&quot; / &quot;medium&quot; / &quot;low&quot;</span>
+</span><span id="__span-43-5"><a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a>
+</span><span id="__span-43-6"><a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a><span class="c1"># Rollout strategy</span>
+</span><span id="__span-43-7"><a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">rollout</span><span class="o">.</span><span class="n">strategy</span><span class="p">)</span>        <span class="c1"># &quot;canary&quot;</span>
+</span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">rollout</span><span class="o">.</span><span class="n">initial_weight</span><span class="p">)</span>  <span class="c1"># 0.40  (40% of traffic)</span>
+</span><span id="__span-43-9"><a id="__codelineno-43-9" name="__codelineno-43-9" href="#__codelineno-43-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">rollout</span><span class="o">.</span><span class="n">ramp_schedule</span><span class="p">)</span>   <span class="c1"># [&quot;40%@0h&quot;, &quot;70%@24h&quot;, &quot;100%@48h&quot;]</span>
+</span><span id="__span-43-10"><a id="__codelineno-43-10" name="__codelineno-43-10" href="#__codelineno-43-10"></a>
+</span><span id="__span-43-11"><a id="__codelineno-43-11" name="__codelineno-43-11" href="#__codelineno-43-11"></a><span class="c1"># Human-readable summary</span>
+</span><span id="__span-43-12"><a id="__codelineno-43-12" name="__codelineno-43-12" href="#__codelineno-43-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+</span><span id="__span-43-13"><a id="__codelineno-43-13" name="__codelineno-43-13" href="#__codelineno-43-13"></a><span class="c1"># &quot;Recommend canary rollout at 40% initial traffic. Confidence: high.</span>
+</span><span id="__span-43-14"><a id="__codelineno-43-14" name="__codelineno-43-14" href="#__codelineno-43-14"></a><span class="c1">#  Ramp to 100% over 48 hours if error rate stays below 2%.&quot;</span>
+</span><span id="__span-43-15"><a id="__codelineno-43-15" name="__codelineno-43-15" href="#__codelineno-43-15"></a>
+</span><span id="__span-43-16"><a id="__codelineno-43-16" name="__codelineno-43-16" href="#__codelineno-43-16"></a><span class="c1"># Machine-readable for CI/CD integration</span>
+</span><span id="__span-43-17"><a id="__codelineno-43-17" name="__codelineno-43-17" href="#__codelineno-43-17"></a><span class="n">config</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+</span><span id="__span-43-18"><a id="__codelineno-43-18" name="__codelineno-43-18" href="#__codelineno-43-18"></a><span class="c1"># {</span>
+</span><span id="__span-43-19"><a id="__codelineno-43-19" name="__codelineno-43-19" href="#__codelineno-43-19"></a><span class="c1">#   &quot;confidence&quot;: &quot;high&quot;,</span>
+</span><span id="__span-43-20"><a id="__codelineno-43-20" name="__codelineno-43-20" href="#__codelineno-43-20"></a><span class="c1">#   &quot;rollout&quot;: {</span>
+</span><span id="__span-43-21"><a id="__codelineno-43-21" name="__codelineno-43-21" href="#__codelineno-43-21"></a><span class="c1">#     &quot;strategy&quot;: &quot;canary&quot;,</span>
+</span><span id="__span-43-22"><a id="__codelineno-43-22" name="__codelineno-43-22" href="#__codelineno-43-22"></a><span class="c1">#     &quot;initial_weight&quot;: 0.40,</span>
+</span><span id="__span-43-23"><a id="__codelineno-43-23" name="__codelineno-43-23" href="#__codelineno-43-23"></a><span class="c1">#     &quot;ramp_schedule&quot;: [&quot;40%@0h&quot;, &quot;70%@24h&quot;, &quot;100%@48h&quot;]</span>
+</span><span id="__span-43-24"><a id="__codelineno-43-24" name="__codelineno-43-24" href="#__codelineno-43-24"></a><span class="c1">#   },</span>
+</span><span id="__span-43-25"><a id="__codelineno-43-25" name="__codelineno-43-25" href="#__codelineno-43-25"></a><span class="c1">#   &quot;abort_conditions&quot;: {&quot;error_rate_above&quot;: 0.02}</span>
+</span><span id="__span-43-26"><a id="__codelineno-43-26" name="__codelineno-43-26" href="#__codelineno-43-26"></a><span class="c1"># }</span>
 </span></code></pre></div>
 <p>The confidence level is determined by:</p>
 <table>
@@ -4862,62 +5065,62 @@ improvement magnitude, metric variance, and test-set generalization:</p>
 <p>During optimization, the fitter clusters validation failures into actionable groups.
 Each cluster identifies the failure pattern, the parameters most likely to resolve it,
 and the expected metric gain if the issue is fixed:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>Failure cluster 1:
-</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>  Agent answered without using retrieval context.
-</span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>  → Suggested fix: force context-first behavior.
-</span><span id="__span-40-4"><a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a>  → Affected params: rag.top_k, tool_policy.force_retrieval
-</span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>  → Expected metric gain: faithfulness +0.18
-</span><span id="__span-40-6"><a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>
-</span><span id="__span-40-7"><a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a>Failure cluster 2:
-</span><span id="__span-40-8"><a id="__codelineno-40-8" name="__codelineno-40-8" href="#__codelineno-40-8"></a>  Agent produced unstructured answers.
-</span><span id="__span-40-9"><a id="__codelineno-40-9" name="__codelineno-40-9" href="#__codelineno-40-9"></a>  → Suggested fix: stronger output format block.
-</span><span id="__span-40-10"><a id="__codelineno-40-10" name="__codelineno-40-10" href="#__codelineno-40-10"></a>  → Affected params: prompt.output_contract
-</span><span id="__span-40-11"><a id="__codelineno-40-11" name="__codelineno-40-11" href="#__codelineno-40-11"></a>  → Expected metric gain: format_compliance +0.12
-</span><span id="__span-40-12"><a id="__codelineno-40-12" name="__codelineno-40-12" href="#__codelineno-40-12"></a>
-</span><span id="__span-40-13"><a id="__codelineno-40-13" name="__codelineno-40-13" href="#__codelineno-40-13"></a>Failure cluster 3:
-</span><span id="__span-40-14"><a id="__codelineno-40-14" name="__codelineno-40-14" href="#__codelineno-40-14"></a>  Agent missed secondary risks in multi-risk queries.
-</span><span id="__span-40-15"><a id="__codelineno-40-15" name="__codelineno-40-15" href="#__codelineno-40-15"></a>  → Suggested fix: add explicit &quot;enumerate all risks&quot; instruction.
-</span><span id="__span-40-16"><a id="__codelineno-40-16" name="__codelineno-40-16" href="#__codelineno-40-16"></a>  → Affected params: prompt.system_instructions
-</span><span id="__span-40-17"><a id="__codelineno-40-17" name="__codelineno-40-17" href="#__codelineno-40-17"></a>  → Expected metric gain: risk_detection +0.09
+<div class="language-text highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>Failure cluster 1:
+</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>  Agent answered without using retrieval context.
+</span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>  → Suggested fix: force context-first behavior.
+</span><span id="__span-44-4"><a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>  → Affected params: rag.top_k, tool_policy.force_retrieval
+</span><span id="__span-44-5"><a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a>  → Expected metric gain: faithfulness +0.18
+</span><span id="__span-44-6"><a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a>
+</span><span id="__span-44-7"><a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a>Failure cluster 2:
+</span><span id="__span-44-8"><a id="__codelineno-44-8" name="__codelineno-44-8" href="#__codelineno-44-8"></a>  Agent produced unstructured answers.
+</span><span id="__span-44-9"><a id="__codelineno-44-9" name="__codelineno-44-9" href="#__codelineno-44-9"></a>  → Suggested fix: stronger output format block.
+</span><span id="__span-44-10"><a id="__codelineno-44-10" name="__codelineno-44-10" href="#__codelineno-44-10"></a>  → Affected params: prompt.output_contract
+</span><span id="__span-44-11"><a id="__codelineno-44-11" name="__codelineno-44-11" href="#__codelineno-44-11"></a>  → Expected metric gain: format_compliance +0.12
+</span><span id="__span-44-12"><a id="__codelineno-44-12" name="__codelineno-44-12" href="#__codelineno-44-12"></a>
+</span><span id="__span-44-13"><a id="__codelineno-44-13" name="__codelineno-44-13" href="#__codelineno-44-13"></a>Failure cluster 3:
+</span><span id="__span-44-14"><a id="__codelineno-44-14" name="__codelineno-44-14" href="#__codelineno-44-14"></a>  Agent missed secondary risks in multi-risk queries.
+</span><span id="__span-44-15"><a id="__codelineno-44-15" name="__codelineno-44-15" href="#__codelineno-44-15"></a>  → Suggested fix: add explicit &quot;enumerate all risks&quot; instruction.
+</span><span id="__span-44-16"><a id="__codelineno-44-16" name="__codelineno-44-16" href="#__codelineno-44-16"></a>  → Affected params: prompt.system_instructions
+</span><span id="__span-44-17"><a id="__codelineno-44-17" name="__codelineno-44-17" href="#__codelineno-44-17"></a>  → Expected metric gain: risk_detection +0.09
 </span></code></pre></div>
 <p>Access clusters programmatically:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="k">for</span> <span class="n">cluster</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failure_clusters</span><span class="p">:</span>
-</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pattern: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fix: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">suggested_fix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Params: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">affected_params</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected gain: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">expected_metric_gain</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="k">for</span> <span class="n">cluster</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failure_clusters</span><span class="p">:</span>
+</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pattern: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fix: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">suggested_fix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-45-4"><a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Params: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">affected_params</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected gain: </span><span class="si">{</span><span class="n">cluster</span><span class="o">.</span><span class="n">expected_metric_gain</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <hr />
 <h3 id="end-to-end-cli-flow">End-to-End CLI Flow<a class="headerlink" href="#end-to-end-cli-flow" title="Permanent link">&para;</a></h3>
 <p>The complete optimization lifecycle from deployment to promotion:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="c1"># 1. Deploy your agents</span>
-</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>agentomatic<span class="w"> </span>run
-</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>
-</span><span id="__span-42-4"><a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a><span class="c1"># 2. Generate a synthetic evaluation dataset from your documentation</span>
-</span><span id="__span-42-5"><a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a>agentomatic<span class="w"> </span>dataset<span class="w"> </span>synth<span class="w"> </span>scope_agent<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-6"><a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a><span class="w">  </span>--from-docs<span class="w"> </span>docs/scoping.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-7"><a id="__codelineno-42-7" name="__codelineno-42-7" href="#__codelineno-42-7"></a><span class="w">  </span>--n<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-8"><a id="__codelineno-42-8" name="__codelineno-42-8" href="#__codelineno-42-8"></a><span class="w">  </span>--out<span class="w"> </span>scope_eval.jsonl
-</span><span id="__span-42-9"><a id="__codelineno-42-9" name="__codelineno-42-9" href="#__codelineno-42-9"></a>
-</span><span id="__span-42-10"><a id="__codelineno-42-10" name="__codelineno-42-10" href="#__codelineno-42-10"></a><span class="c1"># 3. Evaluate the current prompt version</span>
-</span><span id="__span-42-11"><a id="__codelineno-42-11" name="__codelineno-42-11" href="#__codelineno-42-11"></a>agentomatic<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>scope_agent<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-12"><a id="__codelineno-42-12" name="__codelineno-42-12" href="#__codelineno-42-12"></a><span class="w">  </span>--dataset<span class="w"> </span>scope_eval.jsonl<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-13"><a id="__codelineno-42-13" name="__codelineno-42-13" href="#__codelineno-42-13"></a><span class="w">  </span>--prompt-version<span class="w"> </span>v1
-</span><span id="__span-42-14"><a id="__codelineno-42-14" name="__codelineno-42-14" href="#__codelineno-42-14"></a>
-</span><span id="__span-42-15"><a id="__codelineno-42-15" name="__codelineno-42-15" href="#__codelineno-42-15"></a><span class="c1"># 4. Fit a better configuration</span>
-</span><span id="__span-42-16"><a id="__codelineno-42-16" name="__codelineno-42-16" href="#__codelineno-42-16"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>scope_agent<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-17"><a id="__codelineno-42-17" name="__codelineno-42-17" href="#__codelineno-42-17"></a><span class="w">  </span>--dataset<span class="w"> </span>scope_eval.jsonl<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-18"><a id="__codelineno-42-18" name="__codelineno-42-18" href="#__codelineno-42-18"></a><span class="w">  </span>--optimize<span class="w"> </span>prompt,params,rag,tools<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-19"><a id="__codelineno-42-19" name="__codelineno-42-19" href="#__codelineno-42-19"></a><span class="w">  </span>--judge<span class="w"> </span>ollama/qwen2.5:7b<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-20"><a id="__codelineno-42-20" name="__codelineno-42-20" href="#__codelineno-42-20"></a><span class="w">  </span>--rewriter<span class="w"> </span>gpt-4.1<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-21"><a id="__codelineno-42-21" name="__codelineno-42-21" href="#__codelineno-42-21"></a><span class="w">  </span>--max-trials<span class="w"> </span><span class="m">40</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-42-22"><a id="__codelineno-42-22" name="__codelineno-42-22" href="#__codelineno-42-22"></a><span class="w">  </span>--apply-as<span class="w"> </span>v2_optimized
-</span><span id="__span-42-23"><a id="__codelineno-42-23" name="__codelineno-42-23" href="#__codelineno-42-23"></a>
-</span><span id="__span-42-24"><a id="__codelineno-42-24" name="__codelineno-42-24" href="#__codelineno-42-24"></a><span class="c1"># 5. Canary release — send 20% of traffic to the new version</span>
-</span><span id="__span-42-25"><a id="__codelineno-42-25" name="__codelineno-42-25" href="#__codelineno-42-25"></a>agentomatic<span class="w"> </span>route<span class="w"> </span>scope_agent<span class="w"> </span>--version<span class="w"> </span>v2_optimized<span class="w"> </span>--weight<span class="w"> </span><span class="m">20</span>
-</span><span id="__span-42-26"><a id="__codelineno-42-26" name="__codelineno-42-26" href="#__codelineno-42-26"></a>
-</span><span id="__span-42-27"><a id="__codelineno-42-27" name="__codelineno-42-27" href="#__codelineno-42-27"></a><span class="c1"># 6. Monitor and promote when satisfied</span>
-</span><span id="__span-42-28"><a id="__codelineno-42-28" name="__codelineno-42-28" href="#__codelineno-42-28"></a>agentomatic<span class="w"> </span>promote<span class="w"> </span>scope_agent<span class="w"> </span>--version<span class="w"> </span>v2_optimized
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="c1"># 1. Deploy your agents</span>
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>agentomatic<span class="w"> </span>run
+</span><span id="__span-46-3"><a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>
+</span><span id="__span-46-4"><a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="c1"># 2. Generate a synthetic evaluation dataset from your documentation</span>
+</span><span id="__span-46-5"><a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a>agentomatic<span class="w"> </span>dataset<span class="w"> </span>synth<span class="w"> </span>scope_agent<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-6"><a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="w">  </span>--from-docs<span class="w"> </span>docs/scoping.md<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-7"><a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="w">  </span>--n<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-8"><a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="w">  </span>--out<span class="w"> </span>scope_eval.jsonl
+</span><span id="__span-46-9"><a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a>
+</span><span id="__span-46-10"><a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a><span class="c1"># 3. Evaluate the current prompt version</span>
+</span><span id="__span-46-11"><a id="__codelineno-46-11" name="__codelineno-46-11" href="#__codelineno-46-11"></a>agentomatic<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>scope_agent<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-12"><a id="__codelineno-46-12" name="__codelineno-46-12" href="#__codelineno-46-12"></a><span class="w">  </span>--dataset<span class="w"> </span>scope_eval.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-13"><a id="__codelineno-46-13" name="__codelineno-46-13" href="#__codelineno-46-13"></a><span class="w">  </span>--prompt-version<span class="w"> </span>v1
+</span><span id="__span-46-14"><a id="__codelineno-46-14" name="__codelineno-46-14" href="#__codelineno-46-14"></a>
+</span><span id="__span-46-15"><a id="__codelineno-46-15" name="__codelineno-46-15" href="#__codelineno-46-15"></a><span class="c1"># 4. Fit a better configuration</span>
+</span><span id="__span-46-16"><a id="__codelineno-46-16" name="__codelineno-46-16" href="#__codelineno-46-16"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>scope_agent<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-17"><a id="__codelineno-46-17" name="__codelineno-46-17" href="#__codelineno-46-17"></a><span class="w">  </span>--dataset<span class="w"> </span>scope_eval.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-18"><a id="__codelineno-46-18" name="__codelineno-46-18" href="#__codelineno-46-18"></a><span class="w">  </span>--optimize<span class="w"> </span>prompt,params,rag,tools<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-19"><a id="__codelineno-46-19" name="__codelineno-46-19" href="#__codelineno-46-19"></a><span class="w">  </span>--judge<span class="w"> </span>ollama/qwen2.5:7b<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-20"><a id="__codelineno-46-20" name="__codelineno-46-20" href="#__codelineno-46-20"></a><span class="w">  </span>--rewriter<span class="w"> </span>gpt-4.1<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-21"><a id="__codelineno-46-21" name="__codelineno-46-21" href="#__codelineno-46-21"></a><span class="w">  </span>--max-trials<span class="w"> </span><span class="m">40</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-46-22"><a id="__codelineno-46-22" name="__codelineno-46-22" href="#__codelineno-46-22"></a><span class="w">  </span>--apply-as<span class="w"> </span>v2_optimized
+</span><span id="__span-46-23"><a id="__codelineno-46-23" name="__codelineno-46-23" href="#__codelineno-46-23"></a>
+</span><span id="__span-46-24"><a id="__codelineno-46-24" name="__codelineno-46-24" href="#__codelineno-46-24"></a><span class="c1"># 5. Canary release — send 20% of traffic to the new version</span>
+</span><span id="__span-46-25"><a id="__codelineno-46-25" name="__codelineno-46-25" href="#__codelineno-46-25"></a>agentomatic<span class="w"> </span>route<span class="w"> </span>scope_agent<span class="w"> </span>--version<span class="w"> </span>v2_optimized<span class="w"> </span>--weight<span class="w"> </span><span class="m">20</span>
+</span><span id="__span-46-26"><a id="__codelineno-46-26" name="__codelineno-46-26" href="#__codelineno-46-26"></a>
+</span><span id="__span-46-27"><a id="__codelineno-46-27" name="__codelineno-46-27" href="#__codelineno-46-27"></a><span class="c1"># 6. Monitor and promote when satisfied</span>
+</span><span id="__span-46-28"><a id="__codelineno-46-28" name="__codelineno-46-28" href="#__codelineno-46-28"></a>agentomatic<span class="w"> </span>promote<span class="w"> </span>scope_agent<span class="w"> </span>--version<span class="w"> </span>v2_optimized
 </span></code></pre></div>
 <p>Each command maps to a stage in the optimization lifecycle:</p>
 <table>
@@ -4967,23 +5170,23 @@ and the expected metric gain if the issue is fixed:</p>
 that plugs directly into :class:<code>~agentomatic.optimize.fitter.PromptFitter</code>
 (no adapters required).</p>
 <h3 id="callbacks">Callbacks<a class="headerlink" href="#callbacks" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>    <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">ModelCheckpoint</span><span class="p">,</span> <span class="n">NaNStopping</span><span class="p">,</span>
-</span><span id="__span-43-3"><a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>    <span class="n">ScoreThreshold</span><span class="p">,</span> <span class="n">TemperatureScheduler</span><span class="p">,</span> <span class="n">default_callbacks</span><span class="p">,</span>
-</span><span id="__span-43-4"><a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a><span class="p">)</span>
-</span><span id="__span-43-5"><a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptFitter</span>
-</span><span id="__span-43-6"><a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a>
-</span><span id="__span-43-7"><a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a><span class="n">fitter</span> <span class="o">=</span> <span class="n">PromptFitter</span><span class="p">(</span>
-</span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a>    <span class="n">agent</span><span class="o">=</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span>
-</span><span id="__span-43-9"><a id="__codelineno-43-9" name="__codelineno-43-9" href="#__codelineno-43-9"></a>    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-43-10"><a id="__codelineno-43-10" name="__codelineno-43-10" href="#__codelineno-43-10"></a>        <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">patience</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_delta</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
-</span><span id="__span-43-11"><a id="__codelineno-43-11" name="__codelineno-43-11" href="#__codelineno-43-11"></a>        <span class="n">ModelCheckpoint</span><span class="p">(</span><span class="n">save_dir</span><span class="o">=</span><span class="s2">&quot;checkpoints/hello/&quot;</span><span class="p">),</span>
-</span><span id="__span-43-12"><a id="__codelineno-43-12" name="__codelineno-43-12" href="#__codelineno-43-12"></a>        <span class="n">ScoreThreshold</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="mf">0.90</span><span class="p">),</span>
-</span><span id="__span-43-13"><a id="__codelineno-43-13" name="__codelineno-43-13" href="#__codelineno-43-13"></a>        <span class="n">TemperatureScheduler</span><span class="p">(</span><span class="n">initial_temperature</span><span class="o">=</span><span class="mf">0.7</span><span class="p">),</span>
-</span><span id="__span-43-14"><a id="__codelineno-43-14" name="__codelineno-43-14" href="#__codelineno-43-14"></a>        <span class="n">NaNStopping</span><span class="p">(),</span>
-</span><span id="__span-43-15"><a id="__codelineno-43-15" name="__codelineno-43-15" href="#__codelineno-43-15"></a>    <span class="p">],</span>
-</span><span id="__span-43-16"><a id="__codelineno-43-16" name="__codelineno-43-16" href="#__codelineno-43-16"></a><span class="p">)</span>
-</span><span id="__span-43-17"><a id="__codelineno-43-17" name="__codelineno-43-17" href="#__codelineno-43-17"></a><span class="c1"># Or: callbacks=default_callbacks(patience=3, target_score=0.9)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>    <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">ModelCheckpoint</span><span class="p">,</span> <span class="n">NaNStopping</span><span class="p">,</span>
+</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>    <span class="n">ScoreThreshold</span><span class="p">,</span> <span class="n">TemperatureScheduler</span><span class="p">,</span> <span class="n">default_callbacks</span><span class="p">,</span>
+</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a><span class="p">)</span>
+</span><span id="__span-47-5"><a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptFitter</span>
+</span><span id="__span-47-6"><a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a>
+</span><span id="__span-47-7"><a id="__codelineno-47-7" name="__codelineno-47-7" href="#__codelineno-47-7"></a><span class="n">fitter</span> <span class="o">=</span> <span class="n">PromptFitter</span><span class="p">(</span>
+</span><span id="__span-47-8"><a id="__codelineno-47-8" name="__codelineno-47-8" href="#__codelineno-47-8"></a>    <span class="n">agent</span><span class="o">=</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span>
+</span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a>    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-47-10"><a id="__codelineno-47-10" name="__codelineno-47-10" href="#__codelineno-47-10"></a>        <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">patience</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_delta</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
+</span><span id="__span-47-11"><a id="__codelineno-47-11" name="__codelineno-47-11" href="#__codelineno-47-11"></a>        <span class="n">ModelCheckpoint</span><span class="p">(</span><span class="n">save_dir</span><span class="o">=</span><span class="s2">&quot;checkpoints/hello/&quot;</span><span class="p">),</span>
+</span><span id="__span-47-12"><a id="__codelineno-47-12" name="__codelineno-47-12" href="#__codelineno-47-12"></a>        <span class="n">ScoreThreshold</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="mf">0.90</span><span class="p">),</span>
+</span><span id="__span-47-13"><a id="__codelineno-47-13" name="__codelineno-47-13" href="#__codelineno-47-13"></a>        <span class="n">TemperatureScheduler</span><span class="p">(</span><span class="n">initial_temperature</span><span class="o">=</span><span class="mf">0.7</span><span class="p">),</span>
+</span><span id="__span-47-14"><a id="__codelineno-47-14" name="__codelineno-47-14" href="#__codelineno-47-14"></a>        <span class="n">NaNStopping</span><span class="p">(),</span>
+</span><span id="__span-47-15"><a id="__codelineno-47-15" name="__codelineno-47-15" href="#__codelineno-47-15"></a>    <span class="p">],</span>
+</span><span id="__span-47-16"><a id="__codelineno-47-16" name="__codelineno-47-16" href="#__codelineno-47-16"></a><span class="p">)</span>
+</span><span id="__span-47-17"><a id="__codelineno-47-17" name="__codelineno-47-17" href="#__codelineno-47-17"></a><span class="c1"># Or: callbacks=default_callbacks(patience=3, target_score=0.9)</span>
 </span></code></pre></div>
 <p><code>PromptFitter</code> polls callback side-effects after every round:</p>
 <ul>
@@ -4992,39 +5195,39 @@ that plugs directly into :class:<code>~agentomatic.optimize.fitter.PromptFitter<
 <li><code>current_prompt</code> → restores a checkpointed / rolled-back prompt</li>
 </ul>
 <h3 id="presets">Presets<a class="headerlink" href="#presets" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.presets</span><span class="w"> </span><span class="kn">import</span> <span class="n">Presets</span><span class="p">,</span> <span class="n">to_fitter_kwargs</span>
-</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptFitter</span>
-</span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>
-</span><span id="__span-44-4"><a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="n">preset</span> <span class="o">=</span> <span class="n">Presets</span><span class="o">.</span><span class="n">for_local</span><span class="p">()</span>          <span class="c1"># Ollama, 5 rounds</span>
-</span><span id="__span-44-5"><a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="c1"># Presets.for_quality() / Presets.for_quick() / Presets.for_model(...)</span>
-</span><span id="__span-44-6"><a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a><span class="n">fitter</span> <span class="o">=</span> <span class="n">PromptFitter</span><span class="p">(</span><span class="n">agent</span><span class="o">=</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">to_fitter_kwargs</span><span class="p">(</span><span class="n">preset</span><span class="p">))</span>
-</span><span id="__span-44-7"><a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="n">cfg</span> <span class="o">=</span> <span class="n">preset</span><span class="o">.</span><span class="n">to_config</span><span class="p">(</span><span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are helpful.&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.presets</span><span class="w"> </span><span class="kn">import</span> <span class="n">Presets</span><span class="p">,</span> <span class="n">to_fitter_kwargs</span>
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptFitter</span>
+</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>
+</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a><span class="n">preset</span> <span class="o">=</span> <span class="n">Presets</span><span class="o">.</span><span class="n">for_local</span><span class="p">()</span>          <span class="c1"># Ollama, 5 rounds</span>
+</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a><span class="c1"># Presets.for_quality() / Presets.for_quick() / Presets.for_model(...)</span>
+</span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a><span class="n">fitter</span> <span class="o">=</span> <span class="n">PromptFitter</span><span class="p">(</span><span class="n">agent</span><span class="o">=</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">to_fitter_kwargs</span><span class="p">(</span><span class="n">preset</span><span class="p">))</span>
+</span><span id="__span-48-7"><a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a><span class="n">cfg</span> <span class="o">=</span> <span class="n">preset</span><span class="o">.</span><span class="n">to_config</span><span class="p">(</span><span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are helpful.&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="experiment-tracker">Experiment tracker<a class="headerlink" href="#experiment-tracker" title="Permanent link">&para;</a></h3>
 <p>Every <code>PromptFitter.fit()</code> run auto-logs to SQLite under
 <code>{experiment_dir}/experiments.db</code>. You can also drive it manually:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.experiment_tracker</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExperimentTracker</span>
-</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>
-</span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="n">tracker</span> <span class="o">=</span> <span class="n">ExperimentTracker</span><span class="p">()</span>
-</span><span id="__span-45-4"><a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a><span class="n">eid</span> <span class="o">=</span> <span class="k">await</span> <span class="n">tracker</span><span class="o">.</span><span class="n">start_experiment</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="s2">&quot;gepa_like&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;ollama/mistral:7b&quot;</span><span class="p">)</span>
-</span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="k">await</span> <span class="n">tracker</span><span class="o">.</span><span class="n">log_iteration</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="mf">0.72</span><span class="p">,</span> <span class="n">prompt</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">)</span>
-</span><span id="__span-45-6"><a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="k">await</span> <span class="n">tracker</span><span class="o">.</span><span class="n">end_experiment</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="n">final_score</span><span class="o">=</span><span class="mf">0.91</span><span class="p">)</span>
-</span><span id="__span-45-7"><a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a><span class="n">tracker</span><span class="o">.</span><span class="n">display_experiments</span><span class="p">()</span>  <span class="c1"># alias: show_experiments()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.experiment_tracker</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExperimentTracker</span>
+</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>
+</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a><span class="n">tracker</span> <span class="o">=</span> <span class="n">ExperimentTracker</span><span class="p">()</span>
+</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a><span class="n">eid</span> <span class="o">=</span> <span class="k">await</span> <span class="n">tracker</span><span class="o">.</span><span class="n">start_experiment</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="s2">&quot;gepa_like&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;ollama/mistral:7b&quot;</span><span class="p">)</span>
+</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a><span class="k">await</span> <span class="n">tracker</span><span class="o">.</span><span class="n">log_iteration</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="mf">0.72</span><span class="p">,</span> <span class="n">prompt</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">)</span>
+</span><span id="__span-49-6"><a id="__codelineno-49-6" name="__codelineno-49-6" href="#__codelineno-49-6"></a><span class="k">await</span> <span class="n">tracker</span><span class="o">.</span><span class="n">end_experiment</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="n">final_score</span><span class="o">=</span><span class="mf">0.91</span><span class="p">)</span>
+</span><span id="__span-49-7"><a id="__codelineno-49-7" name="__codelineno-49-7" href="#__codelineno-49-7"></a><span class="n">tracker</span><span class="o">.</span><span class="n">display_experiments</span><span class="p">()</span>  <span class="c1"># alias: show_experiments()</span>
 </span></code></pre></div>
 <h3 id="agentfit-mixin-prompt-path"><code>agent.fit()</code> mixin (prompt path)<a class="headerlink" href="#agentfit-mixin-prompt-path" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseGraphAgent</span>
-</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">OptimizerMixin</span>
-</span><span id="__span-46-3"><a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>
-</span><span id="__span-46-4"><a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">HelloAgent</span><span class="p">(</span><span class="n">OptimizerMixin</span><span class="p">,</span> <span class="n">BaseGraphAgent</span><span class="p">):</span>  <span class="c1"># mixin first for fit(test_cases)</span>
-</span><span id="__span-46-5"><a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a>    <span class="n">agent_name</span> <span class="o">=</span> <span class="s2">&quot;hello&quot;</span>
-</span><span id="__span-46-6"><a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a>    <span class="o">...</span>
-</span><span id="__span-46-7"><a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a>
-</span><span id="__span-46-8"><a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="n">result</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">test_cases</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>  <span class="c1"># → FitResult</span>
-</span><span id="__span-46-9"><a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
-</span><span id="__span-46-10"><a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a>
-</span><span id="__span-46-11"><a id="__codelineno-46-11" name="__codelineno-46-11" href="#__codelineno-46-11"></a><span class="c1"># Keras History path still works via smart dispatch:</span>
-</span><span id="__span-46-12"><a id="__codelineno-46-12" name="__codelineno-46-12" href="#__codelineno-46-12"></a><span class="n">agent</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
-</span><span id="__span-46-13"><a id="__codelineno-46-13" name="__codelineno-46-13" href="#__codelineno-46-13"></a><span class="n">history</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># → History</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseGraphAgent</span>
+</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">OptimizerMixin</span>
+</span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>
+</span><span id="__span-50-4"><a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">HelloAgent</span><span class="p">(</span><span class="n">OptimizerMixin</span><span class="p">,</span> <span class="n">BaseGraphAgent</span><span class="p">):</span>  <span class="c1"># mixin first for fit(test_cases)</span>
+</span><span id="__span-50-5"><a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>    <span class="n">agent_name</span> <span class="o">=</span> <span class="s2">&quot;hello&quot;</span>
+</span><span id="__span-50-6"><a id="__codelineno-50-6" name="__codelineno-50-6" href="#__codelineno-50-6"></a>    <span class="o">...</span>
+</span><span id="__span-50-7"><a id="__codelineno-50-7" name="__codelineno-50-7" href="#__codelineno-50-7"></a>
+</span><span id="__span-50-8"><a id="__codelineno-50-8" name="__codelineno-50-8" href="#__codelineno-50-8"></a><span class="n">result</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">test_cases</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>  <span class="c1"># → FitResult</span>
+</span><span id="__span-50-9"><a id="__codelineno-50-9" name="__codelineno-50-9" href="#__codelineno-50-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+</span><span id="__span-50-10"><a id="__codelineno-50-10" name="__codelineno-50-10" href="#__codelineno-50-10"></a>
+</span><span id="__span-50-11"><a id="__codelineno-50-11" name="__codelineno-50-11" href="#__codelineno-50-11"></a><span class="c1"># Keras History path still works via smart dispatch:</span>
+</span><span id="__span-50-12"><a id="__codelineno-50-12" name="__codelineno-50-12" href="#__codelineno-50-12"></a><span class="n">agent</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</span><span id="__span-50-13"><a id="__codelineno-50-13" name="__codelineno-50-13" href="#__codelineno-50-13"></a><span class="n">history</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># → History</span>
 </span></code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">MRO + smart dispatch</p>
@@ -5036,19 +5239,19 @@ agent.optimize_prompts(...)</code> only when you are already inside an
 async context.</p>
 </div>
 <h3 id="per-agent-evalspy-discovery">Per-agent <code>evals.py</code> discovery<a class="headerlink" href="#per-agent-evalspy-discovery" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="c1"># agents/hello/evals.py</span>
-</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_test_cases</span><span class="p">():</span> <span class="o">...</span>
-</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a><span class="n">THRESHOLDS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;answer_relevancy&quot;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">}</span>
-</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>
-</span><span id="__span-47-5"><a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.evals_discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_agent_evals</span>
-</span><span id="__span-47-6"><a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a><span class="n">discovered</span> <span class="o">=</span> <span class="n">discover_agent_evals</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="c1"># agents/hello/evals.py</span>
+</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_test_cases</span><span class="p">():</span> <span class="o">...</span>
+</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a><span class="n">THRESHOLDS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;answer_relevancy&quot;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">}</span>
+</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>
+</span><span id="__span-51-5"><a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.evals_discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_agent_evals</span>
+</span><span id="__span-51-6"><a id="__codelineno-51-6" name="__codelineno-51-6" href="#__codelineno-51-6"></a><span class="n">discovered</span> <span class="o">=</span> <span class="n">discover_agent_evals</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="per-agent-training-cli">Per-agent training CLI<a class="headerlink" href="#per-agent-training-cli" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="c1"># agents/hello/train.py</span>
-</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.train_cli</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_train_cli</span>
-</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a><span class="n">cli</span> <span class="o">=</span> <span class="n">create_train_cli</span><span class="p">(</span><span class="n">agent</span><span class="o">=</span><span class="n">HelloAgent</span><span class="p">(),</span> <span class="n">test_cases_fn</span><span class="o">=</span><span class="n">get_test_cases</span><span class="p">)</span>
-</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>    <span class="n">cli</span><span class="p">()</span>  <span class="c1"># subcommands: train, evaluate, experiments, generate, settings</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a><span class="c1"># agents/hello/train.py</span>
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize.train_cli</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_train_cli</span>
+</span><span id="__span-52-3"><a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a><span class="n">cli</span> <span class="o">=</span> <span class="n">create_train_cli</span><span class="p">(</span><span class="n">agent</span><span class="o">=</span><span class="n">HelloAgent</span><span class="p">(),</span> <span class="n">test_cases_fn</span><span class="o">=</span><span class="n">get_test_cases</span><span class="p">)</span>
+</span><span id="__span-52-4"><a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+</span><span id="__span-52-5"><a id="__codelineno-52-5" name="__codelineno-52-5" href="#__codelineno-52-5"></a>    <span class="n">cli</span><span class="p">()</span>  <span class="c1"># subcommands: train, evaluate, experiments, generate, settings</span>
 </span></code></pre></div>
 <h3 id="offline-end-to-end-coverage">Offline end-to-end coverage<a class="headerlink" href="#offline-end-to-end-coverage" title="Permanent link">&para;</a></h3>
 <p>The suite in <code>tests/test_optimize_langchain_e2e.py</code> exercises the production
@@ -5061,7 +5264,7 @@ paths offline (local echo agent + <code>ExactMatchMetric</code>, no LLM server):
 <li>LangChain adapter + scaffolded <code>langchain</code> agent</li>
 <li>evals discovery, diversity selection, JSON extract, prompt version control</li>
 </ul>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_optimize_langchain_e2e.py<span class="w"> </span>-q<span class="w"> </span>--override-ini<span class="o">=</span><span class="s1">&#39;addopts=&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_optimize_langchain_e2e.py<span class="w"> </span>-q<span class="w"> </span>--override-ini<span class="o">=</span><span class="s1">&#39;addopts=&#39;</span>
 </span></code></pre></div>
 <hr />
 <h3 id="vocabulary">Vocabulary<a class="headerlink" href="#vocabulary" title="Permanent link">&para;</a></h3>
