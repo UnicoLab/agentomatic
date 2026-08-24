@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from agentomatic.core.errors import client_safe_detail
 from agentomatic.core.schemas import SchemaValidator, load_schema_models
 from agentomatic.studio.adapters import resolve_adapter
 from agentomatic.studio.models import (
@@ -440,6 +441,20 @@ def create_studio_router(
                 detail=f"Agent '{name}' does not support interrupt/resume (no graph_fn)",
             )
 
+        # Resume is a LangGraph feature: it needs ``astream_events`` and
+        # ``Command(resume=...)``. Agentomatic's own lightweight AgentGraph has
+        # neither, so without this guard the call raised AttributeError *inside*
+        # the SSE body — surfacing a raw internal error with a 200 status.
+        if not hasattr(agent.graph_fn(), "astream_events"):
+            raise HTTPException(
+                status_code=501,
+                detail=(
+                    f"Agent '{name}' does not support interrupt/resume: its graph is not "
+                    "a LangGraph runnable (no 'astream_events'). Compile the agent with "
+                    "LangGraph to use interrupts."
+                ),
+            )
+
         async def _stream() -> AsyncGenerator[str, None]:
             try:
                 # Guard re-check for the closure (the route already 400s above).
@@ -467,7 +482,15 @@ def create_studio_router(
 
                 yield 'data: {"event": "done"}\n\n'
             except Exception as exc:
-                error_data = json_mod.dumps({"event": "run_error", "data": {"error": str(exc)}})
+                # Don't echo raw internal exception text to the client — it can
+                # carry credentials/paths. Full detail goes to the server log,
+                # correlated by error_id.
+                error_data = json_mod.dumps(
+                    {
+                        "event": "run_error",
+                        "data": client_safe_detail(exc, context="Resume failed"),
+                    }
+                )
                 yield f"data: {error_data}\n\n"
 
         return StreamingResponse(

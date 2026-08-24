@@ -209,3 +209,55 @@ def test_run_puts_project_dir_on_sys_path_before_uvicorn(monkeypatch, tmp_path) 
     assert captured["app_dir"] == project_dir
     assert captured["sys_path_0"] == project_dir
     assert project_dir in captured["pythonpath"].split(os.pathsep)
+
+
+# =====================================================================
+# Scaffold hygiene: no filesystem paths or dead collectors leaked
+# =====================================================================
+
+
+def test_project_title_uses_only_the_directory_name() -> None:
+    """Regression: ``agentomatic new /srv/apps/my_proj`` baked the whole
+    filesystem path into the platform title, which is published via
+    ``/openapi.json``, ``/.well-known/agent.json`` and ``/studio/info`` —
+    leaking the server's directory layout to any caller.
+    """
+    from agentomatic.cli.project import get_project_files
+
+    main_py = get_project_files("/srv/apps/my_proj")["main.py"]
+
+    assert '"My Proj Platform"' in main_py
+    assert "/srv/apps" not in main_py.split("description=")[0]
+
+
+def test_env_example_does_not_enable_a_collector_that_is_not_there() -> None:
+    """An OTLP endpoint set with nothing listening makes the exporter retry
+    every span and flood the log with transient-failure warnings.
+    """
+    from agentomatic.cli.project import get_project_files
+
+    env_example = get_project_files("demo")[".env.example"]
+
+    for line in env_example.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("OTEL_EXPORTER_OTLP_ENDPOINT="):
+            pytest.fail(f"OTLP endpoint enabled by default in .env.example: {stripped!r}")
+    # It should still be documented, just commented out.
+    assert "OTEL_EXPORTER_OTLP_ENDPOINT" in env_example
+
+
+def test_full_template_agent_keeps_its_generated_endpoints() -> None:
+    """A module-level ``router`` in an agent's ``api.py`` REPLACES every
+    auto-generated endpoint (/invoke, /chat, /stream, /card, /health). The
+    ``full`` template shipped one, so the flagship scaffold produced an agent
+    with no way to invoke it.
+    """
+    from agentomatic.cli.templates import get_template_files
+
+    api_py = get_template_files("full", "sample_agent")["api.py"]
+
+    # The registry keys on the exact name ``router``; anything else is inert.
+    assert "\nrouter = APIRouter()" not in api_py
+    assert "custom_router = APIRouter()" in api_py
+    # The pattern is still demonstrated and explained.
+    assert "REPLACES" in api_py

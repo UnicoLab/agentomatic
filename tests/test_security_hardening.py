@@ -248,3 +248,57 @@ def test_generated_env_example_contains_no_literal_secret(tmp_path) -> None:
 
     assert "sk-proj-REALSECRET123" not in env_example
     assert "SuperSecret99" not in env_example
+
+
+# =====================================================================
+# Studio resume: clear status code + sanitised errors
+# =====================================================================
+
+
+def test_studio_resume_rejects_non_langgraph_agent_cleanly(tmp_path) -> None:
+    """Resume is a LangGraph feature (``astream_events`` + ``Command``).
+
+    Agentomatic's own lightweight AgentGraph has neither, so the call used to
+    raise AttributeError *inside* the SSE body — returning HTTP 200 with the
+    raw internal message ``'AgentGraph' object has no attribute
+    'astream_events'``. It must fail fast with a real status code instead.
+    """
+    from agentomatic.agents.graph import AgentGraph, GraphNode
+
+    def node(state: dict[str, Any]) -> dict[str, Any]:
+        return state
+
+    def graph_fn() -> AgentGraph:
+        return AgentGraph(
+            nodes={"n": GraphNode(name="n", handler=node)},
+            edges={},
+            entrypoint="n",
+            finish="n",
+        )
+
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+        enable_studio=True,
+    )
+
+    async def node_fn(state: dict[str, Any]) -> dict[str, Any]:
+        return {"response": "ok"}
+
+    platform.register_agent(
+        manifest=AgentManifest(name="plain", slug="plain", description="no langgraph"),
+        node_fn=node_fn,
+        graph_fn=graph_fn,
+    )
+
+    with TestClient(platform.build(), raise_server_exceptions=False) as client:
+        response = client.post(
+            "/studio/agents/plain/threads/does-not-exist/resume",
+            json={"value": "hi"},
+        )
+
+    assert response.status_code == 501
+    body = response.text
+    assert "astream_events" in body  # actionable: names what's missing
+    assert "AttributeError" not in body

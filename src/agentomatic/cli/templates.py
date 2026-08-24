@@ -329,7 +329,7 @@ def _tools_py(name: str) -> str:
 
 
 def _api_py(name: str) -> str:
-    return f'''"""Custom API router for {name}.\n\nIf this file exports a `router`, it REPLACES the auto-generated endpoints.\nRemove this file to use auto-generated endpoints instead.\n"""\nfrom __future__ import annotations\n\nfrom fastapi import APIRouter\n\nrouter = APIRouter()\n\n\n@router.get("/status")\nasync def status() -> dict:\n    """Custom status endpoint."""\n    return {{"agent": "{name}", "custom_router": True}}\n'''
+    return f'''"""Custom API router for {name}.\n\nExporting a module-level ``router`` REPLACES *all* auto-generated endpoints\nfor this agent — /invoke, /chat, /invoke/stream, /card and /health included.\n\nThis scaffold therefore names it ``custom_router``, which the registry does\nnot pick up, so the agent keeps its auto-generated endpoints out of the box.\nRename it to ``router`` when you genuinely want to take over the agent\'s\nroutes entirely (and re-add any of the generated ones you still need).\n"""\nfrom __future__ import annotations\n\nfrom fastapi import APIRouter\n\ncustom_router = APIRouter()\n\n\n@custom_router.get("/status")\nasync def status() -> dict:\n    """Custom status endpoint."""\n    return {{"agent": "{name}", "custom_router": True}}\n'''
 
 
 def _prompts_json() -> str:

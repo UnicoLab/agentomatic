@@ -38,8 +38,12 @@ def _main_py(name: str) -> str:
     Returns:
         Rendered ``main.py`` source.
     """
-    display = name.replace("_", " ").title()
-    return f'''"""{name} — Agentomatic platform entrypoint.
+    # Use only the final path segment: ``agentomatic new /srv/apps/my_proj``
+    # would otherwise bake the whole filesystem path into the platform title,
+    # which is published via /openapi.json, /.well-known/agent.json and
+    # /studio/info — leaking the server's directory layout.
+    display = Path(name).name.replace("_", " ").title()
+    return f'''"""{display} — Agentomatic platform entrypoint.
 
 Serves an identical feature set whether launched with ``agentomatic run``
 (dev) or ``uvicorn main:app`` (container). Toggle features with
@@ -96,7 +100,7 @@ def create_platform() -> AgentPlatform:
         # Pipelines are auto-discovered from ../pipelines/ (sibling of agents/).
         # stack="local",              # or set via .agentomatic-stack / STACK env
         title=os.getenv("AGENTOMATIC_TITLE", "{display} Platform"),
-        description="Agentomatic multi-agent platform for {name}",
+        description="Agentomatic multi-agent platform for {display}",
         log_level=os.getenv("AGENTOMATIC_LOG_LEVEL", "INFO"),
         # On by default — matches `agentomatic run` (Studio) + prod observability.
         enable_studio=_env_bool("AGENTOMATIC_ENABLE_STUDIO", True),
@@ -232,7 +236,13 @@ QDRANT_URL=
 QDRANT_API_KEY=
 
 # --- Observability ---
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# Uncomment once a collector is actually reachable. Setting this with nothing
+# listening makes the exporter retry every span and fill the log with
+# "Transient error StatusCode.UNAVAILABLE / Failed to export traces".
+# Spans are still recorded either way; this only controls shipping them.
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# Print spans to stdout instead (local debugging only — very verbose):
+# AGENTOMATIC_OTEL_CONSOLE=1
 """
 
 
