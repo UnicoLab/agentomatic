@@ -14,6 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
+from agentomatic.langchain_adapter import json_default, to_jsonable
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
@@ -55,9 +56,13 @@ class AgentInvokeRequest(BaseModel):
     query: str = Field(..., description="User query or input")
     user_id: str = Field("default-user", description="User identifier")
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
-    thread_id: str | None = Field(default=None, description="Thread ID for conversation continuity")
+    thread_id: str | None = Field(
+        default=None, description="Thread ID for conversation continuity"
+    )
     prompt_version: str = Field("v1", description="Prompt version to use")
-    temperature: float | None = Field(default=None, ge=0.0, le=2.0, description="Temperature override")
+    temperature: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="Temperature override"
+    )
     max_tokens: int | None = Field(default=None, ge=1, description="Max tokens override")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
 
@@ -111,7 +116,7 @@ _FRAMEWORK_RESULT_KEYS = frozenset(
 def _json_dumps(value: Any) -> str:
     """Serialize *value* as JSON text (fallback to ``str`` on failure)."""
     try:
-        return json.dumps(value, ensure_ascii=False, default=str)
+        return json.dumps(value, ensure_ascii=False, default=json_default)
     except (TypeError, ValueError):
         return str(value)
 
@@ -141,21 +146,24 @@ def coerce_agent_invoke_payload(
         text = "" if result is None else str(result)
         return text, None, {}
 
-    context = result.get("context", result.get("retrieved_documents", {}))
+    context = to_jsonable(result.get("context", result.get("retrieved_documents", {})))
     raw_response = result.get("response")
 
     # Explicit string response (classic BaseAgentState / chat agents).
     if isinstance(raw_response, str) and raw_response:
         extras = {k: v for k, v in result.items() if k not in _FRAMEWORK_RESULT_KEYS}
-        output: Any | None = extras or None
+        output: Any | None = to_jsonable(extras) if extras else None
         return raw_response, output, context
 
     # Explicit structured response value.
     if isinstance(raw_response, (dict, list)):
-        return _json_dumps(raw_response), raw_response, context
+        jsonable_response = to_jsonable(raw_response)
+        return _json_dumps(jsonable_response), jsonable_response, context
 
-    # Class-agent ``state_to_output``: whole dict is the payload.
-    output = dict(result)
+    # Class-agent ``state_to_output``: whole dict is the payload. May contain raw
+    # LangChain BaseMessage objects (e.g. ``{"messages": state.messages}``) — make
+    # it JSON-safe before it becomes an HTTP response body.
+    output = to_jsonable(dict(result))
     text = _human_response_text(output) or _json_dumps(output)
     return text, output, context if context is not None else {}
 
@@ -205,7 +213,9 @@ class AgentChatRequest(BaseModel):
 class CreateThreadRequest(BaseModel):
     """Request to explicitly create a thread."""
 
-    thread_id: str | None = Field(default=None, description="Custom thread ID (auto-generated if omitted)")
+    thread_id: str | None = Field(
+        default=None, description="Custom thread ID (auto-generated if omitted)"
+    )
     user_id: str = Field("default-user", description="User identifier")
     title: str | None = Field(default=None, description="Thread title")
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -707,26 +717,26 @@ def create_default_router(
                         state_obj = class_agent.input_to_state(input_data)
                         graph = class_agent.graph
                         async for event in graph.astream(state_obj):
-                            yield f"data: {json.dumps(event, default=str)}\n\n"
+                            yield f"data: {json.dumps(event, default=json_default)}\n\n"
                         result = class_agent.state_to_output(state_obj)
                         if hasattr(class_agent, "_graph") and class_agent._graph is not None:
                             class_agent._traces.append(class_agent._graph.last_trace)
                     finally:
                         class_agent._end_request_prompt()
-                    yield f"data: {json.dumps(result, default=str)}\n\n"
+                    yield f"data: {json.dumps(result, default=json_default)}\n\n"
                     collected_response = result.get("response", "")
                     collected_output = result
                 elif agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
-                        yield f"data: {json.dumps(event, default=str)}\n\n"
+                        yield f"data: {json.dumps(event, default=json_default)}\n\n"
                         # Collect response for persistence
                         if isinstance(event, dict) and "response" in event:
                             collected_response = event["response"]
                             collected_output = event
                 elif agent.node_fn:
                     result = await agent.node_fn(state)
-                    yield f"data: {json.dumps(result, default=str)}\n\n"
+                    yield f"data: {json.dumps(result, default=json_default)}\n\n"
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")
                         collected_output = result

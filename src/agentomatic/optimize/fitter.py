@@ -118,6 +118,7 @@ def _candidate_source_rank(source: str) -> int:
     """Return the tie-break rank for a candidate ``source`` label."""
     return _CANDIDATE_SOURCE_PRIORITY.get(source, 3)
 
+
 _EARLY_STOP_PATIENCE: int = 3
 """Stop if no improvement for this many consecutive rounds."""
 
@@ -1266,7 +1267,9 @@ class PromptFitter:
                                 logger.debug("APO beam update skipped: {}", exc)
                         if hasattr(opt, "observe"):
                             try:
-                                getattr(opt, "observe")(dict(cand.config.model_params or {}), full_score)
+                                getattr(opt, "observe")(
+                                    dict(cand.config.model_params or {}), full_score
+                                )
                             except Exception as exc:  # pragma: no cover
                                 logger.debug("Param observe skipped: {}", exc)
                     else:

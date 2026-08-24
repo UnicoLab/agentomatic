@@ -83,7 +83,7 @@ and platform `logs_history` / `allow_logsllm_analysis`. See the optimization gui
 | Command | Purpose |
 | --- | --- |
 | `agentomatic new NAME` | Scaffold a full project (alias for `init --project`) |
-| `agentomatic init NAME [--project] [--template basic\\|full\\|class\\|rag\\|chatbot\\|coordinator\\|extraction\\|deepagent\\|legacy_dict\\|ingestion]` | Scaffold an agent (or project) |
+| `agentomatic init NAME [--project] [--template basic\\|full\\|class\\|rag\\|chatbot\\|coordinator\\|extraction\\|deepagent\\|legacy_dict\\|ingestion\\|langchain]` | Scaffold an agent (or project) |
 | `agentomatic add connection\\|ingestion NAME` | Add components to an existing agent |
 | `agentomatic run [--studio/--no-studio] [--with-ui] [--port 8000] [--ssl-certfile ...] [--require-auth-globally]` | Start the platform (prefers `main:app` when present) |
 | `agentomatic deploy [--profile full\\|minimal] [--minimal] [--distroless] [--stack NAME]` | Generate Dockerfile/compose/.env |

@@ -389,9 +389,7 @@ class EpochDiffCallback(Callback):
             for key, delta in params.items():
                 old_v, new_v = delta["old"], delta["new"]
                 if isinstance(old_v, list) or isinstance(new_v, list):
-                    parts.append(
-                        f"    {key}: {len(old_v or [])} → {len(new_v or [])} items"
-                    )
+                    parts.append(f"    {key}: {len(old_v or [])} → {len(new_v or [])} items")
                 else:
                     parts.append(f"    {key}: {old_v!r} → {new_v!r}")
 

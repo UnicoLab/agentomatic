@@ -264,7 +264,7 @@ def messages_to_dict(
         # → {"current_query": "Hi", "response": "Hello!", "messages": [...]}
     """
     state: dict[str, Any] = dict(fallback_state or {})
-    lc_list: list[dict[str, str]] = []
+    lc_list: list[dict[str, Any]] = []
     last_query = ""
     last_response = ""
 
@@ -272,7 +272,17 @@ def messages_to_dict(
         content = getattr(msg, "content", "") or ""
         content_str = str(content)
         role = _msg_role(msg)
-        lc_list.append({"role": role, "content": content_str})
+        entry: dict[str, Any] = {"role": role, "content": content_str}
+        tool_call_id = getattr(msg, "tool_call_id", None)
+        if tool_call_id:
+            entry["tool_call_id"] = tool_call_id
+        name = getattr(msg, "name", None)
+        if name:
+            entry["name"] = name
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls:
+            entry["tool_calls"] = tool_calls
+        lc_list.append(entry)
         if role in ("user", "human"):
             last_query = content_str
         elif role in ("ai", "assistant"):
@@ -290,6 +300,79 @@ def messages_to_dict(
 def serialize_messages(messages: Sequence[Any]) -> list[dict[str, str]]:
     """Serialize LangChain / role-dict messages to a plain ``list[dict]``."""
     return list(messages_to_dict(messages).get("messages", []))
+
+
+def message_to_dict(msg: Any) -> dict[str, Any]:
+    """Convert a single LangChain ``BaseMessage`` (or role dict) to a plain JSON-safe dict.
+
+    Preserves ``tool_call_id``, ``name``, and ``tool_calls`` when present, so tool-using
+    agents keep protocol fidelity when their state is serialized for REST/SSE responses.
+
+    Raises:
+        TypeError: If *msg* has no ``content`` attribute and isn't already a dict
+            (i.e. it isn't message-shaped at all).
+    """
+    if isinstance(msg, dict):
+        return msg
+    if not hasattr(msg, "content"):
+        raise TypeError(f"not a message-like object: {msg!r}")
+
+    entry: dict[str, Any] = {"role": _msg_role(msg), "content": str(msg.content or "")}
+    tool_call_id = getattr(msg, "tool_call_id", None)
+    if tool_call_id:
+        entry["tool_call_id"] = tool_call_id
+    name = getattr(msg, "name", None)
+    if name:
+        entry["name"] = name
+    tool_calls = getattr(msg, "tool_calls", None)
+    if tool_calls:
+        entry["tool_calls"] = tool_calls
+    return entry
+
+
+def to_jsonable(value: Any) -> Any:
+    """Recursively convert *value* into plain JSON-safe Python types.
+
+    Walks dicts/lists/tuples and converts any LangChain ``BaseMessage`` found
+    along the way into a plain ``{"role": ..., "content": ...}`` dict (via
+    :func:`message_to_dict`), instead of leaving it to be stringified into a
+    ``repr()`` — or to blow up entirely — by a downstream JSON encoder.
+
+    This is what a class agent's ``state_to_output()`` result passes through
+    on the generic REST/Studio response path, so returning raw ``BaseMessage``
+    objects (e.g. ``{"messages": state.messages}``) "just works".
+    """
+    _base_message_cls: Any
+    try:
+        from langchain_core.messages import BaseMessage as _base_message_cls
+    except ImportError:
+        _base_message_cls = None
+
+    if _base_message_cls is not None and isinstance(value, _base_message_cls):
+        return message_to_dict(value)
+    if isinstance(value, dict):
+        return {k: to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [to_jsonable(v) for v in value]
+    return value
+
+
+def json_default(obj: Any) -> Any:
+    """A ``json.dumps(..., default=...)`` callable that understands LangChain messages.
+
+    Converts ``BaseMessage`` instances to plain ``{"role": ..., "content": ...}`` dicts
+    (instead of stringifying their ``repr()``) and falls back to ``str(obj)`` for
+    anything else, matching the platform's previous ``default=str`` behaviour.
+    """
+    _base_message_cls: Any
+    try:
+        from langchain_core.messages import BaseMessage as _base_message_cls
+    except ImportError:
+        _base_message_cls = None
+
+    if _base_message_cls is not None and isinstance(obj, _base_message_cls):
+        return message_to_dict(obj)
+    return str(obj)
 
 
 # =====================================================================
@@ -739,8 +822,12 @@ def _render_text(msg: Any) -> str:
 
 def _dict_to_lc(d: dict[str, Any]) -> Any:
     """Convert a dict to a LangChain message object."""
+    if not isinstance(d, dict):
+        # Already a LangChain message (or other object) — pass through.
+        return d
+
     try:
-        from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
     except ImportError:
         return d
 
@@ -750,9 +837,19 @@ def _dict_to_lc(d: dict[str, Any]) -> Any:
     if role in ("user", "human"):
         return HumanMessage(content=content)
     if role in ("ai", "assistant"):
-        return AIMessage(content=content)
+        tool_calls = d.get("tool_calls")
+        kwargs: dict[str, Any] = {}
+        if tool_calls:
+            kwargs["tool_calls"] = tool_calls
+        return AIMessage(content=content, **kwargs)
     if role == "tool":
-        return ToolMessage(content=content, tool_call_id=str(d.get("tool_call_id", "")))
+        return ToolMessage(
+            content=content,
+            tool_call_id=str(d.get("tool_call_id", "")),
+            name=d.get("name"),
+        )
+    if role == "system":
+        return SystemMessage(content=content)
     return HumanMessage(content=content)
 
 

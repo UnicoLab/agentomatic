@@ -2826,21 +2826,33 @@ __all__ = ["manifest"]
 def _langchain_agent_py(name: str) -> str:
     title = name.replace("_", " ").title().replace(" ", "")
     return f'''"""LangChain-native agent: {name}.
-Uses native LangChain abstractions with agentomatic integration.
+
+Demonstrates the full set of LangChain abstractions inside an agentomatic
+class agent: ``ChatPromptTemplate`` + ``MessagesPlaceholder``, an LCEL chain
+(``prompt | llm``), real ``HumanMessage``/``AIMessage`` objects, and an
+explicit ``RunnableConfig`` threaded into the chain invocation so tracing/
+callbacks work the same way they would in a hand-rolled LangGraph app.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
 from agentomatic.agents import BaseGraphAgent
-from agentomatic.langchain_adapter import dict_to_messages, serialize_messages
+from agentomatic.langchain_adapter import (
+    dict_to_messages,
+    make_config,
+    serialize_messages,
+)
 
 
 @dataclass
 class {title}State:
     request: str = ""
     messages: list[Any] = field(default_factory=list)
+    thread_id: str | None = None
     response: str = ""
     output: dict[str, Any] = field(default_factory=dict)
 
@@ -2858,6 +2870,18 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         super().__init__()
         self.llm = llm
         self.prompt_manager = prompt_manager
+        # ChatPromptTemplate with a system message + a placeholder for the
+        # full conversation history — the standard LangChain chat pattern.
+        self.prompt_template = ChatPromptTemplate.from_messages(
+            [
+                ("system", "{{system_message}}"),
+                MessagesPlaceholder("messages"),
+            ]
+        )
+        # LCEL chain: ``prompt | llm``. When no llm is injected (e.g. in
+        # tests), ``self.chain`` stays None and ``chat()`` falls back to a
+        # deterministic stub response.
+        self.chain = self.prompt_template | self.llm if self.llm is not None else None
 
     def _system_prompt(self) -> str:
         return self.resolve_system_prompt(
@@ -2872,7 +2896,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return g.compile()
 
     def chat(self, state: {title}State) -> {title}State:
-        prompt = self._system_prompt()
+        system_message = self._system_prompt()
         # Normalise REST/Studio dict messages → LangChain message objects.
         # Fall back to current_query/request so optimize/invoke paths work
         # when the payload has no prior message history.
@@ -2882,19 +2906,22 @@ class {title}Agent(BaseGraphAgent[{title}State]):
             lc_messages = dict_to_messages({{"current_query": state.request}})
         else:
             lc_messages = []
-        if self.llm is not None:
+
+        if self.chain is not None:
+            # RunnableConfig carries tracing tags / thread_id through to the
+            # underlying LLM call, same as a hand-rolled LangGraph node would.
+            config = make_config(thread_id=state.thread_id, tags=["{name}"])
             try:
-                if lc_messages:
-                    result = self.llm.invoke(lc_messages)
-                else:
-                    result = self.llm.invoke(
-                        f"{{prompt}}" + "\\n\\nUser: " + f"{{state.request}}"
-                    )
+                result = self.chain.invoke(
+                    {{"system_message": system_message, "messages": lc_messages}},
+                    config=config,
+                )
                 text = getattr(result, "content", None) or str(result)
             except Exception:
                 text = "Response to: " + f"{{state.request}}"
         else:
-            text = f"{{prompt}}" + ": Response to '" + f"{{state.request}}" + "'"
+            text = f"{{system_message}}" + ": Response to '" + f"{{state.request}}" + "'"
+
         state.response = text
         state.messages = serialize_messages(lc_messages) if lc_messages else state.messages
         state.output = {{"response": text, "agent_type": "{name}"}}
@@ -2904,6 +2931,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return {title}State(
             request=input_data.get("current_query", ""),
             messages=input_data.get("messages", []),
+            thread_id=input_data.get("thread_id"),
         )
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:

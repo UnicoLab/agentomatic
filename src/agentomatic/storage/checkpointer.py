@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import builtins
-import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
@@ -16,20 +16,42 @@ from langgraph.checkpoint.base import (
     CheckpointMetadata,
     CheckpointTuple,
 )
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from agentomatic.storage.base import BaseStore
 
+# Encodes/decodes checkpoint payloads using LangGraph's own serializer, which
+# knows how to round-trip LangChain ``BaseMessage`` subclasses, pydantic
+# models, and other rich objects that show up in graph channel values.
+# A naive ``json.dumps(obj, default=str)`` would stringify those objects to
+# their ``repr()`` and permanently lose their structure on reload.
+_SERDE = JsonPlusSerializer()
 
-def _ensure_json_serializable(obj: Any) -> Any:
-    """Round-trip through JSON to guarantee all values are JSON-serializable.
+_ENCODED_TYPE_KEY = "__agentomatic_serde_type__"
+_ENCODED_DATA_KEY = "__agentomatic_serde_data__"
 
-    Non-serializable objects (custom classes, datetimes, bytes, etc.) are
-    converted to their string representation via ``default=str``.
+
+def _encode_for_storage(obj: Any) -> dict[str, str]:
+    """Serialize *obj* into a JSON-safe wrapper using LangGraph's serde.
+
+    Preserves rich objects (LangChain messages, pydantic models, dataclasses,
+    etc.) so they can be reconstructed exactly via :func:`_decode_from_storage`.
     """
-    try:
-        return json.loads(json.dumps(obj, default=str))
-    except (TypeError, ValueError):
-        return obj
+    type_name, raw = _SERDE.dumps_typed(obj)
+    return {
+        _ENCODED_TYPE_KEY: type_name,
+        _ENCODED_DATA_KEY: base64.b64encode(raw).decode("ascii"),
+    }
+
+
+def _decode_from_storage(payload: Any) -> Any:
+    """Inverse of :func:`_encode_for_storage`."""
+    if isinstance(payload, dict) and _ENCODED_TYPE_KEY in payload and _ENCODED_DATA_KEY in payload:
+        raw = base64.b64decode(payload[_ENCODED_DATA_KEY])
+        return _SERDE.loads_typed((payload[_ENCODED_TYPE_KEY], raw))
+    # Back-compat: checkpoints written before this fix used naive JSON
+    # (via ``default=str``) and are returned as-is — best effort only.
+    return payload
 
 
 class AgentomaticCheckpointer(BaseCheckpointSaver):
@@ -78,8 +100,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
                     "checkpoint_id": cp_data["checkpoint_id"],
                 }
             },
-            checkpoint=cp_data["checkpoint"],
-            metadata=cp_data["metadata"],
+            checkpoint=_decode_from_storage(cp_data["checkpoint"]),
+            metadata=_decode_from_storage(cp_data["metadata"]),
             parent_config=(
                 {
                     "configurable": {
@@ -145,8 +167,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
             checkpoint_ns=checkpoint_ns,
             checkpoint_id=checkpoint_id_str,
             parent_checkpoint_id=parent_id_str,
-            checkpoint=_ensure_json_serializable(dict(checkpoint)),
-            metadata=_ensure_json_serializable(dict(metadata)),
+            checkpoint=_encode_for_storage(dict(checkpoint)),
+            metadata=_encode_for_storage(dict(metadata)),
         )
 
         return {
@@ -225,8 +247,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
                             "checkpoint_id": cp["checkpoint_id"],
                         }
                     },
-                    checkpoint=cp["checkpoint"],
-                    metadata=cp["metadata"],
+                    checkpoint=_decode_from_storage(cp["checkpoint"]),
+                    metadata=_decode_from_storage(cp["metadata"]),
                     parent_config=(
                         {
                             "configurable": {

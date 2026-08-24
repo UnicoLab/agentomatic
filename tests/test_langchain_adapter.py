@@ -276,6 +276,55 @@ def test_dict_to_messages_accepts_list() -> None:
     assert plain[0]["content"] == "Hi"
 
 
+def test_dict_to_lc_system_role_becomes_system_message() -> None:
+    """A 'system' role dict must round-trip to a real SystemMessage, not HumanMessage."""
+    from langchain_core.messages import SystemMessage
+
+    from agentomatic.langchain_adapter import dict_to_messages
+
+    msgs = dict_to_messages([{"role": "system", "content": "be terse"}])
+    assert len(msgs) == 1
+    assert isinstance(msgs[0], SystemMessage)
+    assert msgs[0].content == "be terse"
+
+
+def test_messages_to_dict_preserves_tool_call_fidelity() -> None:
+    """tool_call_id / tool_calls / name must survive the message -> dict round-trip.
+
+    Without this, a ToolMessage response loses its tool_call_id and can no longer
+    satisfy the OpenAI/Anthropic tool-call protocol on the next turn.
+    """
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    from agentomatic.langchain_adapter import messages_to_dict
+
+    ai_msg = AIMessage(
+        content="",
+        tool_calls=[{"name": "search", "args": {"q": "hi"}, "id": "call_1"}],
+    )
+    tool_msg = ToolMessage(content="result", tool_call_id="call_1", name="search")
+
+    result = messages_to_dict([ai_msg, tool_msg])
+    entries = result["messages"]
+
+    assert entries[0]["tool_calls"][0]["id"] == "call_1"
+    assert entries[1]["tool_call_id"] == "call_1"
+    assert entries[1]["name"] == "search"
+
+
+def test_dict_to_lc_round_trips_tool_call_id() -> None:
+    """dict -> LangChain message -> dict must preserve tool_call_id (see BUG: dropped id)."""
+    from agentomatic.langchain_adapter import dict_to_messages, messages_to_dict
+
+    original = [{"role": "tool", "content": "42", "tool_call_id": "call_9", "name": "calc"}]
+    lc_messages = dict_to_messages(original)
+    assert lc_messages[0].tool_call_id == "call_9"
+
+    round_tripped = messages_to_dict(lc_messages)["messages"]
+    assert round_tripped[0]["tool_call_id"] == "call_9"
+    assert round_tripped[0]["name"] == "calc"
+
+
 # =====================================================================
 # RunnableConfig
 # =====================================================================
@@ -612,3 +661,46 @@ async def test_agent_adapter_streaming() -> None:
     async for event in adapted.astream({"current_query": "test"}):
         events.append(event)
     assert len(events) == 3
+
+
+# =====================================================================
+# JSON-safe serialization of LangChain objects (to_jsonable / json_default)
+# =====================================================================
+
+
+def test_message_to_dict_preserves_tool_fields() -> None:
+    from langchain_core.messages import AIMessage
+
+    from agentomatic.langchain_adapter import message_to_dict
+
+    msg = AIMessage(content="hi", tool_calls=[{"name": "x", "args": {}, "id": "c1"}])
+    result = message_to_dict(msg)
+    assert result == {"role": "ai", "content": "hi", "tool_calls": msg.tool_calls}
+
+
+def test_to_jsonable_converts_nested_messages() -> None:
+    """A class agent's raw ``state.messages`` (list[BaseMessage]) must become JSON-safe."""
+    import json
+
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    from agentomatic.langchain_adapter import to_jsonable
+
+    payload = {"messages": [HumanMessage(content="hi"), AIMessage(content="hello")], "n": 1}
+    result = to_jsonable(payload)
+    assert result == {
+        "messages": [{"role": "human", "content": "hi"}, {"role": "ai", "content": "hello"}],
+        "n": 1,
+    }
+    json.dumps(result)  # must not raise
+
+
+def test_json_default_handles_base_message() -> None:
+    import json
+
+    from langchain_core.messages import HumanMessage
+
+    from agentomatic.langchain_adapter import json_default
+
+    text = json.dumps({"m": HumanMessage(content="hi")}, default=json_default)
+    assert json.loads(text)["m"] == {"role": "human", "content": "hi"}

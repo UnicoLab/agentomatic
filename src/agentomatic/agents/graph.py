@@ -308,11 +308,18 @@ class AgentGraph(Generic[StateT]):
         import copy
 
         def _state_to_dict(s: Any) -> dict[str, Any]:
+            from agentomatic.langchain_adapter import to_jsonable
+
             if hasattr(s, "model_dump"):
-                return s.model_dump()
-            if hasattr(s, "__dict__"):
-                return vars(s)
-            return dict(s) if isinstance(s, dict) else {}
+                raw = s.model_dump()
+            elif hasattr(s, "__dict__"):
+                raw = vars(s)
+            else:
+                raw = dict(s) if isinstance(s, dict) else {}
+            # Convert any LangChain BaseMessage objects in state fields (e.g.
+            # ``messages: list[BaseMessage]``) to plain dicts so this event
+            # payload is safe to json.dumps downstream (SSE / REST).
+            return cast(dict[str, Any], to_jsonable(raw))
 
         errors = self.validate()
         if errors:
@@ -380,11 +387,18 @@ class AgentGraph(Generic[StateT]):
             return datetime.now(UTC).isoformat()
 
         def _state_to_dict(s: Any) -> dict[str, Any]:
+            from agentomatic.langchain_adapter import to_jsonable
+
             if hasattr(s, "model_dump"):
-                return s.model_dump()
-            if hasattr(s, "__dict__"):
-                return vars(s)
-            return dict(s) if isinstance(s, dict) else {}
+                raw = s.model_dump()
+            elif hasattr(s, "__dict__"):
+                raw = vars(s)
+            else:
+                raw = dict(s) if isinstance(s, dict) else {}
+            # Convert any LangChain BaseMessage objects in state fields (e.g.
+            # ``messages: list[BaseMessage]``) to plain dicts so this event
+            # payload is safe to json.dumps downstream (SSE / REST).
+            return cast(dict[str, Any], to_jsonable(raw))
 
         yield {
             "event": "run_start",

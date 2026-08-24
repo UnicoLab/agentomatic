@@ -353,17 +353,31 @@ platform.register_after_node_hook(audit_output_hook)
 
 ## 🛡️ 8. Safe Checkpoint Serialization
 
-LangGraph checkpoints can contain non-JSON-serializable Python objects (datetimes, bytes, custom classes). The `AgentomaticCheckpointer` automatically handles this via a safe JSON round-trip:
+LangGraph checkpoints can contain non-JSON-serializable Python objects — datetimes,
+bytes, custom classes, and (critically) LangChain `BaseMessage` objects
+(`HumanMessage`, `AIMessage`, `ToolMessage`, ...) sitting in channel values like
+`messages`. The `AgentomaticCheckpointer` automatically handles this using
+LangGraph's own `JsonPlusSerializer`, which round-trips these objects **without
+losing their type or structure**:
 
 ```python
-from agentomatic.storage.checkpointer import AgentomaticCheckpointer, _ensure_json_serializable
+from agentomatic.storage.checkpointer import _decode_from_storage, _encode_for_storage
 
-# Objects like datetimes, bytes, and custom classes are safely converted
-data = _ensure_json_serializable({"ts": datetime.now(), "raw": b"bytes"})
-# → {"ts": "2026-06-14 12:00:00", "raw": "b'bytes'"}
+# Rich objects are encoded into a JSON-safe wrapper for storage...
+data = _encode_for_storage({"ts": datetime.now(), "raw": b"bytes"})
+# → {"__agentomatic_serde_type__": "msgpack", "__agentomatic_serde_data__": "<base64>"}
+
+# ...and decoded back into the *original* Python objects, not strings.
+restored = _decode_from_storage(data)
+# → {"ts": datetime(...), "raw": b"bytes"}
 ```
 
-This happens transparently inside `aput()` — no user configuration needed. All values are round-tripped through `json.dumps(obj, default=str)` → `json.loads()`.
+This happens transparently inside `aput()`/`aget_tuple()` — no user configuration
+needed. Unlike a naive `json.dumps(obj, default=str)`, a `HumanMessage`/`AIMessage`
+stored in `channel_values["messages"]` comes back as a real message object (with
+`tool_calls`, `tool_call_id`, etc. intact) on the next `graph.ainvoke()`, so the
+LangGraph `add_messages` reducer and any `prompt | llm` chain keep working across
+checkpoint resumes.
 
 ---
 

@@ -210,9 +210,7 @@ if _HAS_TEXTUAL:
 
         def on_mount(self) -> None:
             """Initialise the candidates DataTable columns."""
-            table: Any = self.query_one(
-                "#candidates-pane", DataTable
-            )
+            table: Any = self.query_one("#candidates-pane", DataTable)
             table.add_columns("Round", "Name", "Source", "Score", "Status")
 
         # ── public update entry-point ──────────────────────
@@ -297,9 +295,7 @@ if _HAS_TEXTUAL:
                 return
 
             try:
-                table: Any = self.query_one(
-                    "#candidates-pane", DataTable
-                )
+                table: Any = self.query_one("#candidates-pane", DataTable)
                 score_str = f"{data.score:.4f}" if data.score is not None else "—"
                 table.add_row(
                     str(data.round_idx or self._round_idx),

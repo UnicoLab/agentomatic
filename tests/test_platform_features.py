@@ -650,24 +650,31 @@ async def test_checkpoint_serialization_with_non_json_objects(store):
     """Verify checkpointer handles non-JSON-serializable objects (datetimes, custom classes)."""
     from datetime import datetime
 
-    from agentomatic.storage.checkpointer import AgentomaticCheckpointer, _ensure_json_serializable
+    from agentomatic.storage.checkpointer import (
+        AgentomaticCheckpointer,
+        _decode_from_storage,
+        _encode_for_storage,
+    )
 
     checkpointer = AgentomaticCheckpointer(store)
 
-    # 1. Test _ensure_json_serializable directly
-    assert _ensure_json_serializable({"a": 1, "b": "text"}) == {"a": 1, "b": "text"}
+    # 1. Test _encode_for_storage / _decode_from_storage round-trip directly
+    encoded = _encode_for_storage({"a": 1, "b": "text"})
+    assert isinstance(encoded, dict)
+    assert _decode_from_storage(encoded) == {"a": 1, "b": "text"}
 
-    # 2. Test with datetime values (non-JSON-native)
+    # 2. Test with datetime values (non-JSON-native) — value survives as a real datetime.
     dt = datetime(2026, 6, 14, 12, 0, 0)
-    result = _ensure_json_serializable({"ts": dt, "val": 42})
-    assert result["val"] == 42
-    assert isinstance(result["ts"], str)  # datetime converted to string
+    encoded_dt = _encode_for_storage({"ts": dt, "val": 42})
+    decoded_dt = _decode_from_storage(encoded_dt)
+    assert decoded_dt["val"] == 42
+    assert decoded_dt["ts"] == dt
 
-    # 3. Test with bytes
-    result_bytes = _ensure_json_serializable({"data": b"binary"})
-    assert isinstance(result_bytes["data"], str)
+    # 3. Test with bytes — value survives as real bytes.
+    encoded_bytes = _encode_for_storage({"data": b"binary"})
+    assert _decode_from_storage(encoded_bytes)["data"] == b"binary"
 
-    # 4. Test full round-trip through checkpointer
+    # 4. Test full round-trip through checkpointer, encoded value is JSON-safe for storage.
     config = {
         "configurable": {
             "thread_id": "thread_serde_test",
@@ -682,8 +689,51 @@ async def test_checkpoint_serialization_with_non_json_objects(store):
     retrieved = await checkpointer.aget_tuple(config)
     assert retrieved is not None
     assert retrieved.checkpoint["channel_values"]["key"] == "val"
-    # The datetime should be stored as a string
-    assert isinstance(retrieved.checkpoint["ts"], str)
+    # The datetime should round-trip back to a real datetime, not a string.
+    assert retrieved.checkpoint["ts"] == dt
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_serialization_preserves_langchain_messages(store):
+    """LangChain BaseMessage objects in channel_values must survive a checkpoint round-trip.
+
+    A naive ``json.dumps(obj, default=str)`` would stringify HumanMessage/AIMessage
+    to their repr(), breaking the ``add_messages`` reducer and any chain built on
+    ``prompt | llm`` when the graph resumes from a checkpoint.
+    """
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+
+    from agentomatic.storage.checkpointer import AgentomaticCheckpointer
+
+    checkpointer = AgentomaticCheckpointer(store)
+    config = {
+        "configurable": {
+            "thread_id": "thread_lc_messages",
+            "checkpoint_ns": "",
+            "checkpoint_id": "cp_lc_1",
+        }
+    }
+    messages = [
+        SystemMessage(content="be helpful"),
+        HumanMessage(content="hi there"),
+        AIMessage(
+            content="",
+            tool_calls=[{"name": "search", "args": {"q": "hi"}, "id": "call_1"}],
+        ),
+        ToolMessage(content="result", tool_call_id="call_1"),
+    ]
+    checkpoint = {"v": 1, "channel_values": {"messages": messages}}
+    metadata = {"source": "input", "step": 1}
+
+    await checkpointer.aput(config, checkpoint, metadata, {})
+    retrieved = await checkpointer.aget_tuple(config)
+
+    assert retrieved is not None
+    restored = retrieved.checkpoint["channel_values"]["messages"]
+    assert [type(m) for m in restored] == [SystemMessage, HumanMessage, AIMessage, ToolMessage]
+    assert restored[1].content == "hi there"
+    assert restored[2].tool_calls[0]["name"] == "search"
+    assert restored[3].tool_call_id == "call_1"
 
 
 # =========================================================================
@@ -995,8 +1045,8 @@ async def test_lineage_cycle_guard_sqlalchemy():
 
 @pytest.mark.asyncio
 async def test_ensure_json_serializable_nested():
-    """Verify _ensure_json_serializable handles deeply nested non-serializable objects."""
-    from agentomatic.storage.checkpointer import _ensure_json_serializable
+    """Verify the checkpoint encode/decode round-trip handles deeply nested objects."""
+    from agentomatic.storage.checkpointer import _decode_from_storage, _encode_for_storage
 
     nested = {
         "level1": {
@@ -1008,11 +1058,11 @@ async def test_ensure_json_serializable_nested():
         },
         "list_with_dt": [datetime(2026, 6, 1), "normal", 123],
     }
-    result = _ensure_json_serializable(nested)
+    result = _decode_from_storage(_encode_for_storage(nested))
     assert result["level1"]["level2"]["num"] == 42
-    assert isinstance(result["level1"]["level2"]["dt"], str)
-    assert isinstance(result["level1"]["level2"]["data"], str)
-    assert isinstance(result["list_with_dt"][0], str)
+    assert result["level1"]["level2"]["dt"] == datetime(2026, 1, 1, 12, 0)
+    assert result["level1"]["level2"]["data"] == b"binary_nested"
+    assert result["list_with_dt"][0] == datetime(2026, 6, 1)
     assert result["list_with_dt"][1] == "normal"
 
 

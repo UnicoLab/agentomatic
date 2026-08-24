@@ -71,7 +71,9 @@ class _PromptAwareAgent(BaseGraphAgent[_PromptState]):
         return state
 
     def input_to_state(self, input_data: dict[str, Any]) -> _PromptState:
-        return _PromptState(request=input_data.get("current_query") or input_data.get("query") or "")
+        return _PromptState(
+            request=input_data.get("current_query") or input_data.get("query") or ""
+        )
 
     def state_to_output(self, state: _PromptState) -> dict[str, Any]:
         return state.output

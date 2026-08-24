@@ -65,3 +65,40 @@ async def test_agent_graph_astream_studio_events():
     assert "node_end" in event_types
     assert "state_update" in event_types
     assert "run_complete" in event_types
+
+
+@pytest.mark.asyncio
+async def test_agent_graph_astream_serializes_langchain_messages():
+    """State containing raw BaseMessage objects must stream as JSON-safe dicts.
+
+    A class-agent node commonly does ``state.messages = [HumanMessage(...), ...]``.
+    The streamed event payloads must be safe to ``json.dumps`` (no BaseMessage
+    objects left over) so SSE/Studio consumers don't crash or get stringified reprs.
+    """
+    import json
+
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    def node_a(state):
+        state["messages"] = [HumanMessage(content="hi"), AIMessage(content="hello")]
+        return state
+
+    graph = AgentGraph(
+        nodes={"a": GraphNode(name="a", handler=node_a)},
+        edges={},
+        entrypoint="a",
+        finish="a",
+    )
+
+    events = []
+    async for event in graph.astream_studio_events({"messages": []}, run_id="test_lc"):
+        events.append(event)
+
+    state_update = next(e for e in events if e["event"] == "state_update")
+    messages = state_update["data"]["messages"]
+    assert messages == [
+        {"role": "human", "content": "hi"},
+        {"role": "ai", "content": "hello"},
+    ]
+    # Must be JSON-serializable without a `default=` fallback.
+    json.dumps(state_update)
