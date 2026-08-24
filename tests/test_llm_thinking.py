@@ -79,7 +79,39 @@ def test_strip_thinking_for_json() -> None:
     assert cleaned.strip().startswith("{") or "ok" in cleaned
 
 
-def test_openai_compat_mirrors_enable_thinking_into_chat_template() -> None:
+@pytest.fixture
+def _stub_langchain_openai(monkeypatch):
+    """Stand in for ``langchain_openai`` so this runs without the vendor extra.
+
+    ``langchain-openai`` lives in the optional ``openai`` extra, which
+    ``agentomatic[all]`` deliberately does not pull in (the platform ships no
+    first-party vendor connectors). Importing it unconditionally made this
+    test fail — rather than skip — for anyone running the suite after the
+    documented install. The rest of the suite stubs the module the same way.
+    """
+    import sys
+    import types
+
+    if "langchain_openai" in sys.modules:  # real package present — use it
+        yield
+        return
+
+    class _ChatOpenAI:
+        model_fields = {"extra_body": object()}
+
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    module = types.ModuleType("langchain_openai")
+    module.ChatOpenAI = _ChatOpenAI
+    module.AzureChatOpenAI = _ChatOpenAI
+    monkeypatch.setitem(sys.modules, "langchain_openai", module)
+    yield
+
+
+def test_openai_compat_mirrors_enable_thinking_into_chat_template(
+    _stub_langchain_openai,
+) -> None:
     """oMLX/Qwen need chat_template_kwargs.enable_thinking, not only the flat key."""
     out = _openai_compat_kwargs({"extra": {"enable_thinking": False}})
     body = out["extra_body"]
