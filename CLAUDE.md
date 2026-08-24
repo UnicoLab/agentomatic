@@ -130,7 +130,7 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_ENABLE_METRICS` | Prometheus metrics (default on) |
 | `AGENTOMATIC_LOG_LEVEL` | Log level (default `INFO`; `WARNING` in minimal) |
 | `AGENTOMATIC_ENABLE_AUTH` / `AGENTOMATIC_API_KEY` | API-key auth |
-| `AGENTOMATIC_ENABLE_JWT` | JWT auth (configure JWKS via stack) |
+| `AGENTOMATIC_ENABLE_JWT` | JWT auth (JWKS from `AUTH__JWKS_URL` / `AUTH__ISSUER` / `AUTH__AUDIENCE`, or the active stack's `auth:` block) |
 | `AGENTOMATIC_REQUIRE_AUTH` | Require auth globally (implies JWT + zero-trust) |
 | `AGENTOMATIC_ENABLE_CONTROL_PLANE` / `AGENTOMATIC_CONTROL_TOKEN` | Control plane |
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` | Rate limiting |

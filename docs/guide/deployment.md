@@ -485,6 +485,25 @@ Run it:
     `AGENTOMATIC_TITLE`, `AGENTOMATIC_LOG_LEVEL`), so `uvicorn main:app` in the
     generated Dockerfile drops no functionality versus running the CLI.
 
+!!! tip "Turning on verified JWT auth"
+    `AGENTOMATIC_ENABLE_JWT=1` alone gives you a middleware with nothing to
+    verify against. Point it at your identity provider's JWKS endpoint with
+    `AUTH__JWKS_URL` (plus `AUTH__ISSUER` / `AUTH__AUDIENCE`), or set the same
+    values in the active stack's `auth:` block — `agentomatic deploy` writes
+    them into the generated `.env` for you. Environment wins over the stack.
+
+    ```bash
+    AGENTOMATIC_REQUIRE_AUTH=1
+    AUTH__JWKS_URL=https://idp.example.com/.well-known/jwks.json
+    AUTH__ISSUER=https://idp.example.com/
+    AUTH__AUDIENCE=agentomatic
+    ```
+
+    With `AGENTOMATIC_REQUIRE_AUTH=1` and no JWKS, the platform will not accept
+    unsigned tokens: it enforces with your API key if one is configured
+    (`AGENTOMATIC_ENABLE_AUTH=1` + `AGENTOMATIC_API_KEY`), and refuses to start
+    if neither is set.
+
 !!! warning "Workers and in-memory state"
     Connection pools and per-process caches live **per worker**. Keep shared
     state (threads, memory, cache) in external services (Postgres, redis) so it

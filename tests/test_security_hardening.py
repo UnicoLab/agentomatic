@@ -582,3 +582,111 @@ class TestGlobalAuthLockStaysServable:
         )
         with pytest.raises(RuntimeError, match="forged/unsigned JWTs"):
             platform.build()
+
+
+class TestJwtConfigFromEnvironmentAndStack:
+    """Verified JWT auth must be reachable from a container's environment.
+
+    ``agentomatic deploy`` writes ``AUTH__JWKS_URL`` / ``AUTH__ISSUER`` /
+    ``AUTH__AUDIENCE`` into the generated ``.env`` and the docs said JWKS was
+    configurable "via stack" — but only the in-process ``jwt_config=`` kwarg
+    ever reached the middleware. A deployed container running the scaffolded
+    ``main.py`` had no way to switch signature verification on, and
+    ``require_auth_globally`` refused to boot without an API key.
+    """
+
+    def _platform(self, tmp_path, **kwargs):
+        from agentomatic import AgentPlatform
+
+        return AgentPlatform(agents_dir=tmp_path / "agents", **kwargs)
+
+    def test_env_vars_produce_a_verifying_config(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTH__JWKS_URL", "https://idp.test/jwks.json")
+        monkeypatch.setenv("AUTH__ISSUER", "https://idp.test/")
+        monkeypatch.setenv("AUTH__AUDIENCE", "agentomatic")
+
+        cfg = self._platform(tmp_path)._resolve_jwt_config()
+
+        assert cfg is not None
+        assert cfg.jwks_url == "https://idp.test/jwks.json"
+        assert cfg.issuer == "https://idp.test/"
+        assert cfg.audience == "agentomatic"
+
+    def test_nothing_configured_returns_none(self, tmp_path, monkeypatch):
+        for var in ("AUTH__JWKS_URL", "AUTH__ISSUER", "AUTH__AUDIENCE"):
+            monkeypatch.delenv(var, raising=False)
+
+        assert self._platform(tmp_path)._resolve_jwt_config() is None
+
+    def test_stack_supplies_the_jwks_url(self, tmp_path, monkeypatch):
+        from types import SimpleNamespace
+
+        for var in ("AUTH__JWKS_URL", "AUTH__ISSUER", "AUTH__AUDIENCE"):
+            monkeypatch.delenv(var, raising=False)
+
+        platform = self._platform(tmp_path)
+        platform._stack_manager = SimpleNamespace(
+            _active_stack=SimpleNamespace(
+                auth=SimpleNamespace(
+                    jwks_url="https://stack.test/jwks.json",
+                    issuer="https://stack.test/",
+                    audience="from-stack",
+                )
+            )
+        )
+
+        cfg = platform._resolve_jwt_config()
+        assert cfg is not None
+        assert cfg.jwks_url == "https://stack.test/jwks.json"
+        assert cfg.audience == "from-stack"
+
+    def test_environment_wins_over_the_stack(self, tmp_path, monkeypatch):
+        from types import SimpleNamespace
+
+        monkeypatch.setenv("AUTH__JWKS_URL", "https://env.test/jwks.json")
+        platform = self._platform(tmp_path)
+        platform._stack_manager = SimpleNamespace(
+            _active_stack=SimpleNamespace(
+                auth=SimpleNamespace(
+                    jwks_url="https://stack.test/jwks.json", issuer="", audience=""
+                )
+            )
+        )
+
+        assert platform._resolve_jwt_config().jwks_url == "https://env.test/jwks.json"
+
+    def test_unexpanded_stack_placeholder_is_not_treated_as_a_url(self, tmp_path, monkeypatch):
+        """``${JWKS_URL}`` with nothing in the env must not become the URL."""
+        from types import SimpleNamespace
+
+        monkeypatch.delenv("AUTH__JWKS_URL", raising=False)
+        monkeypatch.delenv("JWKS_URL", raising=False)
+
+        platform = self._platform(tmp_path)
+        platform._stack_manager = SimpleNamespace(
+            _active_stack=SimpleNamespace(
+                auth=SimpleNamespace(jwks_url="${JWKS_URL}", issuer="", audience="")
+            )
+        )
+
+        assert platform._resolve_jwt_config() is None
+
+    def test_global_auth_lock_boots_on_a_jwks_url_alone(self, tmp_path, monkeypatch):
+        """No API key needed — remedy (a) from the lock's own error message."""
+        from fastapi.testclient import TestClient
+
+        monkeypatch.setenv("AUTH__JWKS_URL", "https://idp.test/jwks.json")
+
+        platform = self._platform(
+            tmp_path,
+            plugins_dir=tmp_path / "plugins",
+            endpoints_dir=tmp_path / "endpoints",
+            enable_jwt_auth=True,
+            require_auth_globally=True,
+        )
+        app = platform.build()
+
+        with TestClient(app, raise_server_exceptions=False) as client:
+            # No token — rejected, not a 500 from a middleware that refused to
+            # construct.
+            assert client.get("/api/v1/agents").status_code == 401

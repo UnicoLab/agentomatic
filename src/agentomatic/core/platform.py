@@ -791,6 +791,53 @@ class AgentPlatform:
             return None
         return url
 
+    def _resolve_jwt_config(self) -> Any:
+        """Build a :class:`JWTConfig` from ``AUTH__*`` env vars or the stack.
+
+        Verified JWT auth was documented as configurable "via stack", and
+        ``agentomatic deploy`` writes ``AUTH__JWKS_URL`` / ``AUTH__ISSUER`` /
+        ``AUTH__AUDIENCE`` into the generated ``.env`` — but nothing read any
+        of them. Only the in-process ``jwt_config=`` kwarg reached the
+        middleware, so a deployed container running the scaffolded ``main.py``
+        had no way to turn on signature verification at all.
+
+        Environment wins over the stack, matching the database-URL resolution
+        above; ``${VAR}`` placeholders in stack values are expanded.
+
+        Returns:
+            A ``JWTConfig`` when a JWKS endpoint is configured, else ``None``.
+        """
+        import os
+
+        from agentomatic.security.jwt_auth import JWTConfig
+
+        def _expand(value: str) -> str:
+            value = (value or "").strip()
+            if value.startswith("${") and value.endswith("}"):
+                value = (os.getenv(value[2:-1]) or "").strip()
+            return "" if "${" in value else value
+
+        stack_auth = getattr(
+            getattr(getattr(self, "_stack_manager", None), "_active_stack", None), "auth", None
+        )
+
+        def _setting(env_key: str, field: str) -> str:
+            from_env = (os.getenv(env_key) or "").strip()
+            if from_env:
+                return from_env
+            return _expand(str(getattr(stack_auth, field, "") or ""))
+
+        jwks_url = _setting("AUTH__JWKS_URL", "jwks_url")
+        if not jwks_url:
+            return None
+
+        return JWTConfig(
+            enabled=True,
+            jwks_url=jwks_url,
+            issuer=_setting("AUTH__ISSUER", "issuer"),
+            audience=_setting("AUTH__AUDIENCE", "audience"),
+        )
+
     async def _auto_derive_store_from_connections(self) -> None:
         """Populate ``self._store`` from the first MEMORY connection, if any."""
         from agentomatic.connections.manager import PLATFORM_SCOPE, all_managers
@@ -1243,7 +1290,7 @@ class AgentPlatform:
         if self._enable_jwt_auth:
             from agentomatic.security.jwt_auth import JWTAuthMiddleware, JWTConfig
 
-            jwt_cfg = self._jwt_config or JWTConfig(enabled=True)
+            jwt_cfg = self._jwt_config or self._resolve_jwt_config() or JWTConfig(enabled=True)
 
             # Under the global auth lock, signature-disabled (dev) JWT is a
             # bypass: forged/unsigned tokens would authenticate EVERY request.
