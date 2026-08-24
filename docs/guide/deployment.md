@@ -118,6 +118,14 @@ agentomatic deploy --profile minimal --stack remote --distroless
 agentomatic deploy --minimal --stack remote          # shorthand
 ```
 
+!!! note "Distroless images pin Python 3.11"
+    `gcr.io/distroless/python3-debian12` is Debian 12's Python **3.11**, so the
+    distroless build stage uses `python:3.11-slim` and installs dependencies
+    with `pip --target=/app/deps` (on `PYTHONPATH`) rather than into a
+    virtualenv — a venv's `bin/python` points at the *build* stage's
+    interpreter, which does not exist in the runtime image. If you customise
+    the generated Dockerfile, keep the two Python versions in step.
+
 !!! warning "Swagger is always available"
     `--profile minimal` **never** disables `/docs`, `/redoc`, or
     `/openapi.json`. It only sets `AGENTOMATIC_ENABLE_STUDIO=0` and

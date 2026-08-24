@@ -11,8 +11,8 @@ that installs ``agentomatic[all]`` from PyPI (pinned to the current version)
 and launches the project's ``main.py`` via ``uvicorn main:app`` so the
 platform's ``AgentPlatform`` configuration is honoured.  A ``--distroless``
 variant is produced from ``gcr.io/distroless/python3-debian12`` which runs
-under the built-in ``nonroot`` user (numeric UID 65532) — verified to have
-execute permissions on ``/app/.venv/bin/python``.
+under the built-in ``nonroot`` user (numeric UID 65532) and launches the base
+image's own ``/usr/bin/python3`` with dependencies on ``PYTHONPATH``.
 
 Two deploy *profiles* select how much of the platform the image runs, driven
 purely through ``AGENTOMATIC_*`` env vars so both share one ``main.py`` code
@@ -304,7 +304,14 @@ def render_dockerfile_distroless(
     image scanners and Kubernetes ``runAsNonRoot`` policies do not have to
     introspect the base image. ``agentomatic`` is installed from PyPI (pinned
     to *version*) in the build stage; distroless has no shell, so the app is
-    launched by invoking ``uvicorn`` directly through the venv Python.
+    launched by invoking ``uvicorn`` through the base image's own interpreter.
+
+    The build stage must match that interpreter. ``distroless/python3-debian12``
+    is Debian 12's Python 3.11, so packages are built on ``python:3.11-slim``
+    and installed with ``pip --target`` rather than into a virtualenv: a venv's
+    ``bin/python`` is a symlink to the *builder's* interpreter, which does not
+    exist in the runtime image, and C extensions built for another minor
+    version would not import even if it did.
 
     Args:
         version: ``agentomatic`` version to pin (``agentomatic[all]==<version>``).
@@ -322,7 +329,10 @@ def render_dockerfile_distroless(
 # =============================================================================
 
 # ---- Build stage ------------------------------------------------------------
-FROM python:3.12-slim AS builder
+# Must be the same Python minor version as the distroless runtime below
+# (distroless/python3-debian12 is Debian 12's Python 3.11), or the compiled
+# wheels installed here will not import there.
+FROM python:3.11-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \\
     PYTHONUNBUFFERED=1 \\
@@ -335,11 +345,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 
 WORKDIR /app
 
-RUN python -m venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-
+# ``--target`` instead of a virtualenv: the runtime stage runs the distroless
+# image's own interpreter, which cannot use a venv built around a different
+# Python binary.  A plain directory on ``PYTHONPATH`` works with any 3.11.
 RUN pip install --upgrade pip \\
-    && pip install "agentomatic[all]=={version}"
+    && pip install --target=/app/deps "agentomatic[all]=={version}"
 
 # Copy project sources into the build stage so they can be chowned + carried
 # into the runtime stage (distroless cannot chown at runtime — no shell).
@@ -353,8 +363,7 @@ FROM gcr.io/distroless/python3-debian12:nonroot
 
 ENV PYTHONDONTWRITEBYTECODE=1 \\
     PYTHONUNBUFFERED=1 \\
-    PATH="/app/.venv/bin:$PATH" \\
-    VIRTUAL_ENV="/app/.venv"
+    PYTHONPATH="/app/deps"
 
 WORKDIR /app
 
@@ -366,8 +375,9 @@ USER 65532:65532
 EXPOSE 8000
 {profile_env_block}
 # Distroless has no shell but can execute binaries directly. Launch uvicorn
-# through the venv Python so main.py's AgentPlatform config is honoured.
-ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
+# through the base image's interpreter (dependencies come from PYTHONPATH) so
+# main.py's AgentPlatform config is honoured.
+ENTRYPOINT ["/usr/bin/python3", "-m", "uvicorn"]
 CMD ["main:app", "--host", "0.0.0.0", "--port", "8000"]
 """
 
@@ -414,10 +424,10 @@ def render_docker_compose(
         f"      - {key}={value}\n" for key, value in profile_env(profile).items()
     )
     if distroless:
-        # No shell, no curl in distroless — hit /health with the venv Python
-        # (present at this exact path in the distroless runtime stage) instead.
+        # No shell, no curl in distroless — hit /health with the base image's
+        # own interpreter (stdlib only, so no PYTHONPATH needed).
         healthcheck_test = (
-            '["CMD", "/app/.venv/bin/python", "-c", '
+            '["CMD", "/usr/bin/python3", "-c", '
             "\"import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)\"]"
         )
     else:
