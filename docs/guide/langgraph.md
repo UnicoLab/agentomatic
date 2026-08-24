@@ -243,6 +243,16 @@ metadata: Annotated[dict, _merge_dicts]
 
 The Studio adapter extracts state from the LangGraph checkpointer automatically:
 
+!!! warning "Requires a checkpointer"
+    These endpoints read the graph's checkpointer, and nothing else writes
+    checkpoints. An agent whose `build_graph` returns `self.new_graph().compile()`
+    (the native `GraphBuilder` runtime) has no checkpointer, so `/state` returns
+    `{}` and `/history` returns `[]` — Studio's State and History panels stay
+    empty even though the thread's chat messages are persisted separately.
+    To get thread state and time-travel, build the graph with LangGraph's
+    `StateGraph` and compile it with `AgentomaticCheckpointer` as shown in
+    [Storage](storage.md#checkpointer-api).
+
 ```bash
 # Get current thread state
 curl http://localhost:8000/studio/agents/my_agent/threads/thread_001/state
