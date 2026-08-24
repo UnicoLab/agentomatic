@@ -31,11 +31,11 @@ _ENCODED_TYPE_KEY = "__agentomatic_serde_type__"
 _ENCODED_DATA_KEY = "__agentomatic_serde_data__"
 
 
-def _encode_for_storage(obj: Any) -> dict[str, str]:
+def encode_for_storage(obj: Any) -> dict[str, str]:
     """Serialize *obj* into a JSON-safe wrapper using LangGraph's serde.
 
     Preserves rich objects (LangChain messages, pydantic models, dataclasses,
-    etc.) so they can be reconstructed exactly via :func:`_decode_from_storage`.
+    etc.) so they can be reconstructed exactly via :func:`decode_from_storage`.
     """
     type_name, raw = _SERDE.dumps_typed(obj)
     return {
@@ -44,8 +44,8 @@ def _encode_for_storage(obj: Any) -> dict[str, str]:
     }
 
 
-def _decode_from_storage(payload: Any) -> Any:
-    """Inverse of :func:`_encode_for_storage`."""
+def decode_from_storage(payload: Any) -> Any:
+    """Inverse of :func:`encode_for_storage`."""
     if isinstance(payload, dict) and _ENCODED_TYPE_KEY in payload and _ENCODED_DATA_KEY in payload:
         raw = base64.b64decode(payload[_ENCODED_DATA_KEY])
         return _SERDE.loads_typed((payload[_ENCODED_TYPE_KEY], raw))
@@ -100,8 +100,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
                     "checkpoint_id": cp_data["checkpoint_id"],
                 }
             },
-            checkpoint=_decode_from_storage(cp_data["checkpoint"]),
-            metadata=_decode_from_storage(cp_data["metadata"]),
+            checkpoint=decode_from_storage(cp_data["checkpoint"]),
+            metadata=decode_from_storage(cp_data["metadata"]),
             parent_config=(
                 {
                     "configurable": {
@@ -167,8 +167,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
             checkpoint_ns=checkpoint_ns,
             checkpoint_id=checkpoint_id_str,
             parent_checkpoint_id=parent_id_str,
-            checkpoint=_encode_for_storage(dict(checkpoint)),
-            metadata=_encode_for_storage(dict(metadata)),
+            checkpoint=encode_for_storage(dict(checkpoint)),
+            metadata=encode_for_storage(dict(metadata)),
         )
 
         return {
@@ -247,8 +247,8 @@ class AgentomaticCheckpointer(BaseCheckpointSaver):
                             "checkpoint_id": cp["checkpoint_id"],
                         }
                     },
-                    checkpoint=_decode_from_storage(cp["checkpoint"]),
-                    metadata=_decode_from_storage(cp["metadata"]),
+                    checkpoint=decode_from_storage(cp["checkpoint"]),
+                    metadata=decode_from_storage(cp["metadata"]),
                     parent_config=(
                         {
                             "configurable": {

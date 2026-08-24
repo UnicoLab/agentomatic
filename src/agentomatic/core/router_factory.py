@@ -923,7 +923,10 @@ def create_default_router(
                 history_loaded = max(0, len(messages) - 1)
             except Exception as exc:
                 logger.warning(f"History loading failed for chat: {exc}")
-                state["metadata"]["_history_error"] = str(exc)
+                # Surfaced in the 200 response metadata, so sanitise it too.
+                state["metadata"]["_history_error"] = client_safe_message(
+                    exc, context="History loading failed"
+                )
 
         # Run before_node hooks
         for hook in registry.before_node_hooks:
@@ -1725,7 +1728,7 @@ def create_default_router(
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error resuming execution: {exc}",
+                detail=client_safe_detail(exc, context="Error resuming execution"),
             ) from exc
 
     # ── POST /threads/{thread_id}/reject ──────────────────────────

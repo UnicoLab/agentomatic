@@ -27,6 +27,7 @@ from agentomatic.control.models import (
     ToggleResponse,
 )
 from agentomatic.control.state import ControlPlaneState
+from agentomatic.core.errors import client_safe_message
 
 if TYPE_CHECKING:
     from agentomatic.core.platform import AgentPlatform
@@ -117,7 +118,12 @@ def create_control_router(
         except TimeoutError:
             return {"status": "timeout", "error": "health_check timed out"}
         except Exception as exc:  # noqa: BLE001
-            return {"status": "error", "error": str(exc)}
+            # These control *reads* are not token-gated, so never echo raw
+            # exception text from a backend health check.
+            return {
+                "status": "error",
+                "error": client_safe_message(exc, context="health_check failed"),
+            }
 
     @router.get("/agents", response_model=list[ControlAgentInfo], summary="List agents")
     async def list_agents() -> list[ControlAgentInfo]:

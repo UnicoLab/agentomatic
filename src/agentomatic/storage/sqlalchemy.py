@@ -126,7 +126,10 @@ class SQLAlchemyStore(BaseStore):
             self._owns_engine = True
             self._engine = create_async_engine(url, **engine_kwargs)
 
-        if "sqlite" in url:
+        # Only when this store built the engine itself: with engine= the url
+        # argument is the unused default, so testing it could attach a SQLite
+        # pragma to someone else's non-SQLite engine.
+        if self._owns_engine and "sqlite" in url:
             # SQLite disables foreign-key enforcement per connection unless
             # explicitly turned on — without this, the ondelete="CASCADE"
             # declared on CheckpointModel/FeedbackModel/SuspendedStateModel

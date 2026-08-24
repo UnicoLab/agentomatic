@@ -524,7 +524,7 @@ sequenceDiagram
     participant ST as BaseStore (Memory/SQL)
 
     LG->>CP: aput(config, checkpoint, metadata)
-    CP->>CP: _encode_for_storage(checkpoint)
+    CP->>CP: encode_for_storage(checkpoint)
     CP->>ST: save_checkpoint(thread_id, ns, id, data)
     ST-->>CP: saved
     CP-->>LG: RunnableConfig
@@ -577,7 +577,7 @@ graph = builder.compile(checkpointer=checkpointer)
     The checkpointer automatically handles non-JSON-serializable objects — datetimes,
     bytes, custom classes, and LangChain `BaseMessage` objects (`HumanMessage`,
     `AIMessage`, `ToolMessage`, ...) — via LangGraph's own `JsonPlusSerializer`
-    (`_encode_for_storage()` / `_decode_from_storage()`). Messages round-trip back
+    (`encode_for_storage()` / `decode_from_storage()`). Messages round-trip back
     into real message objects, not stringified reprs, so `add_messages` and
     `prompt | llm` chains keep working across checkpoint resumes. No extra
     configuration needed.

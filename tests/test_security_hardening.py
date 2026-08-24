@@ -401,3 +401,61 @@ def test_non_ascii_credentials_are_rejected_not_a_server_error(tmp_path) -> None
         assert (
             client.get("/api/v1/a1/health", headers={"X-API-Key": "SECRETKEY"}).status_code == 200
         )
+
+
+# =====================================================================
+# Studio must display decoded checkpoint state, not the storage wrapper
+# =====================================================================
+
+
+@pytest.mark.asyncio
+async def test_studio_state_and_history_decode_stored_checkpoints() -> None:
+    """Checkpoints are persisted through LangGraph's serde so BaseMessage
+    objects survive a round-trip. Studio reads those rows directly, so it must
+    decode them — otherwise the debug UI shows an opaque
+    ``{__agentomatic_serde_type__, __agentomatic_serde_data__}`` blob instead
+    of the actual state.
+    """
+    from types import SimpleNamespace
+
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    from agentomatic.storage.checkpointer import AgentomaticCheckpointer
+    from agentomatic.storage.memory import MemoryStore
+    from agentomatic.studio.adapters.langgraph import LangGraphAdapter
+
+    store = MemoryStore()
+    await store.initialize()
+    checkpointer = AgentomaticCheckpointer(store)
+    await checkpointer.aput(
+        {"configurable": {"thread_id": "t1", "checkpoint_ns": "", "checkpoint_id": "c1"}},
+        {
+            "v": 1,
+            "channel_values": {
+                "messages": [HumanMessage(content="hello"), AIMessage(content="hi back")],
+                "answer": "42",
+            },
+        },
+        {"source": "input"},
+        {},
+    )
+
+    agent = SimpleNamespace(
+        name="a1",
+        slug="a1",
+        graph_fn=None,
+        manifest=SimpleNamespace(
+            name="a1", slug="a1", description="d", version="1", framework="langgraph"
+        ),
+    )
+    adapter = LangGraphAdapter(agent, store)
+
+    snapshot = await adapter.get_state("t1")
+    assert "__agentomatic_serde_type__" not in str(snapshot.state)
+    channels = snapshot.state["channel_values"]
+    assert channels["answer"] == "42"
+    assert [m.content for m in channels["messages"]] == ["hello", "hi back"]
+
+    history = await adapter.get_history("t1")
+    assert history
+    assert "__agentomatic_serde_type__" not in str(history[0].state)

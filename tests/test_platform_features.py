@@ -652,27 +652,27 @@ async def test_checkpoint_serialization_with_non_json_objects(store):
 
     from agentomatic.storage.checkpointer import (
         AgentomaticCheckpointer,
-        _decode_from_storage,
-        _encode_for_storage,
+        decode_from_storage,
+        encode_for_storage,
     )
 
     checkpointer = AgentomaticCheckpointer(store)
 
-    # 1. Test _encode_for_storage / _decode_from_storage round-trip directly
-    encoded = _encode_for_storage({"a": 1, "b": "text"})
+    # 1. Test encode_for_storage / decode_from_storage round-trip directly
+    encoded = encode_for_storage({"a": 1, "b": "text"})
     assert isinstance(encoded, dict)
-    assert _decode_from_storage(encoded) == {"a": 1, "b": "text"}
+    assert decode_from_storage(encoded) == {"a": 1, "b": "text"}
 
     # 2. Test with datetime values (non-JSON-native) — value survives as a real datetime.
     dt = datetime(2026, 6, 14, 12, 0, 0)
-    encoded_dt = _encode_for_storage({"ts": dt, "val": 42})
-    decoded_dt = _decode_from_storage(encoded_dt)
+    encoded_dt = encode_for_storage({"ts": dt, "val": 42})
+    decoded_dt = decode_from_storage(encoded_dt)
     assert decoded_dt["val"] == 42
     assert decoded_dt["ts"] == dt
 
     # 3. Test with bytes — value survives as real bytes.
-    encoded_bytes = _encode_for_storage({"data": b"binary"})
-    assert _decode_from_storage(encoded_bytes)["data"] == b"binary"
+    encoded_bytes = encode_for_storage({"data": b"binary"})
+    assert decode_from_storage(encoded_bytes)["data"] == b"binary"
 
     # 4. Test full round-trip through checkpointer, encoded value is JSON-safe for storage.
     config = {
@@ -1046,7 +1046,7 @@ async def test_lineage_cycle_guard_sqlalchemy():
 @pytest.mark.asyncio
 async def test_ensure_json_serializable_nested():
     """Verify the checkpoint encode/decode round-trip handles deeply nested objects."""
-    from agentomatic.storage.checkpointer import _decode_from_storage, _encode_for_storage
+    from agentomatic.storage.checkpointer import decode_from_storage, encode_for_storage
 
     nested = {
         "level1": {
@@ -1058,7 +1058,7 @@ async def test_ensure_json_serializable_nested():
         },
         "list_with_dt": [datetime(2026, 6, 1), "normal", 123],
     }
-    result = _decode_from_storage(_encode_for_storage(nested))
+    result = decode_from_storage(encode_for_storage(nested))
     assert result["level1"]["level2"]["num"] == 42
     assert result["level1"]["level2"]["dt"] == datetime(2026, 1, 1, 12, 0)
     assert result["level1"]["level2"]["data"] == b"binary_nested"

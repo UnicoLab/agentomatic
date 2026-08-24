@@ -454,7 +454,14 @@ def create_studio_router(
         # ``Command(resume=...)``. Agentomatic's own lightweight AgentGraph has
         # neither, so without this guard the call raised AttributeError *inside*
         # the SSE body — surfacing a raw internal error with a 200 status.
-        if not hasattr(agent.graph_fn(), "astream_events"):
+        try:
+            resume_graph = agent.graph_fn()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=client_safe_detail(exc, context="Failed to build agent graph"),
+            ) from exc
+        if not hasattr(resume_graph, "astream_events"):
             raise HTTPException(
                 status_code=501,
                 detail=(
@@ -470,7 +477,7 @@ def create_studio_router(
                 if agent.graph_fn is None:
                     yield 'data: {"event": "run_error", "data": {"error": "no graph_fn"}}\n\n'
                     return
-                graph = agent.graph_fn()
+                graph = resume_graph  # already built (and validated) above
                 config = {"configurable": {"thread_id": thread_id}}
 
                 # Use LangGraph's Command to resume from interrupt

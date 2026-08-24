@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from agentomatic.storage.checkpointer import decode_from_storage
 from agentomatic.studio.adapter import StudioAdapter
 from agentomatic.studio.models import (
     StudioCheckpoint,
@@ -247,7 +248,10 @@ class LangGraphAdapter(StudioAdapter):
                 cps = await self._store.list_checkpoints(thread_id, "", limit=1)
                 if cps:
                     latest = cps[0]
-                    state_data = latest.get("checkpoint", {})
+                    # Checkpoints are stored through LangGraph's serde (so
+                    # BaseMessage objects survive), which means the raw row
+                    # holds an encoded wrapper — decode before displaying it.
+                    state_data = decode_from_storage(latest.get("checkpoint", {}))
                     checkpoint_id = latest.get("checkpoint_id")
             except Exception as exc:
                 logger.warning(f"Store fallback get_state failed: {exc}")
@@ -302,8 +306,8 @@ class LangGraphAdapter(StudioAdapter):
                             id=cp.get("checkpoint_id", f"cp_{idx}"),
                             thread_id=thread_id,
                             step=idx,
-                            state=cp.get("checkpoint", {}),
-                            metadata=cp.get("metadata", {}),
+                            state=decode_from_storage(cp.get("checkpoint", {})),
+                            metadata=decode_from_storage(cp.get("metadata", {})),
                             parent_id=cp.get("parent_checkpoint_id"),
                             timestamp=cp.get("timestamp", _now_iso()),
                         )

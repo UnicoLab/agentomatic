@@ -361,14 +361,14 @@ LangGraph's own `JsonPlusSerializer`, which round-trips these objects **without
 losing their type or structure**:
 
 ```python
-from agentomatic.storage.checkpointer import _decode_from_storage, _encode_for_storage
+from agentomatic.storage.checkpointer import decode_from_storage, encode_for_storage
 
 # Rich objects are encoded into a JSON-safe wrapper for storage...
-data = _encode_for_storage({"ts": datetime.now(), "raw": b"bytes"})
+data = encode_for_storage({"ts": datetime.now(), "raw": b"bytes"})
 # → {"__agentomatic_serde_type__": "msgpack", "__agentomatic_serde_data__": "<base64>"}
 
 # ...and decoded back into the *original* Python objects, not strings.
-restored = _decode_from_storage(data)
+restored = decode_from_storage(data)
 # → {"ts": datetime(...), "raw": b"bytes"}
 ```
 
