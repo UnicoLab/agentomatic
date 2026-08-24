@@ -240,7 +240,11 @@ def init(
             name = "agentomatic-app"
         from .project import scaffold_project
 
-        dest = Path(target_dir) if target_dir else Path(name)
+        # ``--dir`` is documented as the *parent* directory, and that is how
+        # it behaves for agents (``init foo --dir x`` → ``x/foo``). Treating it
+        # as the project directory itself scattered the project's 15 files
+        # straight into a directory the user only meant to scaffold *inside*.
+        dest = Path(target_dir) / name if target_dir else Path(name)
         result = scaffold_project(dest, name, force=force)
         click.echo()
         logger.success(f"Created project '{name}'")

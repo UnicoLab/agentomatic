@@ -103,6 +103,13 @@ fully-featured, **env-driven** `app` — nothing is silently dropped.
 
 Agents mount at **`/api/v1/{agent_name}/invoke`** (no `/agents/` segment).
 
+!!! note "`query` on the wire, `current_query` in state"
+
+    The REST body field is **`query`** (`{"query": "..."}`); posting
+    `current_query` returns 422. The framework normalises it, so the dict your
+    `input_to_state` receives has **`current_query`** — which is why the example
+    above reads `data.get("current_query", "")`. `/chat` uses `content` instead.
+
 ### Deploy profiles
 
 - **full** (default): everything on — REST API, Swagger, Studio UI, health,
