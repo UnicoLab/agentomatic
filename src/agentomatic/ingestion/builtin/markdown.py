@@ -30,6 +30,11 @@ from pydantic import BaseModel, Field
 from agentomatic.ingestion.base import BaseIngestor
 from agentomatic.ingestion.context import IngestionContext
 from agentomatic.ingestion.models import IngestionResult
+from agentomatic.ingestion.paths import (
+    IngestionPathError,
+    resolve_within_root,
+    safe_output_filename,
+)
 
 
 class MarkdownIngestRequest(BaseModel):
@@ -103,7 +108,16 @@ class MarkdownIngestor(BaseIngestor[MarkdownIngestRequest]):
             ``{"path": ..., "engine": ..., "size_bytes": ...}``.
         """
         t0 = time.perf_counter()
-        source_path = Path(request.source).expanduser()
+        # Caller-supplied paths arrive over HTTP — confine them, or this
+        # ingestor becomes an arbitrary file read/write primitive.
+        try:
+            source_path = resolve_within_root(request.source, description="source")
+        except IngestionPathError as exc:
+            return IngestionResult(
+                ingestor=self.ingestor_name,
+                status="failed",
+                errors=[str(exc)],
+            )
         if not source_path.exists():
             return IngestionResult(
                 ingestor=self.ingestor_name,
@@ -134,9 +148,20 @@ class MarkdownIngestor(BaseIngestor[MarkdownIngestRequest]):
             stage="write",
         )
 
-        out_dir = Path(request.output_dir).expanduser()
+        try:
+            out_dir = resolve_within_root(request.output_dir, description="output_dir")
+            # ``output_filename`` is a name, not a path — a traversal in it
+            # would escape the (otherwise confined) output directory.
+            out_name = safe_output_filename(
+                request.output_filename, default=f"{source_path.stem}.md"
+            )
+        except IngestionPathError as exc:
+            return IngestionResult(
+                ingestor=self.ingestor_name,
+                status="failed",
+                errors=[str(exc)],
+            )
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = request.output_filename or f"{source_path.stem}.md"
         out_path = out_dir / out_name
         out_path.write_text(markdown, encoding="utf-8")
 

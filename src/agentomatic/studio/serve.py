@@ -226,7 +226,8 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
         """Redirect bare path to trailing-slash version."""
         return RedirectResponse(url=f"{prefix}/")
 
-    logger.info("🎨 Studio UI mounted at %s/", prefix)
+    # loguru uses {}-style formatting, not printf — "%s" would print literally.
+    logger.info("🎨 Studio UI mounted at {}/", prefix)
 
 
 def mount_studio_disabled_page(

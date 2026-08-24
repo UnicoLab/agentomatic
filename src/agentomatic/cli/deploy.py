@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentomatic._version import __version__
+from agentomatic.stacks.redaction import env_example_value, redact_url_credentials
 
 if TYPE_CHECKING:
     from agentomatic.stacks.manager import LLMStackEntry, StackConfig
@@ -574,9 +575,11 @@ def _llm_env_lines(profile: str, entry: LLMStackEntry) -> list[str]:
             lines.append(f"{prefix}LLM__BASE_URL={entry.base_url}")
     if entry.api_key:
         key_var = f"LLM__{entry.provider.upper()}_API_KEY"
-        # Show placeholder as-is (usually ``${OPENAI_API_KEY}``) so the
-        # operator knows which secret to inject at runtime.
-        lines.append(f"{prefix}{key_var}={entry.api_key}")
+        # A ``${OPENAI_API_KEY}``-style reference is shown as-is so the operator
+        # knows which secret to inject at runtime. A *literal* key is replaced
+        # with a placeholder: .env.example is conventionally committed, so
+        # copying a real key into it would publish the secret.
+        lines.append(f"{prefix}{key_var}={env_example_value(entry.api_key)}")
     return lines
 
 
@@ -626,7 +629,7 @@ def render_env_example(stack: StackConfig) -> str:
         f"EMBEDDING__DIMENSION={stack.embedding.dimension}",
         "",
         "# --- Database ----------------------------------------------------",
-        f"DB__URL={stack.database.url}",
+        f"DB__URL={redact_url_credentials(stack.database.url)}",
         f"DB__POOL_SIZE={stack.database.pool_size}",
         f"DB__MAX_OVERFLOW={stack.database.max_overflow}",
         "",
@@ -642,7 +645,7 @@ def render_env_example(stack: StackConfig) -> str:
         f"# AUTH__METHOD={stack.auth.method}",
     ]
     if stack.auth.api_key:
-        lines.append(f"AUTH__API_KEY={stack.auth.api_key}")
+        lines.append(f"AUTH__API_KEY={env_example_value(stack.auth.api_key)}")
     if stack.auth.jwks_url:
         lines.append(f"AUTH__JWKS_URL={stack.auth.jwks_url}")
     if stack.auth.issuer:

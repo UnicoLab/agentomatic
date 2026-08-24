@@ -1394,7 +1394,8 @@ def doctor(agents_dir: str) -> None:
             ver = getattr(mod, "__version__", "installed")
             checks.append((f"{pkg} [{extra}]", True, ver))
         except ImportError:
-            checks.append((f"{pkg} [{extra}]", False, f"pip install agentomatic[{extra}]"))
+            # Quote the extra — unquoted brackets are glob syntax in zsh/bash.
+            checks.append((f"{pkg} [{extra}]", False, f'pip install "agentomatic[{extra}]"'))
 
     # Agents directory
     agents_path = Path(agents_dir)
@@ -2026,8 +2027,22 @@ def stack_list(stacks_dir: str) -> None:
 @stack.command("show")
 @click.argument("name")
 @click.option("--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory")
-def stack_show(name: str, stacks_dir: str) -> None:
-    """Show the contents of a stack configuration."""
+@click.option(
+    "--reveal",
+    is_flag=True,
+    help="Show secret values in clear text (default: redacted).",
+)
+def stack_show(name: str, stacks_dir: str, reveal: bool) -> None:
+    """Show the contents of a stack configuration.
+
+    Secret-looking values (api keys, passwords, tokens, and credentials
+    embedded in URLs) are redacted by default, because this output lands in
+    terminal scrollback, CI logs, and screen shares. ``${ENV_VAR}`` references
+    are always shown as-is — they are indirections, not secrets. Pass
+    ``--reveal`` to print the file verbatim.
+    """
+    from agentomatic.stacks.redaction import redact_yaml_text
+
     stacks_path = Path(stacks_dir)
     stack_file = stacks_path / f"{name}.yaml"
     if not stack_file.exists():
@@ -2038,6 +2053,10 @@ def stack_show(name: str, stacks_dir: str) -> None:
         return
 
     content = stack_file.read_text()
+    if not reveal:
+        content, redactions = redact_yaml_text(content)
+        if redactions:
+            logger.info(f"🔒 {redactions} secret value(s) redacted — use --reveal to show them")
     if HAS_RICH:
         from rich.syntax import Syntax
 

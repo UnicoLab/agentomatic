@@ -14,6 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
+from agentomatic.core.errors import client_safe_detail
 from agentomatic.langchain_adapter import dict_to_messages, json_default, to_jsonable
 
 # ---------------------------------------------------------------------------
@@ -667,8 +668,10 @@ def create_default_router(
                     status="error",
                     error=str(exc),
                 )
-            logger.error(f"Agent {agent_name} invocation failed: {exc}")
-            raise HTTPException(500, detail={"error": f"Agent invocation failed: {exc}"}) from exc
+            raise HTTPException(
+                500,
+                detail=client_safe_detail(exc, context="Agent invocation failed"),
+            ) from exc
 
     async def invoke_stream(request: Any) -> StreamingResponse:
         """Invoke agent with SSE streaming."""
@@ -799,7 +802,8 @@ def create_default_router(
                         status="error",
                         error=str(exc),
                     )
-                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+                safe = client_safe_detail(exc, context="Agent streaming failed")
+                yield f"data: {json.dumps(safe)}\n\n"
 
         return StreamingResponse(
             event_stream(),
@@ -1032,8 +1036,10 @@ def create_default_router(
                     status="error",
                     error=str(exc),
                 )
-            logger.error(f"Chat with {agent_name} failed: {exc}")
-            raise HTTPException(500, detail={"error": f"Chat failed: {exc}"}) from exc
+            raise HTTPException(
+                500,
+                detail=client_safe_detail(exc, context="Chat failed"),
+            ) from exc
 
     # ── GET /health ───────────────────────────────────────────────
     @router.get("/health")
