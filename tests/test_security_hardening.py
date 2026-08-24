@@ -690,3 +690,50 @@ class TestJwtConfigFromEnvironmentAndStack:
             # No token — rejected, not a 500 from a middleware that refused to
             # construct.
             assert client.get("/api/v1/agents").status_code == 401
+
+
+class TestRateLimitClientKey:
+    """What the ``trust_proxy_headers`` flag does — and does not — cover."""
+
+    def _middleware(self, *, trust: bool):
+        from agentomatic.middleware.rate_limit import RateLimitMiddleware
+
+        return RateLimitMiddleware(app=None, trust_proxy_headers=trust)
+
+    def _request(self, *, peer: str, forwarded: str | None):
+        from types import SimpleNamespace
+
+        headers = {"X-Forwarded-For": forwarded} if forwarded else {}
+        return SimpleNamespace(headers=headers, client=SimpleNamespace(host=peer))
+
+    def test_forwarded_header_is_ignored_by_default(self):
+        """Otherwise any caller rotates the header and never gets limited."""
+        mw = self._middleware(trust=False)
+
+        assert mw._client_key(self._request(peer="10.0.0.1", forwarded="9.9.9.9")) == "10.0.0.1"
+
+    def test_forwarded_header_is_used_when_a_proxy_is_declared(self):
+        mw = self._middleware(trust=True)
+
+        key = mw._client_key(self._request(peer="10.0.0.1", forwarded="9.9.9.9, 10.0.0.1"))
+        assert key == "9.9.9.9"
+
+    def test_key_falls_back_to_unknown_without_a_peer(self):
+        from types import SimpleNamespace
+
+        mw = self._middleware(trust=False)
+        request = SimpleNamespace(headers={}, client=None)
+
+        assert mw._client_key(request) == "unknown"
+
+    def test_a_rewritten_peer_address_is_still_taken_at_face_value(self):
+        """Uvicorn's own --proxy-headers rewrites ``request.client`` upstream.
+
+        By the time this middleware runs the original peer is gone, so the
+        flag cannot undo it. This documents the boundary: ``--forwarded-allow-ips``
+        (uvicorn) is what decides whether that rewrite happens at all.
+        """
+        mw = self._middleware(trust=False)
+
+        # What uvicorn hands us after rewriting from X-Forwarded-For.
+        assert mw._client_key(self._request(peer="9.9.9.9", forwarded="9.9.9.9")) == "9.9.9.9"

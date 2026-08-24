@@ -504,6 +504,22 @@ Run it:
     (`AGENTOMATIC_ENABLE_AUTH=1` + `AGENTOMATIC_API_KEY`), and refuses to start
     if neither is set.
 
+!!! warning "Rate limiting behind a proxy"
+    The limiter keys on the client address, so behind a reverse proxy every
+    request looks like it comes from the proxy — set
+    `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS=1` so `X-Forwarded-For` is used
+    instead. Leave it **off** when the platform is exposed directly: the header
+    is caller-controlled, and rotating it per request would bypass the limiter.
+
+    That flag governs Agentomatic's own reading of the header. Uvicorn's
+    `--proxy-headers` (on by default) separately rewrites `request.client` from
+    `X-Forwarded-For` for peers in `--forwarded-allow-ips` (default
+    `127.0.0.1`), before any middleware runs. Keep that list limited to your
+    real proxy — a caller connecting *from* an allowed peer address can steer
+    the rate-limit key regardless of the flag above. The generated
+    `nginx.conf` sits on that trusted hop, which is why it is the right place
+    to set the header.
+
 !!! warning "Workers and in-memory state"
     Connection pools and per-process caches live **per worker**. Keep shared
     state (threads, memory, cache) in external services (Postgres, redis) so it
