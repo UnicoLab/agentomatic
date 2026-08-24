@@ -1133,3 +1133,56 @@ class TestLangChainAdapter:
         history = await adapter.get_history("t1")
         assert len(history) == 1
         assert history[0].metadata["framework"] == "langchain"
+
+
+@pytest.mark.asyncio
+async def test_studio_run_stream_emits_one_lifecycle_pair() -> None:
+    """The run tracker brackets each run with its own run_start/run_complete.
+
+    Adapters may emit their own pair too (``AgentGraph.astream_studio_events``
+    does), and forwarding those verbatim sent the client two runs' worth of
+    lifecycle events — which made the Studio UI render every agent reply twice.
+    Caught by driving the real UI in a browser, not by any unit test.
+    """
+    import json as json_mod
+
+    from agentomatic.studio.models import StudioRunEvent
+    from agentomatic.studio.run_tracker import RunTracker
+
+    class _Adapter:
+        capabilities = ["streaming"]
+
+        async def stream_execution(self, state, config, breakpoints, checkpoint_id):
+            # An adapter that emits its own lifecycle events, as the real
+            # graph runtime does.
+            for event in (
+                StudioRunEvent(event="run_start", run_id="inner", timestamp="t", data={}),
+                StudioRunEvent(event="node_start", run_id="inner", timestamp="t", data={}),
+                StudioRunEvent(
+                    event="node_end", run_id="inner", timestamp="t", data={"response": "ok"}
+                ),
+                StudioRunEvent(event="run_complete", run_id="inner", timestamp="t", data={}),
+            ):
+                yield event
+
+    tracker = RunTracker()
+    run = tracker.create_run(agent_name="a1", thread_id="t1", request_data={"query": "hi"})
+
+    events: list[dict] = []
+    async for frame in tracker.execute_with_adapter(
+        adapter=_Adapter(),
+        state={"query": "hi"},
+        run_id=run.id,
+        thread_id="t1",
+    ):
+        for line in frame.splitlines():
+            if line.startswith("data: "):
+                payload = line[len("data: ") :].strip()
+                if payload and payload.startswith("{"):
+                    events.append(json_mod.loads(payload))
+
+    kinds = [e["event"] for e in events]
+    assert kinds.count("run_start") == 1, kinds
+    assert kinds.count("run_complete") == 1, kinds
+    # The adapter's real work still flows through.
+    assert "node_start" in kinds and "node_end" in kinds

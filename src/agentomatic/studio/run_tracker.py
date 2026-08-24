@@ -183,6 +183,14 @@ class RunTracker:
         try:
             last_output: dict[str, Any] = {}
             async for event in adapter.stream_execution(state, config, breakpoints, checkpoint_id):
+                # This tracker owns the run lifecycle — it already bracketed the
+                # stream with its own run_start/run_complete (carrying the real
+                # run_id, timing and output). Some adapters emit their own pair
+                # too (AgentGraph.astream_studio_events does), which reached the
+                # client as a duplicate run and made the Studio UI render every
+                # agent reply twice.
+                if event.event in {"run_start", "run_complete"}:
+                    continue
                 # Stamp the run_id onto adapter events
                 event.run_id = run_id
                 self.add_event(run_id, event)
