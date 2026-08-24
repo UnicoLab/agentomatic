@@ -60,10 +60,17 @@ def _mount_agent_router(app: FastAPI, agent: RegisteredAgent, name: str, api_pre
     )
     slug = getattr(agent, "slug", None) or getattr(getattr(agent, "manifest", None), "slug", None)
     if slug and slug != name:
+        # The slug mount is a compatibility alias for the canonical
+        # ``{api_prefix}/{name}`` routes above. Keep it out of the OpenAPI
+        # schema: documenting both copies doubled the advertised surface and
+        # produced a duplicate ``operationId`` for every route (FastAPI emits
+        # one UserWarning each, and duplicate ids break client codegen).
+        # The alias still routes normally at runtime.
         app.include_router(
             agent.router,
             prefix=f"{api_prefix}/{slug}",
             tags=[_agent_tag(name)],
+            include_in_schema=False,
         )
 
 
@@ -573,6 +580,21 @@ class AgentPlatform:
             **kwargs: Extra keyword arguments forwarded to
                 :class:`RegisteredAgent`.
         """
+        # A class agent registered as ``class_instance=MyAgent()`` already owns
+        # a compiled graph. Studio's graph view *and* its run streaming both
+        # key off ``graph_fn``, so without deriving it here the agent shows an
+        # empty topology and streaming fails with "Agent has no graph_fn".
+        # (``BaseGraphAgent.as_registered_agent()`` sets it; this is the
+        # programmatic-registration path catching up.)
+        class_instance = kwargs.get("class_instance")
+        if graph_fn is None and class_instance is not None:
+            instance_graph = getattr(class_instance, "graph", None)
+            if instance_graph is not None:
+
+                def graph_fn() -> Any:  # noqa: D401 - adapter closure
+                    """Return the class agent's compiled graph."""
+                    return class_instance.graph
+
         agent = RegisteredAgent(
             manifest=manifest,
             node_fn=node_fn,
@@ -580,6 +602,9 @@ class AgentPlatform:
             **kwargs,
         )
         self._registry._agents[manifest.name] = agent  # noqa: SLF001
+        # Keep the slug index in sync so ``registry.get(slug)`` resolves via the
+        # index (matching folder-discovered agents) rather than the fallback scan.
+        self._registry._index_slug(manifest.name, agent)  # noqa: SLF001
         logger.info(f"  ✅ Programmatically registered: {manifest.name} ({manifest.slug})")
 
     # ------------------------------------------------------------------

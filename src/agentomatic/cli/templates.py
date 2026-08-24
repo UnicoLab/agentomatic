@@ -519,8 +519,11 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         TODO: Replace keyword matching with an LLM classifier.
         """
         query = state.request.lower()
-        # Add your routing logic here
-        state.classification = "default"
+        # Add your routing logic here, e.g.:
+        #     if "invoice" in query:
+        #         state.classification = "billing"
+        #         return state
+        state.classification = "billing" if "invoice" in query else "default"
         return state
 
     def route(self, state: {title}State) -> {title}State:
@@ -529,7 +532,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
         tools = get_handoff_tools()
         if not tools:
-            state.output = {{"response": f"No delegation targets configured"}}
+            state.output = {{"response": "No delegation targets configured"}}
             return state
 
         # Pick the first tool as default, or match by classification
@@ -855,7 +858,7 @@ async def evaluate(dataset_path: str, split: str = "all") -> None:
 
     # Aggregate scores
     print("\\n" + "=" * 60)
-    print(f"\\n  Pipeline: {name}")
+    print("\\n  Pipeline: {name}")
     print(f"  Examples: {{len(examples)}}")
     print(f"  Passed:   {{len(examples) - failures}}")
     print(f"  Failed:   {{failures}}")
@@ -866,7 +869,7 @@ async def evaluate(dataset_path: str, split: str = "all") -> None:
         for key in all_scores[0]:
             values = [s.get(key, 0.0) for s in all_scores]
             avg_scores[key] = sum(values) / len(values)
-        print(f"\\n  Average scores:")
+        print("\\n  Average scores:")
         for k, v in avg_scores.items():
             print(f"    {{k}}: {{v:.3f}}")
 
@@ -920,7 +923,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import time
 from itertools import product
 from pathlib import Path
 from typing import Any
@@ -1162,18 +1164,18 @@ def main() -> None:
         print("Usage: python -m pipelines.{name}.run \\"your query\\"")
         sys.exit(1)
 
-    print(f"Running pipeline '{name}'...")
+    print("Running pipeline '{name}'...")
     print(f"  Query: {{query}}\\n")
 
     result = asyncio.run(run_via_api(query))
 
     print(f"  Status: {{result.get('status', 'unknown')}}")
     print(f"  Duration: {{result.get('duration_ms', 0):.0f}}ms")
-    print(f"\\n  Output:")
+    print("\\n  Output:")
     print(json.dumps(result.get("output", {{}}), indent=4))
 
     if result.get("steps"):
-        print(f"\\n  Steps:")
+        print("\\n  Steps:")
         for step_name, step_data in result["steps"].items():
             status = step_data.get("status", "?")
             dur = step_data.get("duration_ms", 0)
@@ -1336,7 +1338,9 @@ def load_data(filepath: str | Path) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-def train_eval_split(data: list[dict], eval_fraction: float = 0.2) -> tuple[list[dict], list[dict]]:
+def train_eval_split(
+    data: list[dict], eval_fraction: float = 0.2
+) -> tuple[list[dict], list[dict]]:
     """Deterministic tail-split (last N% held out for eval)."""
     if not data:
         return data, []
@@ -1434,7 +1438,10 @@ def to_label(result: str) -> int | None:
 def weighted_score(component_scores: dict[str, float], weights: dict[str, float]) -> float:
     """Return a weight-normalised composite score across components."""
     total_w = sum(weights.get(k, 0.0) for k in component_scores) or 1.0
-    return sum(component_scores.get(k, 0.0) * weights.get(k, 0.0) for k in component_scores) / total_w
+    return (
+        sum(component_scores.get(k, 0.0) * weights.get(k, 0.0) for k in component_scores)
+        / total_w
+    )
 
 
 async def evaluate() -> None:
@@ -1498,7 +1505,6 @@ def _plugin_optimize_py(name: str) -> str:
 from __future__ import annotations
 
 import logging
-import sys
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1689,7 +1695,8 @@ def main(argv: list[str] | None = None) -> int:
     # )
     # history = fit_agent(compiled, data, epochs=cli.epochs, trials=cli.trials)
     # scores = evaluate_agent(compiled, data.test or data.validation).scores
-    # generate_fit_report(compiled.fit_result, output_path=HERE / "reports" / f"train_{{AGENT}}.html",
+    # generate_fit_report(compiled.fit_result,
+    #                     output_path=HERE / "reports" / f"train_{{AGENT}}.html",
     #                     keras_history=history.history, eval_scores=scores)
 
     return 0

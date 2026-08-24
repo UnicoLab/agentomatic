@@ -1,0 +1,211 @@
+# pyright: reportMissingParameterType=none
+# pyright: reportCallIssue=none
+# pyright: reportArgumentType=none
+# pyright: reportAttributeAccessIssue=none
+"""Regression tests for release-blocking defects found by end-to-end testing.
+
+Each test here corresponds to something that was observed failing (or being
+unusably noisy) when the platform was actually booted and driven over HTTP,
+rather than to a hypothetical from reading code.
+"""
+
+from __future__ import annotations
+
+import warnings
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from agentomatic import AgentManifest, AgentPlatform
+
+
+async def _echo(state: dict[str, Any]) -> dict[str, Any]:
+    return {"response": "ok", "agent_type": "echo"}
+
+
+@pytest.fixture
+def dual_mounted_platform(tmp_path):
+    """A platform whose agent's folder name and manifest slug differ.
+
+    Such an agent is mounted under BOTH names so Studio (which addresses
+    agents by slug) does not 404.
+    """
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+        title="Prod Readiness",
+    )
+    platform.register_agent(
+        manifest=AgentManifest(name="hello", slug="agent-hello", description="Hello"),
+        node_fn=_echo,
+    )
+    return platform
+
+
+# =====================================================================
+# OpenAPI: no duplicate operationIds from the name/slug dual mount
+# =====================================================================
+
+
+def test_openapi_has_no_duplicate_operation_ids(dual_mounted_platform) -> None:
+    """Duplicate operationIds break OpenAPI client codegen.
+
+    Mounting each agent under both its folder name and its slug previously
+    emitted one ``UserWarning: Duplicate Operation ID`` per route (~205 on a
+    small project) and produced a spec generators reject.
+    """
+    app = dual_mounted_platform.build()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        spec = app.openapi()
+
+    duplicate_warnings = [w for w in caught if "Duplicate Operation ID" in str(w.message)]
+    assert not duplicate_warnings, (
+        f"{len(duplicate_warnings)} duplicate operationId warning(s): "
+        f"{[str(w.message) for w in duplicate_warnings[:3]]}"
+    )
+
+    operation_ids = [
+        operation["operationId"]
+        for path_item in spec["paths"].values()
+        for operation in path_item.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    ]
+    assert len(operation_ids) == len(set(operation_ids)), "operationIds are not unique"
+
+
+def test_slug_alias_routes_work_but_are_not_documented_twice(dual_mounted_platform) -> None:
+    """The slug mount is a compatibility alias: live, but not in the schema."""
+    app = dual_mounted_platform.build()
+    spec = app.openapi()
+
+    assert "/api/v1/hello/invoke" in spec["paths"], "canonical route must be documented"
+    assert "/api/v1/agent-hello/invoke" not in spec["paths"], (
+        "the slug alias must not be documented — it doubles the advertised surface"
+    )
+
+    with TestClient(app) as client:
+        # ...but it must still route, so Studio's slug-based calls keep working.
+        assert client.post("/api/v1/agent-hello/invoke", json={"query": "x"}).status_code == 200
+        assert client.post("/api/v1/hello/invoke", json={"query": "x"}).status_code == 200
+
+
+# =====================================================================
+# OpenTelemetry console export is opt-in
+# =====================================================================
+
+
+def test_otel_console_export_is_opt_in_by_default(monkeypatch) -> None:
+    """Console span export must not default on.
+
+    It previously attached whenever no OTLP endpoint was configured — i.e. for
+    most deployments — dumping a full JSON span document to stdout for every
+    single HTTP request.
+    """
+    from agentomatic.observability import telemetry
+
+    monkeypatch.delenv("AGENTOMATIC_OTEL_CONSOLE", raising=False)
+    assert telemetry._env_flag("AGENTOMATIC_OTEL_CONSOLE") is False
+
+    for truthy in ("1", "true", "TRUE", "yes", "on"):
+        monkeypatch.setenv("AGENTOMATIC_OTEL_CONSOLE", truthy)
+        assert telemetry._env_flag("AGENTOMATIC_OTEL_CONSOLE") is True, truthy
+
+    for falsy in ("0", "false", "no", "", "off"):
+        monkeypatch.setenv("AGENTOMATIC_OTEL_CONSOLE", falsy)
+        assert telemetry._env_flag("AGENTOMATIC_OTEL_CONSOLE") is False, falsy
+
+
+def test_otel_setup_does_not_attach_console_exporter_by_default(monkeypatch) -> None:
+    """Without the opt-in env var, no ConsoleSpanExporter is registered."""
+    pytest.importorskip("opentelemetry.sdk")
+    from agentomatic.observability import telemetry
+
+    if not telemetry.HAS_OTEL:  # pragma: no cover - depends on extras
+        pytest.skip("OpenTelemetry not installed")
+
+    monkeypatch.delenv("AGENTOMATIC_OTEL_CONSOLE", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+
+    attached: list[Any] = []
+    real_provider_cls = telemetry.TracerProvider
+
+    class _RecordingProvider(real_provider_cls):  # type: ignore[misc, valid-type]
+        def add_span_processor(self, processor: Any) -> None:
+            attached.append(processor)
+            super().add_span_processor(processor)
+
+    monkeypatch.setattr(telemetry, "TracerProvider", _RecordingProvider)
+    telemetry.setup_telemetry(app=None, service_name="test-svc")
+
+    assert not attached, (
+        "a span processor was attached with no OTLP endpoint and console export "
+        "off — this is the per-request stdout span dump regression"
+    )
+
+
+# =====================================================================
+# `agentomatic run` can import the project's main.py
+# =====================================================================
+
+
+def test_run_puts_project_dir_on_sys_path_before_uvicorn(monkeypatch, tmp_path) -> None:
+    """``uvicorn.run("main:app")`` resolves the import string against sys.path.
+
+    Launched as a console script (``uv run agentomatic run``), the project
+    directory is not on sys.path, so importing ``main`` failed outright. The
+    run command must add it (and export PYTHONPATH for the --reload child).
+    """
+    import os
+    import sys
+
+    from agentomatic.cli import commands
+
+    (tmp_path / "main.py").write_text("app = object()\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(commands, "_has_project_main_app", lambda *a, **k: True)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    captured: dict[str, Any] = {}
+
+    class _FakeUvicorn:
+        @staticmethod
+        def run(target: str, **kwargs: Any) -> None:
+            captured["target"] = target
+            captured["app_dir"] = kwargs.get("app_dir")
+            captured["sys_path_0"] = sys.path[0]
+            captured["pythonpath"] = os.environ.get("PYTHONPATH", "")
+
+    monkeypatch.setitem(sys.modules, "uvicorn", _FakeUvicorn)
+
+    original_sys_path = list(sys.path)
+    try:
+        # Invoke the click command's underlying callback directly.
+        commands.run.callback(
+            agents_dir="agents",
+            plugins_dir="plugins",
+            endpoints_dir="endpoints",
+            ingestion_dir="ingestion",
+            stacks_dir="stacks",
+            host="127.0.0.1",
+            port=8000,
+            reload=False,
+            title=None,
+            log_level="INFO",
+            with_ui=False,
+            studio=True,
+            ssl_certfile=None,
+            ssl_keyfile=None,
+            require_auth_globally=False,
+        )
+    finally:
+        sys.path[:] = original_sys_path
+
+    project_dir = str(tmp_path)
+    assert captured["target"] == "main:app"
+    assert captured["app_dir"] == project_dir
+    assert captured["sys_path_0"] == project_dir
+    assert project_dir in captured["pythonpath"].split(os.pathsep)

@@ -36,6 +36,7 @@ try:
     HumanMessage: type[Any] = _lc_messages.HumanMessage
     AIMessage: type[Any] = _lc_messages.AIMessage
     SystemMessage: type[Any] = _lc_messages.SystemMessage
+    ToolMessage: type[Any] = _lc_messages.ToolMessage
 except ImportError:
     HAS_LANGCHAIN = False
 
@@ -61,13 +62,20 @@ except ImportError:
         def __init__(self, content: str = "", **kwargs: Any) -> None:
             super().__init__(content=content, type="system", **kwargs)
 
+    class _ToolMessage(_BaseMessage):
+        def __init__(self, content: str = "", **kwargs: Any) -> None:
+            self.tool_call_id = kwargs.pop("tool_call_id", "")
+            self.name = kwargs.pop("name", None)
+            super().__init__(content=content, type="tool", **kwargs)
+
     # Rebind the public names so the rest of this module (and callers) can
-    # use ``HumanMessage`` / ``AIMessage`` / ``SystemMessage`` uniformly
-    # whether or not langchain_core is installed.
+    # use ``HumanMessage`` / ``AIMessage`` / ``SystemMessage`` / ``ToolMessage``
+    # uniformly whether or not langchain_core is installed.
     BaseMessage = _BaseMessage
     HumanMessage = _HumanMessage
     AIMessage = _AIMessage
     SystemMessage = _SystemMessage
+    ToolMessage = _ToolMessage
 
 
 # Default summary system prompt
@@ -362,17 +370,37 @@ class ConversationMemoryManager:
     def _convert_to_langchain_messages(
         messages: list[dict[str, Any]],
     ) -> list[Any]:
-        """Convert stored message dicts to LangChain BaseMessage objects."""
+        """Convert stored message dicts to LangChain BaseMessage objects.
+
+        Preserves tool-calling metadata: an assistant turn keeps its
+        ``tool_calls``, and a ``tool`` turn becomes a real ``ToolMessage``
+        carrying its ``tool_call_id``. Without that, a tool-using agent's
+        history is silently corrupted (the tool result degrades to a plain
+        human turn and the call/result pairing is lost), which the provider
+        rejects on the next turn.
+        """
         result: list[Any] = []
         for msg in messages:
-            role = msg.get("role", "user")
+            role = str(msg.get("role", "user")).lower()
             content = msg.get("content", "")
-            if role == "user":
+            if role in ("user", "human"):
                 result.append(HumanMessage(content=content))
-            elif role == "assistant":
-                result.append(AIMessage(content=content))
+            elif role in ("assistant", "ai"):
+                tool_calls = msg.get("tool_calls")
+                if tool_calls:
+                    result.append(AIMessage(content=content, tool_calls=tool_calls))
+                else:
+                    result.append(AIMessage(content=content))
             elif role == "system":
                 result.append(SystemMessage(content=content))
+            elif role == "tool":
+                result.append(
+                    ToolMessage(
+                        content=content,
+                        tool_call_id=str(msg.get("tool_call_id", "")),
+                        name=msg.get("name"),
+                    )
+                )
             else:
                 # Default to HumanMessage for unknown roles
                 result.append(HumanMessage(content=content))

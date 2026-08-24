@@ -127,11 +127,18 @@ def _input_from_state(state: dict[str, Any]) -> dict[str, Any]:
         Dict passed to ``BaseGraphAgent.input_to_state`` / ``atransform``.
     """
     query = state.get("current_query", state.get("query", ""))
-    # Drop conversation bookkeeping that agents rarely want as input fields.
-    skip = {"messages", "thread_id"}
+    # ``messages`` and ``thread_id`` are forwarded (they used to be dropped as
+    # "conversation bookkeeping"). Both are load-bearing for class agents built
+    # on LangChain: ``messages`` feeds a ``MessagesPlaceholder`` so the model
+    # sees prior turns, and ``thread_id`` feeds ``RunnableConfig``'s
+    # ``configurable.thread_id`` for checkpointing/tracing. Dropping them made
+    # the scaffolded template's ``input_to_state`` read values that were
+    # guaranteed empty on every HTTP path. ``input_to_state`` is agent-authored
+    # and only reads the keys it asks for, so forwarding extra keys is inert
+    # for agents that ignore them.
     payload: dict[str, Any] = {
         "query": query,
-        **{k: v for k, v in state.items() if k not in skip and k != "context"},
+        **{k: v for k, v in state.items() if k != "context"},
     }
     context = state.get("context")
     if isinstance(context, dict):

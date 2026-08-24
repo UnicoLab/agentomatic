@@ -29,6 +29,7 @@ import click
 from loguru import logger
 
 from agentomatic.cli.agent_guide import WRITE_TARGETS as _AGENT_GUIDE_TARGETS
+from agentomatic.cli.templates import TEMPLATES
 
 # Graceful Rich fallback
 try:
@@ -199,25 +200,10 @@ _TEMPLATE_DEFAULT_DIRS: dict[str, str] = {
 @click.option(
     "--template",
     "-t",
-    type=click.Choice(
-        [
-            "basic",
-            "class",  # alias for basic (class-owned BaseGraphAgent)
-            "full",
-            "coordinator",
-            "pipeline",
-            "rag",
-            "chatbot",
-            "deepagent",
-            "custom",
-            "legacy_dict",
-            "plugin",
-            "endpoint",
-            "connection",
-            "ingestion",
-            "extraction",
-        ]
-    ),
+    # Derived from the template registry so the CLI can never drift out of
+    # sync with it (a hardcoded list previously omitted "langchain", making
+    # a shipped template unreachable from the CLI).
+    type=click.Choice(list(TEMPLATES)),
     default=None,
     help="Template to use (default: interactive selection)",
 )
@@ -638,8 +624,25 @@ def run(
             log_level=log_level,
             require_auth_globally=require_auth_globally,
         )
+        # ``uvicorn.run("main:app")`` resolves the import string against
+        # ``sys.path``. When agentomatic is launched as a console script
+        # (``uv run agentomatic run``, or any pipx/venv install), the project
+        # directory is NOT on sys.path — only the interpreter's script dir is
+        # — so importing ``main`` fails. Put the project dir on the path
+        # explicitly, and export it via PYTHONPATH so uvicorn's --reload
+        # subprocess inherits it too.
+        project_dir = str(Path.cwd())
+        if project_dir not in sys.path:
+            sys.path.insert(0, project_dir)
+        existing_pythonpath = os.environ.get("PYTHONPATH", "")
+        if project_dir not in existing_pythonpath.split(os.pathsep):
+            os.environ["PYTHONPATH"] = (
+                f"{project_dir}{os.pathsep}{existing_pythonpath}"
+                if existing_pythonpath
+                else project_dir
+            )
         logger.info("Found main.py — starting via uvicorn main:app ...")
-        uvicorn.run("main:app", **run_kwargs)
+        uvicorn.run("main:app", app_dir=project_dir, **run_kwargs)
         return
 
     logger.info(f"Starting platform from {agents_dir} (plugins: {plugins_dir})...")

@@ -204,8 +204,13 @@ class TestContextFlatten:
         assert payload["snapshot"] == {"k": 1}
         assert payload["query"] == "q"  # top-level wins over context.query
         assert payload["context"] == {"snapshot": {"k": 1}, "query": "ignored"}
-        assert "messages" not in payload
-        assert "thread_id" not in payload
+        # ``messages`` and ``thread_id`` are forwarded to ``input_to_state``.
+        # They were previously dropped as "conversation bookkeeping", which
+        # made LangChain-style class agents unable to see prior turns (for a
+        # MessagesPlaceholder) or thread a RunnableConfig thread_id through —
+        # the scaffolded template read both and always got empty values.
+        assert payload["messages"] == []
+        assert payload["thread_id"] == "t1"
 
     def test_sync_invoke_reads_flattened_context(self, tmp_path: Any) -> None:
         """REST ``/invoke`` with ``context.snapshot`` reaches ``input_to_state``."""

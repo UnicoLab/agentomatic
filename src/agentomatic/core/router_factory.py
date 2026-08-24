@@ -14,7 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
-from agentomatic.langchain_adapter import json_default, to_jsonable
+from agentomatic.langchain_adapter import dict_to_messages, json_default, to_jsonable
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
@@ -103,7 +103,12 @@ _FRAMEWORK_RESULT_KEYS = frozenset(
         "steps_taken",
         "context",
         "metadata",
-        "messages",
+        # NOTE: "messages" is deliberately NOT filtered. Every other key here
+        # is surfaced elsewhere in AgentInvokeResponse (or is an echo of the
+        # request), but the envelope has no ``messages`` field — so filtering
+        # it silently DROPPED the conversation a class agent returned from
+        # ``state_to_output()``, which is exactly what a LangChain/chat agent
+        # produces. It now flows through to ``output.messages``.
         "current_query",
         "query",
         "user_id",
@@ -884,34 +889,16 @@ def create_default_router(
         # ── Load conversation history ────────────────────────────
         history_loaded = 0
         if request.messages is not None:
-            # User supplied their own messages — use them directly
-            try:
-                from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-                lc_messages: list[Any] = []
-                for msg in request.messages:
-                    role = msg.get("role", "user")
-                    content_val = msg.get("content", "")
-                    if role == "assistant":
-                        lc_messages.append(AIMessage(content=content_val))
-                    elif role == "system":
-                        lc_messages.append(SystemMessage(content=content_val))
-                    else:
-                        lc_messages.append(HumanMessage(content=content_val))
-                lc_messages.append(HumanMessage(content=request.content))
-                state["messages"] = lc_messages
-            except ImportError:
-                # langchain_core not installed — use plain dicts
-                lc_messages_plain: list[dict[str, str]] = []
-                for msg in request.messages:
-                    lc_messages_plain.append(
-                        {
-                            "role": msg.get("role", "user"),
-                            "content": msg.get("content", ""),
-                        }
-                    )
-                lc_messages_plain.append({"role": "user", "content": request.content})
-                state["messages"] = lc_messages_plain
+            # User supplied their own messages — use them directly.
+            # Delegate to the canonical converter in ``langchain_adapter`` so
+            # tool-calling metadata survives: a hand-rolled conversion here
+            # previously dropped ``tool_calls`` and turned a ``tool`` turn into
+            # a HumanMessage, breaking the call/result pairing that providers
+            # require on the next turn. It also degrades gracefully to plain
+            # role/content dicts when langchain_core isn't installed.
+            state["messages"] = dict_to_messages(
+                [*request.messages, {"role": "user", "content": request.content}]
+            )
             history_loaded = len(request.messages)
         elif memory_mgr and request.include_history:
             try:
