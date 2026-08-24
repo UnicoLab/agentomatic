@@ -111,6 +111,12 @@ def create_platform() -> AgentPlatform:
         enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", True),
         control_token=os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
         enable_rate_limit=_env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
+        # Only trust X-Forwarded-For for rate-limit keys behind a real proxy
+        # that overwrites it (e.g. a load balancer) — otherwise any caller
+        # can spoof the header and bypass the limiter.
+        rate_limit_trust_proxy_headers=_env_bool(
+            "AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS", False
+        ),
         # Opt-in per-agent invocation history + optional LLM log analysis.
         logs_history=_env_bool("AGENTOMATIC_LOGS_HISTORY", False),
         allow_logsllm_analysis=_env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),

@@ -254,6 +254,7 @@ class AgentPlatform:
         enable_rate_limit: bool = False,
         rate_limit_requests: int = 100,
         rate_limit_window: int = 60,
+        rate_limit_trust_proxy_headers: bool = False,
         enable_metrics: bool = False,
         enable_feedback: bool = True,
         enable_telemetry: bool = True,
@@ -362,6 +363,7 @@ class AgentPlatform:
         self._enable_rate_limit = enable_rate_limit
         self._rate_limit_requests = rate_limit_requests
         self._rate_limit_window = rate_limit_window
+        self._rate_limit_trust_proxy_headers = rate_limit_trust_proxy_headers
         self._enable_metrics = enable_metrics
         self._enable_feedback = enable_feedback
         self._enable_telemetry = enable_telemetry
@@ -1244,6 +1246,7 @@ class AgentPlatform:
                 RateLimitMiddleware,
                 max_requests=self._rate_limit_requests,
                 window_seconds=self._rate_limit_window,
+                trust_proxy_headers=self._rate_limit_trust_proxy_headers,
             )
             logger.info(
                 f"🚦 Rate limit: {self._rate_limit_requests} req/{self._rate_limit_window}s"

@@ -68,3 +68,8 @@ EXPOSE 8000
 # distroless images boot through the same ``agentomatic run`` entrypoint.
 ENTRYPOINT ["/app/.venv/bin/python", "/app/.venv/bin/agentomatic"]
 CMD ["run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
+
+# No shell and no curl in this image — hit /health with the venv Python
+# instead (exec form, so no shell is needed to run this CMD either).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD ["/app/.venv/bin/python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)"]

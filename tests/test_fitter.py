@@ -905,6 +905,38 @@ class TestFitterOptimizers:
         # The baseline already has temperature=0.5, so no new candidates
         assert len(candidates) == 0
 
+    async def test_few_shot_bootstrap_empty_eval_results_no_crash(self):
+        """k_examples=min(4, len(eval_results))=0 with empty results must not
+        raise ZeroDivisionError — it should just skip (return no candidates).
+        """
+        opt = FewShotBootstrapOptimizer(n_candidates=5, k_examples=0)
+        baseline = PromptRuntimeConfig(system_prompt="test")
+        candidates = await opt.propose(
+            current_config=baseline,
+            eval_results=[],
+            dataset_sample=[],
+            search_space=PromptSearchSpace(),
+        )
+        assert candidates == []
+
+    async def test_few_shot_bootstrap_k_zero_with_usable_results_no_crash(self):
+        """Same guard, but with usable (non-empty) eval_results present —
+        k_examples=0 must still skip cleanly rather than dividing by zero.
+        """
+        opt = FewShotBootstrapOptimizer(n_candidates=5, k_examples=0)
+        baseline = PromptRuntimeConfig(system_prompt="test")
+        eval_results = [
+            {"query": "q1", "response": "r1", "score": 0.9},
+            {"query": "q2", "response": "r2", "score": 0.8},
+        ]
+        candidates = await opt.propose(
+            current_config=baseline,
+            eval_results=eval_results,
+            dataset_sample=[],
+            search_space=PromptSearchSpace(),
+        )
+        assert candidates == []
+
 
 # =====================================================================
 # PromptFitter Tests

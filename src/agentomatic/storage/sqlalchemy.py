@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, event, func, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -44,6 +44,9 @@ from .models import (
     SuspendedStateModel,
     ThreadModel,
 )
+
+_DEFAULT_CHECKPOINT_LIST_LIMIT = 1000
+"""Cap applied to list_checkpoints() when no explicit limit is given."""
 
 
 def _ensure_logs_resource_type_columns(sync_conn: Any) -> None:
@@ -121,6 +124,17 @@ class SQLAlchemyStore(BaseStore):
                 )
             self._owns_engine = True
             self._engine = create_async_engine(url, **engine_kwargs)
+
+        if "sqlite" in url:
+            # SQLite disables foreign-key enforcement per connection unless
+            # explicitly turned on — without this, the ondelete="CASCADE"
+            # declared on CheckpointModel/FeedbackModel/SuspendedStateModel
+            # is silently a no-op and deleting a thread orphans their rows.
+            @event.listens_for(self._engine.sync_engine, "connect")
+            def _enable_sqlite_fk(dbapi_connection: Any, _connection_record: Any) -> None:
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
 
         self._session_factory = async_sessionmaker(
             self._engine,
@@ -223,11 +237,17 @@ class SQLAlchemyStore(BaseStore):
             return [t.to_dict() for t in result.scalars().all()]
 
     async def delete_thread(self, thread_id: str) -> bool:
-        """Delete a thread and all its messages (cascading)."""
+        """Delete a thread and all its messages, feedback, and checkpoints."""
         async with self._session() as session:
             result = await session.execute(select(ThreadModel).where(ThreadModel.id == thread_id))
             thread = result.scalar_one_or_none()
             if thread:
+                # CheckpointModel has no FK to ThreadModel (see models.py), so
+                # it isn't covered by the ondelete="CASCADE" on Feedback/
+                # SuspendedState — clean it up explicitly or it's orphaned.
+                await session.execute(
+                    delete(CheckpointModel).where(CheckpointModel.thread_id == thread_id)
+                )
                 await session.delete(thread)
                 await session.commit()
                 return True
@@ -647,8 +667,11 @@ class SQLAlchemyStore(BaseStore):
                 if before_cp:
                     stmt = stmt.where(CheckpointModel.created_at < before_cp.created_at)
 
-            if limit is not None:
-                stmt = stmt.limit(limit)
+            # Always cap the result set — a long-running thread can accumulate
+            # thousands of checkpoints, and an unbounded query (e.g. a caller,
+            # or LangGraph's own checkpointer.alist(), passing limit=None)
+            # would load the entire history into memory on every call.
+            stmt = stmt.limit(limit if limit is not None else _DEFAULT_CHECKPOINT_LIST_LIMIT)
 
             result = await session.execute(stmt)
             return [c.to_dict() for c in result.scalars().all()]

@@ -1101,6 +1101,70 @@ async def test_delete_thread_cleans_up_suspended_states(store):
 
 
 @pytest.mark.asyncio
+async def test_delete_thread_cleans_up_checkpoints_memory_store(store):
+    """Deleting a thread must not leave its LangGraph checkpoints orphaned."""
+    await store.create_thread("cp_del_thread", "user_1", "agent_1")
+    await store.save_checkpoint(
+        thread_id="cp_del_thread",
+        checkpoint_ns="",
+        checkpoint_id="cp_1",
+        parent_checkpoint_id=None,
+        checkpoint={"v": 1},
+        metadata={"source": "input"},
+    )
+
+    assert await store.get_checkpoint("cp_del_thread", "", "cp_1") is not None
+
+    await store.delete_thread("cp_del_thread")
+
+    assert await store.get_checkpoint("cp_del_thread", "", "cp_1") is None
+    assert await store.list_checkpoints("cp_del_thread", "") == []
+
+
+@pytest.mark.asyncio
+async def test_delete_thread_cleans_up_checkpoints_sqlalchemy_store():
+    """Same guarantee on the SQLAlchemy backend (checkpoints have no DB-level FK)."""
+    db_store = SQLAlchemyStore("sqlite+aiosqlite:///:memory:")
+    await db_store.initialize()
+    try:
+        await db_store.create_thread("cp_del_thread_sqla", "user_1", "agent_1")
+        await db_store.save_checkpoint(
+            thread_id="cp_del_thread_sqla",
+            checkpoint_ns="",
+            checkpoint_id="cp_1",
+            parent_checkpoint_id=None,
+            checkpoint={"v": 1},
+            metadata={"source": "input"},
+        )
+
+        assert await db_store.get_checkpoint("cp_del_thread_sqla", "", "cp_1") is not None
+
+        await db_store.delete_thread("cp_del_thread_sqla")
+
+        assert await db_store.get_checkpoint("cp_del_thread_sqla", "", "cp_1") is None
+        assert await db_store.list_checkpoints("cp_del_thread_sqla", "") == []
+    finally:
+        await db_store.close()
+
+
+@pytest.mark.asyncio
+async def test_sqlite_foreign_keys_are_enforced():
+    """FK constraints (ondelete=CASCADE on feedback/suspended_state) must be
+    enforced on SQLite, which disables FK checks per-connection by default.
+    """
+    from sqlalchemy import text
+
+    db_store = SQLAlchemyStore("sqlite+aiosqlite:///:memory:")
+    await db_store.initialize()
+    try:
+        async with db_store._engine.connect() as conn:
+            result = await conn.execute(text("PRAGMA foreign_keys"))
+            assert result.scalar() == 1
+    finally:
+        await db_store.close()
+
+
+@pytest.mark.asyncio
 async def test_create_thread_returns_consistent_shape(store):
     """Verify create_thread returns dict with parent_thread_id and fork_message_index."""
     thread = await store.create_thread("shape_thread", "user_1", "agent_1")

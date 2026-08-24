@@ -142,6 +142,45 @@ class TestEngineDagExecution:
         assert result.steps["b"].status.value == "success"
 
     @pytest.mark.asyncio
+    async def test_downstream_step_skipped_when_upstream_fails_and_pipeline_continues(
+        self,
+    ) -> None:
+        """A step whose declared upstream FAILED must not run against a
+        missing/stale output just because the pipeline-level policy is
+        "continue" — it should be skipped, and that skip should cascade to
+        its own dependents too.
+        """
+        config = PipelineConfig(
+            name="dag",
+            on_error="continue",
+            steps=[
+                TransformStepConfig(name="a", code="raise ValueError('boom')"),
+                TransformStepConfig(
+                    name="b",
+                    code="return {'v': ctx.steps['a'].output['v'] + 1}",
+                    upstreams=["a"],
+                ),
+                TransformStepConfig(
+                    name="c",
+                    code="return {'v': ctx.steps['b'].output['v'] + 1}",
+                    upstreams=["b"],
+                ),
+                TransformStepConfig(name="d", code="return {'v': 100}"),
+            ],
+        )
+        engine = PipelineEngine(config, MagicMock())
+        result = await engine.run({})
+
+        assert result.steps["a"].status.value == "failed"
+        # b depends directly on the failed step a -> skipped, not run.
+        assert result.steps["b"].status.value == "skipped"
+        assert "a" in result.steps["b"].error
+        # c depends on b, which is now unsuccessful too -> cascaded skip.
+        assert result.steps["c"].status.value == "skipped"
+        # d has no dependency on the failed branch -> runs normally.
+        assert result.steps["d"].status.value == "success"
+
+    @pytest.mark.asyncio
     async def test_cycle_fails_pipeline_without_validate(self) -> None:
         config = _dag_config(
             [

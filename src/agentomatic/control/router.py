@@ -11,6 +11,7 @@ via the ``X-Control-Token`` header.
 
 from __future__ import annotations
 
+import hmac
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Header, HTTPException
@@ -52,7 +53,7 @@ def create_control_router(
 
     def _authorize(token: str | None) -> None:
         """Reject mutating requests lacking the configured control token."""
-        if control_token and token != control_token:
+        if control_token and (not token or not hmac.compare_digest(token, control_token)):
             raise HTTPException(status_code=401, detail="Invalid or missing control token")
 
     def _agent_policy(agent: Any) -> tuple[bool, list[str], list[str]]:

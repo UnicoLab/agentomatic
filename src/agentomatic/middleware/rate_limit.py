@@ -33,16 +33,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         *,
         max_requests: int = 100,
         window_seconds: int = 60,
+        trust_proxy_headers: bool = False,
     ) -> None:
         super().__init__(app)
         self._max = max_requests
         self._window = window_seconds
         self._hits: dict[str, list[float]] = defaultdict(list)
+        # X-Forwarded-For is client-controlled unless a trusted reverse proxy
+        # sets/overwrites it — trusting it by default lets any caller rotate
+        # the header per request and bypass the limiter entirely. Only honour
+        # it when the deployer explicitly confirms a trusted proxy is in front.
+        self._trust_proxy_headers = trust_proxy_headers
 
     def _client_key(self, request: Request) -> str:
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        if self._trust_proxy_headers:
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     async def dispatch(

@@ -6,6 +6,7 @@ Skips health/readiness probes. Supports both header and query param.
 
 from __future__ import annotations
 
+import hmac
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -64,7 +65,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return response
 
         key = request.headers.get(self._header) or request.query_params.get(self._query)
-        if not key or key != self._api_key:
+        if not key or not hmac.compare_digest(key, self._api_key):
             return JSONResponse(
                 {"detail": "Invalid or missing API key"},
                 status_code=401,

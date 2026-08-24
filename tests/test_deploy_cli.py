@@ -100,6 +100,33 @@ class TestComposeRendering:
         )
         assert "dockerfile: Dockerfile.distroless" in content
 
+    def test_compose_distroless_healthcheck_has_no_curl(self) -> None:
+        """The distroless image has no shell and no curl — a curl-based
+        healthcheck would leave the container permanently "unhealthy".
+        """
+        content = deploy_mod.render_docker_compose(
+            stack_name="local",
+            dockerfile_name="Dockerfile.distroless",
+            distroless=True,
+        )
+        assert "curl" not in content
+        assert "http://localhost:8000/health" in content
+        assert "/app/.venv/bin/python" in content
+
+    def test_compose_non_distroless_still_uses_curl(self) -> None:
+        content = deploy_mod.render_docker_compose(stack_name="local", distroless=False)
+        assert '"curl"' in content
+
+    def test_generate_deploy_distroless_compose_has_no_curl(self, tmp_path: Path) -> None:
+        plan = deploy_mod.generate_deploy(
+            out_dir=tmp_path / "out",
+            stack_name="local",
+            stacks_dir=tmp_path / "no-stacks",
+            distroless=True,
+        )
+        compose = plan.files["docker-compose.yml"].read_text()
+        assert "curl" not in compose
+
 
 # =========================================================================
 # Deploy profiles — full (default) vs minimal (Studio off, Swagger stays on)

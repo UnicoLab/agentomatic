@@ -385,6 +385,7 @@ def render_docker_compose(
     build_context: str = ".",
     volume_prefix: str = ".",
     profile: str = "full",
+    distroless: bool = False,
 ) -> str:
     """Return a docker-compose file wiring the platform and optional agents.
 
@@ -403,10 +404,23 @@ def render_docker_compose(
         profile: Deploy profile (``"full"`` or ``"minimal"``); ``minimal``
             adds ``AGENTOMATIC_*`` env vars that disable Studio and quiet logs
             while keeping Swagger, health, metrics, and auth.
+        distroless: When ``True``, use a curl-free, shell-free healthcheck —
+            ``gcr.io/distroless/python3-debian12`` has neither, so the
+            ``curl``-based check used for the regular image would leave the
+            container permanently reporting "unhealthy".
     """
     profile_env_lines = "".join(
         f"      - {key}={value}\n" for key, value in profile_env(profile).items()
     )
+    if distroless:
+        # No shell, no curl in distroless — hit /health with the venv Python
+        # (present at this exact path in the distroless runtime stage) instead.
+        healthcheck_test = (
+            '["CMD", "/app/.venv/bin/python", "-c", '
+            "\"import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)\"]"
+        )
+    else:
+        healthcheck_test = '["CMD", "curl", "-f", "http://localhost:8000/health"]'
     stubs = ""
     for name in agent_names or []:
         service = name.replace("_", "-").lower()
@@ -456,7 +470,7 @@ services:
       - {volume_prefix}/stacks:/app/stacks:ro
       - agentomatic-data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: {healthcheck_test}
       interval: 30s
       timeout: 10s
       retries: 3
@@ -823,6 +837,7 @@ def generate_deploy(
         build_context=build_context,
         volume_prefix=volume_prefix,
         profile=profile,
+        distroless=distroless,
     )
     compose_path = out_path / "docker-compose.yml"
     compose_path.write_text(compose_content)

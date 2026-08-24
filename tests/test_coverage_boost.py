@@ -326,6 +326,45 @@ class TestRateLimitMiddleware:
         assert resp.headers["X-RateLimit-Limit"] == "10"
         assert resp.headers["X-RateLimit-Remaining"] == "9"
 
+    def test_spoofed_forwarded_for_does_not_bypass_limit_by_default(self):
+        """X-Forwarded-For must be ignored unless trust_proxy_headers=True.
+
+        Otherwise any client can send a fresh X-Forwarded-For value per
+        request to get a brand-new rate-limit bucket every time.
+        """
+        client = TestClient(self._make_app(max_requests=2))
+        client.get("/api/test", headers={"X-Forwarded-For": "1.1.1.1"})
+        client.get("/api/test", headers={"X-Forwarded-For": "2.2.2.2"})
+        # Same underlying TestClient connection => same real client key,
+        # so this third request (with yet another spoofed header) must
+        # still be rate-limited.
+        resp = client.get("/api/test", headers={"X-Forwarded-For": "3.3.3.3"})
+        assert resp.status_code == 429
+
+    def test_trusted_proxy_headers_opt_in_honors_forwarded_for(self):
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
+        from agentomatic.middleware.rate_limit import RateLimitMiddleware
+
+        async def home(request):
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/api/test", home)])
+        app.add_middleware(
+            RateLimitMiddleware,
+            max_requests=1,
+            window_seconds=60,
+            trust_proxy_headers=True,
+        )
+        client = TestClient(app)
+        assert client.get("/api/test", headers={"X-Forwarded-For": "1.1.1.1"}).status_code == 200
+        # Same real connection, but a distinct forwarded IP gets its own bucket.
+        assert client.get("/api/test", headers={"X-Forwarded-For": "2.2.2.2"}).status_code == 200
+        # Second request from the same forwarded IP is over the limit.
+        assert client.get("/api/test", headers={"X-Forwarded-For": "1.1.1.1"}).status_code == 429
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Metrics Middleware (without prometheus)
