@@ -1850,6 +1850,13 @@ class AgentPlatform:
         if ssl_certfile or ssl_keyfile:
             logger.info(f"🔐 HTTPS enabled (certfile={ssl_certfile}, keyfile={ssl_keyfile})")
 
+        # The platform's own LoggingMiddleware already logs every request with a
+        # correlation id, so leaving uvicorn's access log on doubles the line
+        # count for the same information — real volume (and cost) in a hosted
+        # log pipeline. An explicit access_log=... from the caller still wins.
+        if self._enable_logging and "access_log" not in run_kwargs:
+            run_kwargs["access_log"] = False
+
         # uvicorn requires an import string (re-imported per worker subprocess)
         # for reload / multi-worker mode. Passing an app *instance* makes modern
         # uvicorn exit(1). Reconstruct via a module-level factory when possible.

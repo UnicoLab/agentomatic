@@ -105,6 +105,7 @@ class SQLAlchemyStore(BaseStore):
         engine: Any = None,
     ) -> None:
         self._url = url
+        self._initialized = False
         # Reuse an existing engine (e.g. from a per-agent DatabaseConnection)
         # so memory shares the agent's own database + pool.
         if engine is not None:
@@ -149,10 +150,19 @@ class SQLAlchemyStore(BaseStore):
     # ------------------------------------------------------------------
 
     async def initialize(self) -> None:
-        """Create all database tables and ensure newer columns exist."""
+        """Create all database tables and ensure newer columns exist.
+
+        Idempotent: the platform can reach this from several places during
+        startup (an explicitly configured store, one derived from
+        ``DATABASE_URL``, and a post-connection pass), and re-running the DDL
+        on every one of them is wasted round trips plus duplicated log lines.
+        """
+        if self._initialized:
+            return
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await conn.run_sync(_ensure_logs_resource_type_columns)
+        self._initialized = True
         logger.info("🗄️ Database tables created/verified")
 
     async def close(self) -> None:
@@ -164,6 +174,7 @@ class SQLAlchemyStore(BaseStore):
         """
         if self._owns_engine:
             await self._engine.dispose()
+            self._initialized = False
             logger.info("🗄️ Database connection pool closed")
 
     async def health_check(self) -> dict[str, Any]:

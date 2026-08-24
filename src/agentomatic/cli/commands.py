@@ -642,6 +642,14 @@ def run(
                 else project_dir
             )
         logger.info("Found main.py — starting via uvicorn main:app ...")
+        # The scaffolded main.py enables the platform's LoggingMiddleware, which
+        # already logs every request with a correlation id; uvicorn's access log
+        # would duplicate each line. Set AGENTOMATIC_UVICORN_ACCESS_LOG=1 to
+        # keep uvicorn's own access log as well.
+        run_kwargs.setdefault(
+            "access_log",
+            _env_bool("AGENTOMATIC_UVICORN_ACCESS_LOG", False),
+        )
         uvicorn.run("main:app", app_dir=project_dir, **run_kwargs)
         return
 

@@ -30,7 +30,11 @@ def configure_logging(level: str = "INFO") -> None:
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level: <8}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> — "
+            # Loguru's built-in format uses " - ", and lines emitted before
+            # this sink is installed still use it. Matching it keeps one
+            # separator across the whole log (and keeps it ASCII, which is
+            # kinder to log-shipping regexes than an em dash).
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
             "<level>{message}</level>"
         ),
     )

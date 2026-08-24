@@ -355,3 +355,92 @@ class ForgetfulPlugin(BaseMLPlugin[Inp, Out]):
             response = client.post("/api/v1/plugins/forgetful/predict", json={"text": "hi"})
             assert response.status_code == 200, response.text
             assert response.json()["result"] == "HI"
+
+
+# =====================================================================
+# Log hygiene: one line per request, one separator, one DDL pass
+# =====================================================================
+
+
+def test_log_format_separator_matches_loguru_default() -> None:
+    """Lines emitted before ``configure_logging`` installs our sink use loguru's
+    built-in format. Using a different separator afterwards produced two
+    formats in one log, which breaks log-shipping regexes.
+    """
+    import inspect
+
+    from agentomatic.core.lifespan import configure_logging
+
+    source = inspect.getsource(configure_logging)
+    assert "{line}</cyan> - " in source
+    assert "—" not in source, "em dash in the log format: non-ASCII and inconsistent"
+
+
+def test_platform_run_disables_uvicorn_access_log_when_middleware_logs(tmp_path) -> None:
+    """The platform's LoggingMiddleware already logs every request, so leaving
+    uvicorn's access log on doubles the volume for the same information.
+    """
+    from unittest.mock import patch
+
+    from agentomatic import AgentPlatform
+
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+        enable_logging=True,
+    )
+    with patch("uvicorn.run") as mock_run:
+        platform.run(host="127.0.0.1", port=9999)
+    assert mock_run.call_args.kwargs["access_log"] is False
+
+    # An explicit choice from the caller still wins.
+    with patch("uvicorn.run") as mock_run:
+        platform.run(host="127.0.0.1", port=9999, access_log=True)
+    assert mock_run.call_args.kwargs["access_log"] is True
+
+
+def test_platform_run_keeps_access_log_when_middleware_is_off(tmp_path) -> None:
+    """With the middleware disabled, uvicorn's access log is the only record
+    of requests — it must not be suppressed.
+    """
+    from unittest.mock import patch
+
+    from agentomatic import AgentPlatform
+
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+        enable_logging=False,
+    )
+    with patch("uvicorn.run") as mock_run:
+        platform.run(host="127.0.0.1", port=9999)
+    assert "access_log" not in mock_run.call_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_sqlalchemy_store_initialize_is_idempotent(tmp_path) -> None:
+    """Startup can reach ``initialize()`` from several paths (configured store,
+    one derived from DATABASE_URL, and a post-connection pass). Re-running the
+    DDL each time is wasted round trips and duplicate log lines.
+    """
+    from loguru import logger
+
+    from agentomatic.storage.sqlalchemy import SQLAlchemyStore
+
+    messages: list[str] = []
+    sink_id = logger.add(lambda m: messages.append(m), level="INFO")
+
+    store = SQLAlchemyStore(url=f"sqlite+aiosqlite:///{tmp_path / 'x.db'}")
+    try:
+        await store.initialize()
+        assert store._initialized is True
+        await store.initialize()
+        await store.initialize()
+    finally:
+        logger.remove(sink_id)
+        await store.close()
+
+    created = [m for m in messages if "Database tables created/verified" in m]
+    assert len(created) == 1, f"DDL ran {len(created)} times, expected once"
