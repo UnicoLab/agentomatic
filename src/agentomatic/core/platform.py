@@ -1211,16 +1211,10 @@ class AgentPlatform:
 
             app.add_middleware(LoggingMiddleware)
 
-        # Auth
-        if self._enable_auth and self._auth_api_key:
-            from agentomatic.middleware.auth import AuthMiddleware
-
-            app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
-            logger.info("🔒 Auth middleware enabled")
-
-        # Zero Trust Enforcer (v0.6) — added BEFORE JWT so that (thanks to
-        # Starlette's reverse middleware ordering) the JWT middleware runs
-        # first and populates ``request.state.jwt_claims`` before enforcement.
+        # Zero Trust Enforcer (v0.6) — added BEFORE the authentication
+        # middlewares so that (thanks to Starlette's reverse middleware
+        # ordering) JWT *and* API-key auth both run first and record the
+        # caller's identity on ``request.state`` before enforcement.
         # Per-agent enforcement is opt-in via each agent's ``security.py``
         # policy (``require_auth`` / ``allowed_roles`` / ``allowed_scopes``).
         if self._enable_zero_trust:
@@ -1256,25 +1250,47 @@ class AgentPlatform:
             # Refuse to start unless real verification (jwks_url) is configured
             # — or API-key auth guards the platform instead. Raised outside the
             # try below so the misconfiguration is not silently swallowed.
-            if self._require_auth_globally and not jwt_cfg.jwks_url and not self._enable_auth:
-                raise RuntimeError(
-                    "require_auth_globally=True but JWT signature verification "
-                    "is not configured (no jwks_url) and API-key auth is "
-                    "disabled — this would accept forged/unsigned JWTs. Fix by "
-                    "one of: (a) set JWTConfig.jwks_url (with issuer/audience) "
-                    "and pass it via jwt_config=/stack; (b) enable_auth=True "
-                    "with auth_api_key; or (c) drop require_auth_globally for "
-                    "local dev."
+            if self._require_auth_globally and not jwt_cfg.jwks_url:
+                if not self._enable_auth:
+                    raise RuntimeError(
+                        "require_auth_globally=True but JWT signature verification "
+                        "is not configured (no jwks_url) and API-key auth is "
+                        "disabled — this would accept forged/unsigned JWTs. Fix by "
+                        "one of: (a) set JWTConfig.jwks_url (with issuer/audience) "
+                        "and pass it via jwt_config=/stack; (b) enable_auth=True "
+                        "with auth_api_key; or (c) drop require_auth_globally for "
+                        "local dev."
+                    )
+                # Remedy (b): API-key auth guards the platform. Adding the JWT
+                # middleware anyway is not merely redundant — under the auth
+                # lock it demands ``require_signature`` and raises from its own
+                # constructor, which Starlette runs when it builds the
+                # middleware stack on the FIRST REQUEST, not here. The app
+                # would start clean and then 500 on every route including
+                # /health. Enforce with the API key alone and say so.
+                logger.warning(
+                    "JWT auth is enabled with require_auth_globally but no "
+                    "jwks_url is configured — enforcing with API-key auth only. "
+                    "Set JWTConfig.jwks_url (with issuer/audience) to verify JWTs."
                 )
-            if self._require_auth_globally:
-                # Enforce signature verification for the global auth lock.
-                jwt_cfg = jwt_cfg.model_copy(update={"require_signature": True})
+            else:
+                if self._require_auth_globally:
+                    # Enforce signature verification for the global auth lock.
+                    jwt_cfg = jwt_cfg.model_copy(update={"require_signature": True})
 
-            try:
                 app.add_middleware(JWTAuthMiddleware, config=jwt_cfg)
                 logger.info("🔐 JWT auth middleware enabled")
-            except Exception as exc:
-                logger.warning(f"JWT auth setup failed: {exc}")
+
+        # API-key auth — registered after zero-trust (so it runs before it)
+        # and marks the request authenticated. Registering it earlier meant
+        # zero-trust denied every request before the key was ever checked, so
+        # API-key auth plus require_auth_globally could not serve a single
+        # request: valid key, 401 "no valid JWT claims found".
+        if self._enable_auth and self._auth_api_key:
+            from agentomatic.middleware.auth import AuthMiddleware
+
+            app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
+            logger.info("🔒 Auth middleware enabled")
 
         # Rate limiting
         if self._enable_rate_limit:

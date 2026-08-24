@@ -78,5 +78,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 {"detail": "Invalid or missing API key"},
                 status_code=401,
             )
+        # Record the authenticated principal so downstream authorization (the
+        # zero-trust enforcer) can tell an API-key caller from an anonymous
+        # one. Without this it looked for JWT claims, found none, and denied
+        # a request that had just presented a valid key.
+        request.state.api_key_authenticated = True
+        request.state.auth_method = "api_key"
         response = await call_next(request)
         return response

@@ -459,3 +459,126 @@ async def test_studio_state_and_history_decode_stored_checkpoints() -> None:
     history = await adapter.get_history("t1")
     assert history
     assert "__agentomatic_serde_type__" not in str(history[0].state)
+
+
+class TestGlobalAuthLockStaysServable:
+    """``require_auth_globally`` with an API key must produce a working app.
+
+    The build-time guard accepts that configuration — it is remedy (b) in its
+    own error message — but the scaffolded ``main.py`` also switches JWT auth
+    on when ``AGENTOMATIC_REQUIRE_AUTH`` is set. ``JWTAuthMiddleware`` then
+    refuses to construct without a ``jwks_url``, and Starlette builds the
+    middleware stack on the *first request*, not at ``build()``. The container
+    started clean and answered 500 to every route, ``/health`` and ``/docs``
+    included.
+    """
+
+    def _app(self):
+        import tempfile
+        from pathlib import Path
+
+        from agentomatic import AgentManifest, AgentPlatform
+
+        async def echo(state):
+            return {"response": "ok", "agent_type": "echo"}
+
+        tmp = Path(tempfile.mkdtemp())
+        platform = AgentPlatform(
+            agents_dir=tmp / "agents",
+            plugins_dir=tmp / "plugins",
+            endpoints_dir=tmp / "endpoints",
+            enable_auth=True,
+            auth_api_key="zt-key",
+            enable_jwt_auth=True,
+            require_auth_globally=True,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="a1", slug="a1", description="echo"),
+            node_fn=echo,
+        )
+        return platform.build()
+
+    def test_every_route_still_answers(self):
+        from fastapi.testclient import TestClient
+
+        with TestClient(self._app(), raise_server_exceptions=False) as client:
+            assert client.get("/health").status_code < 500
+            assert client.get("/docs").status_code < 500
+
+    def test_zero_trust_accepts_an_api_key_authenticated_caller(self):
+        """Zero-trust ran before the API-key middleware and denied everything.
+
+        With ``require_auth_globally`` the enforcer looked for JWT claims,
+        found none — the key had not been checked yet — and returned
+        ``zero_trust_denied`` to a caller presenting a perfectly valid key.
+        The configuration served no request at all.
+        """
+        import tempfile
+        from pathlib import Path
+
+        from fastapi.testclient import TestClient
+
+        from agentomatic import AgentManifest, AgentPlatform
+
+        async def echo(state):
+            return {"response": "ok", "agent_type": "echo"}
+
+        tmp = Path(tempfile.mkdtemp())
+        platform = AgentPlatform(
+            agents_dir=tmp / "agents",
+            plugins_dir=tmp / "plugins",
+            endpoints_dir=tmp / "endpoints",
+            enable_auth=True,
+            auth_api_key="zt-key",
+            enable_jwt_auth=True,
+            enable_zero_trust=True,
+            require_auth_globally=True,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="a1", slug="a1", description="echo"),
+            node_fn=echo,
+        )
+
+        with TestClient(platform.build(), raise_server_exceptions=False) as client:
+            authenticated = client.post(
+                "/api/v1/a1/invoke",
+                json={"query": "x"},
+                headers={"X-API-Key": "zt-key"},
+            )
+            assert authenticated.status_code == 200, authenticated.text
+
+            anonymous = client.post("/api/v1/a1/invoke", json={"query": "x"})
+            assert anonymous.status_code == 401, anonymous.text
+
+    def test_the_api_key_still_gates_agent_routes(self):
+        from fastapi.testclient import TestClient
+
+        with TestClient(self._app(), raise_server_exceptions=False) as client:
+            unauthenticated = client.post("/api/v1/a1/invoke", json={"query": "x"})
+            assert unauthenticated.status_code == 401, unauthenticated.text
+
+            authenticated = client.post(
+                "/api/v1/a1/invoke",
+                json={"query": "x"},
+                headers={"X-API-Key": "zt-key"},
+            )
+            assert authenticated.status_code == 200, authenticated.text
+
+    def test_no_api_key_and_no_jwks_still_refuses_to_boot(self):
+        """The forged-JWT hole must stay closed."""
+        import tempfile
+        from pathlib import Path
+
+        import pytest
+
+        from agentomatic import AgentPlatform
+
+        tmp = Path(tempfile.mkdtemp())
+        platform = AgentPlatform(
+            agents_dir=tmp / "agents",
+            enable_auth=False,
+            enable_jwt_auth=True,
+            require_auth_globally=True,
+        )
+        with pytest.raises(RuntimeError, match="forged/unsigned JWTs"):
+            platform.build()

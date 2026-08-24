@@ -288,10 +288,18 @@ class TestEnforceToolAccess:
 def _mock_request(
     claims: dict | None = None,
     user_id: str | None = None,
+    api_key_authenticated: bool = False,
 ) -> MagicMock:
     """Build a mock Starlette Request with ``state`` attributes."""
     request = MagicMock()
     state = MagicMock()
+
+    # ``MagicMock`` would answer truthily to *any* attribute, which would make
+    # every mocked request look API-key authenticated.
+    if api_key_authenticated:
+        state.api_key_authenticated = True
+    else:
+        del state.api_key_authenticated
 
     # MagicMock auto-creates attributes, so we need to explicitly control
     # which attributes are present on state.
@@ -327,6 +335,24 @@ class TestVerifyRequest:
         ok, reason = enforcer.verify_request(request, "agent")
         assert ok is False
         assert "Authentication is required" in reason
+
+    def test_api_key_authentication_satisfies_the_global_auth_lock(self) -> None:
+        """An API key is a valid credential — it just carries no claims."""
+        enforcer = ZeroTrustEnforcer(require_auth_globally=True)
+        request = _mock_request(api_key_authenticated=True)
+
+        ok, reason = enforcer.verify_request(request, "agent")
+        assert ok is True, reason
+
+    def test_api_key_cannot_satisfy_a_role_restricted_policy(self) -> None:
+        """Fail closed: a key has no roles, so a role policy is unevaluable."""
+        enforcer = ZeroTrustEnforcer(require_auth_globally=True)
+        enforcer.register_policy("agent", AgentSecurityPolicy(allowed_roles=["admin"]))
+        request = _mock_request(api_key_authenticated=True)
+
+        ok, reason = enforcer.verify_request(request, "agent")
+        assert ok is False
+        assert "API key" in reason
 
     def test_auth_required_per_policy_no_claims_denied(self) -> None:
         enforcer = ZeroTrustEnforcer()
