@@ -522,3 +522,26 @@ def test_log_level_applies_to_build_not_just_startup(tmp_path, monkeypatch) -> N
         if " | INFO " in line or " | DEBUG " in line
     ]
     assert not noisy, f"build() logged below WARNING: {noisy[:5]}"
+
+
+def test_build_backend_is_pinned_to_publishable_metadata() -> None:
+    """The wheel must carry metadata PyPI's tooling accepts.
+
+    hatchling 1.30+ emits ``Metadata-Version: 2.5``, which current twine
+    rejects outright ("'2.5' is not a valid metadata version"). The release
+    workflow publishes through ``pypa/gh-action-pypi-publish``, which verifies
+    metadata with twine before upload — so an unbounded ``requires`` turns
+    every release into a coin flip on whatever hatchling resolves that day.
+    """
+    import tomllib
+    from pathlib import Path
+
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    requires = tomllib.loads(pyproject.read_text())["build-system"]["requires"]
+
+    hatchling = [r for r in requires if r.replace("_", "-").startswith("hatchling")]
+    assert hatchling, f"expected hatchling in build-system.requires, got {requires}"
+    assert "<" in hatchling[0], (
+        f"build backend {hatchling[0]!r} has no upper bound — a newer hatchling "
+        "can emit metadata that twine and PyPI reject at publish time"
+    )
