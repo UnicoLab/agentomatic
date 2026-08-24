@@ -131,7 +131,12 @@ class TestManager:
         mgr.register_dispatcher(TargetType.AGENT, boom)
         rec = await mgr.submit_and_wait(TargetType.AGENT, "x", input={})
         assert rec.status == TaskStatus.FAILED
-        assert "kaboom" in (rec.error or "")
+        # The record is served verbatim by GET /tasks/{id} and the task list,
+        # so the raw exception text (which routinely carries DSNs) must not be
+        # stored on it — only the type and a correlation id for the full log.
+        assert "kaboom" not in (rec.error or "")
+        assert "RuntimeError" in (rec.error or "")
+        assert "error_id=" in (rec.error or "")
 
     async def test_batch_progress(self):
         async def run(target, payload, ctx):

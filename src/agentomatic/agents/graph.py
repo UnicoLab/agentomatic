@@ -19,6 +19,8 @@ from typing import Any, Generic, cast
 
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_detail
+
 from .types import StateT, TraceEvent
 
 # Sentinel for "end of graph"
@@ -449,7 +451,8 @@ class AgentGraph(Generic[StateT]):
                     "run_id": run_id,
                     "node": current_node_name,
                     "timestamp": _now_iso(),
-                    "data": {"error": str(exc)},
+                    # Streamed to Studio clients — sanitise (full detail is logged).
+                    "data": client_safe_detail(exc, context="Node failed"),
                 }
                 raise RuntimeError(f"Node '{current_node_name}' failed: {exc}") from exc
 

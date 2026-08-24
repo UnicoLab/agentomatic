@@ -70,7 +70,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return response
 
         key = request.headers.get(self._header) or request.query_params.get(self._query)
-        if not key or not hmac.compare_digest(key, self._api_key):
+        # Compare as bytes: hmac.compare_digest raises TypeError on a str
+        # containing non-ASCII, which would turn a bad key into a 500
+        # instead of a 401 (and is trivially reachable via ?api_key=…).
+        if not key or not hmac.compare_digest(key.encode(), self._api_key.encode()):
             return JSONResponse(
                 {"detail": "Invalid or missing API key"},
                 status_code=401,

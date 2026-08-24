@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_message
+
 from .context import TaskContext
 from .models import (
     TargetType,
@@ -325,7 +327,16 @@ class TaskManager:
                         await asyncio.sleep(delay)
 
             logger.exception(f"Task {record.id} failed after {record.attempts} attempts")
-            await self._finalize(record, TaskStatus.FAILED, error=str(last_error))
+            # Raw exception text routinely carries DSNs/paths, and this
+            # record is served verbatim by GET /tasks/{id}, /result and the
+            # task list — so sanitise before it is persisted.
+            await self._finalize(
+                record,
+                TaskStatus.FAILED,
+                error=client_safe_message(last_error, context="Task failed")
+                if isinstance(last_error, BaseException)
+                else str(last_error),
+            )
 
     def _prepare_input(self, record: TaskRecord) -> Any:
         """Build the payload for a dispatcher invocation, injecting checkpoints.
@@ -370,7 +381,10 @@ class TaskManager:
                 try:
                     results[index] = await dispatcher(record.target, payload, ctx)
                 except Exception as exc:  # noqa: BLE001 - collect per-item errors
-                    results[index] = {"error": str(exc)}
+                    # Per-item errors are returned to the caller too.
+                    results[index] = {
+                        "error": client_safe_message(exc, context="Batch item failed")
+                    }
                 async with lock:
                     done += 1
                     await ctx.report(

@@ -14,7 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
-from agentomatic.core.errors import client_safe_detail
+from agentomatic.core.errors import client_safe_detail, client_safe_message
 from agentomatic.langchain_adapter import dict_to_messages, json_default, to_jsonable
 
 # ---------------------------------------------------------------------------
@@ -1182,7 +1182,11 @@ def create_default_router(
                 "output": structured_output,
             }
         except Exception as exc:
-            return {"task_id": task_id, "status": "failed", "error": str(exc)}
+            return {
+                "task_id": task_id,
+                "status": "failed",
+                "error": client_safe_message(exc, context="A2A task failed"),
+            }
 
     @router.get("/a2a/tasks/{task_id}")
     async def get_a2a_task(task_id: str) -> dict[str, Any]:

@@ -53,7 +53,11 @@ def create_control_router(
 
     def _authorize(token: str | None) -> None:
         """Reject mutating requests lacking the configured control token."""
-        if control_token and (not token or not hmac.compare_digest(token, control_token)):
+        # Bytes comparison — see the note in agentomatic.middleware.auth: a
+        # non-ASCII token would otherwise raise TypeError and surface as 500.
+        if control_token and (
+            not token or not hmac.compare_digest(token.encode(), control_token.encode())
+        ):
             raise HTTPException(status_code=401, detail="Invalid or missing control token")
 
     def _agent_aliases(agent: Any) -> set[str]:

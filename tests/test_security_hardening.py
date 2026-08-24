@@ -302,3 +302,102 @@ def test_studio_resume_rejects_non_langgraph_agent_cleanly(tmp_path) -> None:
     body = response.text
     assert "astream_events" in body  # actionable: names what's missing
     assert "AttributeError" not in body
+
+
+# =====================================================================
+# Async / background paths must sanitise too
+# =====================================================================
+
+
+@pytest.fixture
+def async_leaky_client(tmp_path):
+    """A platform whose agent fails with a credential-bearing exception."""
+
+    async def boom(state: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError(f"connect failed: {_SECRET_DSN} at /srv/secret/config.yaml")
+
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+        enable_studio=True,
+    )
+    platform.register_agent(
+        manifest=AgentManifest(name="boom", slug="boom", description="raises"),
+        node_fn=boom,
+    )
+    with TestClient(platform.build(), raise_server_exceptions=False) as client:
+        yield client
+
+
+def _await_terminal(client, task_id: str) -> dict[str, Any]:
+    import time
+
+    for _ in range(60):
+        body = client.get(f"/api/v1/tasks/{task_id}").json()
+        if body.get("status") in {"succeeded", "failed", "cancelled"}:
+            return body
+        time.sleep(0.05)
+    raise AssertionError("task never reached a terminal state")
+
+
+def test_background_task_record_does_not_leak_exception_text(async_leaky_client) -> None:
+    """The sync paths were sanitised first; the async ones serve the stored
+    record verbatim via /tasks/{id}, /result and the task list.
+    """
+    submitted = async_leaky_client.post("/api/v1/boom/invoke/async", json={"query": "x"})
+    task_id = submitted.json().get("id") or submitted.json().get("task_id")
+    record = _await_terminal(async_leaky_client, task_id)
+
+    assert record["status"] == "failed"
+    assert "HUNTER2" not in str(record)
+    assert "/srv/secret" not in str(record)
+    # Still actionable: names the type and carries a correlation id.
+    assert "RuntimeError" in record["error"]
+    assert "error_id=" in record["error"]
+
+    for path in (f"/api/v1/tasks/{task_id}", f"/api/v1/tasks/{task_id}/result", "/api/v1/tasks"):
+        body = async_leaky_client.get(path).text
+        assert "HUNTER2" not in body, f"{path} leaked the DSN"
+        assert "/srv/secret" not in body, f"{path} leaked a server path"
+
+
+def test_studio_run_and_stream_do_not_leak_exception_text(async_leaky_client) -> None:
+    """Studio runs are reachable unauthenticated in the default `agentomatic
+    run` posture, and the error is both stored on the run and streamed by SSE.
+    """
+    run = async_leaky_client.post("/studio/agents/boom/runs", json={"query": "x"})
+    assert run.status_code == 200
+    assert "HUNTER2" not in run.text
+    assert "/srv/secret" not in run.text
+
+    stream = async_leaky_client.post("/studio/agents/boom/runs/stream", json={"query": "x"})
+    assert "HUNTER2" not in stream.text
+    assert "/srv/secret" not in stream.text
+
+
+def test_non_ascii_credentials_are_rejected_not_a_server_error(tmp_path) -> None:
+    """``hmac.compare_digest`` raises TypeError on a non-ASCII ``str``, which
+    turned a bad key into a 500 — trivially reachable via ``?api_key=…``.
+    """
+
+    async def echo(state: dict[str, Any]) -> dict[str, Any]:
+        return {"response": "ok"}
+
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+        enable_auth=True,
+        auth_api_key="SECRETKEY",
+    )
+    platform.register_agent(
+        manifest=AgentManifest(name="a1", slug="a1", description="echo"),
+        node_fn=echo,
+    )
+    with TestClient(platform.build(), raise_server_exceptions=False) as client:
+        assert client.get("/api/v1/a1/health?api_key=%C3%A9vil").status_code == 401
+        assert client.get("/api/v1/a1/health?api_key=wrong").status_code == 401
+        assert (
+            client.get("/api/v1/a1/health", headers={"X-API-Key": "SECRETKEY"}).status_code == 200
+        )

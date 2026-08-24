@@ -64,3 +64,21 @@ def client_safe_detail(
     if debug_errors_enabled():
         payload["detail"] = str(exc)
     return payload
+
+
+def client_safe_message(
+    exc: BaseException,
+    *,
+    context: str,
+) -> str:
+    """Log *exc* in full and return a one-line message safe to hand a client.
+
+    The string form of :func:`client_safe_detail`, for places that persist an
+    error into a plain ``str`` field — a background task record, a per-item
+    batch result — which is later served over HTTP. The correlation id ties it
+    back to the full server-side log entry.
+    """
+    payload = client_safe_detail(exc, context=context)
+    if "detail" in payload:  # debug mode: raw text is allowed through
+        return f"{context}: {payload['detail']} [error_id={payload['error_id']}]"
+    return f"{context} ({payload['error_type']}) [error_id={payload['error_id']}]"

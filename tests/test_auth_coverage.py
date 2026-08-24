@@ -183,3 +183,82 @@ def test_public_routes_do_not_leak_configured_secrets(public_path, tmp_path) -> 
 
     assert _API_KEY not in body
     assert _CONTROL_TOKEN not in body
+
+
+# =====================================================================
+# The skip-prefix must not be escapable
+# =====================================================================
+
+
+async def _raw_get(app, path: str) -> tuple[int, bytes]:
+    """Send a raw, un-normalised path straight into the ASGI app.
+
+    An HTTP client normally collapses ``..`` before sending, which would mask a
+    traversal bug. Real attackers do not (``curl --path-as-is``, raw sockets),
+    so the scope is constructed by hand here.
+    """
+    chunks: list[bytes] = []
+    status: int | None = None
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "headers": [(b"host", b"testserver")],
+        "client": ("1.2.3.4", 1),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "root_path": "",
+    }
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict[str, Any]) -> None:
+        nonlocal status
+        if message["type"] == "http.response.start":
+            status = message["status"]
+        elif message["type"] == "http.response.body":
+            chunks.append(message.get("body", b""))
+
+    await app(scope, receive, send)
+    return status or 0, b"".join(chunks)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/studio/ui/../agents",
+        "/studio/ui/..%2fagents",
+        "/studio/ui/../../../../etc/passwd",
+        "//studio/agents",
+        "/studio/uiadmin",
+        "/studio/ui-admin",
+    ],
+)
+async def test_public_studio_prefix_cannot_be_escaped(path, tmp_path) -> None:
+    """``/studio/ui`` is public; the debug API next to it is not.
+
+    A traversal that starts inside the public prefix must not reach the
+    protected routes — neither by skipping auth and then normalising into
+    ``/studio/agents``, nor by reading files off disk through the SPA fallback.
+    """
+    platform = _build_platform(tmp_path)
+    app = platform.build()
+
+    async with app.router.lifespan_context(app):
+        status, body = await _raw_get(app, path)
+
+    # Either the request is rejected, or it lands on the SPA shell — never on
+    # agent data and never on a file from outside the static directory.
+    assert b"root:x:" not in body, f"{path} read a file off disk"
+    if status == 200:
+        assert body.lstrip()[:9].lower() == b"<!doctype", (
+            f"{path} returned a 200 that was not the SPA shell: {body[:120]!r}"
+        )
+    else:
+        assert status in {401, 404, 307}, f"{path} returned unexpected status {status}"
