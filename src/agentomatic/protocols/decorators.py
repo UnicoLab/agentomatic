@@ -13,6 +13,8 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from agentomatic.core.errors import client_safe_detail
+
 
 class APIResponse(BaseModel):
     """Standard JSON response envelope."""
@@ -35,7 +37,7 @@ def handle_api_errors(fn: Callable[..., Any]):
             raise
         except Exception as exc:
             logger.error(f"Unhandled error in {fn.__name__}: {exc}")
-            raise HTTPException(500, detail=str(exc))
+            raise HTTPException(500, detail=client_safe_detail(exc, context="Request failed"))
 
     return wrapper
 

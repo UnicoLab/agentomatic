@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_detail
 from agentomatic.endpoints.base import BaseEndpoint
 
 if TYPE_CHECKING:
@@ -132,7 +133,9 @@ def create_endpoint_router(
                     status="error",
                     recorder=log_recorder,
                 )
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=500, detail=client_safe_detail(exc, context="Endpoint call failed")
+            ) from exc
         finally:
             _observe_endpoint(endpoint.endpoint_name, status, time.perf_counter() - t0)
 

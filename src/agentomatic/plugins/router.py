@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_detail
+
 from .ml import BaseMLPlugin
 
 if TYPE_CHECKING:
@@ -53,7 +55,9 @@ def create_plugin_router(
             return await plugin.reload_model()
         except Exception as exc:
             logger.error("Reload failed for plugin '{}': {}", plugin.plugin_name, exc)
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=500, detail=client_safe_detail(exc, context="Plugin call failed")
+            ) from exc
 
     # Create the dynamic predict endpoint
     async def predict_endpoint(request: Any) -> Any:
@@ -101,7 +105,9 @@ def create_plugin_router(
                     status="error",
                     recorder=log_recorder,
                 )
-            raise HTTPException(status_code=500, detail=str(e)) from e
+            raise HTTPException(
+                status_code=500, detail=client_safe_detail(e, context="Plugin prediction failed")
+            ) from e
 
     # Dynamically adjust the signature so FastAPI extracts the correct Pydantic schemas
     import inspect

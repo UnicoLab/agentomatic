@@ -1334,7 +1334,9 @@ def create_default_router(
             summary = await memory_mgr.get_conversation_summary(thread_id)
             return {"thread_id": thread_id, "summary": summary}
         except Exception as exc:
-            raise HTTPException(500, f"Failed to generate summary: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Failed to generate summary")
+            ) from exc
 
     # ── POST /optimize/invoke ─────────────────────────────────────
     @router.post("/optimize/invoke", response_model=OptimizeInvokeResponse)
@@ -1415,7 +1417,9 @@ def create_default_router(
             raise
         except Exception as exc:
             logger.error(f"Optimize invoke for {agent_name} failed: {exc}")
-            raise HTTPException(500, f"Optimize invoke failed: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Optimize invoke failed")
+            ) from exc
 
     # ── POST /feedback ────────────────────────────────────────────
     @router.post("/feedback")
@@ -1572,7 +1576,9 @@ def create_default_router(
             )
         except Exception as exc:  # noqa: BLE001
             logger.error("Log analysis failed for '{}': {}", agent_name, exc)
-            raise HTTPException(500, detail={"error": f"Log analysis failed: {exc}"}) from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Log analysis failed")
+            ) from exc
         return {
             "agent": agent_name,
             "resource": "agent",
@@ -1726,7 +1732,9 @@ def create_default_router(
                 title=request.title,
             )
         except Exception as exc:
-            raise HTTPException(500, f"Failed to fork thread: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Failed to fork thread")
+            ) from exc
         if not forked:
             raise HTTPException(404, f"Thread '{thread_id}' not found")
         return forked
@@ -1741,6 +1749,8 @@ def create_default_router(
             lineage = await thread_store.get_thread_lineage(thread_id)
             return lineage
         except Exception as exc:
-            raise HTTPException(500, f"Failed to retrieve lineage: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Failed to retrieve lineage")
+            ) from exc
 
     return router

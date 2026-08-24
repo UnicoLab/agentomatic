@@ -2564,7 +2564,14 @@ class {title}Ingestor(BaseIngestor[{title}Request]):
             import pymupdf4llm                       # your PDF -> markdown lib
             from langchain_text_splitters import MarkdownTextSplitter
 
-            markdown = pymupdf4llm.to_markdown(request.source)
+            from agentomatic.ingestion.paths import resolve_within_root
+
+            # ``request.source`` arrives over HTTP. Resolve it through
+            # resolve_within_root() (see the import above) or your ingestor
+            # becomes an arbitrary file read: a caller can pass
+            # "/etc/passwd", or "../../" out of any directory you intended.
+            source = resolve_within_root(request.source, description="source")
+            markdown = pymupdf4llm.to_markdown(str(source))
             chunks = MarkdownTextSplitter().split_text(markdown)
 
             upserted = 0

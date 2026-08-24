@@ -163,7 +163,13 @@ class TestHandleApiErrors:
         with pytest.raises(HTTPException) as exc_info:
             await raises_generic()
         assert exc_info.value.status_code == 500
-        assert "boom" in exc_info.value.detail
+        # The raw exception text must NOT reach the client — exception messages
+        # routinely carry DSNs/tokens. A correlation id points at the full
+        # server-side log entry instead.
+        detail = exc_info.value.detail
+        assert "boom" not in str(detail)
+        assert detail["error_type"] == "ValueError"
+        assert detail["error_id"]
 
 
 class TestLogApiCall:
