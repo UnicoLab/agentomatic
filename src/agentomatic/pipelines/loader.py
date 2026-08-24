@@ -480,6 +480,35 @@ def _parse_step(data: dict[str, Any]) -> StepConfigUnion:
 # ---------------------------------------------------------------------------
 
 
+def _iter_pipeline_dir(pipelines_dir: Path) -> Iterator[Path]:
+    """Yield pipeline YAML files held by a ``pipelines/`` folder.
+
+    Covers both layouts:
+
+    - flat — ``pipelines/estimation.yaml``
+    - per-pipeline folder — ``pipelines/estimation/pipeline.yaml``, which is
+      what ``agentomatic init NAME --template pipeline`` scaffolds (alongside
+      its ``dataset.jsonl``, ``eval.py`` and ``Makefile``). Only the flat form
+      used to be scanned, so a freshly scaffolded pipeline was never
+      discovered — ``agentomatic pipeline list`` reported none and the
+      Pipelines API mounted empty.
+
+    Args:
+        pipelines_dir: The ``pipelines/`` directory to scan.
+
+    Yields:
+        Candidate pipeline YAML paths (unresolved).
+    """
+    for child in sorted(pipelines_dir.iterdir()):
+        if child.is_file() and child.suffix in _YAML_SUFFIXES:
+            yield child
+        elif child.is_dir():
+            for suffix in ("yaml", "yml"):
+                candidate = child / f"pipeline.{suffix}"
+                if candidate.is_file():
+                    yield candidate
+
+
 def _iter_pipeline_files(directory: Path) -> Iterator[Path]:
     """Yield pipeline YAML files in discovery order.
 
@@ -487,8 +516,9 @@ def _iter_pipeline_files(directory: Path) -> Iterator[Path]:
 
     - ``pipeline.yaml`` / ``pipeline.yml`` in *directory* itself.
     - Every ``*.yaml`` / ``*.yml`` file when *directory* is named
-      ``pipelines`` (flat project layout).
-    - Every ``*.yaml`` / ``*.yml`` file in a ``pipelines/`` subdirectory.
+      ``pipelines`` (flat project layout), plus ``pipeline.yaml`` inside each
+      of its subfolders (the scaffolded per-pipeline layout).
+    - The same two shapes under a ``pipelines/`` subdirectory.
     - ``pipeline.yaml`` / ``pipeline.yml`` inside each ``agents/*/`` folder.
 
     Args:
@@ -507,16 +537,12 @@ def _iter_pipeline_files(directory: Path) -> Iterator[Path]:
 
     # 1b. Flat layout: callers often pass the pipelines/ folder itself.
     if directory.name == "pipelines":
-        for child in sorted(directory.iterdir()):
-            if child.is_file() and child.suffix in _YAML_SUFFIXES:
-                yield child
+        yield from _iter_pipeline_dir(directory)
 
     # 2. All YAML files under a `pipelines/` subdirectory (project root)
     pipelines_dir = directory / "pipelines"
     if pipelines_dir.is_dir():
-        for child in sorted(pipelines_dir.iterdir()):
-            if child.is_file() and child.suffix in _YAML_SUFFIXES:
-                yield child
+        yield from _iter_pipeline_dir(pipelines_dir)
 
     # 3. pipeline.yaml inside each `agents/*/` folder
     agents_dir = directory / "agents"
