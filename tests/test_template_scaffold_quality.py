@@ -24,10 +24,11 @@ from agentomatic.cli.templates import TEMPLATES, get_template_files
 # Templates render Python plus supporting files; only .py files are compiled.
 _PY_SUFFIX = ".py"
 
-# ``train.py``/``eval.py`` scripts intentionally call ``load_dotenv()`` before
-# importing project modules, which ruff flags as E402 (import not at top of
-# file). That ordering is required for the scripts to work, so it is allowed.
-_ALLOWED_RUFF_CODES = {"E402"}
+# No allowances: every template must render lint-clean as-is. The scripts that
+# genuinely need a ``sys.path`` bootstrap before their project imports carry a
+# file-level E402 suppression of their own, so they satisfy the linter without
+# this gate having to look the other way.
+_ALLOWED_RUFF_CODES: set[str] = set()
 
 
 def _rendered(template: str) -> dict[str, str]:
@@ -68,19 +69,22 @@ def test_every_template_passes_ruff(template: str, tmp_path: Path) -> None:
             "ruff",
             "check",
             "--isolated",
-            # Match the project's own line-length convention (see CLAUDE.md);
-            # --isolated otherwise falls back to ruff's 88-char default.
-            "--line-length",
-            "99",
+            # Deliberately ruff's *default* 88-char line length, not the
+            # project's 99: a scaffolded project starts with no ruff config,
+            # so the defaults are what its first CI run will enforce.
             "--select",
-            "E,F,W",
+            "E,F,W,I",
             "--output-format",
             "concise",
-            str(tmp_path),
+            ".",
         ],
         capture_output=True,
         text=True,
         check=False,
+        # Run from inside the scaffolded dir, exactly as a user's CI would.
+        # From the repo root, ruff's isort resolves ``src/agentomatic`` and
+        # would misclassify ``agentomatic`` as a first-party import.
+        cwd=tmp_path,
     )
     if result.returncode == 0:
         return

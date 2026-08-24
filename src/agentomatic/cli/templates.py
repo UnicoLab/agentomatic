@@ -61,7 +61,10 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         # Honour optimize/fit overrides via resolve_system_prompt (compiled_config,
         # system_prompt_override, prompt_manager) — required for train/optimize.
         return self.resolve_system_prompt(
-            default="You are a helpful RAG assistant. Ground answers in retrieved context."
+            default=(
+                "You are a helpful RAG assistant. "
+                "Ground answers in retrieved context."
+            )
         )
 
     def build_graph(self):
@@ -459,7 +462,7 @@ def _legacy_init_py(
 
 
 def _legacy_graph_py(name: str) -> str:
-    return f'''"""LangGraph graph for {name}."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom langgraph.graph import END, StateGraph\n\nfrom agentomatic import BaseAgentState\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("process", nodes.process)\n    g.set_entry_point("process")\n    g.add_edge("process", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
+    return f'''"""LangGraph graph for {name}."""\nfrom __future__ import annotations\n\nfrom functools import lru_cache\n\nfrom agentomatic import BaseAgentState\nfrom langgraph.graph import END, StateGraph\n\nfrom . import nodes\n\n\ndef build_graph() -> StateGraph:\n    g = StateGraph(BaseAgentState)\n    g.add_node("process", nodes.process)\n    g.set_entry_point("process")\n    g.add_edge("process", END)\n    return g\n\n\n@lru_cache(maxsize=1)\ndef get_graph():\n    return build_graph().compile()\n'''
 
 
 def _legacy_nodes_py(name: str) -> str:
@@ -1252,8 +1255,10 @@ def _plugin_py(name: str) -> str:
 from __future__ import annotations
 
 from typing import Any
-from pydantic import BaseModel, Field
+
 from agentomatic.plugins import BaseMLPlugin
+from pydantic import BaseModel, Field
+
 
 class {title}Input(BaseModel):
     """Input schema for {name}."""
@@ -1317,7 +1322,10 @@ import json
 import logging
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent
@@ -1381,7 +1389,9 @@ if __name__ == "__main__":
 
 
 def _plugin_eval_py(name: str) -> str:
-    title = name.replace("_", "").title()
+    # Must match _plugin_py exactly: "ag_plugin" -> "AgPlugin" (not "Agplugin"),
+    # or the generated imports reference classes that were never defined.
+    title = name.replace("_", " ").title().replace(" ", "")
     return f'''"""Evaluation script for {name} ML plugin.
 
 Loads the plugin, runs it against the labelled dataset, and computes a
@@ -1403,7 +1413,10 @@ from pathlib import Path
 
 from .plugin import {title}Input, {title}Plugin
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent
@@ -1435,11 +1448,16 @@ def to_label(result: str) -> int | None:
     return None
 
 
-def weighted_score(component_scores: dict[str, float], weights: dict[str, float]) -> float:
+def weighted_score(
+    component_scores: dict[str, float], weights: dict[str, float]
+) -> float:
     """Return a weight-normalised composite score across components."""
     total_w = sum(weights.get(k, 0.0) for k in component_scores) or 1.0
     return (
-        sum(component_scores.get(k, 0.0) * weights.get(k, 0.0) for k in component_scores)
+        sum(
+            component_scores.get(k, 0.0) * weights.get(k, 0.0)
+            for k in component_scores
+        )
         / total_w
     )
 
@@ -1451,7 +1469,9 @@ async def evaluate() -> None:
     await plugin.load_model()
 
     if not DATASET.exists():
-        logger.error("No dataset at %s — add labelled JSONL rows before evaluating.", DATASET)
+        logger.error(
+            "No dataset at %s — add labelled JSONL rows before evaluating.", DATASET
+        )
         raise SystemExit(1)
 
     examples = load_data(DATASET)
@@ -1526,10 +1546,14 @@ if __name__ == "__main__":
 
 
 def _plugin_predict_py(name: str) -> str:
-    title = name.replace("_", "").title()
+    # Must match _plugin_py exactly: "ag_plugin" -> "AgPlugin" (not "Agplugin"),
+    # or the generated imports reference classes that were never defined.
+    title = name.replace("_", " ").title().replace(" ", "")
     return f'''"""Local inference script for {name} plugin."""
 import asyncio
-from .plugin import {title}Plugin, {title}Input
+
+from .plugin import {title}Input, {title}Plugin
+
 
 async def predict(text: str):
     plugin = {title}Plugin()
@@ -1612,6 +1636,8 @@ Usage (from project root)::
     AGENTOMATIC_STACK=gemini uv run python agents/{name}/train.py \\
         --augment --n-examples 40 --persist --optimizer rewrite
 """
+# ruff: noqa: E402, I001 - the sys.path bootstrap below must run before the
+# project imports, so those imports cannot sit at the top of the file.
 from __future__ import annotations
 
 import os
@@ -1721,6 +1747,8 @@ Usage (from project root)::
     AGENTOMATIC_STACK=gemini uv run python agents/{name}/eval.py \\
         --split test --prefer-augmented --limit 3
 """
+# ruff: noqa: E402, I001 - the sys.path bootstrap below must run before the
+# project imports, so those imports cannot sit at the top of the file.
 from __future__ import annotations
 
 import os
@@ -1758,7 +1786,11 @@ def main(argv: list[str] | None = None) -> int:
     apply_stack_defaults(stacks)
 
     # --- agent ---
-    llm = None if not cli.judge else get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
+    llm = (
+        None
+        if not cli.judge
+        else get_llm_for_agent(AGENT, role="default", stack_manager=stacks)
+    )
     agent = {title}Agent(llm=llm)
     if cli.compiled:
         agent.load_compiled(cli.compiled)
@@ -1828,8 +1860,6 @@ import argparse
 import os
 from pathlib import Path
 
-from .agent import {title}Agent
-
 from agentomatic.agents import AgentDataset
 from agentomatic.agents.metrics import (
     CallableMetric,
@@ -1838,6 +1868,8 @@ from agentomatic.agents.metrics import (
     WeightedMetric,
 )
 from agentomatic.agents.optimizers import GridSearchOptimizer, PromptFitterBridge
+
+from .agent import {title}Agent
 
 DATA_DIR = Path(__file__).parent
 COMPILED_DIR = Path("compiled") / "{name}"
@@ -1976,7 +2008,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--search-space", type=str, default=None,
-        help="Path to a search_space.yaml (defaults to agents/{name}/search_space.yaml)"
+        help=(
+            "Path to a search_space.yaml "
+            "(defaults to agents/{name}/search_space.yaml)"
+        )
     )
     args = parser.parse_args()
 
@@ -2059,7 +2094,9 @@ def main() -> None:
     # Batch mode
     if args.input:
         input_path = Path(args.input)
-        output_path = Path(args.output) if args.output else DATA_DIR / "predictions.jsonl"
+        output_path = (
+            Path(args.output) if args.output else DATA_DIR / "predictions.jsonl"
+        )
 
         queries = []
         with open(input_path) as f:
@@ -2073,7 +2110,9 @@ def main() -> None:
                 result = agent.transform(query_data)
                 results.append({{"input": query_data, "output": result, "status": "ok"}})
             except Exception as exc:
-                results.append({{"input": query_data, "error": str(exc), "status": "error"}})
+                results.append(
+                    {{"input": query_data, "error": str(exc), "status": "error"}}
+                )
             print(f"  [{{i}}/{{len(queries)}}] done")
 
         with open(output_path, "w") as f:
@@ -2217,8 +2256,6 @@ auto-discovered by the platform and also usable as a pipeline step.
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
 from agentomatic.endpoints import (
     AggregationStrategy,
     AuthType,
@@ -2226,12 +2263,15 @@ from agentomatic.endpoints import (
     UpstreamAuthConfig,
     UpstreamConfig,
 )
+from pydantic import BaseModel, Field
 
 
 class {title}Request(BaseModel):
     """Input schema for {name}."""
 
-    payload: dict = Field(default_factory=dict, description="Data forwarded to upstreams.")
+    payload: dict = Field(
+        default_factory=dict, description="Data forwarded to upstreams."
+    )
 
 
 class {title}Endpoint(BaseEndpoint):
@@ -2479,9 +2519,8 @@ it is auto-discovered and mounted at:
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
 from agentomatic.ingestion import BaseIngestor, IngestionResult
+from pydantic import BaseModel, Field
 
 
 class {title}Request(BaseModel):
@@ -2684,11 +2723,17 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         if not raw:
             return state
         candidate = Path(raw).expanduser()
-        if candidate.exists() and candidate.is_file() and candidate.stat().st_size < 5_000_000:
+        if (
+            candidate.exists()
+            and candidate.is_file()
+            and candidate.stat().st_size < 5_000_000
+        ):
             try:
                 state.markdown = candidate.read_text(encoding="utf-8")
             except UnicodeDecodeError:
-                state.markdown = candidate.read_bytes().decode("utf-8", errors="replace")
+                state.markdown = candidate.read_bytes().decode(
+                    "utf-8", errors="replace"
+                )
         return state
 
     def extract(self, state: {title}State) -> {title}State:
@@ -2845,14 +2890,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
 from agentomatic.agents import BaseGraphAgent
 from agentomatic.langchain_adapter import (
     dict_to_messages,
     make_config,
     serialize_messages,
 )
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
 @dataclass
@@ -2930,7 +2974,9 @@ class {title}Agent(BaseGraphAgent[{title}State]):
             text = f"{{system_message}}" + ": Response to '" + f"{{state.request}}" + "'"
 
         state.response = text
-        state.messages = serialize_messages(lc_messages) if lc_messages else state.messages
+        state.messages = (
+            serialize_messages(lc_messages) if lc_messages else state.messages
+        )
         state.output = {{"response": text, "agent_type": "{name}"}}
         return state
 
