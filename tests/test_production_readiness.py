@@ -15,6 +15,7 @@ import warnings
 from typing import Any
 
 import pytest
+from conftest import install_plugin_package
 from fastapi.testclient import TestClient
 
 from agentomatic import AgentManifest, AgentPlatform
@@ -261,3 +262,96 @@ def test_full_template_agent_keeps_its_generated_endpoints() -> None:
     assert "custom_router = APIRouter()" in api_py
     # The pattern is still demonstrated and explained.
     assert "REPLACES" in api_py
+
+
+def test_all_extra_contents_match_what_the_docs_claim() -> None:
+    """``[all]`` is the advertised "recommended" install, so what it contains
+    must stay in sync with the documented list — a user following the docs and
+    then hitting a missing dependency is a release defect.
+    """
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    with (root / "pyproject.toml").open("rb") as fh:
+        pyproject = tomllib.load(fh)
+
+    extras = pyproject["project"]["optional-dependencies"]
+    all_spec = " ".join(extras["all"])
+    included = {e.strip() for e in all_spec.split("[", 1)[1].rstrip("]\"' ").split(",")}
+
+    documented = {
+        "langgraph",
+        "ollama",
+        "metrics",
+        "db",
+        "cli",
+        "studio",
+        "optimize",
+        "telemetry",
+        "dotenv",
+        "security",
+        "swarm",
+        "vector",
+    }
+    assert included == documented, (
+        "The `all` extra changed; update docs/getting-started/installation.md "
+        f"(added={included - documented}, removed={documented - included})"
+    )
+
+    # These are deliberately excluded — vendor SDKs (provider-agnostic
+    # principle), an alternative DB driver, and the heavy Chainlit UI.
+    for deliberately_excluded in ("openai", "azure", "vertex", "db-postgres", "ui"):
+        assert deliberately_excluded in extras, f"{deliberately_excluded} extra vanished"
+        assert deliberately_excluded not in included
+
+
+def test_platform_marks_plugin_loaded_even_if_subclass_forgets_super(tmp_path) -> None:
+    """A plugin overriding ``load_model`` without calling ``super()`` used to
+    stay ``_is_loaded=False`` forever: /predict answered 503 and /health went
+    "degraded", while startup logged "loaded successfully". The platform now
+    stamps the flag itself so the footgun cannot produce a dead plugin.
+    """
+    from fastapi.testclient import TestClient
+
+    from agentomatic import AgentPlatform
+
+    plugins_dir = tmp_path / "plugins"
+    source = '''"""Plugin that overrides load_model without calling super()."""
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from agentomatic.plugins import BaseMLPlugin
+
+
+class Inp(BaseModel):
+    text: str
+
+
+class Out(BaseModel):
+    result: str
+
+
+class ForgetfulPlugin(BaseMLPlugin[Inp, Out]):
+    plugin_name = "forgetful"
+
+    async def load_model(self) -> None:
+        self.model = object()  # deliberately no: await super().load_model()
+
+    async def predict(self, inputs: Inp) -> Out:
+        return Out(result=inputs.text.upper())
+'''
+    importable = install_plugin_package(plugins_dir, "forgetful", source)
+
+    with importable:
+        platform = AgentPlatform(
+            agents_dir=tmp_path / "agents",
+            plugins_dir=plugins_dir,
+            endpoints_dir=tmp_path / "endpoints",
+        )
+        with TestClient(platform.build()) as client:
+            assert client.get("/health").json()["status"] == "healthy"
+            response = client.post("/api/v1/plugins/forgetful/predict", json={"text": "hi"})
+            assert response.status_code == 200, response.text
+            assert response.json()["result"] == "HI"

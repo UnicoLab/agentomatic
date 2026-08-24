@@ -92,6 +92,18 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         self._is_loaded = True
         self._loaded_at = datetime.now(UTC).isoformat()
 
+    def mark_loaded(self) -> None:
+        """Record that the model is loaded and ready to serve.
+
+        Called by the platform after :meth:`load_model` returns, so a subclass
+        that overrides ``load_model`` without calling ``super()`` still ends up
+        in a usable state instead of answering 503 forever while the startup
+        log claims success. Idempotent — an existing ``_loaded_at`` is kept.
+        """
+        self._is_loaded = True
+        if self._loaded_at is None:
+            self._loaded_at = datetime.now(UTC).isoformat()
+
     def artifact_dir(self) -> Path | None:
         """Return the active artifact bundle directory, or ``None``.
 
@@ -116,9 +128,8 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         self._is_loaded = False
         self._loaded_at = None
         await self.load_model()
-        # Stamp even when a subclass sets ``_is_loaded`` without calling super().
-        if self._loaded_at is None:
-            self._loaded_at = datetime.now(UTC).isoformat()
+        # Stamp even when a subclass overrides load_model without calling super().
+        self.mark_loaded()
         return self.info(include_model_card=True)
 
     def info(self, *, include_model_card: bool = False) -> dict[str, Any]:

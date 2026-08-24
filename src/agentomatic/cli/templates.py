@@ -321,7 +321,7 @@ def _config_py(name: str) -> str:
 
 def _schemas_py(name: str) -> str:
     title = name.replace("_", " ").title().replace(" ", "")
-    return f'''"""Custom schemas for {name}."""\nfrom __future__ import annotations\n\nfrom pydantic import BaseModel, Field\n\n\nclass {title}Request(BaseModel):\n    """Custom request model."""\n    query: str = Field(..., description="User query")\n    context: dict = Field(default_factory=dict)\n\n\nclass {title}Response(BaseModel):\n    """Custom response model."""\n    answer: str\n    confidence: float = Field(0.0, ge=0.0, le=1.0)\n    sources: list[str] = Field(default_factory=list)\n'''
+    return f'''"""Custom schemas for {name}."""\nfrom __future__ import annotations\n\nfrom pydantic import BaseModel, Field\n\n\nclass {title}Request(BaseModel):\n    """Custom request model."""\n    query: str = Field(..., description="User query")\n    context: dict = Field(default_factory=dict)\n\n\nclass {title}Response(BaseModel):\n    """Custom response model.\n\n    Field names must match what the agent\'s ``state_to_output()`` actually\n    returns, or every invoke logs an output-validation warning.\n    """\n    response: str\n    agent_type: str = ""\n    confidence: float = Field(0.0, ge=0.0, le=1.0)\n    sources: list[str] = Field(default_factory=list)\n'''
 
 
 def _tools_py(name: str) -> str:
@@ -1272,12 +1272,21 @@ class {title}Output(BaseModel):
 class {title}Plugin(BaseMLPlugin[{title}Input, {title}Output]):
     """Classical ML model wrapper for {name}."""
 
+    # Without these the plugin inherits BaseMLPlugin's "default_plugin" name,
+    # so it mounts at /api/v1/plugins/default_plugin/* and a second scaffolded
+    # plugin would collide with it.
+    plugin_name = "{name}"
+    plugin_version = "1.0.0"
+
     async def load_model(self) -> None:
         """Load the ML model weights into memory.
         This is called automatically during platform startup.
         """
         # TODO: Load your model here (e.g., joblib.load, torch.load)
         self.model = "dummy_model_instance"
+        # Marks the plugin ready. Without it /predict answers 503 and /health
+        # reports the platform as "degraded".
+        await super().load_model()
 
     async def predict(self, inputs: {title}Input) -> {title}Output:
         """Run inference using the loaded model."""

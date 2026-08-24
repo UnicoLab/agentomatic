@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import install_plugin_package
 
 from agentomatic.cli.templates import TEMPLATES, get_template_files
 
@@ -134,3 +135,72 @@ def test_langchain_template_demonstrates_the_advertised_abstractions() -> None:
         "self.prompt_template | self.llm",  # a real LCEL chain
     ):
         assert expected in agent_py, f"langchain template does not use {expected!r}"
+
+
+# =====================================================================
+# Scaffolded ML plugin must actually be usable
+# =====================================================================
+
+
+def test_plugin_template_sets_its_own_name() -> None:
+    """Without ``plugin_name`` the scaffold inherits BaseMLPlugin's
+    ``default_plugin``, so it mounts at /api/v1/plugins/default_plugin/* and a
+    second scaffolded plugin silently collides with the first.
+    """
+    plugin_py = get_template_files("plugin", "sentiment")["plugin.py"]
+    assert 'plugin_name = "sentiment"' in plugin_py
+
+
+def test_plugin_template_marks_itself_loaded() -> None:
+    """Overriding ``load_model`` without calling super() leaves ``_is_loaded``
+    False: /predict answers 503 and /health reports the platform "degraded",
+    while startup logs claim the plugin loaded successfully.
+    """
+    plugin_py = get_template_files("plugin", "sentiment")["plugin.py"]
+    assert "await super().load_model()" in plugin_py
+
+
+def test_scaffolded_plugin_serves_predictions_and_reports_healthy(tmp_path) -> None:
+    """End-to-end: render the plugin template, mount it, and call /predict."""
+    from fastapi.testclient import TestClient
+
+    from agentomatic import AgentPlatform
+
+    plugins_dir = tmp_path / "plugins"
+    files = get_template_files("plugin", "sentiment")
+    importable = install_plugin_package(plugins_dir, "sentiment", files["plugin.py"])
+    for rel, content in files.items():
+        if rel == "plugin.py":
+            continue
+        path = plugins_dir / "sentiment" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    with importable:
+        platform = AgentPlatform(
+            agents_dir=tmp_path / "agents",
+            plugins_dir=plugins_dir,
+            endpoints_dir=tmp_path / "endpoints",
+        )
+        with TestClient(platform.build()) as client:
+            listed = client.get("/api/v1/plugins").json()
+            entries = listed if isinstance(listed, list) else listed.get("plugins", [])
+            assert [e.get("name") for e in entries] == ["sentiment"]
+
+            assert client.get("/health").json()["status"] == "healthy"
+
+            response = client.post("/api/v1/plugins/sentiment/predict", json={"text": "hi"})
+            assert response.status_code == 200, response.text
+
+
+def test_full_template_response_schema_matches_its_agent_output() -> None:
+    """`schemas.py` required ``answer`` while the agent returned ``response``,
+    so every invoke logged an output-validation warning.
+    """
+    files = get_template_files("full", "sample_agent")
+    schemas_py, agent_py = files["schemas.py"], files["agent.py"]
+
+    assert "response: str" in schemas_py
+    assert "answer: str" not in schemas_py
+    # The agent really does emit "response".
+    assert '"response": text' in agent_py

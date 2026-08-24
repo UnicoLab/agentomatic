@@ -1017,6 +1017,12 @@ class AgentPlatform:
             for name, plugin in platform._plugin_registry.list_plugins().items():
                 try:
                     await plugin.load_model()
+                    # A subclass that overrides load_model() without calling
+                    # super() leaves _is_loaded False, so /predict answers 503
+                    # and /health reports "degraded" — while this line claimed
+                    # success. Stamp it here so a forgotten super() can't
+                    # silently produce a permanently unusable plugin.
+                    plugin.mark_loaded()
                     logger.info(f"  ✅ Plugin '{name}' loaded successfully")
                 except Exception as e:
                     logger.error(f"  ❌ Failed to load plugin '{name}': {e}")
