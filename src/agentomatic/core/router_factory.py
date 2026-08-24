@@ -1332,7 +1332,10 @@ def create_default_router(
     @router.get("/threads/{thread_id}/summary")
     async def get_thread_summary(thread_id: str) -> dict[str, Any]:
         """Get or generate a conversation summary for a thread."""
-        if not memory_mgr:
+        # ``memory_mgr`` wraps the lazy store proxy and stays truthy even when
+        # no store is configured, so check the store itself — otherwise the
+        # RuntimeError surfaced as a 500 for what is a configuration issue.
+        if not memory_mgr or not thread_store:
             raise HTTPException(400, "Memory manager not configured (requires thread storage)")
         try:
             summary = await memory_mgr.get_conversation_summary(thread_id)

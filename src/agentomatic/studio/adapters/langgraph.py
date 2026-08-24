@@ -99,7 +99,14 @@ class LangGraphAdapter(StudioAdapter):
 
     async def get_graph(self) -> StudioGraphTopology:
         if self._agent.graph_fn is None:
-            raise ValueError(f"LangGraph agent '{self.agent_name}' has no graph_fn")
+            # An agent registered with only a node_fn has no graph to draw.
+            # Raising here surfaced as a bare 500 from /studio/agents/{name}/graph,
+            # which the Studio UI calls for *every* agent. Return an empty
+            # topology, matching what the graph-agent adapter already does.
+            return StudioGraphTopology(
+                agent_name=self.agent_name,
+                metadata={"reason": "agent has no graph_fn (node_fn only)"},
+            )
         graph = self._agent.graph_fn()
         drawable = graph.get_graph()
 

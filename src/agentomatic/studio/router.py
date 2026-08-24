@@ -229,6 +229,15 @@ def create_studio_router(
                 agent_name=name,
                 metadata={"error": "get_graph timed out"},
             )
+        except Exception as exc:
+            # Graph introspection runs user code (graph_fn touches imports and
+            # connections). A debug view failing to draw must not 500 — degrade
+            # to an empty topology carrying the reason.
+            logger.warning(f"Studio get_graph failed for '{name}': {exc}")
+            return StudioGraphTopology(
+                agent_name=name,
+                metadata=client_safe_detail(exc, context="get_graph failed"),
+            )
 
     @router.get(
         "/agents/{name}/schemas",
