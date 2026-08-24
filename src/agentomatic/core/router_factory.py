@@ -241,6 +241,57 @@ class A2ATaskRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+def a2a_message_text(message: dict[str, Any]) -> str:
+    """Extract the user text from an A2A message, whatever shape it arrives in.
+
+    The A2A protocol carries text in ``message.parts`` — a list of typed part
+    objects. Agentomatic historically read only ``message.content``, so a
+    spec-shaped request produced an *empty* query and the agent answered
+    nothing, with a 200 and no hint that the text had been dropped.
+
+    Accepted shapes (checked in this order):
+
+    - ``{"parts": [{"type"|"kind": "text", "text": "..."}]}`` — the protocol form
+      (a bare ``{"text": ...}`` part is also accepted)
+    - ``{"content": "..."}`` — the simplified form Agentomatic documents
+    - ``{"content": [ ...parts... ]}`` — content carrying parts
+    - ``{"text": "..."}``
+
+    Args:
+        message: The raw ``message`` object from the request body.
+
+    Returns:
+        The concatenated text, or ``""`` when the message carries none.
+    """
+
+    def _from_parts(parts: Any) -> str:
+        if not isinstance(parts, list):
+            return ""
+        texts: list[str] = []
+        for part in parts:
+            if isinstance(part, str):
+                texts.append(part)
+            elif isinstance(part, dict):
+                value = part.get("text")
+                if isinstance(value, str) and value:
+                    texts.append(value)
+        return "\n".join(texts)
+
+    text = _from_parts(message.get("parts"))
+    if text:
+        return text
+
+    content = message.get("content")
+    if isinstance(content, str) and content:
+        return content
+    text = _from_parts(content)
+    if text:
+        return text
+
+    value = message.get("text")
+    return value if isinstance(value, str) else ""
+
+
 class OptimizeInvokeRequest(BaseModel):
     """Optimization-specific invocation — returns full pipeline context."""
 
@@ -1142,7 +1193,16 @@ def create_default_router(
         synchronous (blocking) execution for backward compatibility.
         """
         agent = _get_agent()
-        query = request.message.get("content", "")
+        query = a2a_message_text(request.message)
+        if not query:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "A2A message carries no text. Send either "
+                    '{"message": {"parts": [{"type": "text", "text": "..."}]}} '
+                    'or {"message": {"content": "..."}}.'
+                ),
+            )
         payload = {
             "query": query,
             "user_id": "a2a",

@@ -376,10 +376,20 @@ Submit an A2A protocol task.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `message` | `object` | ✅ | A2A message with `content` field |
+| `message` | `object` | ✅ | A2A message — protocol `parts`, or a `content` / `text` string |
 | `metadata` | `object` | | Extra metadata |
 
+The protocol form carries text in `parts`; the simplified `content` string is
+also accepted. A message with no readable text is rejected with `422` rather
+than silently running the agent on an empty query.
+
 ```bash
+# Protocol form
+curl -X POST http://localhost:8000/api/v1/my_agent/a2a/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"message": {"role": "user", "parts": [{"type": "text", "text": "Analyze this dataset"}]}}'
+
+# Simplified form
 curl -X POST http://localhost:8000/api/v1/my_agent/a2a/tasks \
   -H "Content-Type: application/json" \
   -d '{"message": {"content": "Analyze this dataset"}}'

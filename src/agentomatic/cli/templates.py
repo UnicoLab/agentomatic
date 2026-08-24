@@ -433,8 +433,20 @@ def _resolve_model() -> str:
 
 @lru_cache(maxsize=1)
 def create_agent():
-    """Create and compile the deep agent."""
-    from deepagents import create_deep_agent
+    """Create and compile the deep agent.
+
+    Raises:
+        RuntimeError: If the third-party ``deepagents`` package is missing.
+    """
+    try:
+        from deepagents import create_deep_agent
+    except ImportError as exc:  # pragma: no cover - depends on the environment
+        raise RuntimeError(
+            "The deepagent template requires the third-party 'deepagents' "
+            "package, which agentomatic does not install. Run "
+            "`pip install deepagents` (and add it to requirements.txt) "
+            "before invoking this agent."
+        ) from exc
 
     return create_deep_agent(
         model=_resolve_model(),

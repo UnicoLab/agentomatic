@@ -390,6 +390,19 @@ def init(
             f"  2. Prefer: [cyan]agentomatic add connection {name}[/cyan] "
             f"to attach to an existing agent without overwrite\n\n"
         )
+    elif template == "deepagent":
+        # This template imports a third-party package that agentomatic does
+        # not depend on. Without it the agent scaffolds and registers fine but
+        # every invocation fails, so say so here rather than at the first 500.
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. [cyan]pip install deepagents[/cyan] "
+            f"[yellow](required — this template imports it)[/yellow]\n"
+            f"  2. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  3. Review [yellow]{target / '__init__.py'}[/yellow] "
+            f"(AgentManifest / card)\n"
+            f"  4. [cyan]agentomatic run --studio[/cyan]\n\n"
+        )
     else:
         steps = (
             f"[bold]Next steps:[/bold]\n\n"

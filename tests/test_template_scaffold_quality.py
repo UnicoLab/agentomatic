@@ -259,3 +259,40 @@ def test_scaffolded_main_does_not_swallow_unrelated_type_errors(
 
     with pytest.raises(TypeError, match="unhashable"):
         exec(compile(_main_py("demo"), "main.py", "exec"), {"__name__": "main"})
+
+
+def test_deepagent_template_names_its_missing_dependency() -> None:
+    """The deepagent template imports a package agentomatic does not install.
+
+    Without it the agent scaffolds, registers, and reports healthy, but every
+    invocation returns a sanitised 500 whose only clue is the exception type
+    ``ModuleNotFoundError`` — the caller cannot tell what to install.
+    """
+    files = get_template_files("deepagent", "mydeep")
+    agent_py = files["agent.py"]
+
+    assert "pip install deepagents" in agent_py
+    assert "except ImportError" in agent_py
+    # The bare import must not remain outside the guard.
+    guarded = agent_py.split("try:", 1)[1]
+    assert "from deepagents import create_deep_agent" in guarded
+
+
+def test_deepagent_scaffold_tells_the_user_to_install_it(tmp_path: Path) -> None:
+    """``agentomatic init --template deepagent`` must surface the dependency."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from agentomatic.cli.commands import cli; cli()",
+            "init",
+            "mydeep",
+            "--template",
+            "deepagent",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "pip install deepagents" in result.stdout + result.stderr
