@@ -56,6 +56,18 @@ def create_control_router(
         if control_token and (not token or not hmac.compare_digest(token, control_token)):
             raise HTTPException(status_code=401, detail="Invalid or missing control token")
 
+    def _agent_aliases(agent: Any) -> set[str]:
+        """Return every path segment an agent's routes are mounted under.
+
+        Agents are mounted under both their folder name and their manifest
+        slug when the two differ (see ``_mount_agent_router`` in
+        ``core/platform.py``) — both must be tracked so enable/disable
+        can't be bypassed via whichever alias wasn't targeted.
+        """
+        manifest = getattr(agent, "manifest", None)
+        aliases = {getattr(manifest, "name", None), getattr(manifest, "slug", None)}
+        return {alias for alias in aliases if alias}
+
     def _agent_policy(agent: Any) -> tuple[bool, list[str], list[str]]:
         """Extract (requires_auth, roles, scopes) from an agent policy."""
         policy = getattr(agent, "security_policy", None)
@@ -267,9 +279,15 @@ def create_control_router(
     ) -> ToggleResponse:
         """Stop routing traffic to an agent (returns 503 for its routes)."""
         _authorize(x_control_token)
-        if platform._registry.get(name) is None:
+        agent = platform._registry.get(name)
+        if agent is None:
             raise HTTPException(404, f"Agent '{name}' not found")
-        state.disable_agent(name)
+        # An agent is mounted under BOTH its folder name and its manifest
+        # slug when they differ (so Studio, which addresses agents by slug,
+        # doesn't 404). Disable both aliases, or draining by whichever one
+        # the operator didn't use leaves the other alias's routes live.
+        for alias in _agent_aliases(agent):
+            state.disable_agent(alias)
         logger.warning(f"🛑 Control plane: agent '{name}' disabled")
         return ToggleResponse(target=name, state="disabled")
 
@@ -284,9 +302,11 @@ def create_control_router(
     ) -> ToggleResponse:
         """Resume routing traffic to a previously disabled agent."""
         _authorize(x_control_token)
-        if platform._registry.get(name) is None:
+        agent = platform._registry.get(name)
+        if agent is None:
             raise HTTPException(404, f"Agent '{name}' not found")
-        state.enable_agent(name)
+        for alias in _agent_aliases(agent):
+            state.enable_agent(alias)
         logger.info(f"✅ Control plane: agent '{name}' enabled")
         return ToggleResponse(target=name, state="enabled")
 

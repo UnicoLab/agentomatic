@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from pydantic import BaseModel
 
@@ -14,6 +16,7 @@ from agentomatic.connections import (
     ConnectionPurpose,
     CustomConnection,
     CustomConnectionConfig,
+    DatabaseConnection,
     DatabaseConnectionConfig,
     HttpConnectionConfig,
     VectorConnection,
@@ -327,6 +330,53 @@ async def test_custom_connection_async_factory():
     )
     await conn.initialize()
     assert isinstance(conn.client, _FakeAsyncClient)
+
+
+async def test_custom_connection_concurrent_initialize_builds_once():
+    """Two concurrent first-callers must not each build (and leak) their
+    own client — only one factory call should happen, and every caller
+    must observe the same client instance.
+    """
+    build_count = 0
+
+    async def counting_factory(url):
+        nonlocal build_count
+        build_count += 1
+        # Yield control so a real race would actually manifest if the
+        # check-then-act in initialize() weren't lock-guarded.
+        await asyncio.sleep(0.01)
+        return _FakeAsyncClient(url)
+
+    conn = CustomConnection(CustomConnectionConfig(name="c", factory=counting_factory, args=["u"]))
+    await asyncio.gather(*(conn.initialize() for _ in range(10)))
+
+    assert build_count == 1
+    assert isinstance(conn.client, _FakeAsyncClient)
+
+
+async def test_database_connection_concurrent_initialize_builds_one_engine(monkeypatch):
+    """Regression: two concurrent first-callers to session()/initialize()
+    must not each build (and leak) their own engine/pool.
+    """
+    import sqlalchemy.ext.asyncio as sa_asyncio
+
+    build_count = 0
+    real_create_async_engine = sa_asyncio.create_async_engine
+
+    def counting_create_async_engine(*args, **kwargs):
+        nonlocal build_count
+        build_count += 1
+        return real_create_async_engine(*args, **kwargs)
+
+    monkeypatch.setattr(sa_asyncio, "create_async_engine", counting_create_async_engine)
+
+    conn = DatabaseConnection(
+        DatabaseConnectionConfig(name="d", url="sqlite+aiosqlite:///:memory:")
+    )
+    await asyncio.gather(*(conn.initialize() for _ in range(10)))
+
+    assert build_count == 1
+    await conn.close()
 
 
 async def test_custom_connection_env_interpolation(monkeypatch):

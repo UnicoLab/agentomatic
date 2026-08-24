@@ -263,6 +263,53 @@ class TestAuthMiddleware:
         resp = client.get("/api/data?api_key=test-key")
         assert resp.status_code == 200
 
+    def _make_studio_app(self, api_key="test-key"):
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
+        from agentomatic.middleware.auth import AuthMiddleware
+
+        async def studio_ui(request):
+            return JSONResponse({"ui": True})
+
+        async def studio_api(request):
+            # Represents a real Studio debug route, e.g.
+            # /studio/agents/{name}/threads/{id}/state
+            return JSONResponse({"thread_state": "secret"})
+
+        app = Starlette(
+            routes=[
+                Route("/studio/ui/", studio_ui),
+                Route("/studio/agents/{name}/threads/{tid}/state", studio_api),
+            ],
+        )
+        app.add_middleware(AuthMiddleware, api_key=api_key)
+        return app
+
+    def test_studio_ui_shell_is_public(self):
+        """The static UI shell (like the /docs Swagger shell) needs no key."""
+        client = TestClient(self._make_studio_app())
+        resp = client.get("/studio/ui/")
+        assert resp.status_code == 200
+
+    def test_studio_debug_api_requires_auth(self):
+        """Regression: the Studio debug REST API must NOT be exempted just
+        because it shares the "/studio" prefix with the public UI shell —
+        that would let an unauthenticated caller read/mutate any agent's
+        run state via /studio/agents/{name}/threads/{id}/state etc.
+        """
+        client = TestClient(self._make_studio_app())
+        resp = client.get("/studio/agents/hello/threads/victim/state")
+        assert resp.status_code == 401
+
+    def test_studio_debug_api_works_with_key(self):
+        client = TestClient(self._make_studio_app())
+        resp = client.get(
+            "/studio/agents/hello/threads/victim/state", headers={"X-API-Key": "test-key"}
+        )
+        assert resp.status_code == 200
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Rate Limit Middleware

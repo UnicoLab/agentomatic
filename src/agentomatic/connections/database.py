@@ -7,6 +7,7 @@ boilerplate.
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote_plus, urlsplit, urlunsplit
@@ -63,6 +64,11 @@ class DatabaseConnection:
         self._engine: AsyncEngine | None = None
         self._sessionmaker: Any = None
         self._resolved_url: str = ""
+        # Guards initialize() so two concurrent first-callers (e.g. two
+        # requests racing at cold start via session()'s lazy init) can't
+        # both pass the `self._engine is None` check and each build (and
+        # leak) their own engine/pool.
+        self._init_lock = asyncio.Lock()
 
     @property
     def name(self) -> str:
@@ -84,38 +90,45 @@ class DatabaseConnection:
         if self._engine is not None:
             return
 
-        try:
-            from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-        except ImportError as exc:  # pragma: no cover
-            raise ImportError(
-                "SQLAlchemy is required for database connections. "
-                "Install with: pip install 'agentomatic[db]'"
-            ) from exc
+        async with self._init_lock:
+            # Re-check: another coroutine may have finished initializing
+            # while we were waiting for the lock.
+            if self._engine is not None:
+                return
 
-        cfg = self.config
-        url = _inject_credentials(
-            resolve_env(cfg.url),
-            resolve_env(cfg.username),
-            resolve_env(cfg.password),
-        )
-        self._resolved_url = url
+            try:
+                from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+            except ImportError as exc:  # pragma: no cover
+                raise ImportError(
+                    "SQLAlchemy is required for database connections. "
+                    "Install with: pip install 'agentomatic[db]'"
+                ) from exc
 
-        engine_kwargs: dict[str, Any] = {
-            "echo": cfg.echo,
-            "pool_pre_ping": cfg.pool_pre_ping,
-            "connect_args": cfg.connect_args,
-        }
-        # SQLite async engines do not support pool sizing kwargs.
-        if not url.startswith("sqlite"):
-            engine_kwargs.update(
-                pool_size=cfg.pool_size,
-                max_overflow=cfg.max_overflow,
-                pool_timeout=cfg.pool_timeout,
+            cfg = self.config
+            url = _inject_credentials(
+                resolve_env(cfg.url),
+                resolve_env(cfg.username),
+                resolve_env(cfg.password),
             )
+            self._resolved_url = url
 
-        self._engine = create_async_engine(url, **engine_kwargs)
-        self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False)
-        logger.info(f"🗄️ Database connection '{self.name}' initialized")
+            engine_kwargs: dict[str, Any] = {
+                "echo": cfg.echo,
+                "pool_pre_ping": cfg.pool_pre_ping,
+                "connect_args": cfg.connect_args,
+            }
+            # SQLite async engines do not support pool sizing kwargs.
+            if not url.startswith("sqlite"):
+                engine_kwargs.update(
+                    pool_size=cfg.pool_size,
+                    max_overflow=cfg.max_overflow,
+                    pool_timeout=cfg.pool_timeout,
+                )
+
+            engine = create_async_engine(url, **engine_kwargs)
+            self._sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+            self._engine = engine
+            logger.info(f"🗄️ Database connection '{self.name}' initialized")
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:

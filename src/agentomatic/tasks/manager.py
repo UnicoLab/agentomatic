@@ -84,9 +84,23 @@ class TaskManager:
         await self.store.initialize()
 
     async def shutdown(self) -> None:
-        """Cancel in-flight tasks and close the store."""
+        """Cancel in-flight tasks and close the store.
+
+        ``asyncio.Task.cancel()`` only *schedules* ``CancelledError`` at the
+        task's next suspension point — the task's own cleanup (including its
+        ``_finalize()`` call, which persists the terminal status via
+        ``self.store.save``) runs later on the event loop. Closing the store
+        immediately after requesting cancellation (the previous behavior)
+        raced that save against ``store.close()`` disposing the underlying
+        connection, so a cancelled task's terminal status could silently
+        fail to persist. Gather the (now-cancelled) tasks first so their
+        cleanup has actually run before the store goes away.
+        """
+        running_tasks = list(self._running.values())
         for task_id in list(self._running):
             await self.cancel(task_id)
+        if running_tasks:
+            await asyncio.gather(*running_tasks, return_exceptions=True)
         await self.store.close()
 
     # ------------------------------------------------------------------

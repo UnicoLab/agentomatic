@@ -24,7 +24,12 @@ _SKIP_PATHS = {
     "/openapi.json",
     "/redoc",
     "/",
-    "/studio",
+    # Only the static UI shell is public (like the Swagger UI shell at
+    # /docs) — NOT "/studio", which (via prefix matching in
+    # path_is_skipped) would also exempt the entire Studio debug REST API
+    # (/studio/agents/..., /studio/.../threads/{id}/state, etc.), letting
+    # an unauthenticated caller read/mutate any agent's run state.
+    "/studio/ui",
     "/status",
 }
 

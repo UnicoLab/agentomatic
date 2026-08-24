@@ -17,6 +17,7 @@ interpolation, lazy build, sync/async factories, and lifecycle)::
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import inspect
 from typing import Any
@@ -60,6 +61,7 @@ class CustomConnection:
     def __init__(self, config: CustomConnectionConfig) -> None:
         self.config = config
         self._client: Any = None
+        self._init_lock = asyncio.Lock()
 
     @property
     def name(self) -> str:
@@ -71,21 +73,25 @@ class CustomConnection:
         if self._client is not None:
             return
 
-        factory = self.config.factory
-        if isinstance(factory, str):
-            factory = import_from_path(resolve_env(factory))
-        if not callable(factory):
-            raise TypeError(
-                f"Custom connection '{self.name}' factory is not callable: {factory!r}"
-            )
+        async with self._init_lock:
+            if self._client is not None:
+                return
 
-        args = resolve_env_deep(self.config.args)
-        kwargs = resolve_env_deep(self.config.kwargs)
-        result = factory(*args, **kwargs)
-        if inspect.isawaitable(result):
-            result = await result
-        self._client = result
-        logger.info(f"🔌 Custom connection '{self.name}' initialized")
+            factory = self.config.factory
+            if isinstance(factory, str):
+                factory = import_from_path(resolve_env(factory))
+            if not callable(factory):
+                raise TypeError(
+                    f"Custom connection '{self.name}' factory is not callable: {factory!r}"
+                )
+
+            args = resolve_env_deep(self.config.args)
+            kwargs = resolve_env_deep(self.config.kwargs)
+            result = factory(*args, **kwargs)
+            if inspect.isawaitable(result):
+                result = await result
+            self._client = result
+            logger.info(f"🔌 Custom connection '{self.name}' initialized")
 
     @property
     def client(self) -> Any:

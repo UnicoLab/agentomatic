@@ -53,7 +53,10 @@ _DEFAULT_SKIP_PATHS: set[str] = {
     "/openapi.json",
     "/redoc",
     "/",
-    "/studio",
+    # Only the static UI shell is public — see the identical comment in
+    # agentomatic.middleware.auth._SKIP_PATHS for why this must not be the
+    # bare "/studio" prefix.
+    "/studio/ui",
     "/status",
 }
 

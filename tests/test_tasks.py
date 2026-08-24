@@ -162,6 +162,33 @@ class TestManager:
         assert refreshed is not None
         assert refreshed.status == TaskStatus.CANCELLED
 
+    async def test_shutdown_waits_for_cancelled_task_finalize(self):
+        """shutdown() must wait for a cancelled task's cleanup (which
+        persists its terminal status via the store) before closing the
+        store — otherwise the save can race the store's own disposal and
+        silently fail to persist the CANCELLED status.
+        """
+        started = asyncio.Event()
+
+        async def slow(target, payload, ctx):
+            started.set()
+            await asyncio.sleep(5)
+            return "done"
+
+        mgr = TaskManager()
+        mgr.register_dispatcher(TargetType.AGENT, slow)
+        await mgr.submit(TargetType.AGENT, "x", input={})
+        await asyncio.wait_for(started.wait(), timeout=2)
+
+        # Before the fix, shutdown() closed the store immediately after
+        # requesting cancellation, without waiting for the task's own
+        # _finalize() to run and persist CANCELLED.
+        await mgr.shutdown()
+
+        # The task must have actually finished (been cancelled) by the time
+        # shutdown() returns, not still be pending in the background.
+        assert not mgr._running
+
     async def test_progress_reporting(self):
         async def run(target, payload, ctx: TaskContext):
             await ctx.report(current=1, total=2, message="half")
