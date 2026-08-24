@@ -204,3 +204,58 @@ def test_full_template_response_schema_matches_its_agent_output() -> None:
     assert "answer: str" not in schemas_py
     # The agent really does emit "response".
     assert '"response": text' in agent_py
+
+
+def test_scaffolded_main_explains_a_version_skew_instead_of_a_bare_typeerror(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An older installed agentomatic must fail with actionable guidance.
+
+    ``main.py`` is generated against the version that scaffolded it. If the
+    image pins an older release (a stale ``requirements.txt`` line or a
+    Dockerfile pin that predates a new option), ``AgentPlatform`` raises a bare
+    ``unexpected keyword argument`` at import time and the container dies with
+    no hint about the cause.
+    """
+    import agentomatic
+    from agentomatic.cli.project import _main_py
+
+    class _OldPlatform:
+        @staticmethod
+        def from_folder(*args: object, **kwargs: object) -> object:
+            raise TypeError(
+                "AgentPlatform.__init__() got an unexpected keyword argument "
+                "'rate_limit_trust_proxy_headers'"
+            )
+
+    monkeypatch.setattr(agentomatic, "AgentPlatform", _OldPlatform)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        exec(compile(_main_py("demo"), "main.py", "exec"), {"__name__": "main"})
+
+    message = str(excinfo.value)
+    assert "rate_limit_trust_proxy_headers" in message
+    assert "older than the one this project was generated with" in message
+    assert "requirements.txt" in message
+    # The original TypeError stays chained so the traceback is not lost.
+    assert isinstance(excinfo.value.__cause__, TypeError)
+
+
+def test_scaffolded_main_does_not_swallow_unrelated_type_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Only unknown-keyword failures are reframed; real bugs propagate as-is."""
+    import agentomatic
+    from agentomatic.cli.project import _main_py
+
+    class _BrokenPlatform:
+        @staticmethod
+        def from_folder(*args: object, **kwargs: object) -> object:
+            raise TypeError("unhashable type: 'dict'")
+
+    monkeypatch.setattr(agentomatic, "AgentPlatform", _BrokenPlatform)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(TypeError, match="unhashable"):
+        exec(compile(_main_py("demo"), "main.py", "exec"), {"__name__": "main"})

@@ -342,6 +342,13 @@ class AgentPlatform:
             allow_logsllm_analysis: When ``True``, expose LLM log-analysis
                 endpoints that score recent logs and return recommendations.
         """
+        # Apply the requested level before anything is logged.  Construction
+        # and ``build()`` narrate settings loading, discovery, and every mount,
+        # while the lifespan's ``configure_logging`` only runs at startup — so
+        # without this, ``log_level="WARNING"`` (what ``--profile minimal``
+        # bakes into the image) still printed every INFO and DEBUG line.
+        configure_logging(log_level)
+
         self.agents_dir = Path(agents_dir).resolve()
         self.plugins_dir = Path(plugins_dir).resolve()
         self.endpoints_dir = Path(endpoints_dir).resolve()

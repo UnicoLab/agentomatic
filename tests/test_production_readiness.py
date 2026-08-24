@@ -11,6 +11,7 @@ rather than to a hypothetical from reading code.
 
 from __future__ import annotations
 
+import sys
 import warnings
 from typing import Any
 
@@ -486,3 +487,38 @@ def test_store_dependent_routes_fail_cleanly_without_a_store(tmp_path) -> None:
             )
             # And it must say something useful rather than an empty body.
             assert response.text.strip(), f"{path} returned an empty body"
+
+
+def test_log_level_applies_to_build_not_just_startup(tmp_path, monkeypatch) -> None:
+    """``--profile minimal`` bakes ``LOG_LEVEL=WARNING`` and must be obeyed.
+
+    ``build()`` narrates discovery and every mount. Configuring loguru only in
+    the lifespan (which runs at startup, after ``build()`` returns) let all of
+    that INFO/DEBUG output through, so the "quieter logs" the minimal profile
+    advertises never materialised in a container.
+    """
+    import io
+
+    from agentomatic.core.lifespan import configure_logging
+    from agentomatic.core.platform import AgentPlatform
+
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+
+    stream = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stream)
+    try:
+        # Start noisy, so a build that ignores ``log_level`` is visible.
+        configure_logging("DEBUG")
+        AgentPlatform(agents_dir=agents_dir, log_level="WARNING").build()
+    finally:
+        monkeypatch.undo()
+        # Leave the global logger as the rest of the suite expects it.
+        configure_logging("INFO")
+
+    noisy = [
+        line
+        for line in stream.getvalue().splitlines()
+        if " | INFO " in line or " | DEBUG " in line
+    ]
+    assert not noisy, f"build() logged below WARNING: {noisy[:5]}"

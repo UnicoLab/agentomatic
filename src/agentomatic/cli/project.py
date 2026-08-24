@@ -52,8 +52,10 @@ supply LLM / embedding / DB defaults — switch with::
 
     agentomatic stack use local   # or remote
 """
+
 from __future__ import annotations
 
+import importlib.metadata
 import os
 
 from agentomatic import AgentPlatform
@@ -77,6 +79,34 @@ def _env_bool(var: str, default: bool) -> bool:
     return raw.strip().lower() in {{"1", "true", "yes", "on"}}
 
 
+def _platform_api_error(exc: TypeError) -> RuntimeError:
+    """Turn an unknown-keyword ``TypeError`` into an actionable message.
+
+    ``main.py`` is generated against the agentomatic version that scaffolded
+    it. If the installed wheel is older (a stale pin in ``requirements.txt``,
+    a cached container layer, or a Dockerfile pinning a release that predates
+    a new option), the call below fails with a bare
+    ``unexpected keyword argument`` and no hint about what to do.
+
+    Args:
+        exc: The original ``TypeError`` raised by ``AgentPlatform``.
+
+    Returns:
+        A ``RuntimeError`` naming the installed version and the fix.
+    """
+    try:
+        installed = importlib.metadata.version("agentomatic")
+    except importlib.metadata.PackageNotFoundError:  # pragma: no cover
+        installed = "unknown"
+    return RuntimeError(
+        f"agentomatic {{installed}} does not support an option this main.py uses "
+        f"({{exc}}). The installed version is older than the one this project was "
+        "generated with. Upgrade it (`pip install -U 'agentomatic[all]'`, and "
+        "raise the pin in requirements.txt / Dockerfile), or remove the "
+        "unsupported argument from create_platform()."
+    )
+
+
 def create_platform() -> AgentPlatform:
     """Build a fully-featured platform matching ``agentomatic run`` defaults.
 
@@ -87,44 +117,53 @@ def create_platform() -> AgentPlatform:
 
     Returns:
         A configured :class:`AgentPlatform` ready to :meth:`build`.
+
+    Raises:
+        RuntimeError: If the installed agentomatic is too old to accept the
+            options below (see :func:`_platform_api_error`).
     """
     # ``require_auth`` mirrors ``agentomatic run --require-auth-globally``:
     # it implies zero-trust + JWT unless those are overridden individually.
     require_auth = _env_bool("AGENTOMATIC_REQUIRE_AUTH", False)
-    return AgentPlatform.from_folder(
-        "agents/",
-        plugins_dir="plugins/",
-        endpoints_dir="endpoints/",
-        ingestion_dir="ingestion/",
-        stacks_dir="stacks/",
-        # Pipelines are auto-discovered from ../pipelines/ (sibling of agents/).
-        # stack="local",              # or set via .agentomatic-stack / STACK env
-        title=os.getenv("AGENTOMATIC_TITLE", "{display} Platform"),
-        description="Agentomatic multi-agent platform for {display}",
-        log_level=os.getenv("AGENTOMATIC_LOG_LEVEL", "INFO"),
-        # On by default — matches `agentomatic run` (Studio) + prod observability.
-        enable_studio=_env_bool("AGENTOMATIC_ENABLE_STUDIO", True),
-        enable_metrics=_env_bool("AGENTOMATIC_ENABLE_METRICS", True),
-        # Opt-in hardening — drive from env / stack; no code edits needed.
-        enable_auth=_env_bool("AGENTOMATIC_ENABLE_AUTH", False),
-        auth_api_key=os.getenv("AGENTOMATIC_API_KEY", ""),
-        enable_jwt_auth=_env_bool("AGENTOMATIC_ENABLE_JWT", require_auth),
-        enable_zero_trust=_env_bool("AGENTOMATIC_ENABLE_ZERO_TRUST", require_auth),
-        require_auth_globally=require_auth,
-        # On with Studio so Control / Endpoints / Connections tabs work out of the box.
-        enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", True),
-        control_token=os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
-        enable_rate_limit=_env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
-        # Only trust X-Forwarded-For for rate-limit keys behind a real proxy
-        # that overwrites it (e.g. a load balancer) — otherwise any caller
-        # can spoof the header and bypass the limiter.
-        rate_limit_trust_proxy_headers=_env_bool(
-            "AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS", False
-        ),
-        # Opt-in per-agent invocation history + optional LLM log analysis.
-        logs_history=_env_bool("AGENTOMATIC_LOGS_HISTORY", False),
-        allow_logsllm_analysis=_env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),
-    )
+    try:
+        return AgentPlatform.from_folder(
+            "agents/",
+            plugins_dir="plugins/",
+            endpoints_dir="endpoints/",
+            ingestion_dir="ingestion/",
+            stacks_dir="stacks/",
+            # Pipelines are auto-discovered from ../pipelines/ (sibling of agents/).
+            # stack="local",              # or set via .agentomatic-stack / STACK env
+            title=os.getenv("AGENTOMATIC_TITLE", "{display} Platform"),
+            description="Agentomatic multi-agent platform for {display}",
+            log_level=os.getenv("AGENTOMATIC_LOG_LEVEL", "INFO"),
+            # On by default — matches `agentomatic run` (Studio) + prod observability.
+            enable_studio=_env_bool("AGENTOMATIC_ENABLE_STUDIO", True),
+            enable_metrics=_env_bool("AGENTOMATIC_ENABLE_METRICS", True),
+            # Opt-in hardening — drive from env / stack; no code edits needed.
+            enable_auth=_env_bool("AGENTOMATIC_ENABLE_AUTH", False),
+            auth_api_key=os.getenv("AGENTOMATIC_API_KEY", ""),
+            enable_jwt_auth=_env_bool("AGENTOMATIC_ENABLE_JWT", require_auth),
+            enable_zero_trust=_env_bool("AGENTOMATIC_ENABLE_ZERO_TRUST", require_auth),
+            require_auth_globally=require_auth,
+            # On with Studio so Control / Endpoints / Connections tabs work out of the box.
+            enable_control_plane=_env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", True),
+            control_token=os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
+            enable_rate_limit=_env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
+            # Only trust X-Forwarded-For for rate-limit keys behind a real proxy
+            # that overwrites it (e.g. a load balancer) — otherwise any caller
+            # can spoof the header and bypass the limiter.
+            rate_limit_trust_proxy_headers=_env_bool(
+                "AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS", False
+            ),
+            # Opt-in per-agent invocation history + optional LLM log analysis.
+            logs_history=_env_bool("AGENTOMATIC_LOGS_HISTORY", False),
+            allow_logsllm_analysis=_env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),
+        )
+    except TypeError as exc:
+        if "unexpected keyword argument" not in str(exc):
+            raise
+        raise _platform_api_error(exc) from exc
 
 
 _platform = create_platform()
