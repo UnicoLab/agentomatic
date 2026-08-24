@@ -25,6 +25,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agentomatic import AgentManifest, AgentPlatform
+from agentomatic.storage import MemoryStore
 
 #: Substitutions that turn a route template into a concrete probe URL. The
 #: values are deliberately non-existent ids — a missing resource is a 404, not
@@ -158,3 +159,58 @@ def test_studio_graph_degrades_for_an_agent_without_a_graph(swept_app) -> None:
 
     assert response.status_code == 200, response.text
     assert response.json()["agent_name"] == "a1"
+
+
+@pytest.fixture(scope="module")
+def swept_app_with_store():
+    """The *other* posture: a store, invocation history, and the task API on.
+
+    The no-store sweep above cannot reach the code paths that only run once a
+    store exists (history reads, checkpoint lookups, thread summaries). A
+    container sweep in that configuration is what surfaced the A2A and
+    template defects, so the same surface is covered here.
+    """
+    import tempfile
+    from pathlib import Path
+
+    async def echo(state: dict[str, Any]) -> dict[str, Any]:
+        return {"response": "ok", "agent_type": "echo"}
+
+    tmp = Path(tempfile.mkdtemp())
+    platform = AgentPlatform(
+        agents_dir=tmp / "agents",
+        plugins_dir=tmp / "plugins",
+        endpoints_dir=tmp / "endpoints",
+        enable_studio=True,
+        enable_control_plane=True,
+        control_token=_CONTROL_TOKEN,
+        store=MemoryStore(),
+        logs_history=True,
+    )
+    platform.register_agent(
+        manifest=AgentManifest(name="a1", slug="a1", description="echo"),
+        node_fn=echo,
+    )
+    return platform.build()
+
+
+def test_no_route_returns_a_server_error_with_a_store_configured(swept_app_with_store) -> None:
+    """Same sweep, store-backed posture — the one a real deployment runs."""
+    failures: list[str] = []
+
+    with TestClient(swept_app_with_store, raise_server_exceptions=False) as client:
+        for method, path, template in _probe_targets(swept_app_with_store):
+            body = _PROBE_BODY if method in {"POST", "PUT", "PATCH"} else None
+            try:
+                response = client.request(
+                    method, path, json=body, headers={"X-Control-Token": _CONTROL_TOKEN}
+                )
+            except Exception as exc:  # noqa: BLE001
+                failures.append(f"{method} {template} raised {type(exc).__name__}: {exc}")
+                continue
+            if response.status_code >= 500:
+                failures.append(
+                    f"{method} {template} -> {response.status_code}: {response.text[:160]}"
+                )
+
+    assert not failures, "Routes returned a server error:\n" + "\n".join(failures)
