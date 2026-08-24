@@ -49,7 +49,9 @@ def create_logs_router(
                     "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
                 },
             )
-        if store is None:
+        # See router_factory: the store may be a lazy proxy that is never
+        # None — rely on its __bool__ instead of an identity check.
+        if not store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
 
     def _require_analysis() -> None:

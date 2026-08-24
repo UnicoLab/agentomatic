@@ -1489,7 +1489,11 @@ def create_default_router(
                     "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
                 },
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         limit = max(1, min(limit, 200))
         offset = max(0, offset)
@@ -1533,7 +1537,11 @@ def create_default_router(
                     "AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1."
                 },
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         analysis = await thread_store.get_latest_log_analysis(agent_name, resource_type="agent")
         if not analysis:
@@ -1562,7 +1570,11 @@ def create_default_router(
                 400,
                 detail={"error": "logs_history must be enabled to analyse invocation logs."},
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
 
         opts = request or AnalyzeLogsRequest(sample_limit=20, persist=True)
@@ -1602,7 +1614,11 @@ def create_default_router(
                     "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
                 },
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         entry = await thread_store.get_invocation_log(log_id)
         if (
@@ -1621,7 +1637,11 @@ def create_default_router(
         offset: int = 0,
     ) -> dict[str, Any]:
         """List auditable prompt-fit / retrain runs for this agent."""
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         limit = max(1, min(limit, 200))
         offset = max(0, offset)

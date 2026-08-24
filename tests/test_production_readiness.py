@@ -444,3 +444,45 @@ async def test_sqlalchemy_store_initialize_is_idempotent(tmp_path) -> None:
 
     created = [m for m in messages if "Database tables created/verified" in m]
     assert len(created) == 1, f"DDL ran {len(created)} times, expected once"
+
+
+def test_store_dependent_routes_fail_cleanly_without_a_store(tmp_path) -> None:
+    """No store is the *default*, so these routes must answer, not crash.
+
+    ``thread_store`` is a ``_LazyStoreProxy`` — never ``None``, with a
+    ``__bool__`` reporting whether a store actually exists. Five routes guarded
+    with ``is None``, which is never true for the proxy, so the guard fell
+    through and the first attribute access raised RuntimeError out of the
+    handler as a bare 500 with no body.
+    """
+    from fastapi.testclient import TestClient
+
+    from agentomatic import AgentManifest, AgentPlatform
+
+    async def echo(state: dict[str, Any]) -> dict[str, Any]:
+        return {"response": "ok"}
+
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        endpoints_dir=tmp_path / "endpoints",
+    )
+    platform.register_agent(
+        manifest=AgentManifest(name="a1", slug="a1", description="echo"),
+        node_fn=echo,
+    )
+
+    with TestClient(platform.build(), raise_server_exceptions=False) as client:
+        for path in (
+            "/api/v1/a1/optimization-runs",
+            "/api/v1/a1/logs",
+            "/api/v1/a1/logs/analysis",
+            "/api/v1/a1/threads",
+        ):
+            response = client.get(path)
+            assert response.status_code != 500, (
+                f"{path} raised an unhandled exception without a store configured: "
+                f"{response.text[:200]}"
+            )
+            # And it must say something useful rather than an empty body.
+            assert response.text.strip(), f"{path} returned an empty body"
