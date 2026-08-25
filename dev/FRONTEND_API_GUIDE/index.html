@@ -1189,6 +1189,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guide/verifying-a-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verifying a Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guide/platform-features/" class="md-nav__link">
         
   
@@ -3196,7 +3224,7 @@ the frontend submits work, then <strong>polls</strong> or <strong>streams</stron
 <p><strong>Submit</strong> (returns immediately with <code>202</code> and a task record):</p>
 <ul>
 <li>Agent: <code>POST /api/v1/{agent}/invoke/async</code> (single) · <code>/invoke/batch</code> (many)</li>
-<li>Plugin: <code>POST /api/v1/{plugin}/predict/async</code> · <code>/predict/batch</code></li>
+<li>Plugin: <code>POST /api/v1/plugins/{plugin}/predict/async</code> · <code>/predict/batch</code></li>
 <li>Pipeline: <code>POST /api/v1/pipelines/{name}/run/async</code> · <code>/run/batch</code></li>
 <li>Endpoint: <code>POST /api/v1/endpoints/{name}{path}/async</code> · <code>.../batch</code></li>
 <li>Ingestor: <code>POST /api/v1/ingestion/{name}/run/async</code> · <code>/run/batch</code></li>
