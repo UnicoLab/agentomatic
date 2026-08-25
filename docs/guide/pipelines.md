@@ -303,6 +303,24 @@ steps:
     `max`, `min`, `sum`, `sorted`, `isinstance`.
     The `ctx` variable is a `PipelineContext` instance.
 
+!!! danger "A broken condition fails the step — it does not skip it"
+    A condition that *raises* (a typo, a renamed step, `$.` mapping syntax
+    where a `ctx` expression belongs) is a defect in the pipeline, not a
+    routing decision. The step is marked **failed** and the pipeline's
+    `on_error` policy decides what happens next.
+
+    ```yaml
+    # ❌ `$.` is mapping syntax — invalid Python, so this step fails.
+    condition: "$.classify.confidence < 0.7"
+
+    # ✅ A `ctx` expression.
+    condition: "ctx.get_step_output('classify').get('confidence', 0) < 0.7"
+    ```
+
+    `validate()` compiles every condition before a run, so a syntax error
+    like the first line above is rejected at load time (HTTP 422) rather
+    than at step three of a long pipeline.
+
 ### Loop
 
 Repeat a step until a condition is met or a maximum iteration count is

@@ -484,9 +484,35 @@ By default the chain advances only on configured triggers (`timeout`,
 Agentomatic provides **automatic conversation memory** for all deployed agents. When a thread store is configured, every `/chat` and `/invoke` call automatically:
 
 1. **Loads prior conversation history** into the agent's `messages` state
-2. **Invokes the agent** with full conversational context
+2. **Invokes the agent** with that state
 3. **Persists** both user and assistant messages to the store
 4. **Summarises** older messages when the conversation grows long
+
+!!! warning "Your agent has to *read* `messages` — loading it is not enough"
+    The platform fills `state["messages"]` and reports `history_loaded`.
+    Whether the model ever sees those turns is the agent's decision. An
+    agent that sends only `current_query` answers every turn as if it were
+    the first, while the response still says `history_loaded: 12`.
+
+    A conversational agent should pass the turns through:
+
+    ```python
+    from agentomatic.langchain_adapter import dict_to_messages
+    from langchain_core.messages import SystemMessage
+
+    def respond(self, state: ChatState) -> ChatState:
+        # state.messages already ends with the current turn -- do not
+        # append state.request again, or the model sees it twice.
+        turns = dict_to_messages(
+            state.messages if state.messages else {"current_query": state.request}
+        )
+        result = self.llm.invoke([SystemMessage(content=self.prompt), *turns])
+        ...
+    ```
+
+    The `chatbot` and `langchain` templates ship this wiring. The other
+    templates take `current_query` alone on purpose: an extraction or
+    routing agent that dragged in prior turns would be the surprise.
 
 ```
           Frontend                    Agentomatic                    Store
@@ -597,7 +623,7 @@ The response includes all agent output fields plus conversation metadata:
 | `steps_taken` | Processing steps the agent took |
 | `context` | Context data returned by agent (RAG docs, search results, etc.) |
 | `metadata` | Merged metadata (request + agent + prompt_version) |
-| `history_loaded` | Number of prior messages loaded into context |
+| `history_loaded` | Prior messages **loaded from the store** — not proof the agent sent them to the model (see the warning above) |
 | `duration_ms` | Processing time in milliseconds |
 
 ### Windowing & Summarization

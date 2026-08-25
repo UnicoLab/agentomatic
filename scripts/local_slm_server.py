@@ -46,6 +46,7 @@ import hashlib
 import json
 import re
 import time
+from collections import deque
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -369,16 +370,38 @@ async def list_models() -> dict[str, Any]:
     }
 
 
+#: The last few request bodies, newest last.
+#:
+#: A verifier can assert what the platform actually put on the wire --
+#: whether conversation history reached the model, whether a system prompt
+#: was sent as a system role -- instead of inferring it from the answer.
+_RECORDED: deque[dict[str, Any]] = deque(maxlen=64)
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     """Liveness probe."""
     return {"status": "ok", "model": MODEL_ID}
 
 
+@app.get("/debug/requests")
+async def recorded_requests() -> dict[str, Any]:
+    """Return the recent request bodies this double was sent."""
+    return {"count": len(_RECORDED), "requests": list(_RECORDED)}
+
+
+@app.delete("/debug/requests")
+async def clear_recorded_requests() -> dict[str, Any]:
+    """Drop the recorded requests, so a check starts from a clean slate."""
+    _RECORDED.clear()
+    return {"count": 0}
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request) -> JSONResponse:
     """OpenAI-compatible chat completion."""
     body = await request.json()
+    _RECORDED.append(body)
     messages = body.get("messages") or []
     system_prompt = " ".join(
         str(m.get("content", "")) for m in messages if m.get("role") == "system"

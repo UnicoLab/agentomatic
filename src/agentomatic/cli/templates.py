@@ -156,14 +156,29 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         g.set_finish_point("respond")
         return g.compile()
 
+    def _turns(self, state: {title}State) -> list[Any]:
+        """Build the message list for the model, system prompt first.
+
+        ``/chat`` loads the whole thread into ``state.messages``, ending
+        with the current turn. Sending only ``state.request`` would answer
+        every turn as if it were the first — the caller sees
+        ``history_loaded: 4`` and a model that has forgotten all four.
+        """
+        from agentomatic.langchain_adapter import dict_to_messages
+        from langchain_core.messages import SystemMessage
+
+        turns = dict_to_messages(
+            state.messages if state.messages else {{"current_query": state.request}}
+        )
+        return [SystemMessage(content=self._system_prompt()), *turns]
+
     def respond(self, state: {title}State) -> {title}State:
-        history_len = len(state.messages)
-        prompt = self._system_prompt()
+        # ``state.messages`` ends with the current turn, so the history
+        # behind it is one shorter than the list.
+        history_len = max(0, len(state.messages) - 1)
         if self.llm is not None:
             try:
-                result = self.llm.invoke(
-                    f"{{prompt}}\\n\\nUser: {{state.request}}"
-                )
+                result = self.llm.invoke(self._turns(state))
                 text = getattr(result, "content", None) or str(result)
             except Exception as exc:  # noqa: BLE001
                 text = f"[Turn {{history_len + 1}}] (llm error: {{exc}})"
