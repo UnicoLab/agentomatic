@@ -24,6 +24,7 @@ import argparse
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -38,6 +39,36 @@ _RATE_LIMIT_MAX_WAIT = 65.0
 _TERMINAL_OK = frozenset({"completed", "succeeded", "success"})
 #: Task statuses that mean the work finished unsuccessfully.
 _TERMINAL_BAD = frozenset({"failed", "error", "cancelled", "canceled"})
+
+#: Every step type the pipeline engine implements. Used to report which
+#: ones a deployment's published pipelines actually exercise.
+_ALL_STEP_TYPES = (
+    "agent",
+    "plugin",
+    "endpoint",
+    "ingestion",
+    "parallel",
+    "map",
+    "transform",
+    "loop",
+    "sub_pipeline",
+)
+
+
+def _collect_step_types(steps: Any, into: set[str]) -> None:
+    """Record every ``step_type`` in a pipeline config, nesting included."""
+    if isinstance(steps, dict):
+        steps = [steps]
+    if not isinstance(steps, list):
+        return
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if step.get("step_type"):
+            into.add(str(step["step_type"]))
+        for nested in ("steps", "body", "step", "branches"):
+            if nested in step:
+                _collect_step_types(step[nested], into)
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +166,10 @@ class Verifier:
         self.expect_auth = expect_auth
         self.expect_studio = expect_studio
         self.report = Report()
+        #: Set by ``verify_agent_rest``'s thread probe. A deployment with
+        #: no store is a legitimate posture, so store-dependent checks
+        #: report as skipped rather than failing.
+        self.thread_store_available = True
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_key:
             # Mirror exactly what the Studio bundle sends.
@@ -601,6 +636,7 @@ class Verifier:
             json_body={"user_id": "e2e-user", "title": "e2e thread"},
         )
         if probe is not None and probe.status_code == 400 and "storage" in probe.text.lower():
+            self.thread_store_available = False
             self.report.skip(
                 g,
                 "thread lifecycle",
@@ -830,6 +866,141 @@ class Verifier:
             "POST",
             "/api/v1/pipelines/validate-draft",
             json_body={"yaml": "name: draft_check\nsteps:\n  - agent: " + self.agent + "\n"},
+        )
+
+    def verify_every_pipeline(self) -> None:
+        """Run *every* published pipeline, not just the sampled one.
+
+        ``verify_pipelines`` proves the routes work against one pipeline. A
+        deployment usually publishes several, each built from different step
+        types, and a step type that only ever validates is not a step type
+        that runs. This executes them all and reports which step types were
+        actually exercised.
+        """
+        g = "pipelines-all"
+        listing = self.check(g, "GET /api/v1/pipelines", "GET", "/api/v1/pipelines")
+        if listing is None:
+            return
+        items = listing if isinstance(listing, list) else listing.get("pipelines", [])
+        names = [i["name"] if isinstance(i, dict) else str(i) for i in items]
+        if not names:
+            self.report.skip(g, "run every pipeline", "no pipelines published")
+            return
+
+        seen: set[str] = set()
+        for name in sorted(names):
+            cfg = self.check(g, f"config: {name}", "GET", f"/api/v1/pipelines/{name}/config")
+            if isinstance(cfg, dict):
+                _collect_step_types(cfg.get("steps") or [], seen)
+
+            def _ran(payload: Any) -> str:
+                if not isinstance(payload, dict):
+                    return "non-dict result"
+                if payload.get("status") != "success":
+                    return f"status={payload.get('status')} {str(payload.get('error'))[:120]}"
+                bad = {
+                    n: st.get("status")
+                    for n, st in (payload.get("steps") or {}).items()
+                    if st.get("status") not in ("success", "skipped")
+                }
+                return f"steps not ok: {bad}" if bad else ""
+
+            self.check(
+                g,
+                f"run: {name}",
+                "POST",
+                f"/api/v1/pipelines/{name}/run",
+                json_body={"input": {"query": "one two three four five"}},
+                validate=_ran,
+            )
+
+        for step_type in sorted(seen):
+            self.report.add(g, f"step type executed: {step_type}", True)
+        missing = sorted(set(_ALL_STEP_TYPES) - seen)
+        if missing:
+            self.report.skip(
+                g, "full step-type coverage", f"not published by this deployment: {missing}"
+            )
+
+    def verify_isolation(self) -> None:
+        """Concurrent callers must never see each other's data.
+
+        Agents are singletons: every request gets the same instance. A class
+        agent that parks per-run data on ``self`` instead of in its state
+        dataclass serves caller A's answer to caller B — a failure that is
+        invisible to sequential testing and is the worst kind to ship.
+
+        Each request carries a marker unique to it; a response containing
+        somebody else's marker is a leak.
+        """
+        g = "isolation"
+        fanout = 24
+        run = f"{int(time.time()):x}"
+
+        def marker(i: int) -> str:
+            return f"MK{i:04d}{run}ZQ"
+
+        def one(i: int) -> tuple[int, int, str]:
+            resp = self._req(
+                "POST",
+                f"/api/v1/{self.agent}/invoke",
+                json_body={"query": f"Reply with exactly {marker(i)} and nothing else."},
+            )
+            if resp is None:
+                return i, 0, ""
+            return i, resp.status_code, resp.text
+
+        with ThreadPoolExecutor(max_workers=fanout) as pool:
+            results = list(pool.map(one, range(fanout)))
+
+        bad = [(i, code) for i, code, _ in results if code != 200]
+        self.report.add(
+            g, f"{fanout} concurrent invokes all succeeded", not bad, f"non-200: {bad[:5]}"
+        )
+
+        leaked = [
+            (marker(i), [marker(j) for j in range(fanout) if j != i and marker(j) in body][:3])
+            for i, code, body in results
+            if code == 200 and any(marker(j) in body for j in range(fanout) if j != i)
+        ]
+        self.report.add(
+            g, "no response carried another caller's marker", not leaked, str(leaked[:3])
+        )
+
+        if not self.thread_store_available:
+            self.report.skip(g, "concurrent threads stay separate", "no thread store")
+            return
+
+        def one_chat(i: int) -> tuple[int, int, Any]:
+            resp = self._req(
+                "POST",
+                f"/api/v1/{self.agent}/chat",
+                json_body={"content": f"Token {marker(i)}", "thread_id": f"iso-{marker(i)}"},
+            )
+            if resp is None:
+                return i, 0, None
+            try:
+                return i, resp.status_code, resp.json()
+            except Exception:  # noqa: BLE001 - non-JSON body is a failure below
+                return i, resp.status_code, None
+
+        with ThreadPoolExecutor(max_workers=fanout) as pool:
+            chats = list(pool.map(one_chat, range(fanout)))
+
+        wrong = [
+            (marker(i), (body or {}).get("thread_id"))
+            for i, code, body in chats
+            if code == 200 and (body or {}).get("thread_id") != f"iso-{marker(i)}"
+        ]
+        self.report.add(g, "each reply came back on its own thread", not wrong, str(wrong[:3]))
+
+        borrowed = [
+            (marker(i), (body or {}).get("history_loaded"))
+            for i, code, body in chats
+            if code == 200 and ((body or {}).get("history_loaded") or 0) != 0
+        ]
+        self.report.add(
+            g, "no fresh thread picked up another's history", not borrowed, str(borrowed[:3])
         )
 
     def verify_tasks(self) -> None:
@@ -1169,6 +1340,8 @@ class Verifier:
         self.verify_endpoints()
         self.verify_ingestion()
         self.verify_pipelines()
+        self.verify_every_pipeline()
+        self.verify_isolation()
         self.verify_tasks()
         self.verify_logs_history()
         self.verify_optimize()

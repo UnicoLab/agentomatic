@@ -35,6 +35,8 @@ CI or a post-deploy gate.
 | `endpoints` | Registry, info, health, call |
 | `ingestion` | Both `/api/v1/ingestion` and the `/api/v1/ingestors` alias the Studio bundle uses, plus per-ingestor info and health |
 | `pipelines` | Registry, config, validate, visualize, run, and `validate-draft` |
+| `pipelines-all` | Runs **every** published pipeline, not just the sampled one, and reports which of the nine step types actually executed |
+| `isolation` | Fans out concurrent callers, each carrying a unique marker, and asserts no response or thread ever carries another caller's |
 | `tasks` | The task board, `invoke/async` submission, and polling a task to a terminal state |
 | `metrics` | Prometheus exposition and the presence of `agentomatic_*` series |
 | `rate-limit` | That user routes *are* limited and probes and `/metrics` are *not* |
@@ -58,6 +60,36 @@ does not produce false failures:
 Rate limiting is handled rather than worked around: the harness is itself a
 burst of traffic from one IP, so it honours `Retry-After` and retries — except
 where a `429` is the property under test.
+
+## Durability: does the data outlive the container?
+
+Every check above runs against one live process, and a store that quietly fell
+back to a file inside the container passes all of them — it writes, it reads
+back, and only a restart tells the two apart. `durability_verify.py` splits the
+proof across a restart so the difference shows:
+
+```bash
+python scripts/durability_verify.py write \
+  --base-url http://localhost:8000 --api-key "$KEY" --agent my_chatbot
+
+# Replace the deployment: destroy the container and start a new one from the
+# same image against the same database. A restart that keeps the writable
+# layer proves nothing.
+docker rm -f my-agent && docker run -d --name my-agent … my-image
+
+python scripts/durability_verify.py verify \
+  --base-url http://localhost:8000 --api-key "$KEY" --agent my_chatbot
+```
+
+The `verify` phase reads the thread back, checks each message survived, and
+appends one more to confirm the new process can *continue* the conversation
+rather than merely read it.
+
+!!! tip "Watch the boot log for a store you did not choose"
+    Two things can silently redirect the store away from `DATABASE_URL`: a
+    MEMORY-purpose connection (which outranks it, and says so with a warning
+    naming both), and no configuration at all (which falls back to a local
+    file). Both look identical until the container is replaced.
 
 ## What it does not cover
 
