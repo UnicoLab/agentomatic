@@ -14,6 +14,44 @@ The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and s
 
 ---
 
+## Running the optimization suites without a cloud key
+
+The live optimization suites drive a real OpenAI-compatible endpoint. Point
+them at whatever local model you run — oMLX, llama.cpp, vLLM, LM Studio,
+Ollama — and they need no changes:
+
+```bash
+export OMLX_BASE_URL=http://127.0.0.1:8000/v1
+export OMLX_API_KEY=your-key
+export AGENTOMATIC_LIVE_MODEL=omlx/your-model
+
+uv run pytest tests/test_live_omlx_optimize.py \
+              tests/test_live_omlx_keras_optimize.py \
+              -q --override-ini='addopts='
+```
+
+Without such an endpoint these suites **skip entirely**, which leaves the
+`omlx/` provider path, the prompt fitter and the whole Keras-style `fit()`
+loop unexercised — including in CI. For that case the repo ships a stand-in:
+
+```bash
+uv run python scripts/local_slm_server.py --port 8000
+```
+
+`scripts/local_slm_server.py` is a **test double, not a language model**. It
+generates nothing; it follows rules. What makes it a valid optimization target
+is that answer quality genuinely depends on the system prompt — each directive
+a prompt carries makes the response satisfy one more property the metric
+rewards, so an optimizer that really searches and selects will climb, and one
+that does not will not. It also plays the rewriter (reading the briefing's
+failing I/O and expected answers, then folding the missing tokens into a new
+prompt) and the judge (returning the exact schema the metric asked for).
+
+It proves the *machinery* — search, evaluation, selection, early stopping,
+checkpointing, config application. It cannot tell you whether a real model
+writes good prompts. Use your own model and eval set for that.
+
+
 ## ⚡ Quick Start — two tiers (same primitives)
 
 Agentomatic exposes **both** a thin one-shot path and a Keras-like staged path.
