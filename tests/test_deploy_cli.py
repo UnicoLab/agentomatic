@@ -51,8 +51,8 @@ class TestDockerfileRendering:
         content = deploy_mod.render_dockerfile_distroless()
         assert "gcr.io/distroless/python3-debian12:nonroot" in content
         assert "USER 65532:65532" in content
-        assert '"/app/.venv/bin/python"' in content
-        assert 'pip install "agentomatic[all]==' in content
+        assert '"/usr/bin/python3"' in content
+        assert 'pip install --target=/app/deps "agentomatic[all]==' in content
         assert '"main:app"' in content
 
     def test_copy_lines_only_include_existing(self, tmp_path: Path) -> None:
@@ -99,6 +99,65 @@ class TestComposeRendering:
             dockerfile_name="Dockerfile.distroless",
         )
         assert "dockerfile: Dockerfile.distroless" in content
+
+    def test_compose_distroless_healthcheck_has_no_curl(self) -> None:
+        """The distroless image has no shell and no curl — a curl-based
+        healthcheck would leave the container permanently "unhealthy".
+        """
+        content = deploy_mod.render_docker_compose(
+            stack_name="local",
+            dockerfile_name="Dockerfile.distroless",
+            distroless=True,
+        )
+        assert "curl" not in content
+        assert "http://localhost:8000/health" in content
+        # The base image's own interpreter — a venv Python from the build
+        # stage does not exist in the distroless runtime.
+        assert "/usr/bin/python3" in content
+        assert "/app/.venv/bin/python" not in content
+
+    def test_distroless_builder_python_matches_the_runtime_interpreter(self) -> None:
+        """The build stage must match ``distroless/python3-debian12``'s Python.
+
+        That base image is Debian 12's Python 3.11. Building the dependencies
+        on ``python:3.12-slim`` produced an image that could not start at all:
+        the venv's ``bin/python`` symlinks to the builder's interpreter, which
+        is absent from the runtime stage, so the ENTRYPOINT was a dangling
+        symlink (``exec: "/app/.venv/bin/python": no such file or directory``).
+        Even resolved, cp312 wheels would not import under 3.11.
+        """
+        content = deploy_mod.render_dockerfile_distroless()
+
+        assert "FROM python:3.11-slim AS builder" in content
+        assert "python:3.12-slim" not in content
+        # Dependencies land in a plain directory on PYTHONPATH, not a venv
+        # built around an interpreter the runtime image does not have.
+        assert "--target=/app/deps" in content
+        assert 'PYTHONPATH="/app/deps"' in content
+        assert "python -m venv" not in content
+        assert ".venv" not in content
+        assert 'ENTRYPOINT ["/usr/bin/python3", "-m", "uvicorn"]' in content
+
+    def test_non_distroless_image_keeps_its_venv(self) -> None:
+        """The regular image runs its own interpreter, so a venv is correct."""
+        content = deploy_mod.render_dockerfile()
+
+        assert "python -m venv /app/.venv" in content
+        assert 'PATH="/app/.venv/bin:$PATH"' in content
+
+    def test_compose_non_distroless_still_uses_curl(self) -> None:
+        content = deploy_mod.render_docker_compose(stack_name="local", distroless=False)
+        assert '"curl"' in content
+
+    def test_generate_deploy_distroless_compose_has_no_curl(self, tmp_path: Path) -> None:
+        plan = deploy_mod.generate_deploy(
+            out_dir=tmp_path / "out",
+            stack_name="local",
+            stacks_dir=tmp_path / "no-stacks",
+            distroless=True,
+        )
+        compose = plan.files["docker-compose.yml"].read_text()
+        assert "curl" not in compose
 
 
 # =========================================================================

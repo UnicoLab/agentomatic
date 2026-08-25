@@ -11,8 +11,8 @@ that installs ``agentomatic[all]`` from PyPI (pinned to the current version)
 and launches the project's ``main.py`` via ``uvicorn main:app`` so the
 platform's ``AgentPlatform`` configuration is honoured.  A ``--distroless``
 variant is produced from ``gcr.io/distroless/python3-debian12`` which runs
-under the built-in ``nonroot`` user (numeric UID 65532) — verified to have
-execute permissions on ``/app/.venv/bin/python``.
+under the built-in ``nonroot`` user (numeric UID 65532) and launches the base
+image's own ``/usr/bin/python3`` with dependencies on ``PYTHONPATH``.
 
 Two deploy *profiles* select how much of the platform the image runs, driven
 purely through ``AGENTOMATIC_*`` env vars so both share one ``main.py`` code
@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentomatic._version import __version__
+from agentomatic.stacks.redaction import env_example_value, redact_url_credentials
 
 if TYPE_CHECKING:
     from agentomatic.stacks.manager import LLMStackEntry, StackConfig
@@ -303,7 +304,14 @@ def render_dockerfile_distroless(
     image scanners and Kubernetes ``runAsNonRoot`` policies do not have to
     introspect the base image. ``agentomatic`` is installed from PyPI (pinned
     to *version*) in the build stage; distroless has no shell, so the app is
-    launched by invoking ``uvicorn`` directly through the venv Python.
+    launched by invoking ``uvicorn`` through the base image's own interpreter.
+
+    The build stage must match that interpreter. ``distroless/python3-debian12``
+    is Debian 12's Python 3.11, so packages are built on ``python:3.11-slim``
+    and installed with ``pip --target`` rather than into a virtualenv: a venv's
+    ``bin/python`` is a symlink to the *builder's* interpreter, which does not
+    exist in the runtime image, and C extensions built for another minor
+    version would not import even if it did.
 
     Args:
         version: ``agentomatic`` version to pin (``agentomatic[all]==<version>``).
@@ -321,7 +329,10 @@ def render_dockerfile_distroless(
 # =============================================================================
 
 # ---- Build stage ------------------------------------------------------------
-FROM python:3.12-slim AS builder
+# Must be the same Python minor version as the distroless runtime below
+# (distroless/python3-debian12 is Debian 12's Python 3.11), or the compiled
+# wheels installed here will not import there.
+FROM python:3.11-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \\
     PYTHONUNBUFFERED=1 \\
@@ -334,11 +345,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 
 WORKDIR /app
 
-RUN python -m venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-
+# ``--target`` instead of a virtualenv: the runtime stage runs the distroless
+# image's own interpreter, which cannot use a venv built around a different
+# Python binary.  A plain directory on ``PYTHONPATH`` works with any 3.11.
 RUN pip install --upgrade pip \\
-    && pip install "agentomatic[all]=={version}"
+    && pip install --target=/app/deps "agentomatic[all]=={version}"
 
 # Copy project sources into the build stage so they can be chowned + carried
 # into the runtime stage (distroless cannot chown at runtime — no shell).
@@ -352,8 +363,7 @@ FROM gcr.io/distroless/python3-debian12:nonroot
 
 ENV PYTHONDONTWRITEBYTECODE=1 \\
     PYTHONUNBUFFERED=1 \\
-    PATH="/app/.venv/bin:$PATH" \\
-    VIRTUAL_ENV="/app/.venv"
+    PYTHONPATH="/app/deps"
 
 WORKDIR /app
 
@@ -365,8 +375,9 @@ USER 65532:65532
 EXPOSE 8000
 {profile_env_block}
 # Distroless has no shell but can execute binaries directly. Launch uvicorn
-# through the venv Python so main.py's AgentPlatform config is honoured.
-ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
+# through the base image's interpreter (dependencies come from PYTHONPATH) so
+# main.py's AgentPlatform config is honoured.
+ENTRYPOINT ["/usr/bin/python3", "-m", "uvicorn"]
 CMD ["main:app", "--host", "0.0.0.0", "--port", "8000"]
 """
 
@@ -385,6 +396,7 @@ def render_docker_compose(
     build_context: str = ".",
     volume_prefix: str = ".",
     profile: str = "full",
+    distroless: bool = False,
 ) -> str:
     """Return a docker-compose file wiring the platform and optional agents.
 
@@ -403,10 +415,23 @@ def render_docker_compose(
         profile: Deploy profile (``"full"`` or ``"minimal"``); ``minimal``
             adds ``AGENTOMATIC_*`` env vars that disable Studio and quiet logs
             while keeping Swagger, health, metrics, and auth.
+        distroless: When ``True``, use a curl-free, shell-free healthcheck —
+            ``gcr.io/distroless/python3-debian12`` has neither, so the
+            ``curl``-based check used for the regular image would leave the
+            container permanently reporting "unhealthy".
     """
     profile_env_lines = "".join(
         f"      - {key}={value}\n" for key, value in profile_env(profile).items()
     )
+    if distroless:
+        # No shell, no curl in distroless — hit /health with the base image's
+        # own interpreter (stdlib only, so no PYTHONPATH needed).
+        healthcheck_test = (
+            '["CMD", "/usr/bin/python3", "-c", '
+            "\"import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)\"]"
+        )
+    else:
+        healthcheck_test = '["CMD", "curl", "-f", "http://localhost:8000/health"]'
     stubs = ""
     for name in agent_names or []:
         service = name.replace("_", "-").lower()
@@ -456,7 +481,7 @@ services:
       - {volume_prefix}/stacks:/app/stacks:ro
       - agentomatic-data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: {healthcheck_test}
       interval: 30s
       timeout: 10s
       retries: 3
@@ -560,9 +585,11 @@ def _llm_env_lines(profile: str, entry: LLMStackEntry) -> list[str]:
             lines.append(f"{prefix}LLM__BASE_URL={entry.base_url}")
     if entry.api_key:
         key_var = f"LLM__{entry.provider.upper()}_API_KEY"
-        # Show placeholder as-is (usually ``${OPENAI_API_KEY}``) so the
-        # operator knows which secret to inject at runtime.
-        lines.append(f"{prefix}{key_var}={entry.api_key}")
+        # A ``${OPENAI_API_KEY}``-style reference is shown as-is so the operator
+        # knows which secret to inject at runtime. A *literal* key is replaced
+        # with a placeholder: .env.example is conventionally committed, so
+        # copying a real key into it would publish the secret.
+        lines.append(f"{prefix}{key_var}={env_example_value(entry.api_key)}")
     return lines
 
 
@@ -612,7 +639,7 @@ def render_env_example(stack: StackConfig) -> str:
         f"EMBEDDING__DIMENSION={stack.embedding.dimension}",
         "",
         "# --- Database ----------------------------------------------------",
-        f"DB__URL={stack.database.url}",
+        f"DB__URL={redact_url_credentials(stack.database.url)}",
         f"DB__POOL_SIZE={stack.database.pool_size}",
         f"DB__MAX_OVERFLOW={stack.database.max_overflow}",
         "",
@@ -628,7 +655,7 @@ def render_env_example(stack: StackConfig) -> str:
         f"# AUTH__METHOD={stack.auth.method}",
     ]
     if stack.auth.api_key:
-        lines.append(f"AUTH__API_KEY={stack.auth.api_key}")
+        lines.append(f"AUTH__API_KEY={env_example_value(stack.auth.api_key)}")
     if stack.auth.jwks_url:
         lines.append(f"AUTH__JWKS_URL={stack.auth.jwks_url}")
     if stack.auth.issuer:
@@ -823,6 +850,7 @@ def generate_deploy(
         build_context=build_context,
         volume_prefix=volume_prefix,
         profile=profile,
+        distroless=distroless,
     )
     compose_path = out_path / "docker-compose.yml"
     compose_path.write_text(compose_content)

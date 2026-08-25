@@ -41,6 +41,7 @@ Also covers:
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -974,3 +975,57 @@ class TestLifecycleHooks:
 
         assert "hooked_agent" in before_calls
         assert "hooked_agent" in after_calls
+
+
+class TestA2AMessageShapes:
+    """The A2A protocol carries text in ``message.parts``, not ``content``.
+
+    Reading only ``content`` meant a spec-shaped request ran the agent on an
+    empty query and returned 200 with a meaningless result — the text was
+    dropped silently.
+    """
+
+    def test_protocol_parts_reach_the_agent(self, client):
+        r = client.post(
+            f"{BASE}/echo/a2a/tasks",
+            json={
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "parts-shaped query"}],
+                }
+            },
+        )
+        assert r.status_code == 200, r.text
+        task_id = r.json()["task_id"]
+
+        for _ in range(100):
+            data = client.get(f"{BASE}/echo/a2a/tasks/{task_id}").json()
+            if data["status"] in {"completed", "failed", "canceled"}:
+                break
+            time.sleep(0.02)
+
+        assert data["status"] == "completed", data
+        assert "parts-shaped query" in str(data["result"])
+
+    def test_documented_content_shape_still_works(self, client):
+        r = client.post(
+            f"{BASE}/echo/a2a/tasks",
+            json={"message": {"content": "content-shaped query"}},
+        )
+        assert r.status_code == 200, r.text
+
+    def test_bare_text_key_is_accepted(self, client):
+        r = client.post(
+            f"{BASE}/echo/a2a/tasks",
+            json={"message": {"text": "text-shaped query"}},
+        )
+        assert r.status_code == 200, r.text
+
+    def test_message_without_any_text_is_rejected(self, client):
+        """Better a 422 naming the accepted shapes than a silent empty run."""
+        r = client.post(
+            f"{BASE}/echo/a2a/tasks",
+            json={"message": {"role": "user", "parts": [{"type": "image"}]}},
+        )
+        assert r.status_code == 422, r.text
+        assert "parts" in r.json()["detail"]

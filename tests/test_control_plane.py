@@ -170,6 +170,51 @@ def test_disable_and_enable_agent(client):
     assert resp.json()["state"] == "enabled"
 
 
+def test_disable_agent_blocks_both_name_and_slug_aliases(client):
+    """Regression: an agent mounted under both its folder name and its
+    manifest slug (name="echo_agent", slug="echo") must be fully drained
+    when disabled by either alias — not leave the other alias's routes live.
+    """
+    resp = client.post(
+        "/api/v1/control/agents/echo_agent/disable",
+        headers={"X-Control-Token": "secret-token"},
+    )
+    assert resp.status_code == 200
+
+    # Disabling by folder name must also block the slug-mounted alias.
+    by_name = client.post("/api/v1/echo_agent/invoke", json={"query": "hi"})
+    by_slug = client.post("/api/v1/echo/invoke", json={"query": "hi"})
+    assert by_name.status_code == 503
+    assert by_slug.status_code == 503
+
+    # Re-enabling must restore both aliases.
+    resp = client.post(
+        "/api/v1/control/agents/echo_agent/enable",
+        headers={"X-Control-Token": "secret-token"},
+    )
+    assert resp.status_code == 200
+    assert client.post("/api/v1/echo_agent/invoke", json={"query": "hi"}).status_code == 200
+    assert client.post("/api/v1/echo/invoke", json={"query": "hi"}).status_code == 200
+
+
+def test_disable_agent_by_slug_blocks_name_alias_too(client):
+    """Same guarantee in the other direction: disabling by slug must also
+    block the folder-name-mounted alias.
+    """
+    resp = client.post(
+        "/api/v1/control/agents/echo/disable",
+        headers={"X-Control-Token": "secret-token"},
+    )
+    assert resp.status_code == 200
+    assert client.post("/api/v1/echo/invoke", json={"query": "hi"}).status_code == 503
+    assert client.post("/api/v1/echo_agent/invoke", json={"query": "hi"}).status_code == 503
+
+    client.post(
+        "/api/v1/control/agents/echo/enable",
+        headers={"X-Control-Token": "secret-token"},
+    )
+
+
 def test_disable_agent_wrong_token(client):
     resp = client.post(
         "/api/v1/control/agents/echo_agent/disable",

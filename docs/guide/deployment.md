@@ -118,6 +118,14 @@ agentomatic deploy --profile minimal --stack remote --distroless
 agentomatic deploy --minimal --stack remote          # shorthand
 ```
 
+!!! note "Distroless images pin Python 3.11"
+    `gcr.io/distroless/python3-debian12` is Debian 12's Python **3.11**, so the
+    distroless build stage uses `python:3.11-slim` and installs dependencies
+    with `pip --target=/app/deps` (on `PYTHONPATH`) rather than into a
+    virtualenv — a venv's `bin/python` points at the *build* stage's
+    interpreter, which does not exist in the runtime image. If you customise
+    the generated Dockerfile, keep the two Python versions in step.
+
 !!! warning "Swagger is always available"
     `--profile minimal` **never** disables `/docs`, `/redoc`, or
     `/openapi.json`. It only sets `AGENTOMATIC_ENABLE_STUDIO=0` and
@@ -476,6 +484,41 @@ Run it:
     `AGENTOMATIC_ENABLE_CONTROL_PLANE`, `AGENTOMATIC_ENABLE_RATE_LIMIT`,
     `AGENTOMATIC_TITLE`, `AGENTOMATIC_LOG_LEVEL`), so `uvicorn main:app` in the
     generated Dockerfile drops no functionality versus running the CLI.
+
+!!! tip "Turning on verified JWT auth"
+    `AGENTOMATIC_ENABLE_JWT=1` alone gives you a middleware with nothing to
+    verify against. Point it at your identity provider's JWKS endpoint with
+    `AUTH__JWKS_URL` (plus `AUTH__ISSUER` / `AUTH__AUDIENCE`), or set the same
+    values in the active stack's `auth:` block — `agentomatic deploy` writes
+    them into the generated `.env` for you. Environment wins over the stack.
+
+    ```bash
+    AGENTOMATIC_REQUIRE_AUTH=1
+    AUTH__JWKS_URL=https://idp.example.com/.well-known/jwks.json
+    AUTH__ISSUER=https://idp.example.com/
+    AUTH__AUDIENCE=agentomatic
+    ```
+
+    With `AGENTOMATIC_REQUIRE_AUTH=1` and no JWKS, the platform will not accept
+    unsigned tokens: it enforces with your API key if one is configured
+    (`AGENTOMATIC_ENABLE_AUTH=1` + `AGENTOMATIC_API_KEY`), and refuses to start
+    if neither is set.
+
+!!! warning "Rate limiting behind a proxy"
+    The limiter keys on the client address, so behind a reverse proxy every
+    request looks like it comes from the proxy — set
+    `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS=1` so `X-Forwarded-For` is used
+    instead. Leave it **off** when the platform is exposed directly: the header
+    is caller-controlled, and rotating it per request would bypass the limiter.
+
+    That flag governs Agentomatic's own reading of the header. Uvicorn's
+    `--proxy-headers` (on by default) separately rewrites `request.client` from
+    `X-Forwarded-For` for peers in `--forwarded-allow-ips` (default
+    `127.0.0.1`), before any middleware runs. Keep that list limited to your
+    real proxy — a caller connecting *from* an allowed peer address can steer
+    the rate-limit key regardless of the flag above. The generated
+    `nginx.conf` sits on that trusted hop, which is why it is the right place
+    to set the header.
 
 !!! warning "Workers and in-memory state"
     Connection pools and per-process caches live **per worker**. Keep shared

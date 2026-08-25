@@ -83,9 +83,7 @@ class HttpConnectionConfig(BaseModel):
     )
     base_url: str = Field(..., description="Base URL of the service (supports ${ENV}).")
     headers: dict[str, str] = Field(default_factory=dict)
-    auth: UpstreamAuthConfig = Field(
-        default_factory=lambda: UpstreamAuthConfig.model_construct()
-    )
+    auth: UpstreamAuthConfig = Field(default_factory=lambda: UpstreamAuthConfig.model_construct())
     timeout: float = Field(30.0, gt=0)
     max_retries: int = Field(2, ge=0, le=10)
     verify_ssl: bool = Field(True)

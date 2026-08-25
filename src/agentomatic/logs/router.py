@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from agentomatic.core.errors import client_safe_detail
 from agentomatic.logs.runtime import RESOURCE_TYPES, normalize_resource_type
 
 if TYPE_CHECKING:
@@ -48,7 +49,9 @@ def create_logs_router(
                     "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
                 },
             )
-        if store is None:
+        # See router_factory: the store may be a lazy proxy that is never
+        # None — rely on its __bool__ instead of an identity check.
+        if not store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
 
     def _require_analysis() -> None:
@@ -163,7 +166,9 @@ def create_logs_router(
             )
         except Exception as exc:  # noqa: BLE001
             logger.error("Log analysis failed for {}:{}: {}", rtype, request.name, exc)
-            raise HTTPException(500, detail={"error": f"Log analysis failed: {exc}"}) from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Log analysis failed")
+            ) from exc
         return {"resource": rtype, "name": request.name, "analysis": result.to_dict()}
 
     @router.get("/{log_id}")

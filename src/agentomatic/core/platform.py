@@ -60,10 +60,17 @@ def _mount_agent_router(app: FastAPI, agent: RegisteredAgent, name: str, api_pre
     )
     slug = getattr(agent, "slug", None) or getattr(getattr(agent, "manifest", None), "slug", None)
     if slug and slug != name:
+        # The slug mount is a compatibility alias for the canonical
+        # ``{api_prefix}/{name}`` routes above. Keep it out of the OpenAPI
+        # schema: documenting both copies doubled the advertised surface and
+        # produced a duplicate ``operationId`` for every route (FastAPI emits
+        # one UserWarning each, and duplicate ids break client codegen).
+        # The alias still routes normally at runtime.
         app.include_router(
             agent.router,
             prefix=f"{api_prefix}/{slug}",
             tags=[_agent_tag(name)],
+            include_in_schema=False,
         )
 
 
@@ -254,6 +261,7 @@ class AgentPlatform:
         enable_rate_limit: bool = False,
         rate_limit_requests: int = 100,
         rate_limit_window: int = 60,
+        rate_limit_trust_proxy_headers: bool = False,
         enable_metrics: bool = False,
         enable_feedback: bool = True,
         enable_telemetry: bool = True,
@@ -334,6 +342,13 @@ class AgentPlatform:
             allow_logsllm_analysis: When ``True``, expose LLM log-analysis
                 endpoints that score recent logs and return recommendations.
         """
+        # Apply the requested level before anything is logged.  Construction
+        # and ``build()`` narrate settings loading, discovery, and every mount,
+        # while the lifespan's ``configure_logging`` only runs at startup — so
+        # without this, ``log_level="WARNING"`` (what ``--profile minimal``
+        # bakes into the image) still printed every INFO and DEBUG line.
+        configure_logging(log_level)
+
         self.agents_dir = Path(agents_dir).resolve()
         self.plugins_dir = Path(plugins_dir).resolve()
         self.endpoints_dir = Path(endpoints_dir).resolve()
@@ -362,6 +377,7 @@ class AgentPlatform:
         self._enable_rate_limit = enable_rate_limit
         self._rate_limit_requests = rate_limit_requests
         self._rate_limit_window = rate_limit_window
+        self._rate_limit_trust_proxy_headers = rate_limit_trust_proxy_headers
         self._enable_metrics = enable_metrics
         self._enable_feedback = enable_feedback
         self._enable_telemetry = enable_telemetry
@@ -571,6 +587,21 @@ class AgentPlatform:
             **kwargs: Extra keyword arguments forwarded to
                 :class:`RegisteredAgent`.
         """
+        # A class agent registered as ``class_instance=MyAgent()`` already owns
+        # a compiled graph. Studio's graph view *and* its run streaming both
+        # key off ``graph_fn``, so without deriving it here the agent shows an
+        # empty topology and streaming fails with "Agent has no graph_fn".
+        # (``BaseGraphAgent.as_registered_agent()`` sets it; this is the
+        # programmatic-registration path catching up.)
+        class_instance = kwargs.get("class_instance")
+        if graph_fn is None and class_instance is not None:
+            instance_graph = getattr(class_instance, "graph", None)
+            if instance_graph is not None:
+
+                def graph_fn() -> Any:  # noqa: D401 - adapter closure
+                    """Return the class agent's compiled graph."""
+                    return class_instance.graph
+
         agent = RegisteredAgent(
             manifest=manifest,
             node_fn=node_fn,
@@ -578,6 +609,9 @@ class AgentPlatform:
             **kwargs,
         )
         self._registry._agents[manifest.name] = agent  # noqa: SLF001
+        # Keep the slug index in sync so ``registry.get(slug)`` resolves via the
+        # index (matching folder-discovered agents) rather than the fallback scan.
+        self._registry._index_slug(manifest.name, agent)  # noqa: SLF001
         logger.info(f"  ✅ Programmatically registered: {manifest.name} ({manifest.slug})")
 
     # ------------------------------------------------------------------
@@ -756,6 +790,53 @@ class AgentPlatform:
         if not url or "${" in url:
             return None
         return url
+
+    def _resolve_jwt_config(self) -> Any:
+        """Build a :class:`JWTConfig` from ``AUTH__*`` env vars or the stack.
+
+        Verified JWT auth was documented as configurable "via stack", and
+        ``agentomatic deploy`` writes ``AUTH__JWKS_URL`` / ``AUTH__ISSUER`` /
+        ``AUTH__AUDIENCE`` into the generated ``.env`` — but nothing read any
+        of them. Only the in-process ``jwt_config=`` kwarg reached the
+        middleware, so a deployed container running the scaffolded ``main.py``
+        had no way to turn on signature verification at all.
+
+        Environment wins over the stack, matching the database-URL resolution
+        above; ``${VAR}`` placeholders in stack values are expanded.
+
+        Returns:
+            A ``JWTConfig`` when a JWKS endpoint is configured, else ``None``.
+        """
+        import os
+
+        from agentomatic.security.jwt_auth import JWTConfig
+
+        def _expand(value: str) -> str:
+            value = (value or "").strip()
+            if value.startswith("${") and value.endswith("}"):
+                value = (os.getenv(value[2:-1]) or "").strip()
+            return "" if "${" in value else value
+
+        stack_auth = getattr(
+            getattr(getattr(self, "_stack_manager", None), "_active_stack", None), "auth", None
+        )
+
+        def _setting(env_key: str, field: str) -> str:
+            from_env = (os.getenv(env_key) or "").strip()
+            if from_env:
+                return from_env
+            return _expand(str(getattr(stack_auth, field, "") or ""))
+
+        jwks_url = _setting("AUTH__JWKS_URL", "jwks_url")
+        if not jwks_url:
+            return None
+
+        return JWTConfig(
+            enabled=True,
+            jwks_url=jwks_url,
+            issuer=_setting("AUTH__ISSUER", "issuer"),
+            audience=_setting("AUTH__AUDIENCE", "audience"),
+        )
 
     async def _auto_derive_store_from_connections(self) -> None:
         """Populate ``self._store`` from the first MEMORY connection, if any."""
@@ -990,6 +1071,12 @@ class AgentPlatform:
             for name, plugin in platform._plugin_registry.list_plugins().items():
                 try:
                     await plugin.load_model()
+                    # A subclass that overrides load_model() without calling
+                    # super() leaves _is_loaded False, so /predict answers 503
+                    # and /health reports "degraded" — while this line claimed
+                    # success. Stamp it here so a forgotten super() can't
+                    # silently produce a permanently unusable plugin.
+                    plugin.mark_loaded()
                     logger.info(f"  ✅ Plugin '{name}' loaded successfully")
                 except Exception as e:
                     logger.error(f"  ❌ Failed to load plugin '{name}': {e}")
@@ -1171,16 +1258,10 @@ class AgentPlatform:
 
             app.add_middleware(LoggingMiddleware)
 
-        # Auth
-        if self._enable_auth and self._auth_api_key:
-            from agentomatic.middleware.auth import AuthMiddleware
-
-            app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
-            logger.info("🔒 Auth middleware enabled")
-
-        # Zero Trust Enforcer (v0.6) — added BEFORE JWT so that (thanks to
-        # Starlette's reverse middleware ordering) the JWT middleware runs
-        # first and populates ``request.state.jwt_claims`` before enforcement.
+        # Zero Trust Enforcer (v0.6) — added BEFORE the authentication
+        # middlewares so that (thanks to Starlette's reverse middleware
+        # ordering) JWT *and* API-key auth both run first and record the
+        # caller's identity on ``request.state`` before enforcement.
         # Per-agent enforcement is opt-in via each agent's ``security.py``
         # policy (``require_auth`` / ``allowed_roles`` / ``allowed_scopes``).
         if self._enable_zero_trust:
@@ -1209,32 +1290,54 @@ class AgentPlatform:
         if self._enable_jwt_auth:
             from agentomatic.security.jwt_auth import JWTAuthMiddleware, JWTConfig
 
-            jwt_cfg = self._jwt_config or JWTConfig(enabled=True)
+            jwt_cfg = self._jwt_config or self._resolve_jwt_config() or JWTConfig(enabled=True)
 
             # Under the global auth lock, signature-disabled (dev) JWT is a
             # bypass: forged/unsigned tokens would authenticate EVERY request.
             # Refuse to start unless real verification (jwks_url) is configured
             # — or API-key auth guards the platform instead. Raised outside the
             # try below so the misconfiguration is not silently swallowed.
-            if self._require_auth_globally and not jwt_cfg.jwks_url and not self._enable_auth:
-                raise RuntimeError(
-                    "require_auth_globally=True but JWT signature verification "
-                    "is not configured (no jwks_url) and API-key auth is "
-                    "disabled — this would accept forged/unsigned JWTs. Fix by "
-                    "one of: (a) set JWTConfig.jwks_url (with issuer/audience) "
-                    "and pass it via jwt_config=/stack; (b) enable_auth=True "
-                    "with auth_api_key; or (c) drop require_auth_globally for "
-                    "local dev."
+            if self._require_auth_globally and not jwt_cfg.jwks_url:
+                if not self._enable_auth:
+                    raise RuntimeError(
+                        "require_auth_globally=True but JWT signature verification "
+                        "is not configured (no jwks_url) and API-key auth is "
+                        "disabled — this would accept forged/unsigned JWTs. Fix by "
+                        "one of: (a) set JWTConfig.jwks_url (with issuer/audience) "
+                        "and pass it via jwt_config=/stack; (b) enable_auth=True "
+                        "with auth_api_key; or (c) drop require_auth_globally for "
+                        "local dev."
+                    )
+                # Remedy (b): API-key auth guards the platform. Adding the JWT
+                # middleware anyway is not merely redundant — under the auth
+                # lock it demands ``require_signature`` and raises from its own
+                # constructor, which Starlette runs when it builds the
+                # middleware stack on the FIRST REQUEST, not here. The app
+                # would start clean and then 500 on every route including
+                # /health. Enforce with the API key alone and say so.
+                logger.warning(
+                    "JWT auth is enabled with require_auth_globally but no "
+                    "jwks_url is configured — enforcing with API-key auth only. "
+                    "Set JWTConfig.jwks_url (with issuer/audience) to verify JWTs."
                 )
-            if self._require_auth_globally:
-                # Enforce signature verification for the global auth lock.
-                jwt_cfg = jwt_cfg.model_copy(update={"require_signature": True})
+            else:
+                if self._require_auth_globally:
+                    # Enforce signature verification for the global auth lock.
+                    jwt_cfg = jwt_cfg.model_copy(update={"require_signature": True})
 
-            try:
                 app.add_middleware(JWTAuthMiddleware, config=jwt_cfg)
                 logger.info("🔐 JWT auth middleware enabled")
-            except Exception as exc:
-                logger.warning(f"JWT auth setup failed: {exc}")
+
+        # API-key auth — registered after zero-trust (so it runs before it)
+        # and marks the request authenticated. Registering it earlier meant
+        # zero-trust denied every request before the key was ever checked, so
+        # API-key auth plus require_auth_globally could not serve a single
+        # request: valid key, 401 "no valid JWT claims found".
+        if self._enable_auth and self._auth_api_key:
+            from agentomatic.middleware.auth import AuthMiddleware
+
+            app.add_middleware(AuthMiddleware, api_key=self._auth_api_key)
+            logger.info("🔒 Auth middleware enabled")
 
         # Rate limiting
         if self._enable_rate_limit:
@@ -1244,6 +1347,7 @@ class AgentPlatform:
                 RateLimitMiddleware,
                 max_requests=self._rate_limit_requests,
                 window_seconds=self._rate_limit_window,
+                trust_proxy_headers=self._rate_limit_trust_proxy_headers,
             )
             logger.info(
                 f"🚦 Rate limit: {self._rate_limit_requests} req/{self._rate_limit_window}s"
@@ -1815,6 +1919,13 @@ class AgentPlatform:
             run_kwargs["ssl_keyfile"] = ssl_keyfile
         if ssl_certfile or ssl_keyfile:
             logger.info(f"🔐 HTTPS enabled (certfile={ssl_certfile}, keyfile={ssl_keyfile})")
+
+        # The platform's own LoggingMiddleware already logs every request with a
+        # correlation id, so leaving uvicorn's access log on doubles the line
+        # count for the same information — real volume (and cost) in a hosted
+        # log pipeline. An explicit access_log=... from the caller still wins.
+        if self._enable_logging and "access_log" not in run_kwargs:
+            run_kwargs["access_log"] = False
 
         # uvicorn requires an import string (re-imported per worker subprocess)
         # for reload / multi-worker mode. Passing an app *instance* makes modern

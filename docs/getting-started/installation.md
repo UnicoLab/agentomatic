@@ -68,7 +68,30 @@ If you prefer a lightweight install, you can select only the modules and depende
 | `studio` | `pip install agentomatic[studio]` | Agentomatic Studio visual debugger |
 | `optimize` | `pip install agentomatic[optimize]` | DSPy-style optimizer loop + DeepEval validation |
 | `telemetry` | `pip install agentomatic[telemetry]` | OpenTelemetry APM tracing exporters |
-| `all` | `pip install agentomatic[all]` | Installs all components and drivers above |
+| `all` | `pip install "agentomatic[all]"` | Everything except the vendor LLM drivers and the Chainlit UI — see the note below |
+
+!!! warning "What `all` does *not* include"
+
+    `all` covers `langgraph`, `ollama`, `metrics`, `db`, `cli`, `studio`,
+    `optimize`, `telemetry`, `dotenv`, `security`, `swarm` and `vector`.
+
+    It deliberately leaves out the vendor LLM drivers — `openai`, `azure`,
+    `vertex` — which follow the provider-agnostic principle: you install the
+    SDK for the backend you actually use. It also leaves out `db-postgres`
+    (an alternative to `db`) and `ui` (Chainlit), which is a heavy dependency.
+
+    So `agentomatic ui` needs `pip install "agentomatic[ui]"` even after an
+    `all` install. Add what you need alongside it:
+
+    ```bash
+    pip install "agentomatic[all,openai,ui]"
+    ```
+
+!!! tip "Quote the extras in zsh/bash"
+
+    Square brackets are glob syntax in most shells, so quote them:
+    `pip install "agentomatic[all]"`. Unquoted, zsh fails with
+    `no matches found`.
 
 !!! note "Combining extras"
     You can combine multiple extras in a single install command:

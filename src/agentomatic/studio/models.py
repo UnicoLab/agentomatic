@@ -69,7 +69,9 @@ class StudioGraphEdge(BaseModel):
     id: str = Field(..., description="Unique edge identifier")
     source: str = Field(..., description="Source node ID")
     target: str = Field(..., description="Target node ID")
-    condition: str | None = Field(default=None, description="Condition label for conditional edges")
+    condition: str | None = Field(
+        default=None, description="Condition label for conditional edges"
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -138,7 +140,9 @@ class StudioRunRequest(BaseModel):
 
     query: str = Field(..., description="User query or input text")
     user_id: str = Field("default-user", description="User identifier")
-    thread_id: str | None = Field(default=None, description="Thread ID for conversation continuity")
+    thread_id: str | None = Field(
+        default=None, description="Thread ID for conversation continuity"
+    )
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
     prompt_version: str = Field("v1", description="Prompt version to use")
@@ -218,7 +222,9 @@ class StudioStateSnapshot(BaseModel):
     agent_name: str = Field(..., description="Agent name")
     state: dict[str, Any] = Field(default_factory=dict, description="Full state dict")
     timestamp: str = Field(..., description="ISO-8601 snapshot timestamp")
-    checkpoint_id: str | None = Field(default=None, description="Checkpoint ID if backed by storage")
+    checkpoint_id: str | None = Field(
+        default=None, description="Checkpoint ID if backed by storage"
+    )
 
 
 class StudioStateUpdate(BaseModel):

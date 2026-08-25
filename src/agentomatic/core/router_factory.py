@@ -14,6 +14,8 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
+from agentomatic.core.errors import client_safe_detail, client_safe_message
+from agentomatic.langchain_adapter import dict_to_messages, json_default, to_jsonable
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
@@ -55,9 +57,13 @@ class AgentInvokeRequest(BaseModel):
     query: str = Field(..., description="User query or input")
     user_id: str = Field("default-user", description="User identifier")
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
-    thread_id: str | None = Field(default=None, description="Thread ID for conversation continuity")
+    thread_id: str | None = Field(
+        default=None, description="Thread ID for conversation continuity"
+    )
     prompt_version: str = Field("v1", description="Prompt version to use")
-    temperature: float | None = Field(default=None, ge=0.0, le=2.0, description="Temperature override")
+    temperature: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="Temperature override"
+    )
     max_tokens: int | None = Field(default=None, ge=1, description="Max tokens override")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
 
@@ -98,7 +104,12 @@ _FRAMEWORK_RESULT_KEYS = frozenset(
         "steps_taken",
         "context",
         "metadata",
-        "messages",
+        # NOTE: "messages" is deliberately NOT filtered. Every other key here
+        # is surfaced elsewhere in AgentInvokeResponse (or is an echo of the
+        # request), but the envelope has no ``messages`` field — so filtering
+        # it silently DROPPED the conversation a class agent returned from
+        # ``state_to_output()``, which is exactly what a LangChain/chat agent
+        # produces. It now flows through to ``output.messages``.
         "current_query",
         "query",
         "user_id",
@@ -111,7 +122,7 @@ _FRAMEWORK_RESULT_KEYS = frozenset(
 def _json_dumps(value: Any) -> str:
     """Serialize *value* as JSON text (fallback to ``str`` on failure)."""
     try:
-        return json.dumps(value, ensure_ascii=False, default=str)
+        return json.dumps(value, ensure_ascii=False, default=json_default)
     except (TypeError, ValueError):
         return str(value)
 
@@ -141,21 +152,24 @@ def coerce_agent_invoke_payload(
         text = "" if result is None else str(result)
         return text, None, {}
 
-    context = result.get("context", result.get("retrieved_documents", {}))
+    context = to_jsonable(result.get("context", result.get("retrieved_documents", {})))
     raw_response = result.get("response")
 
     # Explicit string response (classic BaseAgentState / chat agents).
     if isinstance(raw_response, str) and raw_response:
         extras = {k: v for k, v in result.items() if k not in _FRAMEWORK_RESULT_KEYS}
-        output: Any | None = extras or None
+        output: Any | None = to_jsonable(extras) if extras else None
         return raw_response, output, context
 
     # Explicit structured response value.
     if isinstance(raw_response, (dict, list)):
-        return _json_dumps(raw_response), raw_response, context
+        jsonable_response = to_jsonable(raw_response)
+        return _json_dumps(jsonable_response), jsonable_response, context
 
-    # Class-agent ``state_to_output``: whole dict is the payload.
-    output = dict(result)
+    # Class-agent ``state_to_output``: whole dict is the payload. May contain raw
+    # LangChain BaseMessage objects (e.g. ``{"messages": state.messages}``) — make
+    # it JSON-safe before it becomes an HTTP response body.
+    output = to_jsonable(dict(result))
     text = _human_response_text(output) or _json_dumps(output)
     return text, output, context if context is not None else {}
 
@@ -205,7 +219,9 @@ class AgentChatRequest(BaseModel):
 class CreateThreadRequest(BaseModel):
     """Request to explicitly create a thread."""
 
-    thread_id: str | None = Field(default=None, description="Custom thread ID (auto-generated if omitted)")
+    thread_id: str | None = Field(
+        default=None, description="Custom thread ID (auto-generated if omitted)"
+    )
     user_id: str = Field("default-user", description="User identifier")
     title: str | None = Field(default=None, description="Thread title")
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -223,6 +239,57 @@ class A2ATaskRequest(BaseModel):
 
     message: dict[str, Any] = Field(..., description="A2A message")
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+def a2a_message_text(message: dict[str, Any]) -> str:
+    """Extract the user text from an A2A message, whatever shape it arrives in.
+
+    The A2A protocol carries text in ``message.parts`` — a list of typed part
+    objects. Agentomatic historically read only ``message.content``, so a
+    spec-shaped request produced an *empty* query and the agent answered
+    nothing, with a 200 and no hint that the text had been dropped.
+
+    Accepted shapes (checked in this order):
+
+    - ``{"parts": [{"type"|"kind": "text", "text": "..."}]}`` — the protocol form
+      (a bare ``{"text": ...}`` part is also accepted)
+    - ``{"content": "..."}`` — the simplified form Agentomatic documents
+    - ``{"content": [ ...parts... ]}`` — content carrying parts
+    - ``{"text": "..."}``
+
+    Args:
+        message: The raw ``message`` object from the request body.
+
+    Returns:
+        The concatenated text, or ``""`` when the message carries none.
+    """
+
+    def _from_parts(parts: Any) -> str:
+        if not isinstance(parts, list):
+            return ""
+        texts: list[str] = []
+        for part in parts:
+            if isinstance(part, str):
+                texts.append(part)
+            elif isinstance(part, dict):
+                value = part.get("text")
+                if isinstance(value, str) and value:
+                    texts.append(value)
+        return "\n".join(texts)
+
+    text = _from_parts(message.get("parts"))
+    if text:
+        return text
+
+    content = message.get("content")
+    if isinstance(content, str) and content:
+        return content
+    text = _from_parts(content)
+    if text:
+        return text
+
+    value = message.get("text")
+    return value if isinstance(value, str) else ""
 
 
 class OptimizeInvokeRequest(BaseModel):
@@ -652,8 +719,10 @@ def create_default_router(
                     status="error",
                     error=str(exc),
                 )
-            logger.error(f"Agent {agent_name} invocation failed: {exc}")
-            raise HTTPException(500, detail={"error": f"Agent invocation failed: {exc}"}) from exc
+            raise HTTPException(
+                500,
+                detail=client_safe_detail(exc, context="Agent invocation failed"),
+            ) from exc
 
     async def invoke_stream(request: Any) -> StreamingResponse:
         """Invoke agent with SSE streaming."""
@@ -707,26 +776,26 @@ def create_default_router(
                         state_obj = class_agent.input_to_state(input_data)
                         graph = class_agent.graph
                         async for event in graph.astream(state_obj):
-                            yield f"data: {json.dumps(event, default=str)}\n\n"
+                            yield f"data: {json.dumps(event, default=json_default)}\n\n"
                         result = class_agent.state_to_output(state_obj)
                         if hasattr(class_agent, "_graph") and class_agent._graph is not None:
                             class_agent._traces.append(class_agent._graph.last_trace)
                     finally:
                         class_agent._end_request_prompt()
-                    yield f"data: {json.dumps(result, default=str)}\n\n"
+                    yield f"data: {json.dumps(result, default=json_default)}\n\n"
                     collected_response = result.get("response", "")
                     collected_output = result
                 elif agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
-                        yield f"data: {json.dumps(event, default=str)}\n\n"
+                        yield f"data: {json.dumps(event, default=json_default)}\n\n"
                         # Collect response for persistence
                         if isinstance(event, dict) and "response" in event:
                             collected_response = event["response"]
                             collected_output = event
                 elif agent.node_fn:
                     result = await agent.node_fn(state)
-                    yield f"data: {json.dumps(result, default=str)}\n\n"
+                    yield f"data: {json.dumps(result, default=json_default)}\n\n"
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")
                         collected_output = result
@@ -784,7 +853,8 @@ def create_default_router(
                         status="error",
                         error=str(exc),
                     )
-                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+                safe = client_safe_detail(exc, context="Agent streaming failed")
+                yield f"data: {json.dumps(safe)}\n\n"
 
         return StreamingResponse(
             event_stream(),
@@ -874,34 +944,16 @@ def create_default_router(
         # ── Load conversation history ────────────────────────────
         history_loaded = 0
         if request.messages is not None:
-            # User supplied their own messages — use them directly
-            try:
-                from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-                lc_messages: list[Any] = []
-                for msg in request.messages:
-                    role = msg.get("role", "user")
-                    content_val = msg.get("content", "")
-                    if role == "assistant":
-                        lc_messages.append(AIMessage(content=content_val))
-                    elif role == "system":
-                        lc_messages.append(SystemMessage(content=content_val))
-                    else:
-                        lc_messages.append(HumanMessage(content=content_val))
-                lc_messages.append(HumanMessage(content=request.content))
-                state["messages"] = lc_messages
-            except ImportError:
-                # langchain_core not installed — use plain dicts
-                lc_messages_plain: list[dict[str, str]] = []
-                for msg in request.messages:
-                    lc_messages_plain.append(
-                        {
-                            "role": msg.get("role", "user"),
-                            "content": msg.get("content", ""),
-                        }
-                    )
-                lc_messages_plain.append({"role": "user", "content": request.content})
-                state["messages"] = lc_messages_plain
+            # User supplied their own messages — use them directly.
+            # Delegate to the canonical converter in ``langchain_adapter`` so
+            # tool-calling metadata survives: a hand-rolled conversion here
+            # previously dropped ``tool_calls`` and turned a ``tool`` turn into
+            # a HumanMessage, breaking the call/result pairing that providers
+            # require on the next turn. It also degrades gracefully to plain
+            # role/content dicts when langchain_core isn't installed.
+            state["messages"] = dict_to_messages(
+                [*request.messages, {"role": "user", "content": request.content}]
+            )
             history_loaded = len(request.messages)
         elif memory_mgr and request.include_history:
             try:
@@ -922,7 +974,10 @@ def create_default_router(
                 history_loaded = max(0, len(messages) - 1)
             except Exception as exc:
                 logger.warning(f"History loading failed for chat: {exc}")
-                state["metadata"]["_history_error"] = str(exc)
+                # Surfaced in the 200 response metadata, so sanitise it too.
+                state["metadata"]["_history_error"] = client_safe_message(
+                    exc, context="History loading failed"
+                )
 
         # Run before_node hooks
         for hook in registry.before_node_hooks:
@@ -1035,8 +1090,10 @@ def create_default_router(
                     status="error",
                     error=str(exc),
                 )
-            logger.error(f"Chat with {agent_name} failed: {exc}")
-            raise HTTPException(500, detail={"error": f"Chat failed: {exc}"}) from exc
+            raise HTTPException(
+                500,
+                detail=client_safe_detail(exc, context="Chat failed"),
+            ) from exc
 
     # ── GET /health ───────────────────────────────────────────────
     @router.get("/health")
@@ -1136,7 +1193,16 @@ def create_default_router(
         synchronous (blocking) execution for backward compatibility.
         """
         agent = _get_agent()
-        query = request.message.get("content", "")
+        query = a2a_message_text(request.message)
+        if not query:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "A2A message carries no text. Send either "
+                    '{"message": {"parts": [{"type": "text", "text": "..."}]}} '
+                    'or {"message": {"content": "..."}}.'
+                ),
+            )
         payload = {
             "query": query,
             "user_id": "a2a",
@@ -1179,7 +1245,11 @@ def create_default_router(
                 "output": structured_output,
             }
         except Exception as exc:
-            return {"task_id": task_id, "status": "failed", "error": str(exc)}
+            return {
+                "task_id": task_id,
+                "status": "failed",
+                "error": client_safe_message(exc, context="A2A task failed"),
+            }
 
     @router.get("/a2a/tasks/{task_id}")
     async def get_a2a_task(task_id: str) -> dict[str, Any]:
@@ -1325,13 +1395,18 @@ def create_default_router(
     @router.get("/threads/{thread_id}/summary")
     async def get_thread_summary(thread_id: str) -> dict[str, Any]:
         """Get or generate a conversation summary for a thread."""
-        if not memory_mgr:
+        # ``memory_mgr`` wraps the lazy store proxy and stays truthy even when
+        # no store is configured, so check the store itself — otherwise the
+        # RuntimeError surfaced as a 500 for what is a configuration issue.
+        if not memory_mgr or not thread_store:
             raise HTTPException(400, "Memory manager not configured (requires thread storage)")
         try:
             summary = await memory_mgr.get_conversation_summary(thread_id)
             return {"thread_id": thread_id, "summary": summary}
         except Exception as exc:
-            raise HTTPException(500, f"Failed to generate summary: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Failed to generate summary")
+            ) from exc
 
     # ── POST /optimize/invoke ─────────────────────────────────────
     @router.post("/optimize/invoke", response_model=OptimizeInvokeResponse)
@@ -1412,7 +1487,9 @@ def create_default_router(
             raise
         except Exception as exc:
             logger.error(f"Optimize invoke for {agent_name} failed: {exc}")
-            raise HTTPException(500, f"Optimize invoke failed: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Optimize invoke failed")
+            ) from exc
 
     # ── POST /feedback ────────────────────────────────────────────
     @router.post("/feedback")
@@ -1478,7 +1555,11 @@ def create_default_router(
                     "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
                 },
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         limit = max(1, min(limit, 200))
         offset = max(0, offset)
@@ -1522,7 +1603,11 @@ def create_default_router(
                     "AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=1."
                 },
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         analysis = await thread_store.get_latest_log_analysis(agent_name, resource_type="agent")
         if not analysis:
@@ -1551,7 +1636,11 @@ def create_default_router(
                 400,
                 detail={"error": "logs_history must be enabled to analyse invocation logs."},
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
 
         opts = request or AnalyzeLogsRequest(sample_limit=20, persist=True)
@@ -1569,7 +1658,9 @@ def create_default_router(
             )
         except Exception as exc:  # noqa: BLE001
             logger.error("Log analysis failed for '{}': {}", agent_name, exc)
-            raise HTTPException(500, detail={"error": f"Log analysis failed: {exc}"}) from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Log analysis failed")
+            ) from exc
         return {
             "agent": agent_name,
             "resource": "agent",
@@ -1589,7 +1680,11 @@ def create_default_router(
                     "Set logs_history=True / AGENTOMATIC_LOGS_HISTORY=1."
                 },
             )
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         entry = await thread_store.get_invocation_log(log_id)
         if (
@@ -1608,7 +1703,11 @@ def create_default_router(
         offset: int = 0,
     ) -> dict[str, Any]:
         """List auditable prompt-fit / retrain runs for this agent."""
-        if thread_store is None:
+        # NOT ``is None``: thread_store is a _LazyStoreProxy, which is never
+        # None. Its __bool__ reports whether a store is actually configured,
+        # so an identity check silently fell through and the first attribute
+        # access raised RuntimeError as a bare 500.
+        if not thread_store:
             raise HTTPException(400, detail={"error": "Storage backend is not configured"})
         limit = max(1, min(limit, 200))
         offset = max(0, offset)
@@ -1689,7 +1788,7 @@ def create_default_router(
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error resuming execution: {exc}",
+                detail=client_safe_detail(exc, context="Error resuming execution"),
             ) from exc
 
     # ── POST /threads/{thread_id}/reject ──────────────────────────
@@ -1723,7 +1822,9 @@ def create_default_router(
                 title=request.title,
             )
         except Exception as exc:
-            raise HTTPException(500, f"Failed to fork thread: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Failed to fork thread")
+            ) from exc
         if not forked:
             raise HTTPException(404, f"Thread '{thread_id}' not found")
         return forked
@@ -1738,6 +1839,8 @@ def create_default_router(
             lineage = await thread_store.get_thread_lineage(thread_id)
             return lineage
         except Exception as exc:
-            raise HTTPException(500, f"Failed to retrieve lineage: {exc}") from exc
+            raise HTTPException(
+                500, detail=client_safe_detail(exc, context="Failed to retrieve lineage")
+            ) from exc
 
     return router

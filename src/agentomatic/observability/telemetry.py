@@ -35,6 +35,12 @@ from typing import Any, TypeVar, cast
 
 from loguru import logger
 
+
+def _env_flag(name: str) -> bool:
+    """Return True when *name* is set to a truthy value in the environment."""
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 F = TypeVar("F", bound=Callable[..., Any])
 
 # ---------------------------------------------------------------------------
@@ -173,8 +179,23 @@ def setup_telemetry(
                 logger.warning("OTLP exporter packages not installed — falling back to console")
                 enable_console = True
 
-    if enable_console or not otlp_endpoint:
+    # Console export is strictly opt-in. It previously defaulted on whenever no
+    # OTLP endpoint was configured — i.e. for most deployments — which dumped a
+    # full JSON span document to stdout for *every* HTTP request (thousands of
+    # log lines per minute, and real money in a hosted log pipeline). Spans are
+    # still recorded either way; this only controls printing them.
+    if not enable_console and _env_flag("AGENTOMATIC_OTEL_CONSOLE"):
+        enable_console = True
+
+    if enable_console:
         provider.add_span_processor(BatchSpanProcessor(SafeConsoleSpanExporter()))
+        logger.info("🔭 OTEL console span export enabled")
+    elif not otlp_endpoint:
+        logger.debug(
+            "OTEL: no OTLP endpoint configured and console export is off — "
+            "spans are recorded but not exported. Set OTEL_EXPORTER_OTLP_ENDPOINT "
+            "to ship them, or AGENTOMATIC_OTEL_CONSOLE=1 to print them locally."
+        )
 
     trace.set_tracer_provider(provider)
     _tracer = trace.get_tracer("agentomatic")

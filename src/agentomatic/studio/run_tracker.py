@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_message
 from agentomatic.studio.models import StudioRunEvent, StudioRunInfo
 
 if TYPE_CHECKING:
@@ -182,6 +183,14 @@ class RunTracker:
         try:
             last_output: dict[str, Any] = {}
             async for event in adapter.stream_execution(state, config, breakpoints, checkpoint_id):
+                # This tracker owns the run lifecycle — it already bracketed the
+                # stream with its own run_start/run_complete (carrying the real
+                # run_id, timing and output). Some adapters emit their own pair
+                # too (AgentGraph.astream_studio_events does), which reached the
+                # client as a duplicate run and made the Studio UI render every
+                # agent reply twice.
+                if event.event in {"run_start", "run_complete"}:
+                    continue
                 # Stamp the run_id onto adapter events
                 event.run_id = run_id
                 self.add_event(run_id, event)
@@ -207,14 +216,17 @@ class RunTracker:
 
         except Exception as exc:
             duration = (time.monotonic() - start_time) * 1000
-            self.fail_run(run_id, str(exc))
-            logger.error(f"Studio run {run_id} failed: {exc}")
+            # Studio runs are reachable unauthenticated in the default
+            # `agentomatic run` posture, and this error is both stored on the
+            # run and streamed over SSE — so never put raw exception text in it.
+            safe = client_safe_message(exc, context="Studio run failed")
+            self.fail_run(run_id, safe)
 
             error_event = StudioRunEvent(
                 event="run_error",
                 run_id=run_id,
                 timestamp=_now_iso(),
-                data={"error": str(exc), "type": type(exc).__name__},
+                data={"error": safe, "type": type(exc).__name__},
                 duration_ms=round(duration, 2),
             )
             self.add_event(run_id, error_event)

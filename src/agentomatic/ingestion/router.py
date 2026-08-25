@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_detail
+
 from .context import NullIngestionContext
 from .registry import IngestionRegistry
 
@@ -87,7 +89,10 @@ def _mount_ingestor(
                     status="error",
                     recorder=log_recorder,
                 )
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=500,
+                detail=client_safe_detail(exc, context="Ingestion failed"),
+            ) from exc
         duration = (time.perf_counter() - t0) * 1000
         logger.debug(f"Ingestor '{_ingestor.ingestor_name}' ran in {duration:.1f}ms")
         if log_recorder is not None:

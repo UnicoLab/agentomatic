@@ -25,6 +25,12 @@ if TYPE_CHECKING:
 _task_ctx: ContextVar[Any] = ContextVar("agentomatic_task_ctx", default=None)
 _INSTALLED = False
 
+# asyncio only holds a *weak* reference to scheduled tasks — without a strong
+# reference kept somewhere, the event loop can garbage-collect a fire-and-
+# forget task mid-execution, silently dropping the progress report. Keep one
+# here until it completes.
+_background_tasks: set[asyncio.Task[Any]] = set()
+
 
 def bind_task_context(ctx: TaskContext | None) -> Any:
     """Bind *ctx* for the current async task; return a reset token."""
@@ -78,7 +84,7 @@ def report_stage_sync(
         loop = asyncio.get_running_loop()
     except RuntimeError:
         return
-    loop.create_task(
+    task = loop.create_task(
         report_stage(
             stage,
             percent=percent,
@@ -87,6 +93,8 @@ def report_stage_sync(
             message=message,
         )
     )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 def _wrap_dispatcher(dispatcher: Any) -> Any:

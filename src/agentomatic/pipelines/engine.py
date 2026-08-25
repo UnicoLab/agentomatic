@@ -313,7 +313,7 @@ class PipelineEngine:
         (each step runs after all of its declared upstreams), tie-broken
         by list index for determinism.
         """
-        from .ordering import compute_execution_order
+        from .ordering import compute_execution_order, upstreams_of
 
         try:
             order = compute_execution_order(self.config.steps)
@@ -325,7 +325,31 @@ class PipelineEngine:
 
         ordered_steps = [self.config.steps[i] for i in order]
         total_steps = len(ordered_steps)
+        # Steps that ended up FAILED or SKIPPED, in DAG mode — used to cascade
+        # a skip to any declared downstream dependent instead of letting it
+        # run against a missing/stale upstream output. Only applies to steps
+        # that actually declare ``upstreams``: legacy sequential pipelines
+        # (no upstreams anywhere) keep their existing "keep going" behavior
+        # under on_error="continue".
+        unsuccessful_steps: set[str] = set()
         for exec_pos, step_config in enumerate(ordered_steps):
+            blocking_upstreams = [u for u in upstreams_of(step_config) if u in unsuccessful_steps]
+            if blocking_upstreams:
+                logger.warning(
+                    f"  ⏭️ Skipping '{step_config.name}' "
+                    f"(upstream(s) {blocking_upstreams} did not complete successfully)"
+                )
+                pipeline_result.steps[step_config.name] = StepResult(
+                    name=step_config.name,
+                    status=StepStatus.SKIPPED,
+                    error=f"Skipped: upstream(s) {blocking_upstreams} did not complete successfully",
+                )
+                unsuccessful_steps.add(step_config.name)
+                await self._report_step_progress(
+                    exec_pos + 1, total_steps, step_config.name, "skipped"
+                )
+                continue
+
             # Evaluate condition if present
             condition = getattr(step_config, "condition", None)
             if condition and not self._evaluate_condition(condition, ctx):
@@ -360,6 +384,11 @@ class PipelineEngine:
 
             # Handle failure
             if result.status == StepStatus.FAILED:
+                # Mark unsuccessful up front so any DAG dependent of this step
+                # is skipped (see the ``blocking_upstreams`` check above),
+                # rather than running against a missing/failed upstream's
+                # output under a pipeline-level on_error="continue" policy.
+                unsuccessful_steps.add(step_config.name)
                 on_error = getattr(step_config, "on_error", ErrorPolicy.FAIL)
                 if on_error == ErrorPolicy.SKIP:
                     logger.warning(

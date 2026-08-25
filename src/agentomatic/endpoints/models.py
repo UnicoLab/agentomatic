@@ -55,9 +55,7 @@ class UpstreamAuthConfig(BaseModel):
     # oauth2 client credentials
     token_url: str = Field(default="", description="OAuth2 token endpoint (supports ${ENV}).")
     client_id: str = Field(default="", description="OAuth2 client id (supports ${ENV}).")
-    client_secret: str = Field(
-        default="", description="OAuth2 client secret (supports ${ENV})."
-    )
+    client_secret: str = Field(default="", description="OAuth2 client secret (supports ${ENV}).")
     scope: str = Field(default="", description="Optional OAuth2 scope(s), space-delimited.")
     audience: str = Field(default="", description="Optional OAuth2 audience claim.")
     token_leeway: int = Field(

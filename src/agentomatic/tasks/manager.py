@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from agentomatic.core.errors import client_safe_message
+
 from .context import TaskContext
 from .models import (
     TargetType,
@@ -84,9 +86,23 @@ class TaskManager:
         await self.store.initialize()
 
     async def shutdown(self) -> None:
-        """Cancel in-flight tasks and close the store."""
+        """Cancel in-flight tasks and close the store.
+
+        ``asyncio.Task.cancel()`` only *schedules* ``CancelledError`` at the
+        task's next suspension point — the task's own cleanup (including its
+        ``_finalize()`` call, which persists the terminal status via
+        ``self.store.save``) runs later on the event loop. Closing the store
+        immediately after requesting cancellation (the previous behavior)
+        raced that save against ``store.close()`` disposing the underlying
+        connection, so a cancelled task's terminal status could silently
+        fail to persist. Gather the (now-cancelled) tasks first so their
+        cleanup has actually run before the store goes away.
+        """
+        running_tasks = list(self._running.values())
         for task_id in list(self._running):
             await self.cancel(task_id)
+        if running_tasks:
+            await asyncio.gather(*running_tasks, return_exceptions=True)
         await self.store.close()
 
     # ------------------------------------------------------------------
@@ -311,7 +327,16 @@ class TaskManager:
                         await asyncio.sleep(delay)
 
             logger.exception(f"Task {record.id} failed after {record.attempts} attempts")
-            await self._finalize(record, TaskStatus.FAILED, error=str(last_error))
+            # Raw exception text routinely carries DSNs/paths, and this
+            # record is served verbatim by GET /tasks/{id}, /result and the
+            # task list — so sanitise before it is persisted.
+            await self._finalize(
+                record,
+                TaskStatus.FAILED,
+                error=client_safe_message(last_error, context="Task failed")
+                if isinstance(last_error, BaseException)
+                else str(last_error),
+            )
 
     def _prepare_input(self, record: TaskRecord) -> Any:
         """Build the payload for a dispatcher invocation, injecting checkpoints.
@@ -356,7 +381,10 @@ class TaskManager:
                 try:
                     results[index] = await dispatcher(record.target, payload, ctx)
                 except Exception as exc:  # noqa: BLE001 - collect per-item errors
-                    results[index] = {"error": str(exc)}
+                    # Per-item errors are returned to the caller too.
+                    results[index] = {
+                        "error": client_safe_message(exc, context="Batch item failed")
+                    }
                 async with lock:
                     done += 1
                     await ctx.report(

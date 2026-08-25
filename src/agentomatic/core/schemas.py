@@ -28,6 +28,7 @@ from pydantic import BaseModel, ValidationError
 # ``{Title}`` is the agent folder name converted to CamelCase
 # (e.g. ``weather_bot`` -> ``WeatherBot``).
 
+
 def schema_model_candidates(
     agent_name: str,
 ) -> tuple[list[str], list[str]]:

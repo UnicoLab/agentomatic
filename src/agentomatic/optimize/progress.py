@@ -230,9 +230,7 @@ class RichProgressCallback:
         self._best_score = score
         self._scores.append(score)
         if self._console is not None:
-            self._console.print(
-                f"  📊 Baseline score: [bold]{score:.4f}[/]"
-            )
+            self._console.print(f"  📊 Baseline score: [bold]{score:.4f}[/]")
 
     def _on_round_start(self, data: EventData) -> None:
         """Start a per-round sub-progress bar."""
@@ -306,16 +304,12 @@ class RichProgressCallback:
             spark = _make_sparkline(self._scores)
             first = self._scores[0]
             last = self._scores[-1]
-            self._console.print(
-                f"  📈 {spark} {first:.2f} → {last:.2f}"
-            )
+            self._console.print(f"  📈 {spark} {first:.2f} → {last:.2f}")
 
     def _on_early_stop(self, data: EventData) -> None:
         """Log early-stop notification."""
         if self._console is not None:
-            self._console.print(
-                "\n  ⏹️  [yellow]Early stop triggered[/]"
-            )
+            self._console.print("\n  ⏹️  [yellow]Early stop triggered[/]")
 
     def _on_fit_complete(self, data: EventData) -> None:
         """Print final summary table and stop progress bars."""
@@ -337,9 +331,7 @@ class RichProgressCallback:
             return
         s_score = data.sample_score if data.sample_score is not None else 0.0
         query_preview = (data.query or "")[:60]
-        self._console.print(
-            f"    🔹 {s_score:.3f}  {query_preview}"
-        )
+        self._console.print(f"    🔹 {s_score:.3f}  {query_preview}")
 
     def _on_rewrite_accepted(self, data: EventData) -> None:
         """Display rewrite acceptance info."""

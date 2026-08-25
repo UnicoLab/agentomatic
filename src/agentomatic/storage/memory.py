@@ -7,6 +7,9 @@ from typing import Any
 
 from .base import BaseStore
 
+_DEFAULT_CHECKPOINT_LIST_LIMIT = 1000
+"""Cap applied to list_checkpoints() when no explicit limit is given."""
+
 
 class MemoryStore(BaseStore):
     """Fast in-memory store — perfect for development and unit tests.
@@ -80,6 +83,12 @@ class MemoryStore(BaseStore):
             ]
             for sid in orphan_ids:
                 del self._suspended_states[sid]
+            # Clean up orphaned checkpoints (keyed by (thread_id, ns, checkpoint_id)).
+            orphan_cp_keys = [key for key in self._checkpoints if key[0] == thread_id]
+            for key in orphan_cp_keys:
+                del self._checkpoints[key]
+            # Clean up orphaned feedback entries.
+            self._feedback = [fb for fb in self._feedback if fb.get("thread_id") != thread_id]
             return True
         return False
 
@@ -394,8 +403,8 @@ class MemoryStore(BaseStore):
                     break
             if found_idx != -1:
                 cps = cps[found_idx + 1 :]
-        if limit is not None:
-            cps = cps[:limit]
+        # Always cap the result set (see SQLAlchemyStore.list_checkpoints for why).
+        cps = cps[: limit if limit is not None else _DEFAULT_CHECKPOINT_LIST_LIMIT]
         return cps
 
     # ------------------------------------------------------------------

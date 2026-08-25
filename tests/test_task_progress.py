@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -117,3 +118,36 @@ async def test_report_stage_sync_schedules() -> None:
         reset_task_context(token)
     assert reports
     assert reports[0]["stage"] == "sync-stage"
+
+
+@pytest.mark.asyncio
+async def test_report_stage_sync_keeps_strong_task_reference() -> None:
+    """The scheduled task must be held strongly until it completes.
+
+    asyncio only keeps a *weak* reference to a task created via
+    ``loop.create_task`` with no reference kept elsewhere — without an
+    explicit strong reference, the task can be garbage-collected mid-flight,
+    silently dropping the progress report.
+    """
+    import gc
+
+    from agentomatic.tasks.progress import _background_tasks, bind_task_context, reset_task_context
+
+    async def slow_report_fn(**kwargs: Any) -> None:
+        await asyncio.sleep(0.05)
+
+    ctx = TaskContext(task_id="t3", report_fn=slow_report_fn, is_cancelled=lambda: False)
+    token = bind_task_context(ctx)
+    try:
+        report_stage_sync("gc-stage")
+        # Force a collection pass immediately — before our fix this could
+        # collect the fire-and-forget task before it ever ran.
+        gc.collect()
+        assert len(_background_tasks) == 1
+        pending = next(iter(_background_tasks))
+        assert not pending.done()
+        await pending
+    finally:
+        reset_task_context(token)
+    # The done-callback must remove it from the tracking set afterwards.
+    assert len(_background_tasks) == 0

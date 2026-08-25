@@ -11,6 +11,7 @@ via the ``X-Control-Token`` header.
 
 from __future__ import annotations
 
+import hmac
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Header, HTTPException
@@ -26,6 +27,7 @@ from agentomatic.control.models import (
     ToggleResponse,
 )
 from agentomatic.control.state import ControlPlaneState
+from agentomatic.core.errors import client_safe_message
 
 if TYPE_CHECKING:
     from agentomatic.core.platform import AgentPlatform
@@ -52,8 +54,24 @@ def create_control_router(
 
     def _authorize(token: str | None) -> None:
         """Reject mutating requests lacking the configured control token."""
-        if control_token and token != control_token:
+        # Bytes comparison — see the note in agentomatic.middleware.auth: a
+        # non-ASCII token would otherwise raise TypeError and surface as 500.
+        if control_token and (
+            not token or not hmac.compare_digest(token.encode(), control_token.encode())
+        ):
             raise HTTPException(status_code=401, detail="Invalid or missing control token")
+
+    def _agent_aliases(agent: Any) -> set[str]:
+        """Return every path segment an agent's routes are mounted under.
+
+        Agents are mounted under both their folder name and their manifest
+        slug when the two differ (see ``_mount_agent_router`` in
+        ``core/platform.py``) — both must be tracked so enable/disable
+        can't be bypassed via whichever alias wasn't targeted.
+        """
+        manifest = getattr(agent, "manifest", None)
+        aliases = {getattr(manifest, "name", None), getattr(manifest, "slug", None)}
+        return {alias for alias in aliases if alias}
 
     def _agent_policy(agent: Any) -> tuple[bool, list[str], list[str]]:
         """Extract (requires_auth, roles, scopes) from an agent policy."""
@@ -100,7 +118,12 @@ def create_control_router(
         except TimeoutError:
             return {"status": "timeout", "error": "health_check timed out"}
         except Exception as exc:  # noqa: BLE001
-            return {"status": "error", "error": str(exc)}
+            # These control *reads* are not token-gated, so never echo raw
+            # exception text from a backend health check.
+            return {
+                "status": "error",
+                "error": client_safe_message(exc, context="health_check failed"),
+            }
 
     @router.get("/agents", response_model=list[ControlAgentInfo], summary="List agents")
     async def list_agents() -> list[ControlAgentInfo]:
@@ -266,9 +289,15 @@ def create_control_router(
     ) -> ToggleResponse:
         """Stop routing traffic to an agent (returns 503 for its routes)."""
         _authorize(x_control_token)
-        if platform._registry.get(name) is None:
+        agent = platform._registry.get(name)
+        if agent is None:
             raise HTTPException(404, f"Agent '{name}' not found")
-        state.disable_agent(name)
+        # An agent is mounted under BOTH its folder name and its manifest
+        # slug when they differ (so Studio, which addresses agents by slug,
+        # doesn't 404). Disable both aliases, or draining by whichever one
+        # the operator didn't use leaves the other alias's routes live.
+        for alias in _agent_aliases(agent):
+            state.disable_agent(alias)
         logger.warning(f"🛑 Control plane: agent '{name}' disabled")
         return ToggleResponse(target=name, state="disabled")
 
@@ -283,9 +312,11 @@ def create_control_router(
     ) -> ToggleResponse:
         """Resume routing traffic to a previously disabled agent."""
         _authorize(x_control_token)
-        if platform._registry.get(name) is None:
+        agent = platform._registry.get(name)
+        if agent is None:
             raise HTTPException(404, f"Agent '{name}' not found")
-        state.enable_agent(name)
+        for alias in _agent_aliases(agent):
+            state.enable_agent(alias)
         logger.info(f"✅ Control plane: agent '{name}' enabled")
         return ToggleResponse(target=name, state="enabled")
 

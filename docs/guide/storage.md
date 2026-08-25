@@ -404,8 +404,13 @@ The checkpointer implements the full LangGraph `BaseCheckpointSaver` interface:
 | `list(config, ...)` | List checkpoints (sync wrapper, returns `Iterator`) |
 | `alist(config, ...)` | List checkpoints (async, returns `AsyncIterator`) |
 
-!!! info "JSON Serialization"
-    The checkpointer automatically ensures all checkpoint and metadata values are JSON-serializable using a `default=str` fallback. Custom objects, datetimes, and bytes are converted to their string representation.
+!!! info "Serialization"
+    Checkpoints and metadata are serialized with LangGraph's own
+    `JsonPlusSerializer`, so LangChain `BaseMessage` subclasses, pydantic
+    models, dataclasses, datetimes, and bytes round-trip as themselves — a
+    reloaded thread gives you back real `HumanMessage` / `AIMessage` objects,
+    not their `repr()`. Payloads written before this used a lossy
+    `default=str` fallback and are returned as-is on read (best effort).
 
 ---
 

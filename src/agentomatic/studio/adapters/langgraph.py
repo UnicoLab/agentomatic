@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from agentomatic.storage.checkpointer import decode_from_storage
 from agentomatic.studio.adapter import StudioAdapter
 from agentomatic.studio.models import (
     StudioCheckpoint,
@@ -99,7 +100,14 @@ class LangGraphAdapter(StudioAdapter):
 
     async def get_graph(self) -> StudioGraphTopology:
         if self._agent.graph_fn is None:
-            raise ValueError(f"LangGraph agent '{self.agent_name}' has no graph_fn")
+            # An agent registered with only a node_fn has no graph to draw.
+            # Raising here surfaced as a bare 500 from /studio/agents/{name}/graph,
+            # which the Studio UI calls for *every* agent. Return an empty
+            # topology, matching what the graph-agent adapter already does.
+            return StudioGraphTopology(
+                agent_name=self.agent_name,
+                metadata={"reason": "agent has no graph_fn (node_fn only)"},
+            )
         graph = self._agent.graph_fn()
         drawable = graph.get_graph()
 
@@ -240,7 +248,10 @@ class LangGraphAdapter(StudioAdapter):
                 cps = await self._store.list_checkpoints(thread_id, "", limit=1)
                 if cps:
                     latest = cps[0]
-                    state_data = latest.get("checkpoint", {})
+                    # Checkpoints are stored through LangGraph's serde (so
+                    # BaseMessage objects survive), which means the raw row
+                    # holds an encoded wrapper — decode before displaying it.
+                    state_data = decode_from_storage(latest.get("checkpoint", {}))
                     checkpoint_id = latest.get("checkpoint_id")
             except Exception as exc:
                 logger.warning(f"Store fallback get_state failed: {exc}")
@@ -295,8 +306,8 @@ class LangGraphAdapter(StudioAdapter):
                             id=cp.get("checkpoint_id", f"cp_{idx}"),
                             thread_id=thread_id,
                             step=idx,
-                            state=cp.get("checkpoint", {}),
-                            metadata=cp.get("metadata", {}),
+                            state=decode_from_storage(cp.get("checkpoint", {})),
+                            metadata=decode_from_storage(cp.get("metadata", {})),
                             parent_id=cp.get("parent_checkpoint_id"),
                             timestamp=cp.get("timestamp", _now_iso()),
                         )

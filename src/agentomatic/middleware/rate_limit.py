@@ -33,16 +33,31 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         *,
         max_requests: int = 100,
         window_seconds: int = 60,
+        trust_proxy_headers: bool = False,
     ) -> None:
         super().__init__(app)
         self._max = max_requests
         self._window = window_seconds
         self._hits: dict[str, list[float]] = defaultdict(list)
+        # X-Forwarded-For is client-controlled unless a trusted reverse proxy
+        # sets/overwrites it — trusting it by default lets any caller rotate
+        # the header per request and bypass the limiter entirely. Only honour
+        # it when the deployer explicitly confirms a trusted proxy is in front.
+        #
+        # This flag governs *this* middleware only. Uvicorn's own
+        # ``--proxy-headers`` (on by default) rewrites ``request.client`` from
+        # X-Forwarded-For for peers listed in ``--forwarded-allow-ips``
+        # (default ``127.0.0.1``), and that rewrite happens before any of this
+        # runs — the original peer address is not recoverable. So a caller who
+        # can reach the server *from an allowed peer address* can still steer
+        # the key. Keep ``--forwarded-allow-ips`` limited to your real proxy.
+        self._trust_proxy_headers = trust_proxy_headers
 
     def _client_key(self, request: Request) -> str:
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        if self._trust_proxy_headers:
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     async def dispatch(

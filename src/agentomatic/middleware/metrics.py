@@ -33,9 +33,7 @@ _SKIP_PATHS = {"/health", "/healthz", "/readiness", "/metrics"}
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Prometheus metrics collection per request."""
 
-    def __init__(
-        self, app: Any, *, prefix: str = "agentomatic"
-    ) -> None:
+    def __init__(self, app: Any, *, prefix: str = "agentomatic") -> None:
         super().__init__(app)
         self._requests: Any | None = None
         self._duration: Any | None = None

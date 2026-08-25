@@ -1258,7 +1258,12 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             """Node function adapter for registry."""
             input_data = {
                 "query": state.get("current_query", ""),
-                **{k: v for k, v in state.items() if k not in ("messages", "thread_id")},
+                # Forward ``messages``/``thread_id`` too — see the rationale in
+                # ``agentomatic.core.agent_invoke._input_from_state``: they are
+                # required by LangChain-style agents (MessagesPlaceholder
+                # history and RunnableConfig thread_id) and were previously
+                # unreachable from ``input_to_state``.
+                **state,
             }
             return await self.atransform(input_data)
 

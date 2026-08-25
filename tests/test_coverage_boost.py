@@ -163,7 +163,13 @@ class TestHandleApiErrors:
         with pytest.raises(HTTPException) as exc_info:
             await raises_generic()
         assert exc_info.value.status_code == 500
-        assert "boom" in exc_info.value.detail
+        # The raw exception text must NOT reach the client — exception messages
+        # routinely carry DSNs/tokens. A correlation id points at the full
+        # server-side log entry instead.
+        detail = exc_info.value.detail
+        assert "boom" not in str(detail)
+        assert detail["error_type"] == "ValueError"
+        assert detail["error_id"]
 
 
 class TestLogApiCall:
@@ -263,6 +269,53 @@ class TestAuthMiddleware:
         resp = client.get("/api/data?api_key=test-key")
         assert resp.status_code == 200
 
+    def _make_studio_app(self, api_key="test-key"):
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
+        from agentomatic.middleware.auth import AuthMiddleware
+
+        async def studio_ui(request):
+            return JSONResponse({"ui": True})
+
+        async def studio_api(request):
+            # Represents a real Studio debug route, e.g.
+            # /studio/agents/{name}/threads/{id}/state
+            return JSONResponse({"thread_state": "secret"})
+
+        app = Starlette(
+            routes=[
+                Route("/studio/ui/", studio_ui),
+                Route("/studio/agents/{name}/threads/{tid}/state", studio_api),
+            ],
+        )
+        app.add_middleware(AuthMiddleware, api_key=api_key)
+        return app
+
+    def test_studio_ui_shell_is_public(self):
+        """The static UI shell (like the /docs Swagger shell) needs no key."""
+        client = TestClient(self._make_studio_app())
+        resp = client.get("/studio/ui/")
+        assert resp.status_code == 200
+
+    def test_studio_debug_api_requires_auth(self):
+        """Regression: the Studio debug REST API must NOT be exempted just
+        because it shares the "/studio" prefix with the public UI shell —
+        that would let an unauthenticated caller read/mutate any agent's
+        run state via /studio/agents/{name}/threads/{id}/state etc.
+        """
+        client = TestClient(self._make_studio_app())
+        resp = client.get("/studio/agents/hello/threads/victim/state")
+        assert resp.status_code == 401
+
+    def test_studio_debug_api_works_with_key(self):
+        client = TestClient(self._make_studio_app())
+        resp = client.get(
+            "/studio/agents/hello/threads/victim/state", headers={"X-API-Key": "test-key"}
+        )
+        assert resp.status_code == 200
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Rate Limit Middleware
@@ -325,6 +378,45 @@ class TestRateLimitMiddleware:
         resp = client.get("/api/test")
         assert resp.headers["X-RateLimit-Limit"] == "10"
         assert resp.headers["X-RateLimit-Remaining"] == "9"
+
+    def test_spoofed_forwarded_for_does_not_bypass_limit_by_default(self):
+        """X-Forwarded-For must be ignored unless trust_proxy_headers=True.
+
+        Otherwise any client can send a fresh X-Forwarded-For value per
+        request to get a brand-new rate-limit bucket every time.
+        """
+        client = TestClient(self._make_app(max_requests=2))
+        client.get("/api/test", headers={"X-Forwarded-For": "1.1.1.1"})
+        client.get("/api/test", headers={"X-Forwarded-For": "2.2.2.2"})
+        # Same underlying TestClient connection => same real client key,
+        # so this third request (with yet another spoofed header) must
+        # still be rate-limited.
+        resp = client.get("/api/test", headers={"X-Forwarded-For": "3.3.3.3"})
+        assert resp.status_code == 429
+
+    def test_trusted_proxy_headers_opt_in_honors_forwarded_for(self):
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
+        from agentomatic.middleware.rate_limit import RateLimitMiddleware
+
+        async def home(request):
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/api/test", home)])
+        app.add_middleware(
+            RateLimitMiddleware,
+            max_requests=1,
+            window_seconds=60,
+            trust_proxy_headers=True,
+        )
+        client = TestClient(app)
+        assert client.get("/api/test", headers={"X-Forwarded-For": "1.1.1.1"}).status_code == 200
+        # Same real connection, but a distinct forwarded IP gets its own bucket.
+        assert client.get("/api/test", headers={"X-Forwarded-For": "2.2.2.2"}).status_code == 200
+        # Second request from the same forwarded IP is over the limit.
+        assert client.get("/api/test", headers={"X-Forwarded-For": "1.1.1.1"}).status_code == 429
 
 
 # ─────────────────────────────────────────────────────────────────────

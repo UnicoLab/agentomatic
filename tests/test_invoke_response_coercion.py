@@ -40,3 +40,25 @@ def test_coerce_json_fallback_when_no_human_text() -> None:
     text, output, _ = coerce_agent_invoke_payload(payload)
     assert output == payload
     assert json.loads(text)["p50"] == 10
+
+
+def test_coerce_state_to_output_with_raw_langchain_messages() -> None:
+    """A class agent returning ``{"messages": state.messages}`` (raw BaseMessage
+    objects, the pattern shown in TODO.md's LangGraph example) must not crash the
+    REST response — messages become plain role/content dicts.
+    """
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    result = {
+        "agent_type": "chatbot",
+        "messages": [HumanMessage(content="hi"), AIMessage(content="hello there")],
+    }
+    text, output, _ = coerce_agent_invoke_payload(result)
+
+    assert output["messages"] == [
+        {"role": "human", "content": "hi"},
+        {"role": "ai", "content": "hello there"},
+    ]
+    # The whole envelope must be safe to json-encode as a real HTTP response.
+    envelope = AgentInvokeResponse(response=text, output=output, agent_type="chatbot")
+    json.dumps(envelope.model_dump())

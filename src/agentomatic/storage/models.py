@@ -175,7 +175,14 @@ class CheckpointModel(Base):
 
     __tablename__ = "checkpoints"
 
-    thread_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # No ForeignKey to ThreadModel: LangGraph checkpoints are keyed by whatever
+    # ``configurable.thread_id`` the caller passes to the checkpointer, which
+    # is not required to correspond to an agentomatic ThreadModel row (a graph
+    # can be checkpointed standalone, without ever calling create_thread()).
+    # Orphan cleanup on thread deletion is therefore done explicitly in
+    # SQLAlchemyStore.delete_thread()/MemoryStore.delete_thread() instead of
+    # relying on a DB-level cascade.
+    thread_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
     checkpoint_ns: Mapped[str] = mapped_column(String(128), primary_key=True, default="")
     checkpoint_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     parent_checkpoint_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

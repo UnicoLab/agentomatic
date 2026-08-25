@@ -435,9 +435,9 @@ def test_keras_fit_loss_decreases_per_epoch(mode: str) -> None:
         # Prompt modes discover at least the deterministic marker.
         assert history["banana"][-1] == 1.0, mode
         prompt = agent.compiled_config.get("system_prompt") or agent.system_prompt
-        assert (
-            MARKER in prompt.lower() or agent.compiled_config.get("few_shot_examples")
-        ), f"{mode}: banana missing from applied config: {prompt[:120]}"
+        assert MARKER in prompt.lower() or agent.compiled_config.get("few_shot_examples"), (
+            f"{mode}: banana missing from applied config: {prompt[:120]}"
+        )
 
 
 @pytest.mark.asyncio

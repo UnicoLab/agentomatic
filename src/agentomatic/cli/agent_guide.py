@@ -83,7 +83,7 @@ and platform `logs_history` / `allow_logsllm_analysis`. See the optimization gui
 | Command | Purpose |
 | --- | --- |
 | `agentomatic new NAME` | Scaffold a full project (alias for `init --project`) |
-| `agentomatic init NAME [--project] [--template basic\\|full\\|class\\|rag\\|chatbot\\|coordinator\\|extraction\\|deepagent\\|legacy_dict\\|ingestion]` | Scaffold an agent (or project) |
+| `agentomatic init NAME [--project] [--template basic\\|full\\|class\\|rag\\|chatbot\\|coordinator\\|extraction\\|deepagent\\|legacy_dict\\|ingestion\\|langchain]` | Scaffold an agent (or project) |
 | `agentomatic add connection\\|ingestion NAME` | Add components to an existing agent |
 | `agentomatic run [--studio/--no-studio] [--with-ui] [--port 8000] [--ssl-certfile ...] [--require-auth-globally]` | Start the platform (prefers `main:app` when present) |
 | `agentomatic deploy [--profile full\\|minimal] [--minimal] [--distroless] [--stack NAME]` | Generate Dockerfile/compose/.env |
@@ -151,6 +151,13 @@ fully-featured, **env-driven** `app` — nothing is silently dropped.
 
 Agents mount at **`/api/v1/{{agent_name}}/invoke`** (no `/agents/` segment).
 
+!!! note "`query` on the wire, `current_query` in state"
+
+    The REST body field is **`query`** (`{{"query": "..."}}`); posting
+    `current_query` returns 422. The framework normalises it, so the dict your
+    `input_to_state` receives has **`current_query`** — which is why the example
+    above reads `data.get("current_query", "")`. `/chat` uses `content` instead.
+
 ### Deploy profiles
 
 - **full** (default): everything on — REST API, Swagger, Studio UI, health,
@@ -177,6 +184,10 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` | Rate limiting |
 | `AGENTOMATIC_LOGS_HISTORY` | Persist per-agent invoke/chat/stream history (default off) |
 | `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` | Enable LLM analysis over those logs (default off) |
+| `AGENTOMATIC_INGESTION_ROOT` | Confine ingestion source/output paths to this dir (default: cwd) |
+| `AGENTOMATIC_DEBUG_ERRORS` | Return raw exception text in API errors (default off — dev only) |
+| `AGENTOMATIC_OTEL_CONSOLE` | Print OpenTelemetry spans to stdout (default off) |
+| `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS` | Honour X-Forwarded-For for rate-limit keys (default off) |
 | `AGENTOMATIC_TITLE` | Platform title |
 | `AGENTOMATIC_STACK` | Active stack name |
 | `AGENTOMATIC_AGENTS` | Comma-separated allow-list scoping agent discovery |

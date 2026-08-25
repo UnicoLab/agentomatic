@@ -986,6 +986,26 @@ steps:
         pipelines = PipelineLoader.discover_pipelines(tmp_path)
         assert "research" in pipelines
 
+    def test_discover_pipelines_in_a_per_pipeline_folder(self, tmp_path):
+        """``pipelines/<name>/pipeline.yaml`` is what the CLI scaffolds.
+
+        ``agentomatic init NAME --template pipeline`` writes the YAML into its
+        own folder next to ``dataset.jsonl``, ``eval.py`` and a ``Makefile``.
+        Discovery only scanned flat ``pipelines/*.yaml``, so a freshly
+        scaffolded pipeline was invisible: ``agentomatic pipeline list``
+        reported none and the Pipelines API mounted empty.
+        """
+        from agentomatic.pipelines.loader import PipelineLoader
+
+        folder = tmp_path / "pipelines" / "estimation"
+        folder.mkdir(parents=True)
+        (folder / "pipeline.yaml").write_text("name: estimation\nsteps:\n  - agent: estimator\n")
+        (folder / "dataset.jsonl").write_text("{}\n")
+
+        assert "estimation" in PipelineLoader.discover_pipelines(tmp_path)
+        # Also when the pipelines/ folder itself is what gets passed.
+        assert "estimation" in PipelineLoader.discover_pipelines(tmp_path / "pipelines")
+
     def test_discover_pipelines_flat_pipelines_dir(self, tmp_path):
         """When callers pass pipelines/ itself, flat *.yaml must load."""
         from agentomatic.pipelines.loader import PipelineLoader

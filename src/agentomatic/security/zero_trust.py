@@ -88,13 +88,35 @@ class ZeroTrustEnforcer:
         raw_claims = getattr(request.state, "jwt_claims", None)
         claims: dict[str, Any] = raw_claims if isinstance(raw_claims, dict) else {}
 
-        if auth_required and not claims:
+        # An API key is a valid way to authenticate — the API-key middleware
+        # runs first and marks the request. It carries no roles or scopes,
+        # though, so an agent policy that restricts either cannot be evaluated
+        # for such a caller and must fail closed rather than silently pass.
+        api_key_authenticated = bool(getattr(request.state, "api_key_authenticated", False))
+
+        if auth_required and not claims and not api_key_authenticated:
             self.audit_log(
                 "request_denied",
                 agent_name,
                 {"reason": "authentication_required"},
             )
             return False, "Authentication is required but no valid JWT claims found"
+
+        if (
+            api_key_authenticated
+            and not claims
+            and (policy.allowed_roles or policy.allowed_scopes)
+        ):
+            self.audit_log(
+                "request_denied",
+                agent_name,
+                {"reason": "api_key_cannot_satisfy_role_or_scope_policy"},
+            )
+            return False, (
+                f"Agent '{agent_name}' restricts roles/scopes, which an API key "
+                "cannot carry — authenticate with a JWT that has the required "
+                "claims."
+            )
 
         # Prefer middleware-normalized lists; fall back to claim extraction so
         # Keycloak-style realm_access / scope strings are honoured.

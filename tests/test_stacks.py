@@ -172,9 +172,7 @@ class TestStackManagerLoad:
         assert stack.llm["default"].provider == "ollama"
         assert stack.llm["default"].temperature == 0.2
 
-    def test_load_missing_file_falls_back_to_builtin(
-        self, tmp_path: Path
-    ) -> None:
+    def test_load_missing_file_falls_back_to_builtin(self, tmp_path: Path) -> None:
         mgr = StackManager(stacks_dir=tmp_path)
         stack = mgr.load("local")
         assert stack.name == "local"

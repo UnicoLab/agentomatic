@@ -598,7 +598,11 @@ class FewShotBootstrapOptimizer(BaseFitterOptimizer):
         usable = [
             r for r in scored if r.get("query") and r.get("response") and r.get("score", 0.0) > 0
         ]
-        if len(usable) < self.k_examples:
+        # ``k_examples`` can be 0 (e.g. caller passes min(4, len(eval_results))
+        # with an empty eval_results) — guard on it explicitly, since
+        # ``len(usable) < 0`` never fires and would otherwise fall through to
+        # a ZeroDivisionError below when averaging an empty subset.
+        if self.k_examples <= 0 or len(usable) < self.k_examples:
             logger.warning(
                 "FewShotBootstrapOptimizer: only {} usable results, need {} — skipping",
                 len(usable),

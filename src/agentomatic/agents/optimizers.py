@@ -380,16 +380,13 @@ class PromptFitterBridge:
 
         effective_space = overrides.get("search_space") or kwargs.get("search_space") or _Space()
         baseline_model_params: dict[str, Any] = {}
-        if (
-            isinstance(compiled_cfg, dict)
-            and getattr(effective_space, "optimize_model_params", False)
+        if isinstance(compiled_cfg, dict) and getattr(
+            effective_space, "optimize_model_params", False
         ):
             param_keys = set(getattr(effective_space, "model_param_space", {}) or {})
             param_keys.add("temperature")
             baseline_model_params = {
-                k: v
-                for k, v in compiled_cfg.items()
-                if k in param_keys and v is not None
+                k: v for k, v in compiled_cfg.items() if k in param_keys and v is not None
             }
         # Same compounding for few-shot examples accepted by an earlier epoch.
         baseline_few_shot: list[dict[str, Any]] = []

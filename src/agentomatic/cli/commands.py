@@ -29,6 +29,7 @@ import click
 from loguru import logger
 
 from agentomatic.cli.agent_guide import WRITE_TARGETS as _AGENT_GUIDE_TARGETS
+from agentomatic.cli.templates import TEMPLATES
 
 # Graceful Rich fallback
 try:
@@ -199,25 +200,10 @@ _TEMPLATE_DEFAULT_DIRS: dict[str, str] = {
 @click.option(
     "--template",
     "-t",
-    type=click.Choice(
-        [
-            "basic",
-            "class",  # alias for basic (class-owned BaseGraphAgent)
-            "full",
-            "coordinator",
-            "pipeline",
-            "rag",
-            "chatbot",
-            "deepagent",
-            "custom",
-            "legacy_dict",
-            "plugin",
-            "endpoint",
-            "connection",
-            "ingestion",
-            "extraction",
-        ]
-    ),
+    # Derived from the template registry so the CLI can never drift out of
+    # sync with it (a hardcoded list previously omitted "langchain", making
+    # a shipped template unreachable from the CLI).
+    type=click.Choice(list(TEMPLATES)),
     default=None,
     help="Template to use (default: interactive selection)",
 )
@@ -254,7 +240,11 @@ def init(
             name = "agentomatic-app"
         from .project import scaffold_project
 
-        dest = Path(target_dir) if target_dir else Path(name)
+        # ``--dir`` is documented as the *parent* directory, and that is how
+        # it behaves for agents (``init foo --dir x`` → ``x/foo``). Treating it
+        # as the project directory itself scattered the project's 15 files
+        # straight into a directory the user only meant to scaffold *inside*.
+        dest = Path(target_dir) / name if target_dir else Path(name)
         result = scaffold_project(dest, name, force=force)
         click.echo()
         logger.success(f"Created project '{name}'")
@@ -399,6 +389,19 @@ def init(
             f"  1. Edit [yellow]{target / edit_file}[/yellow]\n"
             f"  2. Prefer: [cyan]agentomatic add connection {name}[/cyan] "
             f"to attach to an existing agent without overwrite\n\n"
+        )
+    elif template == "deepagent":
+        # This template imports a third-party package that agentomatic does
+        # not depend on. Without it the agent scaffolds and registers fine but
+        # every invocation fails, so say so here rather than at the first 500.
+        steps = (
+            f"[bold]Next steps:[/bold]\n\n"
+            f"  1. [cyan]pip install deepagents[/cyan] "
+            f"[yellow](required — this template imports it)[/yellow]\n"
+            f"  2. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  3. Review [yellow]{target / '__init__.py'}[/yellow] "
+            f"(AgentManifest / card)\n"
+            f"  4. [cyan]agentomatic run --studio[/cyan]\n\n"
         )
     else:
         steps = (
@@ -638,8 +641,33 @@ def run(
             log_level=log_level,
             require_auth_globally=require_auth_globally,
         )
+        # ``uvicorn.run("main:app")`` resolves the import string against
+        # ``sys.path``. When agentomatic is launched as a console script
+        # (``uv run agentomatic run``, or any pipx/venv install), the project
+        # directory is NOT on sys.path — only the interpreter's script dir is
+        # — so importing ``main`` fails. Put the project dir on the path
+        # explicitly, and export it via PYTHONPATH so uvicorn's --reload
+        # subprocess inherits it too.
+        project_dir = str(Path.cwd())
+        if project_dir not in sys.path:
+            sys.path.insert(0, project_dir)
+        existing_pythonpath = os.environ.get("PYTHONPATH", "")
+        if project_dir not in existing_pythonpath.split(os.pathsep):
+            os.environ["PYTHONPATH"] = (
+                f"{project_dir}{os.pathsep}{existing_pythonpath}"
+                if existing_pythonpath
+                else project_dir
+            )
         logger.info("Found main.py — starting via uvicorn main:app ...")
-        uvicorn.run("main:app", **run_kwargs)
+        # The scaffolded main.py enables the platform's LoggingMiddleware, which
+        # already logs every request with a correlation id; uvicorn's access log
+        # would duplicate each line. Set AGENTOMATIC_UVICORN_ACCESS_LOG=1 to
+        # keep uvicorn's own access log as well.
+        run_kwargs.setdefault(
+            "access_log",
+            _env_bool("AGENTOMATIC_UVICORN_ACCESS_LOG", False),
+        )
+        uvicorn.run("main:app", app_dir=project_dir, **run_kwargs)
         return
 
     logger.info(f"Starting platform from {agents_dir} (plugins: {plugins_dir})...")
@@ -1391,7 +1419,8 @@ def doctor(agents_dir: str) -> None:
             ver = getattr(mod, "__version__", "installed")
             checks.append((f"{pkg} [{extra}]", True, ver))
         except ImportError:
-            checks.append((f"{pkg} [{extra}]", False, f"pip install agentomatic[{extra}]"))
+            # Quote the extra — unquoted brackets are glob syntax in zsh/bash.
+            checks.append((f"{pkg} [{extra}]", False, f'pip install "agentomatic[{extra}]"'))
 
     # Agents directory
     agents_path = Path(agents_dir)
@@ -2023,8 +2052,22 @@ def stack_list(stacks_dir: str) -> None:
 @stack.command("show")
 @click.argument("name")
 @click.option("--dir", "-d", "stacks_dir", default="stacks", help="Stacks directory")
-def stack_show(name: str, stacks_dir: str) -> None:
-    """Show the contents of a stack configuration."""
+@click.option(
+    "--reveal",
+    is_flag=True,
+    help="Show secret values in clear text (default: redacted).",
+)
+def stack_show(name: str, stacks_dir: str, reveal: bool) -> None:
+    """Show the contents of a stack configuration.
+
+    Secret-looking values (api keys, passwords, tokens, and credentials
+    embedded in URLs) are redacted by default, because this output lands in
+    terminal scrollback, CI logs, and screen shares. ``${ENV_VAR}`` references
+    are always shown as-is — they are indirections, not secrets. Pass
+    ``--reveal`` to print the file verbatim.
+    """
+    from agentomatic.stacks.redaction import redact_yaml_text
+
     stacks_path = Path(stacks_dir)
     stack_file = stacks_path / f"{name}.yaml"
     if not stack_file.exists():
@@ -2035,6 +2078,10 @@ def stack_show(name: str, stacks_dir: str) -> None:
         return
 
     content = stack_file.read_text()
+    if not reveal:
+        content, redactions = redact_yaml_text(content)
+        if redactions:
+            logger.info(f"🔒 {redactions} secret value(s) redacted — use --reveal to show them")
     if HAS_RICH:
         from rich.syntax import Syntax
 

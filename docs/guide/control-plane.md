@@ -90,6 +90,28 @@ flowchart LR
 - A disabled agent → only that agent's routes return `503`.
 - The control plane itself remains reachable so you can turn things back on.
 
+!!! warning "Control-plane state is per-process and does not survive a restart"
+
+    `maintenance_mode` and the set of disabled agents live in memory for the
+    lifetime of the process. They are **not** persisted, so any restart — a
+    redeploy, a crash-restart, a rolling update, or scaling to a new replica —
+    resets them to "maintenance off, nothing disabled".
+
+    Two consequences worth planning around in production:
+
+    - An agent you drained comes back **live** after a deploy. If a drain has
+      to outlast a restart, enforce it upstream (load balancer, ingress rule,
+      or by removing the agent from `AGENTOMATIC_AGENTS`) rather than relying
+      on the control plane alone.
+    - With more than one replica, a control call only affects the **replica
+      that served it**. Route control requests to every replica, or treat the
+      control plane as a per-instance debugging tool rather than a
+      fleet-wide switch.
+
+    Both toggles are enforced on the hot request path (not merely reported),
+    and an agent mounted under both its folder name and its manifest slug is
+    disabled under both aliases.
+
 ## Typical rollout flow
 
 1. Enable maintenance mode before a risky migration.
