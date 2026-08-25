@@ -641,8 +641,16 @@ class Verifier:
         self.check(g, "DELETE thread", "DELETE", f"{base}/threads/{tid}")
 
     def verify_a2a(self) -> None:
-        """Agent-to-Agent task protocol."""
+        """Agent-to-Agent discovery card and task protocol."""
         g = "a2a"
+        # The well-known card is how a peer agent discovers this platform.
+        self.check(
+            g,
+            "GET /.well-known/agent.json",
+            "GET",
+            "/.well-known/agent.json",
+            validate=lambda p: "" if isinstance(p, dict) and p else "empty card",
+        )
         base = f"/api/v1/{self.agent}/a2a"
         task = self.check(
             g,
@@ -741,6 +749,22 @@ class Verifier:
             return
         self.check(g, "GET ingestor info", "GET", f"/api/v1/ingestion/{i}/info")
         self.check(g, "GET ingestor health", "GET", f"/api/v1/ingestion/{i}/health")
+
+        def _run(p: Any) -> str:
+            if not isinstance(p, dict):
+                return "not an object"
+            if p.get("status") not in ("succeeded", "success", "completed", "partial"):
+                return f"status={p.get('status')!r} errors={p.get('errors')!r}"
+            return ""
+
+        self.check(
+            g,
+            "POST ingestor run",
+            "POST",
+            f"/api/v1/ingestion/{i}/run",
+            json_body={"source": "inline://e2e verification document"},
+            validate=_run,
+        )
 
     def verify_pipelines(self) -> None:
         """Pipeline discovery, validation, visualisation and execution."""
@@ -969,6 +993,66 @@ class Verifier:
             "" if ok else f"→ {getattr(resp, 'status_code', 'transport error')}",
         )
 
+    def verify_logs_history(self) -> None:
+        """Per-agent invocation history, when the deployment records it."""
+        g = "logs-history"
+        base = f"/api/v1/{self.agent}"
+        resp = self._req("GET", f"{base}/logs?limit=5")
+        if resp is None:
+            self.report.add(g, "GET logs", False, "transport error")
+            return
+        if resp.status_code == 400:
+            self.report.skip(g, "logs history", "disabled (AGENTOMATIC_LOGS_HISTORY=0)")
+            return
+
+        def _logs(p: Any) -> str:
+            entries = p.get("logs") if isinstance(p, dict) else p
+            return "" if isinstance(entries, list) else f"no logs list: {p!r}"
+
+        payload = self.check(g, "GET logs", "GET", f"{base}/logs?limit=5", validate=_logs)
+        entries = (payload or {}).get("logs") if isinstance(payload, dict) else None
+        # This deployment has served traffic already, so history must be non-empty.
+        ok = bool(entries)
+        self.report.add(
+            g, "history records invocations", ok, "" if ok else "no entries after traffic"
+        )
+        if entries:
+            log_id = entries[0].get("id")
+            if log_id:
+                self.check(g, "GET log by id", "GET", f"{base}/logs/{log_id}")
+
+        # LLM analysis over those logs is opt-in and must say so when off.
+        resp = self._req("GET", f"{base}/logs/analysis")
+        if resp is not None and resp.status_code == 400:
+            body = resp.text.lower()
+            ok = "allow_logsllm_analysis" in body or "disabled" in body
+            self.report.add(
+                g,
+                "log analysis refuses clearly when disabled",
+                ok,
+                "" if ok else f"unhelpful 400 body: {resp.text[:160]}",
+            )
+        else:
+            self.check(g, "GET log analysis", "GET", f"{base}/logs/analysis")
+
+    def verify_optimize(self) -> None:
+        """The optimize-aware invoke path."""
+        g = "optimize"
+        self.check(
+            g,
+            "POST optimize/invoke",
+            "POST",
+            f"/api/v1/{self.agent}/optimize/invoke",
+            json_body={"query": "optimize e2e"},
+        )
+        self.check(
+            g,
+            "GET optimization-runs",
+            "GET",
+            f"/api/v1/{self.agent}/optimization-runs",
+            expect=(200, 400),
+        )
+
     def verify_rate_limit(self) -> None:
         """Rate limiting, when the deployment enables it.
 
@@ -1026,6 +1110,8 @@ class Verifier:
         self.verify_ingestion()
         self.verify_pipelines()
         self.verify_tasks()
+        self.verify_logs_history()
+        self.verify_optimize()
         self.verify_metrics()
         self.verify_rate_limit()
         self.verify_auth()

@@ -140,6 +140,14 @@ class SQLAlchemyStore(BaseStore):
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.close()
 
+        # ``expire_on_commit=False`` keeps every attribute loaded after a
+        # commit. Combined with the Python-side column defaults in
+        # ``storage.models`` (there are no server defaults), a committed row is
+        # already complete — so the write paths below deliberately do *not*
+        # call ``session.refresh()``. Doing so issued a second round trip per
+        # write purely to re-read values the object already held, which on a
+        # networked Postgres roughly doubled the latency of every logged
+        # invocation.
         self._session_factory = async_sessionmaker(
             self._engine,
             expire_on_commit=False,
@@ -221,7 +229,6 @@ class SQLAlchemyStore(BaseStore):
             )
             session.add(thread)
             await session.commit()
-            await session.refresh(thread)
             return thread.to_dict()
 
     async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
@@ -283,7 +290,6 @@ class SQLAlchemyStore(BaseStore):
                     setattr(thread, key, val)
             thread.updated_at = datetime.now(UTC)
             await session.commit()
-            await session.refresh(thread)
             return thread.to_dict()
 
     # ------------------------------------------------------------------
@@ -314,7 +320,6 @@ class SQLAlchemyStore(BaseStore):
                 thread.message_count += 1
                 thread.updated_at = datetime.now(UTC)
             await session.commit()
-            await session.refresh(msg)
             return msg.to_dict()
 
     async def get_messages(
@@ -364,7 +369,6 @@ class SQLAlchemyStore(BaseStore):
             )
             session.add(fb)
             await session.commit()
-            await session.refresh(fb)
             return fb.to_dict()
 
     async def get_feedback(
@@ -425,7 +429,6 @@ class SQLAlchemyStore(BaseStore):
             )
             session.add(suspended)
             await session.commit()
-            await session.refresh(suspended)
             return suspended.to_dict()
 
     async def get_suspended_state(self, approval_id: str) -> dict[str, Any] | None:
@@ -546,7 +549,6 @@ class SQLAlchemyStore(BaseStore):
 
             forked_thread.message_count = forked_count
             await session.commit()
-            await session.refresh(forked_thread)
             return forked_thread.to_dict()
 
     async def get_thread_lineage(self, thread_id: str) -> dict[str, Any]:
@@ -730,7 +732,6 @@ class SQLAlchemyStore(BaseStore):
             row = AgentInvocationLogModel(**kwargs)
             session.add(row)
             await session.commit()
-            await session.refresh(row)
             return row.to_dict()
 
     async def get_invocation_log(self, log_id: str) -> dict[str, Any] | None:
@@ -844,7 +845,6 @@ class SQLAlchemyStore(BaseStore):
             row = LogAnalysisModel(**kwargs)
             session.add(row)
             await session.commit()
-            await session.refresh(row)
             return row.to_dict()
 
     async def get_latest_log_analysis(
@@ -921,7 +921,6 @@ class SQLAlchemyStore(BaseStore):
             row = OptimizationRunModel(**kwargs)
             session.add(row)
             await session.commit()
-            await session.refresh(row)
             return row.to_dict()
 
     async def get_optimization_run(self, run_id: str) -> dict[str, Any] | None:

@@ -18,6 +18,29 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
+def iso_utc(value: datetime | None) -> str | None:
+    """Render a stored timestamp as an unambiguous UTC ISO-8601 string.
+
+    Every timestamp in this schema is written as UTC (``datetime.now(UTC)``),
+    but not every backend hands it back that way: ``DateTime(timezone=True)``
+    is a no-op on SQLite, so a value read from there comes back naive while
+    the same value from Postgres carries ``+00:00``. Emitting the raw
+    ``isoformat()`` therefore made the API's timestamp format depend on which
+    database was configured, leaving clients to guess a naive string's zone.
+
+    Args:
+        value: A stored datetime, naive (assumed UTC) or aware.
+
+    Returns:
+        An ISO-8601 string with an explicit offset, or ``None``.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat()
+
+
 class Base(DeclarativeBase):
     """SQLAlchemy declarative base."""
 
@@ -64,8 +87,8 @@ class ThreadModel(Base):
             "agent_name": self.agent_name,
             "title": self.title,
             "metadata": self.metadata_json or {},
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": iso_utc(self.created_at),
+            "updated_at": iso_utc(self.updated_at),
             "message_count": self.message_count,
             "parent_thread_id": self.parent_thread_id,
             "fork_message_index": self.fork_message_index,
@@ -97,7 +120,7 @@ class MessageModel(Base):
             "role": self.role,
             "content": self.content,
             "metadata": self.metadata_json or {},
-            "timestamp": self.created_at.isoformat() if self.created_at else None,
+            "timestamp": iso_utc(self.created_at),
         }
 
 
@@ -132,7 +155,7 @@ class FeedbackModel(Base):
             "rating": self.rating,
             "comment": self.comment,
             "feedback_type": self.feedback_type,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
 
@@ -165,8 +188,8 @@ class SuspendedStateModel(Base):
             "agent_name": self.agent_name,
             "node_name": self.node_name,
             "state_snapshot": self.state_json,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "created_at": iso_utc(self.created_at),
+            "expires_at": iso_utc(self.expires_at),
         }
 
 
@@ -200,7 +223,7 @@ class CheckpointModel(Base):
             "parent_checkpoint_id": self.parent_checkpoint_id,
             "checkpoint": self.checkpoint_json,
             "metadata": self.metadata_json,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
 
@@ -247,7 +270,7 @@ class AgentInvocationLogModel(Base):
             "agent_name": self.agent_name,  # BC alias
             "thread_id": self.thread_id,
             "run_id": self.run_id,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "timestamp": iso_utc(self.timestamp),
             "endpoint": self.endpoint,
             "input": self.input_json or {},
             "output": self.output_json or {},
@@ -297,7 +320,7 @@ class LogAnalysisModel(Base):
             "status": self.status,
             "recommendations": self.recommendations or [],
             "metadata": self.metadata_json or {},
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
 
@@ -338,5 +361,5 @@ class OptimizationRunModel(Base):
             "learnings": self.learnings or [],
             "artefacts": self.artefacts or {},
             "metadata": self.metadata_json or {},
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
