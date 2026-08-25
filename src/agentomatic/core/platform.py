@@ -840,7 +840,11 @@ class AgentPlatform:
 
     async def _auto_derive_store_from_connections(self) -> None:
         """Populate ``self._store`` from the first MEMORY connection, if any."""
-        from agentomatic.connections.manager import PLATFORM_SCOPE, all_managers
+        from agentomatic.connections.manager import (
+            PLATFORM_SCOPE,
+            _unconfigured_reason,
+            all_managers,
+        )
         from agentomatic.connections.models import ConnectionPurpose
         from agentomatic.connections.stores import create_store_from_connection
 
@@ -852,6 +856,18 @@ class AgentPlatform:
                 continue
             candidate = manager.first_for_purpose(ConnectionPurpose.MEMORY)
             if candidate is None:
+                continue
+            # A connection built from unset ${ENV} placeholders is not a
+            # broken store, it is an absent one — the scaffolded
+            # connections.py ships a MEMORY example. Say which variable would
+            # enable it instead of surfacing whatever the driver made of an
+            # empty URL.
+            reason = _unconfigured_reason(getattr(candidate, "config", None))
+            if reason:
+                logger.info(
+                    f"Connection '{getattr(candidate, 'name', '?')}' in scope "
+                    f"'{scope}' is not configured ({reason}) — not using it as a store."
+                )
                 continue
             try:
                 self._store = await create_store_from_connection(candidate)

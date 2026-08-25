@@ -126,3 +126,51 @@ class TestManagerSkipsUnconfigured:
 
         assert manager.database("main") is not None
         await manager.close()
+
+
+class TestHealthDistinguishesAbsentFromBroken:
+    """An operator acts differently on "down" than on "never switched on".
+
+    Regression: an unconfigured connection reported ``unhealthy`` with
+    whatever the driver made of an empty URL — in the control plane that reads
+    as a backend outage, when nothing is wrong and no variable was ever set.
+    """
+
+    @pytest.mark.asyncio
+    async def test_unconfigured_reports_not_configured(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AG_ABSENT_URL", raising=False)
+        manager = ConnectionManager("scope")
+        manager.add(DatabaseConnectionConfig(name="absent", url="${AG_ABSENT_URL}"))
+
+        health = await manager.health_check()
+
+        assert health["absent"]["status"] == "not_configured"
+        assert "AG_ABSENT_URL" in health["absent"]["detail"]
+
+    @pytest.mark.asyncio
+    async def test_unconfigured_still_reports_its_kind(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AG_ABSENT_URL", raising=False)
+        manager = ConnectionManager("scope")
+        manager.add(DatabaseConnectionConfig(name="absent", url="${AG_ABSENT_URL}"))
+
+        health = await manager.health_check()
+
+        assert "database" in health["absent"]["kind"]
+
+    @pytest.mark.asyncio
+    async def test_a_configured_connection_reports_healthy(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        monkeypatch.setenv("AG_REAL_URL", f"sqlite+aiosqlite:///{tmp_path / 'h.db'}")
+        manager = ConnectionManager("scope")
+        manager.add(DatabaseConnectionConfig(name="real", url="${AG_REAL_URL}"))
+        await manager.initialize()
+
+        health = await manager.health_check()
+
+        assert health["real"]["status"] == "healthy"
+        await manager.close()

@@ -101,9 +101,7 @@ class TestDiscoveredPipelinesAreComposable:
 
     def test_a_sub_pipeline_step_runs(self, tmp_path) -> None:
         with TestClient(_platform(tmp_path, INNER, OUTER).build()) as client:
-            resp = client.post(
-                "/api/v1/pipelines/outer_flow/run", json={"input": {"query": "hi"}}
-            )
+            resp = client.post("/api/v1/pipelines/outer_flow/run", json={"input": {"query": "hi"}})
 
             assert resp.status_code == 200, resp.text
             body = resp.json()
@@ -113,9 +111,7 @@ class TestDiscoveredPipelinesAreComposable:
     def test_the_inner_pipeline_still_serves_its_own_route(self, tmp_path) -> None:
         """Being usable as a sub-pipeline must not remove it from the API."""
         with TestClient(_platform(tmp_path, INNER, OUTER).build()) as client:
-            resp = client.post(
-                "/api/v1/pipelines/inner_flow/run", json={"input": {"query": "hi"}}
-            )
+            resp = client.post("/api/v1/pipelines/inner_flow/run", json={"input": {"query": "hi"}})
 
             assert resp.status_code == 200
             assert resp.json()["status"] == "success"

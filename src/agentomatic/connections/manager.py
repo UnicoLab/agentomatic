@@ -311,9 +311,26 @@ class ConnectionManager:
                 logger.error(f"Failed to initialize connection '{name}': {exc}")
 
     async def health_check(self) -> dict[str, Any]:
-        """Aggregate health across all connections."""
+        """Aggregate health across all connections.
+
+        A connection whose target is nothing but unset ``${ENV}`` placeholders
+        reports ``not_configured``, not ``unhealthy``. The distinction is what
+        an operator acts on: unhealthy means a backend this deployment depends
+        on is down; not configured means a feature was never switched on, and
+        the message names the variable that would switch it on.
+        """
         results: dict[str, Any] = {}
         for name, conn in self._connections.items():
+            config = getattr(conn, "config", None)
+            reason = _unconfigured_reason(config)
+            if reason:
+                results[name] = {
+                    "connection": name,
+                    "kind": str(getattr(config, "kind", "unknown")),
+                    "status": "not_configured",
+                    "detail": reason,
+                }
+                continue
             try:
                 results[name] = await conn.health_check()
             except Exception as exc:  # noqa: BLE001
