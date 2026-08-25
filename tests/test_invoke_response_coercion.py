@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from agentomatic.core.router_factory import AgentInvokeResponse, coerce_agent_invoke_payload
 
 
@@ -47,6 +49,7 @@ def test_coerce_state_to_output_with_raw_langchain_messages() -> None:
     objects, the pattern shown in TODO.md's LangGraph example) must not crash the
     REST response — messages become plain role/content dicts.
     """
+    pytest.importorskip("langchain_core")
     from langchain_core.messages import AIMessage, HumanMessage
 
     result = {

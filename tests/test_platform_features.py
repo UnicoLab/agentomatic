@@ -9,7 +9,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
+
+pytest.importorskip("sqlalchemy")
+
+from fastapi.testclient import TestClient  # noqa: E402
 from pydantic import BaseModel, Field
 
 from agentomatic import AgentManifest, AgentPlatform

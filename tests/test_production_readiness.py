@@ -426,6 +426,7 @@ async def test_sqlalchemy_store_initialize_is_idempotent(tmp_path) -> None:
     one derived from DATABASE_URL, and a post-connection pass). Re-running the
     DDL each time is wasted round trips and duplicate log lines.
     """
+    pytest.importorskip("sqlalchemy")
     from loguru import logger
 
     from agentomatic.storage.sqlalchemy import SQLAlchemyStore

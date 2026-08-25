@@ -416,6 +416,7 @@ async def test_studio_state_and_history_decode_stored_checkpoints() -> None:
     ``{__agentomatic_serde_type__, __agentomatic_serde_data__}`` blob instead
     of the actual state.
     """
+    pytest.importorskip("langchain_core")
     from types import SimpleNamespace
 
     from langchain_core.messages import AIMessage, HumanMessage
@@ -673,6 +674,7 @@ class TestJwtConfigFromEnvironmentAndStack:
 
     def test_global_auth_lock_boots_on_a_jwks_url_alone(self, tmp_path, monkeypatch):
         """No API key needed — remedy (a) from the lock's own error message."""
+        pytest.importorskip("jwt")
         from fastapi.testclient import TestClient
 
         monkeypatch.setenv("AUTH__JWKS_URL", "https://idp.test/jwks.json")

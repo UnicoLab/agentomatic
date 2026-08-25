@@ -358,6 +358,7 @@ async def test_database_connection_concurrent_initialize_builds_one_engine(monke
     """Regression: two concurrent first-callers to session()/initialize()
     must not each build (and leak) their own engine/pool.
     """
+    pytest.importorskip("sqlalchemy")
     import sqlalchemy.ext.asyncio as sa_asyncio
 
     build_count = 0

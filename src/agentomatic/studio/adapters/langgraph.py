@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from agentomatic.storage.checkpointer import decode_from_storage
 from agentomatic.studio.adapter import StudioAdapter
 from agentomatic.studio.models import (
     StudioCheckpoint,
@@ -32,6 +31,19 @@ if TYPE_CHECKING:
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _decode_from_storage(payload: Any) -> Any:
+    """Decode a stored checkpoint payload.
+
+    Imported lazily: :mod:`agentomatic.storage.checkpointer` pulls in
+    ``langchain_core`` and ``langgraph``, which are optional extras. Keeping
+    the import inside the call lets this adapter module stay importable on a
+    core-only install, where Studio simply has no LangGraph graph to inspect.
+    """
+    from agentomatic.storage.checkpointer import decode_from_storage
+
+    return decode_from_storage(payload)
 
 
 class LangGraphAdapter(StudioAdapter):
@@ -251,7 +263,7 @@ class LangGraphAdapter(StudioAdapter):
                     # Checkpoints are stored through LangGraph's serde (so
                     # BaseMessage objects survive), which means the raw row
                     # holds an encoded wrapper — decode before displaying it.
-                    state_data = decode_from_storage(latest.get("checkpoint", {}))
+                    state_data = _decode_from_storage(latest.get("checkpoint", {}))
                     checkpoint_id = latest.get("checkpoint_id")
             except Exception as exc:
                 logger.warning(f"Store fallback get_state failed: {exc}")
@@ -306,8 +318,8 @@ class LangGraphAdapter(StudioAdapter):
                             id=cp.get("checkpoint_id", f"cp_{idx}"),
                             thread_id=thread_id,
                             step=idx,
-                            state=decode_from_storage(cp.get("checkpoint", {})),
-                            metadata=decode_from_storage(cp.get("metadata", {})),
+                            state=_decode_from_storage(cp.get("checkpoint", {})),
+                            metadata=_decode_from_storage(cp.get("metadata", {})),
                             parent_id=cp.get("parent_checkpoint_id"),
                             timestamp=cp.get("timestamp", _now_iso()),
                         )

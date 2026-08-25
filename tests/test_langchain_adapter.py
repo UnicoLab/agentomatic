@@ -278,6 +278,7 @@ def test_dict_to_messages_accepts_list() -> None:
 
 def test_dict_to_lc_system_role_becomes_system_message() -> None:
     """A 'system' role dict must round-trip to a real SystemMessage, not HumanMessage."""
+    pytest.importorskip("langchain_core")
     from langchain_core.messages import SystemMessage
 
     from agentomatic.langchain_adapter import dict_to_messages
@@ -294,6 +295,7 @@ def test_messages_to_dict_preserves_tool_call_fidelity() -> None:
     Without this, a ToolMessage response loses its tool_call_id and can no longer
     satisfy the OpenAI/Anthropic tool-call protocol on the next turn.
     """
+    pytest.importorskip("langchain_core")
     from langchain_core.messages import AIMessage, ToolMessage
 
     from agentomatic.langchain_adapter import messages_to_dict
@@ -314,6 +316,7 @@ def test_messages_to_dict_preserves_tool_call_fidelity() -> None:
 
 def test_dict_to_lc_round_trips_tool_call_id() -> None:
     """dict -> LangChain message -> dict must preserve tool_call_id (see BUG: dropped id)."""
+    pytest.importorskip("langchain_core")
     from agentomatic.langchain_adapter import dict_to_messages, messages_to_dict
 
     original = [{"role": "tool", "content": "42", "tool_call_id": "call_9", "name": "calc"}]
@@ -669,6 +672,7 @@ async def test_agent_adapter_streaming() -> None:
 
 
 def test_message_to_dict_preserves_tool_fields() -> None:
+    pytest.importorskip("langchain_core")
     from langchain_core.messages import AIMessage
 
     from agentomatic.langchain_adapter import message_to_dict
@@ -680,6 +684,7 @@ def test_message_to_dict_preserves_tool_fields() -> None:
 
 def test_to_jsonable_converts_nested_messages() -> None:
     """A class agent's raw ``state.messages`` (list[BaseMessage]) must become JSON-safe."""
+    pytest.importorskip("langchain_core")
     import json
 
     from langchain_core.messages import AIMessage, HumanMessage
@@ -696,6 +701,7 @@ def test_to_jsonable_converts_nested_messages() -> None:
 
 
 def test_json_default_handles_base_message() -> None:
+    pytest.importorskip("langchain_core")
     import json
 
     from langchain_core.messages import HumanMessage

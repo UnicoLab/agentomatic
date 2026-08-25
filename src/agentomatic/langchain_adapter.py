@@ -342,9 +342,10 @@ def to_jsonable(value: Any) -> Any:
     on the generic REST/Studio response path, so returning raw ``BaseMessage``
     objects (e.g. ``{"messages": state.messages}``) "just works".
     """
-    _base_message_cls: Any
     try:
-        from langchain_core.messages import BaseMessage as _base_message_cls
+        from langchain_core.messages import BaseMessage
+
+        _base_message_cls: Any = BaseMessage
     except ImportError:
         _base_message_cls = None
 
@@ -364,9 +365,10 @@ def json_default(obj: Any) -> Any:
     (instead of stringifying their ``repr()``) and falls back to ``str(obj)`` for
     anything else, matching the platform's previous ``default=str`` behaviour.
     """
-    _base_message_cls: Any
     try:
-        from langchain_core.messages import BaseMessage as _base_message_cls
+        from langchain_core.messages import BaseMessage
+
+        _base_message_cls: Any = BaseMessage
     except ImportError:
         _base_message_cls = None
 

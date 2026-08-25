@@ -75,6 +75,7 @@ async def test_agent_graph_astream_serializes_langchain_messages():
     The streamed event payloads must be safe to ``json.dumps`` (no BaseMessage
     objects left over) so SSE/Studio consumers don't crash or get stringified reprs.
     """
+    pytest.importorskip("langchain_core")
     import json
 
     from langchain_core.messages import AIMessage, HumanMessage

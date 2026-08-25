@@ -428,6 +428,7 @@ class TestTrainCliE2E:
 
 class TestLangChainAdapterE2E:
     def test_scaffold_langchain_agent_runs_with_message_history(self) -> None:
+        pytest.importorskip("langchain_core")
         from agentomatic.cli.templates import get_template_files
 
         files = get_template_files("langchain", "e2e_chat")

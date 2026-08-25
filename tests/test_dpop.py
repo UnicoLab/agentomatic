@@ -7,8 +7,11 @@ import time
 import uuid
 from typing import Any
 
-import jwt
 import pytest
+
+pytest.importorskip("jwt")
+
+import jwt  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from agentomatic.security.dpop import (

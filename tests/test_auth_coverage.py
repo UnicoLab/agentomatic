@@ -120,6 +120,7 @@ def test_api_key_auth_covers_every_route_except_the_reviewed_allowlist(tmp_path)
 
 def test_jwt_auth_covers_every_route_except_the_reviewed_allowlist(tmp_path) -> None:
     """The JWT middleware keeps its own skip list, so it needs its own sweep."""
+    pytest.importorskip("jwt")
     platform = _build_platform(
         tmp_path,
         enable_auth=False,

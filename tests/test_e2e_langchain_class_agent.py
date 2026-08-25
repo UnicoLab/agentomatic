@@ -24,7 +24,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from fastapi.testclient import TestClient
+
+pytest.importorskip("langchain_core")
+
+from fastapi.testclient import TestClient  # noqa: E402
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
