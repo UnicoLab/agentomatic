@@ -185,13 +185,51 @@ def _rewrite_prompt(user_prompt: str) -> str:
         gaps.append("- The output format is not stated explicitly.")
         return "\n".join(gaps)
 
-    if not keywords:
+    clauses: list[str] = []
+    if keywords:
+        required = ", ".join(f"'{k}'" for k in keywords[:4])
+        clauses.append(
+            f"Always include {required} in your answer, exactly as written, for every query."
+        )
+    # Judge feedback and improvement hints in the briefing say what the grader
+    # is actually rewarding. A rewrite model that ignored them would never
+    # climb a rubric-based metric, so act on the ones we recognise.
+    clauses.extend(_hinted_clauses(user_prompt))
+    if not clauses:
         return f"---\n{role}."
-    required = ", ".join(f"'{k}'" for k in keywords[:4])
-    improved = (
-        f"{role}. Always include {required} in your answer, exactly as written, for every query."
-    )
-    return f"---\n{improved}"
+    return "---\n" + " ".join([f"{role}.", *clauses])
+
+
+#: Instructions the responder honours, and the words a briefing uses to ask
+#: for them — in judge feedback, improvement hints, or the criteria itself.
+_HINT_CLAUSES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("json", "structured output"), "Always answer as a JSON object."),
+    (("source", "cite", "attribution"), "Always cite your source."),
+    (("confidence", "certainty"), "Always state your confidence."),
+    (("reasoning", "step by step", "step-by-step"), "Explain your reasoning step by step."),
+)
+
+
+def _hinted_clauses(briefing: str) -> list[str]:
+    """Return instructions the briefing's feedback is asking for.
+
+    Args:
+        briefing: The full rewrite prompt, including judge feedback and hints.
+
+    Returns:
+        Instruction sentences to fold into the improved prompt.
+    """
+    # Only read the parts of the briefing that describe what is *wanted*, so a
+    # token appearing in an agent's own output does not look like a request.
+    wanted = "\n".join(
+        line
+        for line in briefing.splitlines()
+        if any(
+            marker in line.lower()
+            for marker in ("hint", "feedback", "criteria", "judge", "what_failed", "missing")
+        )
+    ).lower()
+    return [clause for words, clause in _HINT_CLAUSES if any(w in wanted for w in words)]
 
 
 def _requested_dimensions(prompt: str) -> list[str]:
@@ -347,6 +385,11 @@ async def chat_completions(request: Request) -> JSONResponse:
     )
     user_prompt = "\n".join(str(m.get("content", "")) for m in messages if m.get("role") == "user")
 
+    # Many agents concatenate their system prompt into the user turn rather
+    # than sending a system role (``llm.invoke(f"{prompt}\n\nUser: {q}")`` is
+    # the shape the scaffolded templates use). A real model reads instructions
+    # wherever they appear, so directives are detected across both turns.
+    instructions = f"{system_prompt}\n{user_prompt}"
     literal = _literal_echo(user_prompt)
     echoed = _echo_requested_json(user_prompt)
     if literal is not None:
@@ -358,7 +401,7 @@ async def chat_completions(request: Request) -> JSONResponse:
     elif _is_rewrite_request(user_prompt) or _is_rewrite_request(system_prompt):
         content = _rewrite_prompt(user_prompt)
     else:
-        content = _answer(system_prompt, user_prompt)
+        content = _answer(instructions, user_prompt)
 
     wants_json = (body.get("response_format") or {}).get("type") == "json_object"
     if wants_json and not content.lstrip().startswith("{"):

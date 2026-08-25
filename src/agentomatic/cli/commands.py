@@ -1774,6 +1774,7 @@ def optimize(
     _run_fitter_optimize(
         agent=agent,
         dataset=dataset,
+        prompt=prompt,
         val_dataset=val_dataset,
         test_dataset=test_dataset,
         metric_names=[m.strip() for m in metrics.split(",") if m.strip()],
@@ -1860,6 +1861,7 @@ def _run_prompt_only_optimize(
 def _run_fitter_optimize(
     agent: str,
     dataset: str,
+    prompt: str | None,
     val_dataset: str | None,
     test_dataset: str | None,
     metric_names: list[str],
@@ -1960,6 +1962,12 @@ def _run_fitter_optimize(
         "api_base": host,
         "auto_report": not no_report,
     }
+    if prompt:
+        # --prompt is documented as "overrides prompts.json". It reached the
+        # legacy prompt_only path only, so every fitter mode silently
+        # optimized from the agent's own prompt instead — and reported a
+        # baseline score for a prompt the caller never asked for.
+        fitter_kwargs["baseline_system_prompt"] = prompt
     if n_runners is not None:
         fitter_kwargs["n_runners"] = n_runners
 
