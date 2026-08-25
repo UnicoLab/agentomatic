@@ -737,3 +737,103 @@ class TestRateLimitClientKey:
 
         # What uvicorn hands us after rewriting from X-Forwarded-For.
         assert mw._client_key(self._request(peer="9.9.9.9", forwarded="9.9.9.9")) == "9.9.9.9"
+
+
+class TestOperationalPathsAreNeverThrottled:
+    """Probe and scrape endpoints must survive the rate limiter.
+
+    Regression: ``_SKIP_PATHS`` exempted ``/healthz`` — a path the platform
+    never mounts — while ``/ready`` and ``/metrics``, which it does mount,
+    counted against the per-IP budget. Behind a NAT, ingress, or service mesh
+    the kubelet and Prometheus share one source IP with real traffic, so under
+    load the readiness probe flapped to 429 (restarting a healthy pod) and the
+    scrape blanked out exactly when the metrics were needed.
+    """
+
+    def _platform(self, tmp_path):
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        platform = AgentPlatform(
+            agents_dir=str(agents),
+            enable_rate_limit=True,
+            enable_metrics=True,
+        )
+        platform.register_agent(
+            AgentManifest(name="probe", slug="probe", description="probe agent"),
+            node_fn=lambda state: {"response": "ok"},
+        )
+        return platform
+
+    @pytest.mark.parametrize("path", ["/health", "/ready", "/readiness"])
+    def test_probe_paths_never_429(self, tmp_path, path):
+        """Far more probes than the 100/window budget must all succeed."""
+        with TestClient(self._platform(tmp_path).build()) as client:
+            codes = {client.get(path).status_code for _ in range(150)}
+
+            assert 429 not in codes, f"{path} was rate limited: {codes}"
+
+    def test_metrics_scrape_never_429(self, tmp_path):
+        """A scraper polling /metrics must not exhaust the caller's budget."""
+        with TestClient(self._platform(tmp_path).build()) as client:
+            codes = {client.get("/metrics").status_code for _ in range(150)}
+
+            assert 429 not in codes, f"/metrics was rate limited: {codes}"
+
+    def test_probes_do_not_consume_the_budget_for_real_traffic(self, tmp_path):
+        """Probe traffic must not push user requests over the limit."""
+        with TestClient(self._platform(tmp_path).build()) as client:
+            for _ in range(150):
+                client.get("/ready")
+
+            # The budget is untouched, so a normal call still goes through.
+            assert client.get("/api/v1/agents").status_code == 200
+
+    def test_user_traffic_is_still_limited(self, tmp_path):
+        """The exemption must not disable limiting for everything else."""
+        with TestClient(self._platform(tmp_path).build()) as client:
+            codes = {client.get("/api/v1/agents").status_code for _ in range(150)}
+
+            assert 429 in codes, "rate limiting stopped applying to user routes"
+
+    def test_probe_traffic_is_not_recorded_as_user_requests(self, tmp_path):
+        """Probes must stay out of the request metrics they would skew."""
+        from agentomatic.middleware.metrics import _SKIP_PATHS
+
+        for path in ("/health", "/ready", "/readiness", "/metrics"):
+            assert path in _SKIP_PATHS
+
+
+class TestMetricsSurviveRepeatedBuilds:
+    """Two platforms with metrics enabled must coexist in one process.
+
+    Regression: ``MetricsMiddleware.__init__`` registered its collectors into
+    the process-wide Prometheus registry, so the *second* ``build()`` raised
+    ``ValueError: Duplicated timeseries in CollectorRegistry``. Uvicorn
+    ``--reload``, embedding hosts that serve several platforms, and test
+    suites all build more than once per process.
+    """
+
+    def _platform(self, tmp_path, name: str):
+        agents = tmp_path / name
+        agents.mkdir()
+        platform = AgentPlatform(agents_dir=str(agents), enable_metrics=True)
+        platform.register_agent(
+            AgentManifest(name=name, slug=name, description=name),
+            node_fn=lambda state: {"response": "ok"},
+        )
+        return platform
+
+    def test_second_build_does_not_raise(self, tmp_path):
+        first = self._platform(tmp_path, "one").build()
+        second = self._platform(tmp_path, "two").build()
+
+        assert first is not second
+
+    def test_both_platforms_still_serve_metrics(self, tmp_path):
+        with TestClient(self._platform(tmp_path, "alpha").build()) as client:
+            client.get("/api/v1/agents")
+            assert b"agentomatic_http_requests" in client.get("/metrics").content
+
+        with TestClient(self._platform(tmp_path, "beta").build()) as client:
+            client.get("/api/v1/agents")
+            assert b"agentomatic_http_requests" in client.get("/metrics").content

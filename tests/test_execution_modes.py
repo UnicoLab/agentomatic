@@ -96,6 +96,33 @@ class TestAgentExecutionModes:
             assert isinstance(result, list)
             assert len(result) == 3
 
+    def test_batch_rejects_unknown_item_key(self, tmp_path):
+        """A misnamed item list must 422, not submit a zero-item batch.
+
+        Regression: ``{"items": [...]}`` used to bind to the ``inputs``
+        default of ``[]``, so the caller got ``202`` and a task that reported
+        ``succeeded`` after running nothing.
+        """
+        with TestClient(_platform(tmp_path).build()) as client:
+            resp = client.post(
+                "/api/v1/echo/invoke/batch",
+                json={"items": [{"query": "a"}, {"query": "b"}]},
+            )
+            assert resp.status_code == 422
+            assert "items" in resp.text
+
+    def test_batch_rejects_empty_inputs(self, tmp_path):
+        """An empty batch is always a caller mistake, so it must 422."""
+        with TestClient(_platform(tmp_path).build()) as client:
+            resp = client.post("/api/v1/echo/invoke/batch", json={"inputs": []})
+            assert resp.status_code == 422
+
+    def test_batch_requires_inputs(self, tmp_path):
+        """Omitting ``inputs`` entirely must 422 rather than run nothing."""
+        with TestClient(_platform(tmp_path).build()) as client:
+            resp = client.post("/api/v1/echo/invoke/batch", json={})
+            assert resp.status_code == 422
+
 
 # =====================================================================
 # Ingestors (batch is new via the shared helper)
