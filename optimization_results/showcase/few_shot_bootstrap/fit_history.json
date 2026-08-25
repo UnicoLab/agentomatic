@@ -1,0 +1,249 @@
+{
+  "params": {
+    "epochs": 10,
+    "optimizer": "PromptFitterBridge",
+    "metrics": [
+      "banana",
+      "strawberry",
+      "blueberry",
+      "kiwi",
+      "temp_ok",
+      "r1",
+      "r2",
+      "r3",
+      "quality",
+      "exact_key_match"
+    ],
+    "loss": "quality_loss",
+    "train_size": 10,
+    "val_size": 6,
+    "optimize": {
+      "search_space": {
+        "optimize_system_prompt": false,
+        "optimize_user_template": false,
+        "optimize_few_shot": true,
+        "optimize_model_params": false,
+        "optimize_rag_params": false,
+        "optimize_tool_params": false,
+        "optimize_model_choice": false,
+        "model_param_space": {
+          "temperature": [
+            0.0,
+            0.1,
+            0.2,
+            0.4,
+            0.7
+          ],
+          "top_p": [
+            0.7,
+            0.9,
+            1.0
+          ],
+          "max_tokens": [
+            800,
+            1200,
+            2000
+          ]
+        },
+        "rag_param_space": {},
+        "tool_param_space": {},
+        "model_choices": [],
+        "fallback_models": [],
+        "routing_weight_space": {},
+        "max_few_shot_examples": 5,
+        "few_shot_selection_strategy": "diversity_weighted",
+        "search_method": "random",
+        "optimize_nodes": [],
+        "node_match": null
+      },
+      "optimizer": "few_shot_bootstrap",
+      "max_trials": 6
+    }
+  },
+  "epoch": [
+    -1,
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "history": {
+    "banana": [
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "strawberry": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "blueberry": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "kiwi": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "temp_ok": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "r1": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "r2": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "r3": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "quality": [
+      0.0,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285
+    ],
+    "exact_key_match": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "loss": [
+      1.0,
+      0.857142857142857,
+      0.857142857142857,
+      0.857142857142857,
+      0.857142857142857,
+      0.857142857142857
+    ],
+    "val_banana": [
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "val_strawberry": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_blueberry": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_kiwi": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_temp_ok": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_r1": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_r2": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_r3": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "val_quality": [
+      0.0,
+      0.14285714285714288,
+      0.14285714285714288,
+      0.14285714285714288,
+      0.14285714285714288,
+      0.14285714285714288
+    ],
+    "val_exact_key_match": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "val_loss": [
+      1.0,
+      0.8571428571428571,
+      0.8571428571428571,
+      0.8571428571428571,
+      0.8571428571428571,
+      0.8571428571428571
+    ]
+  }
+}

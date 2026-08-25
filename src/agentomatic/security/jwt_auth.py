@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from agentomatic.middleware.pathutils import path_is_skipped
+from agentomatic.middleware.pathutils import PROBE_PATHS, path_is_skipped
 from agentomatic.security.claims import extract_roles, extract_scopes
 from agentomatic.security.dpop import DPoPConfig, DPoPError, validate_dpop
 
@@ -46,9 +46,9 @@ except ImportError:  # pragma: no cover
 # ---------------------------------------------------------------------------
 
 _DEFAULT_SKIP_PATHS: set[str] = {
-    "/health",
-    "/healthz",
-    "/readiness",
+    # Probe endpoints (see PROBE_PATHS): an orchestrator carries no bearer
+    # token, so a readiness probe that 401s keeps every pod out of service.
+    *PROBE_PATHS,
     "/docs",
     "/openapi.json",
     "/redoc",

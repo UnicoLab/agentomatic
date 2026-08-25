@@ -15,7 +15,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-_SKIP_PATHS = {"/health", "/healthz", "/readiness"}
+from agentomatic.middleware.pathutils import OPERATIONAL_PATHS
+
+#: Probe and scrape endpoints are exempt — see ``OPERATIONAL_PATHS``.
+_SKIP_PATHS = OPERATIONAL_PATHS
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

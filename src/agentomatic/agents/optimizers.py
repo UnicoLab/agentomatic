@@ -372,6 +372,26 @@ class PromptFitterBridge:
                 "PromptFitterBridge: using compiled system_prompt as baseline ({} chars)",
                 len(baseline_prompt),
             )
+        else:
+            # First epoch: nothing compiled yet. Without this the fitter starts
+            # from its own generic default, so the baseline score measures a
+            # prompt the agent never uses and the rewrite improves on the wrong
+            # text — the author's own ``system_prompt`` silently ignored.
+            resolver = getattr(agent, "resolve_system_prompt", None)
+            if callable(resolver):
+                try:
+                    baseline_prompt = resolver(default="") or None
+                except Exception:  # noqa: BLE001 - fall through to the attribute
+                    baseline_prompt = None
+            if not baseline_prompt:
+                attr = getattr(agent, "system_prompt", None)
+                baseline_prompt = attr if isinstance(attr, str) and attr.strip() else None
+            if baseline_prompt:
+                logger.info(
+                    "PromptFitterBridge: using the agent's own system_prompt as "
+                    "the baseline ({} chars)",
+                    len(baseline_prompt),
+                )
 
         # Same compounding for tuned model params: carry previously-applied
         # values (e.g. temperature from a param_search epoch) as the fitter's

@@ -1,0 +1,17 @@
+{
+  "system_prompt": "You are a helpful AI assistant.\n\n## Fit tips (from labelled demos)\n- Ground every answer ONLY in the provided snapshot; never invent budgets or stakeholders.\n- Always return non-empty JSON keys `content` and `next_action`.\n- Prefer concrete next actions (\u22654 words) tied to unknowns/status.\n- When relevant, include these anchors naturally: banana.",
+  "few_shot_examples": [
+    {
+      "query": "Who is accountable for the migration?",
+      "response": "{\"response\": \"OPT, banana\"}"
+    },
+    {
+      "query": "What are the open blockers for the release?",
+      "response": "{\"response\": \"OPT, banana\"}"
+    },
+    {
+      "query": "What was decided about the API contract?",
+      "response": "{\"response\": \"OPT, banana\"}"
+    }
+  ]
+}

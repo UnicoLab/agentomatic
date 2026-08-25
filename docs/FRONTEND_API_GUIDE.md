@@ -213,7 +213,7 @@ the frontend submits work, then **polls** or **streams** progress.
 **Submit** (returns immediately with `202` and a task record):
 
 - Agent: `POST /api/v1/{agent}/invoke/async` (single) · `/invoke/batch` (many)
-- Plugin: `POST /api/v1/{plugin}/predict/async` · `/predict/batch`
+- Plugin: `POST /api/v1/plugins/{plugin}/predict/async` · `/predict/batch`
 - Pipeline: `POST /api/v1/pipelines/{name}/run/async` · `/run/batch`
 - Endpoint: `POST /api/v1/endpoints/{name}{path}/async` · `.../batch`
 - Ingestor: `POST /api/v1/ingestion/{name}/run/async` · `/run/batch`

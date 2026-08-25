@@ -1,0 +1,147 @@
+[
+  {
+    "agent_name": "marker_agent",
+    "dataset_name": "inline",
+    "scores": {
+      "banana": 1.0,
+      "strawberry": 1.0,
+      "blueberry": 1.0,
+      "kiwi": 1.0,
+      "temp_ok": 1.0,
+      "r1": 1.0,
+      "r2": 1.0,
+      "r3": 1.0,
+      "quality": 1.0,
+      "exact_key_match": 1.0
+    },
+    "num_examples": 4,
+    "pass_rate": 1.0,
+    "metadata": {},
+    "example_results": [
+      {
+        "example_id": "marker_016",
+        "prediction": {
+          "response": "OPT: answer to What did the customer ask for in the last meeting? banana strawberry blueberry kiwi r1 r2 r3",
+          "used_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.\n\n## Few-shot examples\n\nExample 1\nQ: What happened at the steering committee?\nA: PARTIAL: answer to What happened at the steering committee? banana strawberry blueberry\n\nExample 2\nQ: What follow-up is needed after the demo?\nA: PARTIAL: answer to What follow-up is needed after the demo? banana strawberry blueberry\n\nExample 3\nQ: What is the budget for Q3?\nA: PARTIAL: answer to What is the budget for Q3? banana strawberry blueberry\n\nExample 4\nQ: When is the next release candidate?\nA: PARTIAL: answer to When is the next release candidate? banana strawberry blueberry",
+          "temperature": 0.15,
+          "temp_ok": true,
+          "temp_rungs": 3,
+          "banana_ok": true,
+          "strawberry_ok": true,
+          "blueberry_ok": true,
+          "kiwi_ok": true,
+          "n_satisfied": 7,
+          "difficulty": 7
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 1.0,
+          "blueberry": 1.0,
+          "kiwi": 1.0,
+          "temp_ok": 1.0,
+          "r1": 1.0,
+          "r2": 1.0,
+          "r3": 1.0,
+          "quality": 1.0,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.2729759999056114,
+        "error": null,
+        "metadata": {}
+      },
+      {
+        "example_id": "marker_017",
+        "prediction": {
+          "response": "OPT: answer to Which teams need to be unblocked this week? banana strawberry blueberry kiwi r1 r2 r3",
+          "used_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.\n\n## Few-shot examples\n\nExample 1\nQ: What happened at the steering committee?\nA: PARTIAL: answer to What happened at the steering committee? banana strawberry blueberry\n\nExample 2\nQ: What follow-up is needed after the demo?\nA: PARTIAL: answer to What follow-up is needed after the demo? banana strawberry blueberry\n\nExample 3\nQ: What is the budget for Q3?\nA: PARTIAL: answer to What is the budget for Q3? banana strawberry blueberry\n\nExample 4\nQ: When is the next release candidate?\nA: PARTIAL: answer to When is the next release candidate? banana strawberry blueberry",
+          "temperature": 0.15,
+          "temp_ok": true,
+          "temp_rungs": 3,
+          "banana_ok": true,
+          "strawberry_ok": true,
+          "blueberry_ok": true,
+          "kiwi_ok": true,
+          "n_satisfied": 7,
+          "difficulty": 7
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 1.0,
+          "blueberry": 1.0,
+          "kiwi": 1.0,
+          "temp_ok": 1.0,
+          "r1": 1.0,
+          "r2": 1.0,
+          "r3": 1.0,
+          "quality": 1.0,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.16014500010896882,
+        "error": null,
+        "metadata": {}
+      },
+      {
+        "example_id": "marker_018",
+        "prediction": {
+          "response": "OPT: answer to What is the budget for Q3? banana strawberry blueberry kiwi r1 r2 r3",
+          "used_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.\n\n## Few-shot examples\n\nExample 1\nQ: What happened at the steering committee?\nA: PARTIAL: answer to What happened at the steering committee? banana strawberry blueberry\n\nExample 2\nQ: What follow-up is needed after the demo?\nA: PARTIAL: answer to What follow-up is needed after the demo? banana strawberry blueberry\n\nExample 3\nQ: What is the budget for Q3?\nA: PARTIAL: answer to What is the budget for Q3? banana strawberry blueberry\n\nExample 4\nQ: When is the next release candidate?\nA: PARTIAL: answer to When is the next release candidate? banana strawberry blueberry",
+          "temperature": 0.15,
+          "temp_ok": true,
+          "temp_rungs": 3,
+          "banana_ok": true,
+          "strawberry_ok": true,
+          "blueberry_ok": true,
+          "kiwi_ok": true,
+          "n_satisfied": 7,
+          "difficulty": 7
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 1.0,
+          "blueberry": 1.0,
+          "kiwi": 1.0,
+          "temp_ok": 1.0,
+          "r1": 1.0,
+          "r2": 1.0,
+          "r3": 1.0,
+          "quality": 1.0,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.16184500009330804,
+        "error": null,
+        "metadata": {}
+      },
+      {
+        "example_id": "marker_019",
+        "prediction": {
+          "response": "OPT: answer to What is the current status of the project? banana strawberry blueberry kiwi r1 r2 r3",
+          "used_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.\n\n## Few-shot examples\n\nExample 1\nQ: What happened at the steering committee?\nA: PARTIAL: answer to What happened at the steering committee? banana strawberry blueberry\n\nExample 2\nQ: What follow-up is needed after the demo?\nA: PARTIAL: answer to What follow-up is needed after the demo? banana strawberry blueberry\n\nExample 3\nQ: What is the budget for Q3?\nA: PARTIAL: answer to What is the budget for Q3? banana strawberry blueberry\n\nExample 4\nQ: When is the next release candidate?\nA: PARTIAL: answer to When is the next release candidate? banana strawberry blueberry",
+          "temperature": 0.15,
+          "temp_ok": true,
+          "temp_rungs": 3,
+          "banana_ok": true,
+          "strawberry_ok": true,
+          "blueberry_ok": true,
+          "kiwi_ok": true,
+          "n_satisfied": 7,
+          "difficulty": 7
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 1.0,
+          "blueberry": 1.0,
+          "kiwi": 1.0,
+          "temp_ok": 1.0,
+          "r1": 1.0,
+          "r2": 1.0,
+          "r3": 1.0,
+          "quality": 1.0,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.1364820000162581,
+        "error": null,
+        "metadata": {}
+      }
+    ]
+  }
+]

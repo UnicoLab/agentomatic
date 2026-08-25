@@ -207,7 +207,9 @@ class PipelineContext:
     def to_eval_namespace(self) -> dict[str, Any]:
         """Create a namespace dict for evaluating condition expressions.
 
-        The namespace exposes ``ctx`` (this context) and ``len``.
+        The namespace exposes ``ctx`` (this context) plus a small set of
+        safe builtins; ``__builtins__`` itself is stripped by the caller, so
+        anything absent here is unavailable to a condition.
         """
         return {
             "ctx": self,

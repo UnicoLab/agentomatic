@@ -53,6 +53,50 @@ Everything above is configured declaratively — agents in folders, connections
 in `connections.py`, endpoints in `endpoint.py`, and a handful of platform
 flags. No custom FastAPI wiring is required.
 
+## Project dependencies in the generated image
+
+`agentomatic deploy` builds with **uv**, pinned via `ARG UV_VERSION` so the
+image is reproducible, and installs your project's own dependencies as well
+as agentomatic itself.
+
+Declare what *your* project needs — a vendor LLM driver, a vector client, an
+in-house package — in `requirements.txt` next to `main.py`:
+
+```txt title="requirements.txt"
+agentomatic[all]==1.10.0
+# This project's agents talk to a local OpenAI-compatible model server,
+# so it needs that client library.
+langchain-openai>=0.3
+```
+
+The generated Dockerfile installs agentomatic first (at its pinned version)
+and your requirements second, so a looser pin in your file cannot downgrade
+the framework.
+
+!!! warning "This is how a provider driver reaches the image"
+
+    The `all` extra deliberately excludes the vendor LLM drivers — `openai`,
+    `azure`, `vertex` — because the platform is provider-agnostic: you install
+    the SDK for the backend you actually use. `requirements.txt` is where that
+    happens. A stack configured for `openai_compatible` (which is what oMLX,
+    llama.cpp, vLLM and LM Studio all speak) needs `langchain-openai` there,
+    or the platform will refuse to start rather than answer with a fake model.
+
+### Reproducible builds with a lockfile
+
+If your project keeps a `pyproject.toml` and a `uv.lock`, the generated
+Dockerfile installs from the lock instead:
+
+```dockerfile
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --inexact
+```
+
+That installs the exact resolved versions the lock pins rather than
+re-resolving at build time. Regenerate the lock with `uv lock` whenever you
+change a dependency.
+
+
 ## 1. Install for production
 
 Install only the extras you use. Common production combinations:

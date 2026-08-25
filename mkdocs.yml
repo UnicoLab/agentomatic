@@ -133,6 +133,7 @@ nav:
     - Testing Your Agents: guide/testing.md
   - Advanced:
     - Production Deployment: guide/deployment.md
+    - Verifying a Deployment: guide/verifying-a-deployment.md
     - Platform Features: guide/platform-features.md
     - Custom Endpoints: guide/endpoints.md
     - Tasks & Execution Modes: guide/tasks.md

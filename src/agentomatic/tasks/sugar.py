@@ -17,7 +17,7 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -29,9 +29,22 @@ if TYPE_CHECKING:
 
 
 class BatchSubmitRequest(BaseModel):
-    """Body for a batch execution request."""
+    """Body for a batch execution request.
 
-    inputs: list[Any] = Field(default_factory=list, description="Input payloads to fan out.")
+    ``inputs`` is required and must be non-empty, and unknown fields are
+    rejected. Both rules exist to prevent a silent no-op: a body that carries
+    the item list under the wrong key (``items``, ``payloads``, …) or an empty
+    list would otherwise be accepted as a valid *zero-item* batch and reported
+    as ``succeeded`` having run nothing at all.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    inputs: list[Any] = Field(
+        ...,
+        min_length=1,
+        description="Input payloads to fan out (at least one).",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict, description="Task metadata.")
     callback_url: str | None = Field(
         default=None, description="Optional webhook POSTed on completion."

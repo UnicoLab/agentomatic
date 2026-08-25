@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+
 from agentomatic.agents.base import BaseGraphAgent
 from agentomatic.agents.decorators import agent_node
 from agentomatic.agents.history import (
@@ -351,3 +353,144 @@ class TestPromptFitterBridge:
         empty = AgentDataset(name="empty", examples=[])
         bridge.optimize(agent, empty, [])
         assert agent._last_optimize_status == "skipped: empty dataset"
+
+
+# ---------------------------------------------------------------------------
+# save() / load() — what does and does not round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestMetricsDoNotSurviveSaveLoad:
+    """A metric is a live object, so ``load()`` cannot bring it back.
+
+    That is the design, not a bug — but the error a loaded agent raised
+    ("Pass metrics=... to evaluate() or compile(metrics=...) first") reads as
+    wrong advice to somebody who compiled with metrics, saved, and loaded.
+    The message now names the metrics the save recorded and says why they are
+    gone.
+    """
+
+    def test_a_loaded_agent_reports_what_it_was_compiled_with(self, tmp_path) -> None:
+        agent = EchoAgent()
+        agent.compile(_dataset(), metrics=[_Accuracy()])
+        agent.save(tmp_path / "saved")
+
+        restored = EchoAgent()
+        restored.load(tmp_path / "saved")
+
+        with pytest.raises(ValueError) as exc:
+            restored.evaluate(_dataset())
+
+        message = str(exc.value)
+        assert "accuracy" in message, message
+        assert "save()/load()" in message, message
+
+    def test_supplying_metrics_again_works(self, tmp_path) -> None:
+        agent = EchoAgent()
+        agent.compile(_dataset(), metrics=[_Accuracy()])
+        agent.save(tmp_path / "saved")
+
+        restored = EchoAgent()
+        restored.load(tmp_path / "saved")
+
+        report = restored.evaluate(_dataset(), metrics=[_Accuracy()])
+
+        assert report.scores["accuracy"] == 1.0
+
+    def test_recompiling_restores_the_full_loop(self, tmp_path) -> None:
+        agent = EchoAgent()
+        agent.compile(_dataset(), metrics=[_Accuracy()])
+        agent.save(tmp_path / "saved")
+
+        restored = EchoAgent()
+        restored.load(tmp_path / "saved")
+        restored.compile(_dataset(), metrics=[_Accuracy()])
+
+        assert restored.evaluate(_dataset()).scores["accuracy"] == 1.0
+
+    def test_an_agent_never_compiled_gets_the_plain_message(self) -> None:
+        """No saved metric names to quote — keep the original advice."""
+        with pytest.raises(ValueError) as exc:
+            EchoAgent().evaluate(_dataset())
+
+        message = str(exc.value)
+        assert "compile(metrics=...)" in message
+        assert "save()/load()" not in message
+
+    def test_the_tuned_config_and_histories_do_survive(self, tmp_path) -> None:
+        agent = EchoAgent()
+        agent.compile(_dataset(), metrics=[_Accuracy()])
+        agent.evaluate(_dataset())
+        agent.save(tmp_path / "saved")
+
+        restored = EchoAgent()
+        restored.load(tmp_path / "saved")
+
+        assert restored.compiled_metadata["dataset_size"] == 2
+        assert restored.compiled_metadata["metrics"] == ["accuracy"]
+        assert restored.evaluation_history
+        assert restored.evaluation_history[-1].scores["accuracy"] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# PromptFitterBridge — where the first epoch's baseline comes from
+# ---------------------------------------------------------------------------
+
+
+class TestTheFirstEpochStartsFromTheAgentsOwnPrompt:
+    """Nothing is compiled yet on epoch one — do not fall back to a generic.
+
+    ``_build_fitter`` seeded ``baseline_system_prompt`` only from
+    ``compiled_config``, which is empty until a fit succeeds. The first epoch
+    therefore measured its baseline against the fitter's own default and
+    rewrote *that*, silently ignoring the prompt the author wrote on the
+    agent.
+    """
+
+    @staticmethod
+    def _baseline_seen(agent) -> str | None:
+        captured: dict[str, Any] = {}
+
+        class _Probe(PromptFitterBridge):
+            def _build_fitter(self, agent, name):  # noqa: ANN001
+                import agentomatic.optimize.fitter as fitter_mod
+
+                real = fitter_mod.PromptFitter
+
+                class _Capture(real):  # type: ignore[misc, valid-type]
+                    def __init__(self, *a, **kw):
+                        captured["baseline"] = kw.get("baseline_system_prompt")
+                        raise RuntimeError("stop here — only the kwargs matter")
+
+                fitter_mod.PromptFitter = _Capture
+                try:
+                    return super()._build_fitter(agent, name)
+                except RuntimeError:
+                    return None
+                finally:
+                    fitter_mod.PromptFitter = real
+
+        _Probe()._build_fitter(agent, "probe")
+        return captured.get("baseline")
+
+    def test_the_instance_prompt_is_used_when_nothing_is_compiled(self) -> None:
+        agent = EchoAgent()
+        agent.system_prompt = "Answer only in French."
+
+        assert self._baseline_seen(agent) == "Answer only in French."
+
+    def test_a_compiled_prompt_still_wins(self) -> None:
+        """Later epochs must compound, not restart from the original."""
+        agent = EchoAgent()
+        agent.system_prompt = "Answer only in French."
+        agent.compiled_config = {"system_prompt": "Tuned by a previous epoch."}
+
+        assert self._baseline_seen(agent) == "Tuned by a previous epoch."
+
+    def test_an_agent_with_no_prompt_at_all_passes_none(self) -> None:
+        """No prompt anywhere is a real state — let the fitter decide."""
+
+        class _Bare(EchoAgent):
+            system_prompt = ""
+
+        assert self._baseline_seen(_Bare()) is None

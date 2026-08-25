@@ -1,0 +1,21 @@
+{
+  "agent_class": "examples.keras_optimize_showcase.agent.MarkerAgent",
+  "agent_name": "marker_agent",
+  "agent_version": "1.0.0",
+  "dataset_name": "marker_fake",
+  "dataset_size": 20,
+  "metrics": [
+    "banana",
+    "strawberry",
+    "blueberry",
+    "kiwi",
+    "temp_ok",
+    "r1",
+    "r2",
+    "r3",
+    "quality",
+    "exact_key_match"
+  ],
+  "optimizer": "PromptFitterBridge",
+  "loss": "quality_loss"
+}

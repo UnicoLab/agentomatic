@@ -175,10 +175,15 @@ def create_pipeline_router(
         """Build an engine for an arbitrary (possibly unsaved) config."""
         from .engine import PipelineEngine
 
+        # Every served pipeline doubles as a sub-pipeline, so `sub_pipeline`
+        # steps can compose what the platform already discovered. Read
+        # `all_pipelines` here rather than at router-build time so a pipeline
+        # saved through the builder is immediately referencable. Explicit
+        # `sub_pipelines` win on a name clash.
         return PipelineEngine(
             config,
             registry,
-            all_sub,
+            {**all_pipelines, **all_sub},
             endpoints=endpoints,
             ingestors=ingestors,
             plugins=plugins,

@@ -43,6 +43,22 @@ from .steps import (
 )
 from .validation import validate_against_schema
 
+#: How deep ``sub_pipeline`` steps may nest before the engine refuses.
+#:
+#: Validation catches reference cycles statically, but pipelines are editable
+#: over HTTP: a sub-pipeline can be saved after an engine was built, so this
+#: bounds the damage even when the static check could not have seen it.
+MAX_SUB_PIPELINE_DEPTH = 10
+
+
+class ConditionError(RuntimeError):
+    """A step condition could not be evaluated.
+
+    Distinct from a condition that evaluated falsy: that is a routing
+    decision, this is a broken pipeline.
+    """
+
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -65,6 +81,8 @@ class PipelineEngine:
         registry: The agent registry for resolving agent names.
         sub_pipelines: Optional dict of named sub-pipelines for
             ``sub_pipeline`` steps.
+        depth: Sub-pipeline nesting depth. Set by the engine when it
+            recurses; callers should leave it at ``0``.
 
     Example::
 
@@ -82,10 +100,13 @@ class PipelineEngine:
         endpoints: EndpointRegistry | None = None,
         ingestors: IngestionRegistry | None = None,
         plugins: PluginRegistry | None = None,
+        depth: int = 0,
     ) -> None:
         self.config = config
         self.registry = registry
         self.sub_pipelines = sub_pipelines or {}
+        #: How many sub-pipeline frames deep this engine is running.
+        self.depth = depth
         self.endpoints = endpoints
         self.ingestors = ingestors
         self.plugins = plugins
@@ -131,11 +152,27 @@ class PipelineEngine:
                     f"Available: {self.registry.list_names()}"
                 )
 
-        # Check sub-pipeline references
+        # Check sub-pipeline references, and that following them terminates.
         for step in self.config.steps:
             if isinstance(step, SubPipelineStepConfig):
                 if step.pipeline not in self.sub_pipelines:
                     errors.append(f"Sub-pipeline '{step.pipeline}' not found")
+        errors.extend(self._sub_pipeline_cycles())
+
+        # Conditions are Python expressions; a syntax error in one is worth
+        # reporting before the pipeline runs rather than at the step.
+        for step in self.config.steps:
+            condition = getattr(step, "condition", None)
+            if not condition:
+                continue
+            try:
+                compile(condition, f"<condition:{step.name}>", "eval")
+            except SyntaxError as exc:
+                errors.append(
+                    f"Step '{step.name}' has an invalid condition {condition!r}: "
+                    f"{exc.msg}. Conditions are Python expressions over `ctx`, "
+                    "not `$.` mappings."
+                )
 
         # Check plugin references
         required_plugins = self.config.get_plugin_names()
@@ -352,16 +389,39 @@ class PipelineEngine:
 
             # Evaluate condition if present
             condition = getattr(step_config, "condition", None)
-            if condition and not self._evaluate_condition(condition, ctx):
-                logger.info(f"  ⏭️ Skipping '{step_config.name}' (condition not met)")
-                pipeline_result.steps[step_config.name] = StepResult(
-                    name=step_config.name,
-                    status=StepStatus.SKIPPED,
-                )
-                await self._report_step_progress(
-                    exec_pos + 1, total_steps, step_config.name, "skipped"
-                )
-                continue
+            if condition:
+                try:
+                    should_run = self._evaluate_condition(condition, ctx)
+                except ConditionError as exc:
+                    # Surface it as a failed step so the pipeline's on_error
+                    # policy decides — never as a silent skip under a
+                    # successful pipeline.
+                    logger.error(f"  ❌ Step '{step_config.name}': {exc}")
+                    result = StepResult(
+                        name=step_config.name,
+                        status=StepStatus.FAILED,
+                        error=str(exc),
+                    )
+                    pipeline_result.steps[step_config.name] = result
+                    unsuccessful_steps.add(step_config.name)
+                    await self._report_step_progress(
+                        exec_pos + 1, total_steps, step_config.name, "failed"
+                    )
+                    if step_config.on_error is ErrorPolicy.SKIP:
+                        continue
+                    pipeline_result.status = PipelineStatus.FAILED
+                    pipeline_result.error = f"Step '{step_config.name}' failed: {exc}"
+                    break
+                if not should_run:
+                    logger.info(f"  ⏭️ Skipping '{step_config.name}' (condition not met)")
+                    pipeline_result.steps[step_config.name] = StepResult(
+                        name=step_config.name,
+                        status=StepStatus.SKIPPED,
+                    )
+                    await self._report_step_progress(
+                        exec_pos + 1, total_steps, step_config.name, "skipped"
+                    )
+                    continue
 
             logger.info(f"  ▶️ Executing step '{step_config.name}'")
             await self._report_step_progress(exec_pos, total_steps, step_config.name, "running")
@@ -584,6 +644,37 @@ class PipelineEngine:
         except Exception as exc:  # noqa: BLE001
             logger.debug(f"pipeline progress_cb failed: {exc}")
 
+    def _sub_pipeline_cycles(self) -> list[str]:
+        """Report sub-pipeline reference cycles reachable from this pipeline.
+
+        Every discovered pipeline is available as a sub-pipeline, so a
+        pipeline can reference itself — directly, or around a longer loop.
+        Executing one would recurse until the worker died, and pipelines are
+        editable over HTTP, so this has to be caught before it runs rather
+        than only bounded at runtime.
+
+        Returns:
+            One message per cycle found, naming the path.
+        """
+        cycles: list[str] = []
+        start = self.config.name
+
+        def walk(name: str, path: list[str], seen: set[str]) -> None:
+            config = self.sub_pipelines.get(name) if name != start else self.config
+            if config is None:
+                return
+            for step in config.steps:
+                if not isinstance(step, SubPipelineStepConfig):
+                    continue
+                nxt = step.pipeline
+                if nxt in seen:
+                    cycles.append("Sub-pipeline cycle: " + " -> ".join([*path, nxt]))
+                    continue
+                walk(nxt, [*path, nxt], seen | {nxt})
+
+        walk(start, [start], {start})
+        return cycles
+
     async def _execute_sub_pipeline(
         self,
         config: SubPipelineStepConfig,
@@ -591,6 +682,18 @@ class PipelineEngine:
     ) -> StepResult:
         """Execute a nested sub-pipeline."""
         t0 = time.perf_counter()
+
+        if self.depth >= MAX_SUB_PIPELINE_DEPTH:
+            # Backstop for a cycle that validation did not see — for instance
+            # a sub-pipeline saved after this engine was built.
+            return StepResult(
+                name=config.name,
+                status=StepStatus.FAILED,
+                error=(
+                    f"Sub-pipeline nesting exceeded {MAX_SUB_PIPELINE_DEPTH} levels at "
+                    f"'{config.pipeline}' — check for a reference cycle"
+                ),
+            )
 
         sub_config = self.sub_pipelines.get(config.pipeline)
         if sub_config is None:
@@ -615,6 +718,7 @@ class PipelineEngine:
             endpoints=self.endpoints,
             ingestors=self.ingestors,
             plugins=self.plugins,
+            depth=self.depth + 1,
         )
         sub_result = await asyncio.wait_for(
             sub_engine.run(sub_input),
@@ -672,13 +776,34 @@ class PipelineEngine:
         pipeline_result.metadata["rolled_back_steps"] = compensated
 
     def _evaluate_condition(self, condition: str, ctx: PipelineContext) -> bool:
-        """Safely evaluate a condition expression."""
+        """Evaluate a step condition.
+
+        Args:
+            condition: A Python expression over ``ctx`` (see the pipelines
+                guide) deciding whether the step runs.
+            ctx: The live pipeline context.
+
+        Returns:
+            Whether the step should run.
+
+        Raises:
+            ConditionError: If the expression cannot be evaluated at all —
+                a typo, a renamed step, or ``$.`` mapping syntax used where a
+                ``ctx`` expression belongs. That is a defect in the pipeline,
+                not a decision to skip, and it used to be swallowed into
+                ``False``: the branch silently never fired and the pipeline
+                still reported ``success``.
+        """
+        ns = ctx.to_eval_namespace()
         try:
-            ns = ctx.to_eval_namespace()
             return bool(eval(condition, {"__builtins__": {}}, ns))  # noqa: S307
         except Exception as exc:
-            logger.warning(f"Condition eval failed: {exc}")
-            return False
+            raise ConditionError(
+                f"condition {condition!r} could not be evaluated "
+                f"({type(exc).__name__}: {exc}). Conditions are Python "
+                "expressions over `ctx` — e.g. "
+                "ctx.get_step_output('step').get('field') — not `$.` mappings."
+            ) from exc
 
     def _apply_output_mapping(
         self,

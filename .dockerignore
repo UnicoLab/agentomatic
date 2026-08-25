@@ -52,6 +52,11 @@ README*
 CHANGELOG*
 TODO*
 
+# …except README.md: pyproject.toml declares `readme = "README.md"`, so the
+# build backend needs it present to install the project. Excluding it made
+# `uv sync` in the Dockerfiles die with "Readme file does not exist".
+!README.md
+
 # Development and build tools
 Makefile
 docker-compose*.yml

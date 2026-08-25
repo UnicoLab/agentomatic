@@ -34,7 +34,7 @@ class TestDockerfileRendering:
         assert "USER appuser" in content
         # Installs from PyPI pinned to the current version (project image, not
         # the framework repo image) and launches the user's main.py.
-        assert 'pip install "agentomatic[all]==' in content
+        assert 'uv pip install "agentomatic[all,db-postgres]==' in content
         assert 'CMD ["uvicorn", "main:app"' in content
         assert "COPY --chown=appuser:appuser main.py ./main.py" in content
         assert "HEALTHCHECK" in content
@@ -45,14 +45,14 @@ class TestDockerfileRendering:
         from agentomatic._version import __version__
 
         content = deploy_mod.render_dockerfile()
-        assert f'pip install "agentomatic[all]=={__version__}"' in content
+        assert f'uv pip install "agentomatic[all,db-postgres]=={__version__}"' in content
 
     def test_distroless_uses_nonroot_numeric_uid(self) -> None:
         content = deploy_mod.render_dockerfile_distroless()
         assert "gcr.io/distroless/python3-debian12:nonroot" in content
         assert "USER 65532:65532" in content
         assert '"/usr/bin/python3"' in content
-        assert 'pip install --target=/app/deps "agentomatic[all]==' in content
+        assert 'uv pip install --target=/app/deps "agentomatic[all,db-postgres]==' in content
         assert '"main:app"' in content
 
     def test_copy_lines_only_include_existing(self, tmp_path: Path) -> None:
@@ -63,6 +63,101 @@ class TestDockerfileRendering:
         assert "COPY --chown=appuser:appuser agents/ ./agents/" in content
         # Non-existent dirs must not be emitted (would break docker build).
         assert "plugins/ ./plugins/" not in content
+
+    def test_generated_images_install_the_project_requirements(self) -> None:
+        """Regression: requirements.txt was copied into the image, never installed.
+
+        It is where a project declares what *it* needs on top of agentomatic —
+        a vendor LLM driver, a vector client, an in-house package — so every
+        such dependency was silently absent at runtime. An agent configured for
+        a provider whose driver lived only there could not be built.
+        """
+        for render in (deploy_mod.render_dockerfile, deploy_mod.render_dockerfile_distroless):
+            content = render()
+            install_lines = [
+                line
+                for line in content.splitlines()
+                if line.startswith("RUN uv pip install") and "requirements.txt" in line
+            ]
+
+            assert install_lines, (
+                f"{render.__name__} copies requirements.txt but never installs it"
+            )
+
+    def test_requirements_are_installed_after_agentomatic(self) -> None:
+        """The pinned agentomatic above must win over any looser pin below."""
+        for render in (deploy_mod.render_dockerfile, deploy_mod.render_dockerfile_distroless):
+            lines = render().splitlines()
+            agentomatic_at = next(
+                i
+                for i, line in enumerate(lines)
+                if "pip install" in line and "agentomatic[" in line
+            )
+            requirements_at = next(
+                i
+                for i, line in enumerate(lines)
+                if line.startswith("RUN uv pip install") and "requirements.txt" in line
+            )
+
+            assert agentomatic_at < requirements_at, render.__name__
+
+    def test_no_requirements_step_when_the_project_has_none(self, tmp_path: Path) -> None:
+        """A project without requirements.txt must not get a broken COPY."""
+        (tmp_path / "main.py").write_text("app = None\n")
+        (tmp_path / "agents").mkdir()
+
+        content = deploy_mod.render_dockerfile(project_root=tmp_path)
+
+        assert "requirements.txt" not in content
+
+    def test_requirements_step_appears_when_the_project_has_one(self, tmp_path: Path) -> None:
+        (tmp_path / "main.py").write_text("app = None\n")
+        (tmp_path / "agents").mkdir()
+        (tmp_path / "requirements.txt").write_text("langchain-openai>=0.3\n")
+
+        content = deploy_mod.render_dockerfile(project_root=tmp_path)
+
+        assert "RUN uv pip install -r requirements.txt" in content
+
+    def test_generated_images_use_uv(self) -> None:
+        """uv is what this project builds with, and it dominates build time."""
+        for render in (deploy_mod.render_dockerfile, deploy_mod.render_dockerfile_distroless):
+            content = render()
+
+            assert "uv pip install" in content, render.__name__
+            assert "ARG UV_VERSION=" in content, f"{render.__name__} does not pin uv"
+
+    def test_uv_is_pinned_not_latest(self) -> None:
+        """An unpinned installer changes image contents with no diff to show."""
+        content = deploy_mod.render_dockerfile()
+
+        assert f"ARG UV_VERSION={deploy_mod.UV_VERSION}" in content
+        assert "uv:latest" not in content
+
+    def test_a_project_with_a_lockfile_gets_a_frozen_sync(self, tmp_path: Path) -> None:
+        """A pinned tree beats re-resolving at build time."""
+        (tmp_path / "main.py").write_text("app = None\n")
+        (tmp_path / "agents").mkdir()
+        (tmp_path / "pyproject.toml").write_text("[project]\nname='p'\nversion='0'\n")
+        (tmp_path / "uv.lock").write_text("version = 1\n")
+
+        content = deploy_mod.render_dockerfile(project_root=tmp_path)
+
+        assert "uv sync --frozen" in content
+
+    def test_generated_images_can_reach_postgres(self) -> None:
+        """The generated .env wires DB__URL, so the driver must be present.
+
+        Regression: the image installed ``agentomatic[all]``, which
+        deliberately ships only the SQLite driver. A deployment that set
+        ``DATABASE_URL`` to the Postgres URL the generated ``.env`` expects
+        started cleanly and then failed with "No module named 'asyncpg'" the
+        moment persistence was used.
+        """
+        for render in (deploy_mod.render_dockerfile, deploy_mod.render_dockerfile_distroless):
+            content = render()
+
+            assert "db-postgres" in content, f"{render.__name__} omits the Postgres driver"
 
 
 # =========================================================================

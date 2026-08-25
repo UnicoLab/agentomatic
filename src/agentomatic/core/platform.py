@@ -36,6 +36,11 @@ if TYPE_CHECKING:
     from agentomatic.tasks.store import TaskStore
 
 
+def _safe_db_url(url: str) -> str:
+    """Return a database URL with any credentials stripped, for logging."""
+    return url.split("@")[-1] if "@" in url else url
+
+
 def _agent_tag(name: str) -> str:
     """Return a human-friendly OpenAPI tag for an agent name.
 
@@ -840,7 +845,11 @@ class AgentPlatform:
 
     async def _auto_derive_store_from_connections(self) -> None:
         """Populate ``self._store`` from the first MEMORY connection, if any."""
-        from agentomatic.connections.manager import PLATFORM_SCOPE, all_managers
+        from agentomatic.connections.manager import (
+            PLATFORM_SCOPE,
+            _unconfigured_reason,
+            all_managers,
+        )
         from agentomatic.connections.models import ConnectionPurpose
         from agentomatic.connections.stores import create_store_from_connection
 
@@ -853,12 +862,41 @@ class AgentPlatform:
             candidate = manager.first_for_purpose(ConnectionPurpose.MEMORY)
             if candidate is None:
                 continue
+            # A connection built from unset ${ENV} placeholders is not a
+            # broken store, it is an absent one — the scaffolded
+            # connections.py ships a MEMORY example. Say which variable would
+            # enable it instead of surfacing whatever the driver made of an
+            # empty URL.
+            reason = _unconfigured_reason(getattr(candidate, "config", None))
+            if reason:
+                logger.info(
+                    f"Connection '{getattr(candidate, 'name', '?')}' in scope "
+                    f"'{scope}' is not configured ({reason}) — not using it as a store."
+                )
+                continue
             try:
                 self._store = await create_store_from_connection(candidate)
-                logger.info(
-                    f"🗄️ Auto-derived store from connection "
-                    f"'{getattr(candidate, 'name', '?')}' in scope '{scope}'"
-                )
+                name = getattr(candidate, "name", "?")
+                database_url = self._resolve_database_url()
+                if database_url:
+                    # Both are configured and the connection wins. Say so:
+                    # otherwise an operator who set DATABASE_URL to a managed
+                    # Postgres reads "store configured" and believes their
+                    # threads live there, while they are actually going
+                    # wherever this connection points — which for the
+                    # scaffolded MEMORY example is a file inside the
+                    # container, lost on the next restart.
+                    logger.warning(
+                        f"🗄️ Store taken from MEMORY connection '{name}' (scope "
+                        f"'{scope}'), which OVERRIDES the configured "
+                        f"DATABASE_URL ({_safe_db_url(database_url)}). Remove "
+                        "the MEMORY connection, or point it at the same "
+                        "database, if that is not what you intended."
+                    )
+                else:
+                    logger.info(
+                        f"🗄️ Auto-derived store from connection '{name}' in scope '{scope}'"
+                    )
                 return
             except Exception as exc:  # noqa: BLE001
                 logger.warning(

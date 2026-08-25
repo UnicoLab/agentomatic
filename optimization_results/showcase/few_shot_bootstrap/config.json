@@ -1,0 +1,21 @@
+{
+  "system_prompt": "You are a helpful AI assistant.",
+  "few_shot_examples": [
+    {
+      "query": "What is the budget for Q3?",
+      "response": "BASE: answer to What is the budget for Q3?"
+    },
+    {
+      "query": "What did the customer ask for in the last meeting?",
+      "response": "BASE: answer to What did the customer ask for in the last meeting?"
+    },
+    {
+      "query": "Who approved the scope change?",
+      "response": "BASE: answer to Who approved the scope change?"
+    },
+    {
+      "query": "When is the next release candidate?",
+      "response": "BASE: answer to When is the next release candidate?"
+    }
+  ]
+}

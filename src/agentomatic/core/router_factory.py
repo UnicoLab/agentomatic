@@ -903,12 +903,21 @@ def create_default_router(
 
         When a ``thread_id`` is provided and a thread store is configured,
         this endpoint automatically:
-        1. Loads prior conversation history into the agent's message context
-        2. Invokes the agent with full conversational awareness
-        3. Persists both user and assistant messages to the store
+
+        1. Loads prior conversation history into ``state["messages"]``,
+           ending with the current turn.
+        2. Invokes the agent with that state.
+        3. Persists both user and assistant messages to the store.
 
         If the conversation exceeds the configured threshold, older messages
         are automatically summarised and compressed.
+
+        Whether the model *sees* that history is up to the agent: the
+        platform supplies ``state["messages"]``, and an agent that reads
+        only ``current_query`` answers every turn as if it were the first.
+        ``history_loaded`` in the response counts what was loaded, not what
+        the agent chose to send. See the conversation-memory section of the
+        agents guide.
         """
         agent = _get_agent()
         thread_id = request.thread_id or f"thread_{uuid.uuid4().hex[:12]}"

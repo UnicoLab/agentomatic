@@ -6,6 +6,22 @@ Inspired by Stanford's [DSPy](https://github.com/stanfordnlp/dspy), the framewor
 
 ---
 
+## Seeing the whole loop run
+
+`scripts/keras_showcase.py` runs `compile() → fit() → evaluate() → save() →
+load()` against any OpenAI-compatible endpoint and prints the measured loss
+curve, so you can watch the loop move before wiring it to your own agent:
+
+```bash
+export OMLX_BASE_URL=http://127.0.0.1:8000/v1
+export OMLX_API_KEY=whatever
+python scripts/keras_showcase.py --model omlx/my-local-model
+```
+
+Its agent answers correctly only once the prompt contains a token it has to
+*discover from its own failures*, so an improvement in the curve is
+attributable to the optimizer rather than to model variance.
+
 ## 🏗️ The Optimization Flow
 
 The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and scoring metrics to iteratively improve prompt versions:
@@ -13,6 +29,44 @@ The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and s
 ![Prompt Optimization Flow](../assets/optimization_flow.png)
 
 ---
+
+## Running the optimization suites without a cloud key
+
+The live optimization suites drive a real OpenAI-compatible endpoint. Point
+them at whatever local model you run — oMLX, llama.cpp, vLLM, LM Studio,
+Ollama — and they need no changes:
+
+```bash
+export OMLX_BASE_URL=http://127.0.0.1:8000/v1
+export OMLX_API_KEY=your-key
+export AGENTOMATIC_LIVE_MODEL=omlx/your-model
+
+uv run pytest tests/test_live_omlx_optimize.py \
+              tests/test_live_omlx_keras_optimize.py \
+              -q --override-ini='addopts='
+```
+
+Without such an endpoint these suites **skip entirely**, which leaves the
+`omlx/` provider path, the prompt fitter and the whole Keras-style `fit()`
+loop unexercised — including in CI. For that case the repo ships a stand-in:
+
+```bash
+uv run python scripts/local_slm_server.py --port 8000
+```
+
+`scripts/local_slm_server.py` is a **test double, not a language model**. It
+generates nothing; it follows rules. What makes it a valid optimization target
+is that answer quality genuinely depends on the system prompt — each directive
+a prompt carries makes the response satisfy one more property the metric
+rewards, so an optimizer that really searches and selects will climb, and one
+that does not will not. It also plays the rewriter (reading the briefing's
+failing I/O and expected answers, then folding the missing tokens into a new
+prompt) and the judge (returning the exact schema the metric asked for).
+
+It proves the *machinery* — search, evaluation, selection, early stopping,
+checkpointing, config application. It cannot tell you whether a real model
+writes good prompts. Use your own model and eval set for that.
+
 
 ## ⚡ Quick Start — two tiers (same primitives)
 
@@ -260,6 +314,18 @@ Agentomatic supports standard matches, LLM judges, and full **DeepEval** validat
 ### 1. Text Matching Metrics
 - **Exact Match** (`exact_match`): Verifies if the agent response matches the expected answer exactly.
 - **Contains** (`contains`): Verifies if the agent response contains a set of defined target keywords.
+
+!!! note "Matching metrics read the answer, not the whole reference"
+    An `AgentExample` with a structured `expected_output` is rendered for the
+    optimizer as a *judge-facing reference* — judge guidance, a rubric, an
+    `## Expected answer` section, the structured output as JSON. An LLM judge
+    reads all of it.
+
+    A matching metric compares strings, so it reads only the
+    `## Expected answer` section. Without that it would be comparing your
+    agent's response against markdown headers, and every candidate would score
+    near zero however good it was — `fit()` would report "no improvement"
+    forever. Plain-string expectations are used exactly as written.
 
 ### 2. LLM-as-a-Judge Metrics
 - **LLM Judge** (`llm_judge`): Asks an evaluator LLM to grade the response on a scale of 0 to 1 based on custom criteria instructions.

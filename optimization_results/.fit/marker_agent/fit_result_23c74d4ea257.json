@@ -1,0 +1,399 @@
+{
+  "experiment_id": "23c74d4ea257",
+  "agent": "marker_agent",
+  "best_score": 0.5724285714285714,
+  "baseline_score": 0.4295714285714286,
+  "absolute_improvement": 0.1428571428571428,
+  "improved": true,
+  "score_history": [
+    0.4295714285714286,
+    0.5724285714285714
+  ],
+  "prompt_history": [
+    {
+      "round_idx": 0,
+      "prompt_snapshot": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.",
+      "score": 0.5724285714285714,
+      "dims": {},
+      "accepted": true,
+      "what_worked": [],
+      "what_failed": [],
+      "judge_insights": [
+        "response is missing the 'r1' marker (temperature must be <= 0.5); response is missing the 'r2' marker (temperature must be <= 0.3); response is missing the 'r3' marker (temperature must be <= 0.15)"
+      ],
+      "next_focus": [
+        "Preserve strengths; tighten output contract and edge-case coverage."
+      ],
+      "candidate_name": "mipro_000_03",
+      "train_score": 0.5724285714285714,
+      "holdout_score": 0.5724285714285714,
+      "generalization_gap": 0.0,
+      "metadata": {}
+    }
+  ],
+  "holdout_score": 0.5724285714285714,
+  "baseline_holdout_score": 0.42957142857142855,
+  "generalization_gap": 0.0,
+  "metric_deltas": {
+    "composite": 0.1429
+  },
+  "param_suggestions": {
+    "system_prompt": {
+      "param_name": "system_prompt",
+      "old_value": "[142 chars]",
+      "new_value": "[132 chars]",
+      "reason": "System prompt revised (142 → 132 chars)"
+    },
+    "few_shot_examples": {
+      "param_name": "few_shot_examples",
+      "old_value": 4,
+      "new_value": 4,
+      "reason": "Few-shot examples changed (4 → 4)"
+    },
+    "model_params.temperature": {
+      "param_name": "model_params.temperature",
+      "old_value": 0.6,
+      "new_value": 0.15,
+      "reason": "Model param 'temperature': 0.6 → 0.15"
+    }
+  },
+  "best_config": {
+    "system_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.",
+    "user_template": null,
+    "few_shot_examples": [
+      {
+        "query": "What happened at the steering committee?",
+        "response": "PARTIAL: answer to What happened at the steering committee? banana strawberry blueberry"
+      },
+      {
+        "query": "What follow-up is needed after the demo?",
+        "response": "PARTIAL: answer to What follow-up is needed after the demo? banana strawberry blueberry"
+      },
+      {
+        "query": "What is the budget for Q3?",
+        "response": "PARTIAL: answer to What is the budget for Q3? banana strawberry blueberry"
+      },
+      {
+        "query": "When is the next release candidate?",
+        "response": "PARTIAL: answer to When is the next release candidate? banana strawberry blueberry"
+      }
+    ],
+    "output_contract": null,
+    "model_params": {
+      "temperature": 0.15
+    },
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "baseline_config": {
+    "system_prompt": "You are a helpful AI assistant. Always include 'blueberry', 'strawberry', 'OPT', 'banana' in your answer, exactly as written, for every query.",
+    "user_template": null,
+    "few_shot_examples": [
+      {
+        "query": "What is the budget for Q3?",
+        "response": "PARTIAL: answer to What is the budget for Q3? banana"
+      },
+      {
+        "query": "List the next steps for the delivery plan.",
+        "response": "PARTIAL: answer to List the next steps for the delivery plan. banana"
+      },
+      {
+        "query": "What did the customer ask for in the last meeting?",
+        "response": "PARTIAL: answer to What did the customer ask for in the last meeting? banana"
+      },
+      {
+        "query": "What happened at the steering committee?",
+        "response": "PARTIAL: answer to What happened at the steering committee? banana"
+      }
+    ],
+    "output_contract": null,
+    "model_params": {
+      "temperature": 0.6
+    },
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "failure_clusters": [],
+  "trials": [
+    {
+      "round": 1,
+      "name": "mipro_000_00",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.42957142857142855,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 0: instruction variant (len=136), 4 few-shot examples, params={'temperature': 0.7}",
+      "critique": "",
+      "resource_versions": 3,
+      "trace_count": 15
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_01",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.42957142857142855,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 1: instruction variant (len=136), 4 few-shot examples, params={'temperature': 0.35}",
+      "critique": "",
+      "resource_versions": 4,
+      "trace_count": 20
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_02",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.42957142857142855,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 2: instruction variant (len=136), 4 few-shot examples, params={'temperature': 0.02}",
+      "critique": "",
+      "resource_versions": 5,
+      "trace_count": 25
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_03",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 3: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.15}",
+      "critique": "",
+      "resource_versions": 6,
+      "trace_count": 30
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_04",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 4: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.0}",
+      "critique": "",
+      "resource_versions": 7,
+      "trace_count": 35
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_05",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 5: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.7}",
+      "critique": "",
+      "resource_versions": 8,
+      "trace_count": 40
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_06",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 6: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.35}",
+      "critique": "",
+      "resource_versions": 9,
+      "trace_count": 45
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_07",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 7: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.02}",
+      "critique": "",
+      "resource_versions": 10,
+      "trace_count": 50
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_08",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 8: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.15}",
+      "critique": "",
+      "resource_versions": 11,
+      "trace_count": 55
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_09",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 9: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.0}",
+      "critique": "",
+      "resource_versions": 12,
+      "trace_count": 60
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_10",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 10: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.7}",
+      "critique": "",
+      "resource_versions": 13,
+      "trace_count": 65
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_11",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 11: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.35}",
+      "critique": "",
+      "resource_versions": 14,
+      "trace_count": 70
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_12",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 12: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.02}",
+      "critique": "",
+      "resource_versions": 15,
+      "trace_count": 75
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_13",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 13: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.15}",
+      "critique": "",
+      "resource_versions": 16,
+      "trace_count": 80
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_14",
+      "source": "mipro_like",
+      "phase": "minibatch",
+      "score": 0.5724285714285714,
+      "dimensions": {},
+      "mutation_notes": "MIPRO candidate 14: instruction variant (len=132), 4 few-shot examples, params={'temperature': 0.0}",
+      "critique": "",
+      "resource_versions": 17,
+      "trace_count": 85
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_03",
+      "source": "mipro_like",
+      "phase": "full_val",
+      "score": 0.5724285714285714,
+      "holdout_score": 0.5724285714285714,
+      "generalization": {
+        "ok": true,
+        "reason": "Generalization OK: fit=0.5724, holdout=0.5724, gap=+0.0000",
+        "fit_score": 0.5724285714285714,
+        "holdout_score": 0.5724285714285714,
+        "gap": 0.0,
+        "max_gap": 0.15
+      },
+      "dimensions": {},
+      "system_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.",
+      "prompt_preview": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query."
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_04",
+      "source": "mipro_like",
+      "phase": "full_val",
+      "score": 0.5724285714285714,
+      "holdout_score": 0.5724285714285714,
+      "generalization": {
+        "ok": true,
+        "reason": "Generalization OK: fit=0.5724, holdout=0.5724, gap=+0.0000",
+        "fit_score": 0.5724285714285714,
+        "holdout_score": 0.5724285714285714,
+        "gap": 0.0,
+        "max_gap": 0.15
+      },
+      "dimensions": {},
+      "system_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.",
+      "prompt_preview": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query."
+    },
+    {
+      "round": 1,
+      "name": "mipro_000_05",
+      "source": "mipro_like",
+      "phase": "full_val",
+      "score": 0.5724285714285714,
+      "holdout_score": 0.5724285714285714,
+      "generalization": {
+        "ok": true,
+        "reason": "Generalization OK: fit=0.5724, holdout=0.5724, gap=+0.0000",
+        "fit_score": 0.5724285714285714,
+        "holdout_score": 0.5724285714285714,
+        "gap": 0.0,
+        "max_gap": 0.15
+      },
+      "dimensions": {},
+      "system_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.",
+      "prompt_preview": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query."
+    }
+  ],
+  "suggestions": [
+    "System prompt revised (142 → 132 chars)",
+    "Few-shot examples changed (4 → 4)",
+    "Model param 'temperature': 0.6 → 0.15"
+  ],
+  "duration_seconds": 0.66,
+  "applied": false,
+  "optimizer_name": "mipro_like",
+  "early_stop_reason": "completed all 1 optimize round(s) (max_trials=6)",
+  "dataset_sizes": {
+    "train": 10,
+    "fit_val": 8,
+    "holdout": 2,
+    "test": 0
+  },
+  "deployment_recommendation": {
+    "prompt_version": "v2_fit_23c74d4ea257",
+    "confidence": "high",
+    "model_params": {
+      "temperature": 0.15
+    },
+    "deployment_recommendation": {
+      "rollout": "canary",
+      "weight": 0.4,
+      "monitoring_hours": 12
+    },
+    "monitoring": {
+      "metrics": [
+        "composite"
+      ],
+      "rollback_threshold": -0.03,
+      "rollback_instructions": "If 'composite' drops below baseline, rollback to You are a helpful AI assistant... (previous version)."
+    },
+    "expected_improvement": 0.1429,
+    "baseline_score": 0.4296,
+    "projected_score": 0.5724
+  }
+}

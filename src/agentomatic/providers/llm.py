@@ -148,6 +148,27 @@ def set_llm(instance: Any) -> None:
         logger.info(f"Global LLM set to: {type(instance).__name__}")
 
 
+#: The pip extra that supplies each provider's client library.
+_PROVIDER_EXTRAS: dict[str, str] = {
+    "ollama": "ollama",
+    "openai": "openai",
+    "openai_compatible": "openai",
+    "azure": "azure",
+    "vertex": "vertex",
+}
+
+
+class LLMDriverMissingError(RuntimeError):
+    """A configured LLM provider's client library is not installed.
+
+    Distinct from a backend that is merely unreachable. An unreachable
+    backend may recover; a missing driver never will, and until this was
+    raised the platform quietly substituted a dummy model — so a deployment
+    that had configured a real provider booted healthy and answered every
+    request with fabricated text.
+    """
+
+
 def _build_llm(provider: str, **kwargs: Any) -> Any:
     """Build an LLM instance for the given provider.
 
@@ -574,8 +595,28 @@ def get_named_llm(
             )
             _named_instances[name] = built
             logger.debug(f"Created named LLM instance '{name}' ({provider})")
+        except ImportError as exc:
+            extra = _PROVIDER_EXTRAS.get(provider.lower())
+            install = (
+                f"pip install 'agentomatic[{extra}]'"
+                if extra
+                else "install the provider's client library"
+            )
+            raise LLMDriverMissingError(
+                f"LLM '{name}' is configured for provider '{provider}', but its "
+                f"client library is not installed ({exc}). Fix the image rather "
+                f"than the request: {install}. Refusing to substitute a dummy "
+                "model — that would answer every call with fabricated text while "
+                "the platform reported healthy."
+            ) from exc
         except Exception as exc:
-            logger.warning(f"Failed to build LLM '{name}' ({provider}): {exc}. Using dummy.")
+            # The backend may simply be down; that can recover, so keep the
+            # dummy so local development still runs. It is logged loudly
+            # because every answer from here on is fake.
+            logger.warning(
+                f"Failed to build LLM '{name}' ({provider}): {exc}. "
+                "Using a DUMMY model — responses are fabricated."
+            )
             built = _build_dummy_llm()
             _named_instances[name] = built
         return built

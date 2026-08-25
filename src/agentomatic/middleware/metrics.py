@@ -15,6 +15,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from agentomatic.middleware.pathutils import OPERATIONAL_PATHS
+
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
@@ -27,7 +29,58 @@ except ImportError:
     generate_latest = cast(Any, None)
     CONTENT_TYPE_LATEST = cast(Any, None)
 
-_SKIP_PATHS = {"/health", "/healthz", "/readiness", "/metrics"}
+#: Probe and scrape traffic is infrastructure noise, not user requests —
+#: recording it would skew request counts and latency histograms.
+_SKIP_PATHS = OPERATIONAL_PATHS
+
+#: Collectors already registered, keyed by metric prefix.
+#:
+#: ``prometheus_client`` registers every collector into one process-wide
+#: registry and raises ``ValueError: Duplicated timeseries`` when the same
+#: metric name is registered twice. Building the collectors in
+#: ``__init__`` therefore made a second ``AgentPlatform.build()`` in one
+#: process a hard crash — which is an ordinary thing to do: uvicorn
+#: ``--reload`` re-imports the app module, embedding hosts serve several
+#: platforms side by side, and test suites build one per case. The metrics
+#: are process-global anyway, so the instances are shared rather than
+#: rebuilt.
+_COLLECTOR_CACHE: dict[str, tuple[Any, Any, Any]] = {}
+
+
+def _collectors(prefix: str) -> tuple[Any, Any, Any]:
+    """Return the ``(requests, duration, active)`` collectors for *prefix*.
+
+    Creates them on first use and reuses them afterwards, so constructing
+    several :class:`MetricsMiddleware` instances in one process is safe.
+
+    Args:
+        prefix: Metric name prefix (e.g. ``agentomatic``).
+
+    Returns:
+        The counter, histogram and gauge registered for *prefix*.
+    """
+    cached = _COLLECTOR_CACHE.get(prefix)
+    if cached is not None:
+        return cached
+    collectors = (
+        Counter(
+            f"{prefix}_http_requests_total",
+            "Total HTTP requests",
+            ["method", "path", "status"],
+        ),
+        Histogram(
+            f"{prefix}_http_request_duration_seconds",
+            "HTTP request duration",
+            ["method", "path"],
+            buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+        ),
+        Gauge(
+            f"{prefix}_http_requests_active",
+            "Active HTTP requests",
+        ),
+    )
+    _COLLECTOR_CACHE[prefix] = collectors
+    return collectors
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
@@ -39,21 +92,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         self._duration: Any | None = None
         self._active: Any | None = None
         if HAS_PROMETHEUS:
-            self._requests = Counter(
-                f"{prefix}_http_requests_total",
-                "Total HTTP requests",
-                ["method", "path", "status"],
-            )
-            self._duration = Histogram(
-                f"{prefix}_http_request_duration_seconds",
-                "HTTP request duration",
-                ["method", "path"],
-                buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
-            )
-            self._active = Gauge(
-                f"{prefix}_http_requests_active",
-                "Active HTTP requests",
-            )
+            self._requests, self._duration, self._active = _collectors(prefix)
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]

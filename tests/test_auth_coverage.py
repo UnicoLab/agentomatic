@@ -33,6 +33,12 @@ _INTENTIONALLY_PUBLIC: dict[str, str] = {
     "/": "root landing page — no data",
     "/health": "liveness probe: orchestrators cannot authenticate",
     "/readiness": "readiness probe: same",
+    "/ready": (
+        "readiness probe alias, and the spelling a Kubernetes probe usually "
+        "uses. It was gated while /readiness was not, so a "
+        "`readinessProbe: /ready` got 401 and no pod ever became ready. It "
+        "returns the same body as /readiness, which is already public."
+    ),
     "/status": "human status page — verified to carry no secrets",
     "/docs": "Swagger UI shell (the API it documents is still gated)",
     "/docs/oauth2-redirect": "Swagger OAuth redirect target",

@@ -1,0 +1,5 @@
+{
+  "system_prompt": "You are a helpful AI assistant.",
+  "few_shot_examples": [],
+  "temperature": 0.05
+}

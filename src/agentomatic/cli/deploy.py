@@ -49,6 +49,10 @@ if TYPE_CHECKING:
 # Project artefacts copied into the image, in a stable order. Only those that
 # actually exist in the project are emitted so ``docker build`` never fails on
 # a missing COPY source.
+#: uv version baked into generated images. Pinned so a build is reproducible;
+#: an unpinned installer changes image contents with no diff to show for it.
+UV_VERSION = "0.8.17"
+
 _PROJECT_COPY_CANDIDATES: tuple[str, ...] = (
     "main.py",
     "agents",
@@ -58,7 +62,56 @@ _PROJECT_COPY_CANDIDATES: tuple[str, ...] = (
     "pipelines",
     "stacks",
     "requirements.txt",
+    "pyproject.toml",
+    "uv.lock",
 )
+
+
+def _requirements_install(project_root: Path | None, *, target: str = "") -> str:
+    """Return the build step that installs the project's own dependencies.
+
+    ``requirements.txt`` is where a project declares what *it* needs on top of
+    agentomatic — a vendor LLM driver, a vector client, an in-house package.
+    The generated image copied the file and never installed it, so every such
+    dependency was silently absent at runtime: an agent configured for a
+    provider whose driver lived only there could not be built.
+
+    A project that keeps a ``uv.lock`` gets ``uv sync --frozen`` instead, which
+    installs the exact resolved versions the lock pins rather than re-resolving
+    at build time.
+
+    Args:
+        project_root: Project directory, scanned for ``uv.lock`` and
+            ``requirements.txt``. When ``None``, the requirements step is
+            emitted anyway (standalone Dockerfile).
+        target: Optional ``--target=DIR`` for the distroless layout.
+
+    Returns:
+        The ``COPY`` + ``RUN`` pair to install project dependencies, or an
+        empty string when the project declares none.
+    """
+    if (
+        project_root is not None
+        and not target
+        and (project_root / "uv.lock").exists()
+        and (project_root / "pyproject.toml").exists()
+    ):
+        return (
+            "\n# This project pins its full dependency tree in uv.lock, so install\n"
+            "# exactly that rather than re-resolving at build time.\n"
+            "COPY pyproject.toml uv.lock ./\n"
+            "RUN uv sync --frozen --no-dev --inexact\n"
+        )
+    if project_root is not None and not (project_root / "requirements.txt").exists():
+        return ""
+    flag = f"--target={target} " if target else ""
+    return (
+        "\n# The project's own dependencies (vendor LLM drivers, vector clients,\n"
+        "# in-house packages). Installed after agentomatic so the pinned version\n"
+        "# above wins, and skipped entirely when the project declares none.\n"
+        "COPY requirements.txt ./requirements.txt\n"
+        f"RUN uv pip install {flag}-r requirements.txt\n"
+    )
 
 
 def _copy_lines(project_root: Path | None, *, chown: str | None = None) -> list[str]:
@@ -217,6 +270,8 @@ def render_dockerfile(
             baked-in ``AGENTOMATIC_*`` env defaults.
     """
     copies = "\n".join(_copy_lines(project_root, chown="appuser:appuser"))
+    requirements = _requirements_install(project_root)
+    uv_version = UV_VERSION
     profile_env_block = _profile_env_block(profile)
     return f"""\
 # =============================================================================
@@ -239,13 +294,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 
 WORKDIR /app
 
+# uv resolves and installs an order of magnitude faster than pip, which is
+# most of a container build's wall clock. Pinned so the image is reproducible.
+ARG UV_VERSION={uv_version}
+RUN pip install --no-cache-dir "uv==${{UV_VERSION}}"
+
 # Isolated virtualenv so we can copy just the deps into the runtime stage.
 RUN python -m venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH" \\
+    VIRTUAL_ENV="/app/.venv"
 
-RUN pip install --upgrade pip \\
-    && pip install "agentomatic[all]=={version}"
-
+# ``db-postgres`` on top of ``all``: the ``all`` extra deliberately ships
+# only the SQLite driver, but the .env generated next to this Dockerfile
+# wires DB__URL to a DATABASE_URL that is usually Postgres — without the
+# driver that container starts and then fails with "No module named
+# 'asyncpg'" the moment persistence is switched on.
+RUN uv pip install "agentomatic[all,db-postgres]=={version}"
+{requirements}
 # ---- Runtime stage ----------------------------------------------------------
 FROM python:3.12-slim
 
@@ -320,6 +385,8 @@ def render_dockerfile_distroless(
             baked-in ``AGENTOMATIC_*`` env defaults.
     """
     copies = "\n".join(_copy_lines(project_root, chown="65532:65532"))
+    requirements = _requirements_install(project_root, target="/app/deps")
+    uv_version = UV_VERSION
     profile_env_block = _profile_env_block(profile)
     return f"""\
 # =============================================================================
@@ -348,8 +415,15 @@ WORKDIR /app
 # ``--target`` instead of a virtualenv: the runtime stage runs the distroless
 # image's own interpreter, which cannot use a venv built around a different
 # Python binary.  A plain directory on ``PYTHONPATH`` works with any 3.11.
-RUN pip install --upgrade pip \\
-    && pip install --target=/app/deps "agentomatic[all]=={version}"
+# ``db-postgres`` on top of ``all``: the ``all`` extra deliberately ships
+# only the SQLite driver, but the .env generated next to this Dockerfile
+# wires DB__URL to a DATABASE_URL that is usually Postgres — without the
+# driver that container starts and then fails with "No module named
+# 'asyncpg'" the moment persistence is switched on.
+ARG UV_VERSION={uv_version}
+RUN pip install --no-cache-dir "uv==${{UV_VERSION}}"
+RUN uv pip install --target=/app/deps "agentomatic[all,db-postgres]=={version}"
+{requirements}
 
 # Copy project sources into the build stage so they can be chowned + carried
 # into the runtime stage (distroless cannot chown at runtime — no shell).

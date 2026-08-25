@@ -480,6 +480,9 @@ class PromptFitter:
 
         self._resource_registry = ResourceRegistry()
         self._trace_store = RolloutTraceStore(path=trace_store_path)
+        #: Set when an evaluation scored nothing at all, so the summary can say
+        #: the reported score is not a measurement.
+        self._eval_blackout: str = ""
         self._reward_adapter = MetricRewardAdapter()
 
         # Fitter optimizer — lazy-imported to avoid circular deps
@@ -1415,10 +1418,17 @@ class PromptFitter:
             baseline_config,
             best_config,
         )
+        blackout = getattr(self, "_eval_blackout", "")
+        if blackout:
+            # Ahead of every other advisory: nothing else in this report means
+            # anything if no datapoint was ever scored.
+            suggestions.insert(0, blackout)
         if saturation_warning:
-            suggestions.insert(0, saturation_warning)
+            suggestions.insert(1 if blackout else 0, saturation_warning)
         if tiny_data_warning:
-            suggestions.insert(0 if not saturation_warning else 1, tiny_data_warning)
+            suggestions.insert(
+                sum(1 for flag in (blackout, saturation_warning) if flag), tiny_data_warning
+            )
 
         # Compute metric deltas
         metric_deltas: dict[str, float] = {}
@@ -1763,6 +1773,8 @@ class PromptFitter:
         eval_details: list[dict[str, Any]] = []
 
         scored_count = 0
+        #: Reasons the metric itself refused, for the blackout message below.
+        metric_errors: list[str] = []
         for rr in run_results:
             messages = trace_adapter.adapt_run_result(rr)
             if rr.error:
@@ -1877,6 +1889,7 @@ class PromptFitter:
                 )
             except Exception as exc:
                 logger.warning("Metric evaluation failed for '{}': {}", rr.query[:50], exc)
+                metric_errors.append(f"{type(exc).__name__}: {exc}")
                 eval_details.append(
                     {
                         "query": rr.query,
@@ -1891,7 +1904,27 @@ class PromptFitter:
                     }
                 )
 
-        # If every point failed evaluation, report 0.0 (not a fabricated mid score).
+        # If every point failed evaluation, report 0.0 (not a fabricated mid
+        # score) -- but say so. A silent 0.0000 is indistinguishable from "the
+        # agent answered everything wrong", and an operator whose server was
+        # simply not running reads a confident verdict on a prompt that was
+        # never exercised.
+        if run_results and not scored_count:
+            # Distinguish "the agent never answered" from "the metric could not
+            # score the answers": they point at completely different fixes.
+            call_errors = [str(rr.error) for rr in run_results if rr.error]
+            if len(call_errors) == len(run_results):
+                cause = f"all {len(run_results)} agent call(s) failed"
+                first_error = call_errors[0]
+            else:
+                cause = f"the metric scored none of {len(run_results)} response(s)"
+                first_error = metric_errors[0] if metric_errors else ""
+            self._eval_blackout = (
+                f"No datapoint could be evaluated: {cause}. The score below is "
+                "not a measurement."
+                + (f" First error: {first_error[:200]}" if first_error else "")
+            )
+            logger.error("❌ {}", self._eval_blackout)
         avg_score = sum(scores) / scored_count if scored_count else 0.0
         per_dim: dict[str, float] = {
             dim: sum(vals) / len(vals) for dim, vals in dim_accumulators.items() if vals

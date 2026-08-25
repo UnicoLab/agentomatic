@@ -342,11 +342,15 @@ def to_jsonable(value: Any) -> Any:
     on the generic REST/Studio response path, so returning raw ``BaseMessage``
     objects (e.g. ``{"messages": state.messages}``) "just works".
     """
-    _base_message_cls: Any
+    # Bind through a separate name: importing *as* the annotated name is a
+    # redefinition, which mypy 2.1 rejects.
+    _base_message_cls: Any = None
     try:
-        from langchain_core.messages import BaseMessage as _base_message_cls
+        from langchain_core.messages import BaseMessage
+
+        _base_message_cls = BaseMessage
     except ImportError:
-        _base_message_cls = None
+        pass
 
     if _base_message_cls is not None and isinstance(value, _base_message_cls):
         return message_to_dict(value)
@@ -364,11 +368,15 @@ def json_default(obj: Any) -> Any:
     (instead of stringifying their ``repr()``) and falls back to ``str(obj)`` for
     anything else, matching the platform's previous ``default=str`` behaviour.
     """
-    _base_message_cls: Any
+    # Bind through a separate name: importing *as* the annotated name is a
+    # redefinition, which mypy 2.1 rejects.
+    _base_message_cls: Any = None
     try:
-        from langchain_core.messages import BaseMessage as _base_message_cls
+        from langchain_core.messages import BaseMessage
+
+        _base_message_cls = BaseMessage
     except ImportError:
-        _base_message_cls = None
+        pass
 
     if _base_message_cls is not None and isinstance(obj, _base_message_cls):
         return message_to_dict(obj)
