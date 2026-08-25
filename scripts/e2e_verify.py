@@ -241,34 +241,15 @@ class Verifier:
         """Stream a POST SSE endpoint exactly as the Studio bundle does."""
         events: list[dict[str, Any]] = []
         raw_lines: list[str] = []
-        try:
-            with self.client.stream(
-                "POST",
-                path,
-                json=body,
-                headers={"Accept": "text/event-stream"},
-            ) as resp:
-                if resp.status_code != 200:
-                    text = resp.read().decode("utf-8", "replace")[:300]
-                    self.report.add(group, name, False, f"{path} → {resp.status_code}: {text}")
-                    return events
-                ctype = resp.headers.get("content-type", "")
-                if "text/event-stream" not in ctype:
-                    self.report.add(group, name, False, f"{path} — content-type {ctype!r}")
-                    return events
-                for line in resp.iter_lines():
-                    raw_lines.append(line)
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        events.append(json.loads(data))
-                    except Exception:  # noqa: BLE001 - captured below
-                        pass
-        except Exception as exc:  # noqa: BLE001
-            self.report.add(group, name, False, f"{path} — {type(exc).__name__}: {exc}")
+        for attempt in range(_RATE_LIMIT_RETRIES):
+            events, raw_lines, retry_after = self._stream_once(group, name, path, body)
+            if retry_after is None:
+                break
+            if attempt == _RATE_LIMIT_RETRIES - 1:
+                self.report.add(group, name, False, f"{path} — still rate limited")
+                return events
+            time.sleep(min(retry_after, _RATE_LIMIT_MAX_WAIT) + 0.5)
+        else:  # pragma: no cover - loop always breaks or returns
             return events
         if not events:
             self.report.add(group, name, False, f"{path} — no SSE data frames ({raw_lines[:4]})")
@@ -282,6 +263,50 @@ class Verifier:
             return events
         self.report.add(group, name, True)
         return events
+
+    def _stream_once(
+        self, group: str, name: str, path: str, body: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[str], float | None]:
+        """Read one SSE attempt.
+
+        Returns:
+            ``(events, raw_lines, retry_after)``. ``retry_after`` is set only
+            when the deployment rate-limited this attempt, in which case the
+            caller should wait and retry rather than report a failure.
+        """
+        events: list[dict[str, Any]] = []
+        raw_lines: list[str] = []
+        try:
+            with self.client.stream(
+                "POST",
+                path,
+                json=body,
+                headers={"Accept": "text/event-stream"},
+            ) as resp:
+                if resp.status_code == 429:
+                    return events, raw_lines, float(resp.headers.get("Retry-After") or 1)
+                if resp.status_code != 200:
+                    text = resp.read().decode("utf-8", "replace")[:300]
+                    self.report.add(group, name, False, f"{path} → {resp.status_code}: {text}")
+                    return events, raw_lines, None
+                ctype = resp.headers.get("content-type", "")
+                if "text/event-stream" not in ctype:
+                    self.report.add(group, name, False, f"{path} — content-type {ctype!r}")
+                    return events, raw_lines, None
+                for line in resp.iter_lines():
+                    raw_lines.append(line)
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        events.append(json.loads(data))
+                    except Exception:  # noqa: BLE001 - captured below
+                        pass
+        except Exception as exc:  # noqa: BLE001
+            self.report.add(group, name, False, f"{path} — {type(exc).__name__}: {exc}")
+        return events, raw_lines, None
 
     def await_task(self, group: str, name: str, submitted: Any, *, timeout: float = 30.0) -> Any:
         """Poll a 202-submitted task to a terminal state and return its record.
@@ -925,19 +950,33 @@ class Verifier:
             self.report.skip(g, "auth enforcement", "deployment runs without auth")
             return
         anon = httpx.Client(base_url=self.base, timeout=15.0)
+
+        def _anon(headers: dict[str, str] | None = None) -> httpx.Response:
+            """POST as an anonymous caller, waiting out the shared rate limit.
+
+            The anonymous client shares this harness's source IP, so it shares
+            the limiter's per-IP budget — a 429 here says nothing about auth.
+            """
+            for attempt in range(_RATE_LIMIT_RETRIES):
+                got = anon.post(
+                    f"/api/v1/{self.agent}/invoke", json={"query": "x"}, headers=headers
+                )
+                if got.status_code != 429 or attempt == _RATE_LIMIT_RETRIES - 1:
+                    return got
+                time.sleep(
+                    min(float(got.headers.get("Retry-After") or 1), _RATE_LIMIT_MAX_WAIT) + 0.5
+                )
+            return got
+
         try:
             # Protected route must reject an anonymous caller.
-            resp = anon.post(f"/api/v1/{self.agent}/invoke", json={"query": "x"})
+            resp = _anon()
             ok = resp.status_code in (401, 403)
             self.report.add(
                 g, "anonymous invoke rejected", ok, "" if ok else f"→ {resp.status_code}"
             )
             # A wrong key must also be rejected.
-            resp = anon.post(
-                f"/api/v1/{self.agent}/invoke",
-                json={"query": "x"},
-                headers={"X-Api-Key": "definitely-wrong"},
-            )
+            resp = _anon({"X-Api-Key": "definitely-wrong"})
             ok = resp.status_code in (401, 403)
             self.report.add(g, "bad key rejected", ok, "" if ok else f"→ {resp.status_code}")
             # Every probe route must stay open: an orchestrator carries no
@@ -1089,15 +1128,36 @@ class Verifier:
         ok = 429 not in codes
         self.report.add(g, "/metrics never throttled", ok, "" if ok else f"codes={codes}")
 
-        # …and that flood must not have spent the caller's budget.
-        resp = self._req("GET", "/api/v1/agents", honour_retry_after=False)
-        ok = resp is not None and resp.status_code == 200
-        self.report.add(
-            g,
-            "probes do not consume the user budget",
-            ok,
-            "" if ok else f"→ {getattr(resp, 'status_code', 'transport error')}",
-        )
+        # …and that flood must not have spent the caller's budget. Compare the
+        # advertised remaining count either side of it rather than just calling
+        # a route: by this point the harness has legitimately used budget of its
+        # own, so "a normal call still works" would be measuring the wrong thing.
+        before = self._remaining_budget()
+        for path in ("/health", "/ready", "/readiness", "/metrics"):
+            for _ in range(10):
+                self._req("GET", path, honour_retry_after=False)
+        after = self._remaining_budget()
+        if before is None or after is None:
+            self.report.skip(g, "probes do not consume the user budget", "no budget header")
+        else:
+            # `after` is read with one billed request, so allow that single unit.
+            ok = after >= before - 1
+            self.report.add(
+                g,
+                "probes do not consume the user budget",
+                ok,
+                "" if ok else f"remaining fell {before} → {after} across 40 probes",
+            )
+
+    def _remaining_budget(self) -> int | None:
+        """Return the limiter's advertised remaining requests, if it advertises one."""
+        resp = self._req("GET", "/api/v1/agents")
+        if resp is None or "X-RateLimit-Remaining" not in resp.headers:
+            return None
+        try:
+            return int(resp.headers["X-RateLimit-Remaining"])
+        except ValueError:
+            return None
 
     def run_all(self) -> Report:
         """Run every group and return the report."""
