@@ -558,7 +558,6 @@ class Verifier:
         self.check(g, "GET card", "GET", f"{base}/card")
         self.check(g, "GET config", "GET", f"{base}/config")
         self.check(g, "GET prompts", "GET", f"{base}/prompts")
-        self.check(g, "GET optimization-runs", "GET", f"{base}/optimization-runs")
 
         self.sse(
             g,
@@ -567,7 +566,23 @@ class Verifier:
             {"query": "stream me"},
         )
 
-        # Threads: the Studio client drives this whole lifecycle.
+        # Threads: the Studio client drives this whole lifecycle. A deployment
+        # with no store configured is a legitimate posture (the platform says
+        # so with a 400), not a failure — report the whole group as skipped
+        # rather than as broken, and say why.
+        probe = self._req(
+            "POST",
+            f"{base}/threads",
+            json_body={"user_id": "e2e-user", "title": "e2e thread"},
+        )
+        if probe is not None and probe.status_code == 400 and "storage" in probe.text.lower():
+            self.report.skip(
+                g,
+                "thread lifecycle",
+                "no store configured (set DATABASE_URL / AGENTOMATIC_LOGS_HISTORY)",
+            )
+            self.report.skip(g, "optimization-runs", "no store configured")
+            return
         thread = self.check(
             g,
             "POST threads",
@@ -583,6 +598,7 @@ class Verifier:
             self.report.add(g, "thread id present", False, f"no id in {thread}")
             return
         self.report.add(g, "thread id present", True)
+        self.check(g, "GET optimization-runs", "GET", f"{base}/optimization-runs")
         self.check(g, "GET threads", "GET", f"{base}/threads")
         self.check(g, "GET thread", "GET", f"{base}/threads/{tid}")
         self.check(
@@ -900,10 +916,15 @@ class Verifier:
             )
             ok = resp.status_code in (401, 403)
             self.report.add(g, "bad key rejected", ok, "" if ok else f"→ {resp.status_code}")
-            # Health must stay open so orchestrators can probe it.
-            resp = anon.get("/health")
-            ok = resp.status_code == 200
-            self.report.add(g, "health stays public", ok, "" if ok else f"→ {resp.status_code}")
+            # Every probe route must stay open: an orchestrator carries no
+            # credentials, and a readiness probe that 401s keeps a pod out of
+            # service for good while the platform looks healthy in its logs.
+            for path in ("/health", "/ready", "/readiness"):
+                resp = anon.get(path)
+                ok = resp.status_code == 200
+                self.report.add(
+                    g, f"{path} stays public", ok, "" if ok else f"→ {resp.status_code}"
+                )
         except Exception as exc:  # noqa: BLE001
             self.report.add(g, "auth checks", False, f"{type(exc).__name__}: {exc}")
         finally:

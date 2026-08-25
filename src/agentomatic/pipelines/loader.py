@@ -148,7 +148,21 @@ def _parse_agent_step(data: dict[str, Any]) -> AgentStepConfig:
 
     Returns:
         A validated ``AgentStepConfig``.
+
+    Raises:
+        ValueError: If the step declares no ``agent``. The message names the
+            step, because a bare ``KeyError('agent')`` reached the operator as
+            ``failed to load: 'agent'`` — which says neither which step nor
+            what to add, and the pipeline is then simply absent at runtime.
     """
+    if "agent" not in data:
+        label = data.get("name") or "<unnamed>"
+        declared = ", ".join(sorted(data)) or "nothing"
+        raise ValueError(
+            f"Step '{label}' has no 'agent' key (it declares: {declared}). "
+            "Steps nested under 'parallel' must be agent steps; plugin, "
+            "endpoint and ingestion steps have to sit at the top level."
+        )
     agent: str = data["agent"]
     name: str = data.get("name", agent)
 
@@ -708,7 +722,12 @@ class PipelineLoader:
             try:
                 cfg = PipelineLoader.from_yaml(path)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Skipping {} – failed to load: {}", path, exc)
+                logger.warning(
+                    "Skipping pipeline {} – it will NOT be served: {}: {}",
+                    path,
+                    type(exc).__name__,
+                    exc,
+                )
                 continue
 
             if cfg.name in configs:
@@ -747,7 +766,12 @@ class PipelineLoader:
             try:
                 cfg = PipelineLoader.from_yaml(path)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Skipping {} – failed to load: {}", path, exc)
+                logger.warning(
+                    "Skipping pipeline {} – it will NOT be served: {}: {}",
+                    path,
+                    type(exc).__name__,
+                    exc,
+                )
                 continue
             if cfg.name in files:
                 continue  # first occurrence wins, matching discover_pipelines
