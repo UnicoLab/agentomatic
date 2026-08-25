@@ -1,0 +1,147 @@
+[
+  {
+    "agent_name": "marker_agent",
+    "dataset_name": "inline",
+    "scores": {
+      "banana": 1.0,
+      "strawberry": 0.0,
+      "blueberry": 0.0,
+      "kiwi": 0.0,
+      "temp_ok": 0.0,
+      "r1": 0.0,
+      "r2": 0.0,
+      "r3": 0.0,
+      "quality": 0.14285714285714288,
+      "exact_key_match": 1.0
+    },
+    "num_examples": 4,
+    "pass_rate": 0.0,
+    "metadata": {},
+    "example_results": [
+      {
+        "example_id": "marker_016",
+        "prediction": {
+          "response": "OPT: answer to What did the customer ask for in the last meeting? banana",
+          "used_prompt": "You are a helpful AI assistant.\n\n## Few-shot examples\n\nExample 1\nQ: What is the budget for Q3?\nA: BASE: answer to What is the budget for Q3?\n\nExample 2\nQ: What did the customer ask for in the last meeting?\nA: BASE: answer to What did the customer ask for in the last meeting?\n\nExample 3\nQ: Who approved the scope change?\nA: BASE: answer to Who approved the scope change?\n\nExample 4\nQ: When is the next release candidate?\nA: BASE: answer to When is the next release candidate?",
+          "temperature": 0.7,
+          "temp_ok": false,
+          "temp_rungs": 0,
+          "banana_ok": true,
+          "strawberry_ok": false,
+          "blueberry_ok": false,
+          "kiwi_ok": false,
+          "n_satisfied": 1,
+          "difficulty": 1
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 0.0,
+          "blueberry": 0.0,
+          "kiwi": 0.0,
+          "temp_ok": 0.0,
+          "r1": 0.0,
+          "r2": 0.0,
+          "r3": 0.0,
+          "quality": 0.14285714285714288,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.16948600000432634,
+        "error": null,
+        "metadata": {}
+      },
+      {
+        "example_id": "marker_017",
+        "prediction": {
+          "response": "OPT: answer to Which teams need to be unblocked this week? banana",
+          "used_prompt": "You are a helpful AI assistant.\n\n## Few-shot examples\n\nExample 1\nQ: What is the budget for Q3?\nA: BASE: answer to What is the budget for Q3?\n\nExample 2\nQ: What did the customer ask for in the last meeting?\nA: BASE: answer to What did the customer ask for in the last meeting?\n\nExample 3\nQ: Who approved the scope change?\nA: BASE: answer to Who approved the scope change?\n\nExample 4\nQ: When is the next release candidate?\nA: BASE: answer to When is the next release candidate?",
+          "temperature": 0.7,
+          "temp_ok": false,
+          "temp_rungs": 0,
+          "banana_ok": true,
+          "strawberry_ok": false,
+          "blueberry_ok": false,
+          "kiwi_ok": false,
+          "n_satisfied": 1,
+          "difficulty": 1
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 0.0,
+          "blueberry": 0.0,
+          "kiwi": 0.0,
+          "temp_ok": 0.0,
+          "r1": 0.0,
+          "r2": 0.0,
+          "r3": 0.0,
+          "quality": 0.14285714285714288,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.10843399991244951,
+        "error": null,
+        "metadata": {}
+      },
+      {
+        "example_id": "marker_018",
+        "prediction": {
+          "response": "OPT: answer to What is the budget for Q3? banana",
+          "used_prompt": "You are a helpful AI assistant.\n\n## Few-shot examples\n\nExample 1\nQ: What is the budget for Q3?\nA: BASE: answer to What is the budget for Q3?\n\nExample 2\nQ: What did the customer ask for in the last meeting?\nA: BASE: answer to What did the customer ask for in the last meeting?\n\nExample 3\nQ: Who approved the scope change?\nA: BASE: answer to Who approved the scope change?\n\nExample 4\nQ: When is the next release candidate?\nA: BASE: answer to When is the next release candidate?",
+          "temperature": 0.7,
+          "temp_ok": false,
+          "temp_rungs": 0,
+          "banana_ok": true,
+          "strawberry_ok": false,
+          "blueberry_ok": false,
+          "kiwi_ok": false,
+          "n_satisfied": 1,
+          "difficulty": 1
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 0.0,
+          "blueberry": 0.0,
+          "kiwi": 0.0,
+          "temp_ok": 0.0,
+          "r1": 0.0,
+          "r2": 0.0,
+          "r3": 0.0,
+          "quality": 0.14285714285714288,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.09667599988461006,
+        "error": null,
+        "metadata": {}
+      },
+      {
+        "example_id": "marker_019",
+        "prediction": {
+          "response": "OPT: answer to What is the current status of the project? banana",
+          "used_prompt": "You are a helpful AI assistant.\n\n## Few-shot examples\n\nExample 1\nQ: What is the budget for Q3?\nA: BASE: answer to What is the budget for Q3?\n\nExample 2\nQ: What did the customer ask for in the last meeting?\nA: BASE: answer to What did the customer ask for in the last meeting?\n\nExample 3\nQ: Who approved the scope change?\nA: BASE: answer to Who approved the scope change?\n\nExample 4\nQ: When is the next release candidate?\nA: BASE: answer to When is the next release candidate?",
+          "temperature": 0.7,
+          "temp_ok": false,
+          "temp_rungs": 0,
+          "banana_ok": true,
+          "strawberry_ok": false,
+          "blueberry_ok": false,
+          "kiwi_ok": false,
+          "n_satisfied": 1,
+          "difficulty": 1
+        },
+        "scores": {
+          "banana": 1.0,
+          "strawberry": 0.0,
+          "blueberry": 0.0,
+          "kiwi": 0.0,
+          "temp_ok": 0.0,
+          "r1": 0.0,
+          "r2": 0.0,
+          "r3": 0.0,
+          "quality": 0.14285714285714288,
+          "exact_key_match": 1.0
+        },
+        "duration_ms": 0.10697800007619662,
+        "error": null,
+        "metadata": {}
+      }
+    ]
+  }
+]

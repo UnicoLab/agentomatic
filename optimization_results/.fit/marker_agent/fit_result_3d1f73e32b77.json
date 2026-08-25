@@ -1,0 +1,183 @@
+{
+  "experiment_id": "3d1f73e32b77",
+  "agent": "marker_agent",
+  "best_score": 0.14385714285714288,
+  "baseline_score": 0.14385714285714288,
+  "absolute_improvement": 0.0,
+  "improved": false,
+  "score_history": [
+    0.14385714285714288,
+    0.14385714285714288
+  ],
+  "prompt_history": [
+    {
+      "round_idx": 0,
+      "prompt_snapshot": "You are a helpful AI assistant.",
+      "score": 0.14385714285714288,
+      "dims": {},
+      "accepted": false,
+      "what_worked": [],
+      "what_failed": [
+        "q='When is the next release candidate?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.14 | response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token ",
+        "q='Who approved the scope change?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.14 | response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token ",
+        "q='List the next steps for the delivery plan.' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.14 | response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token ",
+        "q='What follow-up is needed after the demo?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.14 | response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token ",
+        "q='What happened at the steering committee?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.14 | response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token "
+      ],
+      "judge_insights": [
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an",
+        "response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal an"
+      ],
+      "next_focus": [
+        "Address lowest-scoring failure modes without hardcoding those exact queries."
+      ],
+      "candidate_name": "",
+      "train_score": 0.14385714285714288,
+      "holdout_score": 0.14385714285714285,
+      "generalization_gap": 2.7755575615628914e-17,
+      "metadata": {}
+    }
+  ],
+  "holdout_score": 0.14385714285714285,
+  "baseline_holdout_score": 0.14385714285714285,
+  "generalization_gap": 2.7755575615628914e-17,
+  "metric_deltas": {
+    "composite": 0.0
+  },
+  "param_suggestions": {},
+  "best_config": {
+    "system_prompt": "You are a helpful AI assistant.",
+    "user_template": null,
+    "few_shot_examples": [
+      {
+        "query": "What is the budget for Q3?",
+        "response": "BASE: answer to What is the budget for Q3?"
+      },
+      {
+        "query": "What did the customer ask for in the last meeting?",
+        "response": "BASE: answer to What did the customer ask for in the last meeting?"
+      },
+      {
+        "query": "Who approved the scope change?",
+        "response": "BASE: answer to Who approved the scope change?"
+      },
+      {
+        "query": "When is the next release candidate?",
+        "response": "BASE: answer to When is the next release candidate?"
+      }
+    ],
+    "output_contract": null,
+    "model_params": {},
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "baseline_config": {
+    "system_prompt": "You are a helpful AI assistant.",
+    "user_template": null,
+    "few_shot_examples": [
+      {
+        "query": "What is the budget for Q3?",
+        "response": "BASE: answer to What is the budget for Q3?"
+      },
+      {
+        "query": "What did the customer ask for in the last meeting?",
+        "response": "BASE: answer to What did the customer ask for in the last meeting?"
+      },
+      {
+        "query": "Who approved the scope change?",
+        "response": "BASE: answer to Who approved the scope change?"
+      },
+      {
+        "query": "When is the next release candidate?",
+        "response": "BASE: answer to When is the next release candidate?"
+      }
+    ],
+    "output_contract": null,
+    "model_params": {},
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "failure_clusters": [],
+  "trials": [
+    {
+      "round": 1,
+      "name": "fewshot_000_0",
+      "source": "few_shot_bootstrap",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "Few-shot bootstrap (rank 0): 4 examples, avg_score=0.144, diversity=1.000, combined=0.401",
+      "critique": "",
+      "resource_versions": 3,
+      "trace_count": 15
+    },
+    {
+      "round": 1,
+      "name": "fewshot_000_1",
+      "source": "few_shot_bootstrap",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "Few-shot bootstrap (rank 1): 4 examples, avg_score=0.144, diversity=1.000, combined=0.401",
+      "critique": "",
+      "resource_versions": 4,
+      "trace_count": 20
+    },
+    {
+      "round": 1,
+      "name": "fewshot_000_2",
+      "source": "few_shot_bootstrap",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "Few-shot bootstrap (rank 2): 4 examples, avg_score=0.144, diversity=1.000, combined=0.401",
+      "critique": "",
+      "resource_versions": 5,
+      "trace_count": 25
+    }
+  ],
+  "suggestions": [
+    "No configuration changes improved over the baseline."
+  ],
+  "duration_seconds": 0.17,
+  "applied": false,
+  "optimizer_name": "few_shot_bootstrap",
+  "early_stop_reason": "no improvement for 1 round(s) (patience=1, monitor=best_score)",
+  "dataset_sizes": {
+    "train": 10,
+    "fit_val": 8,
+    "holdout": 2,
+    "test": 0
+  },
+  "deployment_recommendation": {
+    "prompt_version": "v2_fit_3d1f73e32b77",
+    "confidence": "no_improvement",
+    "deployment_recommendation": {
+      "rollout": "hold",
+      "weight": 0.0,
+      "monitoring_hours": 0
+    },
+    "monitoring": {
+      "metrics": [
+        "composite"
+      ],
+      "rollback_threshold": -0.03,
+      "rollback_instructions": "If 'composite' drops below baseline, rollback to You are a helpful AI assistant... (previous version)."
+    },
+    "expected_improvement": 0.0,
+    "baseline_score": 0.1439,
+    "projected_score": 0.1439
+  }
+}

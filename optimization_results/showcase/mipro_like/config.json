@@ -1,0 +1,22 @@
+{
+  "system_prompt": "You are a helpful AI assistant. Always include 'OPT', 'banana', 'kiwi', 'Judge' in your answer, exactly as written, for every query.",
+  "few_shot_examples": [
+    {
+      "query": "What happened at the steering committee?",
+      "response": "PARTIAL: answer to What happened at the steering committee? banana strawberry blueberry"
+    },
+    {
+      "query": "What follow-up is needed after the demo?",
+      "response": "PARTIAL: answer to What follow-up is needed after the demo? banana strawberry blueberry"
+    },
+    {
+      "query": "What is the budget for Q3?",
+      "response": "PARTIAL: answer to What is the budget for Q3? banana strawberry blueberry"
+    },
+    {
+      "query": "When is the next release candidate?",
+      "response": "PARTIAL: answer to When is the next release candidate? banana strawberry blueberry"
+    }
+  ],
+  "temperature": 0.15
+}

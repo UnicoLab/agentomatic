@@ -1,0 +1,228 @@
+{
+  "experiment_id": "fd94ff3bc2e5",
+  "agent": "marker_agent",
+  "best_score": 0.4295714285714286,
+  "baseline_score": 0.4295714285714286,
+  "absolute_improvement": 0.0,
+  "improved": false,
+  "score_history": [
+    0.4295714285714286,
+    0.4295714285714286
+  ],
+  "prompt_history": [
+    {
+      "round_idx": 0,
+      "prompt_snapshot": "You are a helpful AI assistant.",
+      "score": 0.4295714285714286,
+      "dims": {},
+      "accepted": false,
+      "what_worked": [],
+      "what_failed": [
+        "q='When is the next release candidate?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (jud",
+        "q='Who approved the scope change?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (jud",
+        "q='List the next steps for the delivery plan.' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (jud",
+        "q='What follow-up is needed after the demo?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (jud",
+        "q='What happened at the steering committee?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (jud"
+      ],
+      "judge_insights": [
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response ",
+        "response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the required marker token 'strawberry' (judge guidance lists it as part of the ideal answer); response "
+      ],
+      "next_focus": [
+        "Address lowest-scoring failure modes without hardcoding those exact queries."
+      ],
+      "candidate_name": "",
+      "train_score": 0.4295714285714286,
+      "holdout_score": 0.42957142857142855,
+      "generalization_gap": 5.551115123125783e-17,
+      "metadata": {}
+    }
+  ],
+  "holdout_score": 0.42957142857142855,
+  "baseline_holdout_score": 0.42957142857142855,
+  "generalization_gap": 5.551115123125783e-17,
+  "metric_deltas": {
+    "composite": 0.0
+  },
+  "param_suggestions": {},
+  "best_config": {
+    "system_prompt": "You are a helpful AI assistant.",
+    "user_template": null,
+    "few_shot_examples": [],
+    "output_contract": null,
+    "model_params": {
+      "temperature": 0.05
+    },
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "baseline_config": {
+    "system_prompt": "You are a helpful AI assistant.",
+    "user_template": null,
+    "few_shot_examples": [],
+    "output_contract": null,
+    "model_params": {
+      "temperature": 0.05
+    },
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "failure_clusters": [],
+  "trials": [
+    {
+      "round": 1,
+      "name": "param_000_m00",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.2867142857142857,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.2",
+      "critique": "",
+      "resource_versions": 3,
+      "trace_count": 15
+    },
+    {
+      "round": 1,
+      "name": "param_000_m01",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.5",
+      "critique": "",
+      "resource_versions": 4,
+      "trace_count": 20
+    },
+    {
+      "round": 1,
+      "name": "param_000_m02",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.2867142857142857,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.3",
+      "critique": "",
+      "resource_versions": 5,
+      "trace_count": 25
+    },
+    {
+      "round": 1,
+      "name": "param_000_m03",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.42957142857142855,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.15",
+      "critique": "",
+      "resource_versions": 6,
+      "trace_count": 30
+    },
+    {
+      "round": 1,
+      "name": "param_000_m04",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.42957142857142855,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.0",
+      "critique": "",
+      "resource_versions": 7,
+      "trace_count": 35
+    },
+    {
+      "round": 1,
+      "name": "param_000_m05",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.45",
+      "critique": "",
+      "resource_versions": 8,
+      "trace_count": 40
+    },
+    {
+      "round": 1,
+      "name": "param_000_m06",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.001,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.65",
+      "critique": "",
+      "resource_versions": 9,
+      "trace_count": 45
+    },
+    {
+      "round": 1,
+      "name": "param_000_m07",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.001,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.55",
+      "critique": "",
+      "resource_versions": 10,
+      "trace_count": 50
+    },
+    {
+      "round": 1,
+      "name": "param_000_m08",
+      "source": "param_search",
+      "phase": "minibatch",
+      "score": 0.001,
+      "dimensions": {},
+      "mutation_notes": "Model param change (random): temperature=0.6",
+      "critique": "",
+      "resource_versions": 11,
+      "trace_count": 55
+    }
+  ],
+  "suggestions": [
+    "No configuration changes improved over the baseline."
+  ],
+  "duration_seconds": 0.13,
+  "applied": false,
+  "optimizer_name": "param_search",
+  "early_stop_reason": "no improvement for 1 round(s) (patience=1, monitor=best_score)",
+  "dataset_sizes": {
+    "train": 10,
+    "fit_val": 8,
+    "holdout": 2,
+    "test": 0
+  },
+  "deployment_recommendation": {
+    "prompt_version": "v2_fit_fd94ff3bc2e5",
+    "confidence": "no_improvement",
+    "model_params": {
+      "temperature": 0.05
+    },
+    "deployment_recommendation": {
+      "rollout": "hold",
+      "weight": 0.0,
+      "monitoring_hours": 0
+    },
+    "monitoring": {
+      "metrics": [
+        "composite"
+      ],
+      "rollback_threshold": -0.03,
+      "rollback_instructions": "If 'composite' drops below baseline, rollback to You are a helpful AI assistant... (previous version)."
+    },
+    "expected_improvement": 0.0,
+    "baseline_score": 0.4296,
+    "projected_score": 0.4296
+  }
+}

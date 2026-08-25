@@ -1,0 +1,149 @@
+{
+  "experiment_id": "12905a65554d",
+  "agent": "marker_agent",
+  "best_score": 0.2867142857142857,
+  "baseline_score": 0.2867142857142857,
+  "absolute_improvement": 0.0,
+  "improved": false,
+  "score_history": [
+    0.2867142857142857,
+    0.2867142857142857
+  ],
+  "prompt_history": [
+    {
+      "round_idx": 0,
+      "prompt_snapshot": "You are a helpful AI assistant. Always include 'banana', 'strawberry', 'Judge', 'OPT' in your answer, exactly as written, for every query.",
+      "score": 0.2867142857142857,
+      "dims": {},
+      "accepted": false,
+      "what_worked": [],
+      "what_failed": [
+        "q='When is the next release candidate?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.29 | response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token '",
+        "q='Who approved the scope change?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.29 | response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token '",
+        "q='List the next steps for the delivery plan.' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.29 | response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token '",
+        "q='What follow-up is needed after the demo?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.29 | response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token '",
+        "q='What happened at the steering committee?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.29 | response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token '"
+      ],
+      "judge_insights": [
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);",
+        "response is missing the required marker token 'blueberry' (judge guidance lists it as part of the ideal answer); response is missing the required marker token 'kiwi' (judge guidance lists it as part of the ideal answer);"
+      ],
+      "next_focus": [
+        "Address lowest-scoring failure modes without hardcoding those exact queries."
+      ],
+      "candidate_name": "",
+      "train_score": 0.2867142857142857,
+      "holdout_score": 0.2867142857142857,
+      "generalization_gap": 0.0,
+      "metadata": {}
+    }
+  ],
+  "holdout_score": 0.2867142857142857,
+  "baseline_holdout_score": 0.2867142857142857,
+  "generalization_gap": 0.0,
+  "metric_deltas": {
+    "composite": 0.0
+  },
+  "param_suggestions": {},
+  "best_config": {
+    "system_prompt": "You are a helpful AI assistant. Always include 'banana', 'strawberry', 'Judge', 'OPT' in your answer, exactly as written, for every query.",
+    "user_template": null,
+    "few_shot_examples": [],
+    "output_contract": null,
+    "model_params": {},
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "baseline_config": {
+    "system_prompt": "You are a helpful AI assistant. Always include 'banana', 'strawberry', 'Judge', 'OPT' in your answer, exactly as written, for every query.",
+    "user_template": null,
+    "few_shot_examples": [],
+    "output_contract": null,
+    "model_params": {},
+    "rag_params": {},
+    "tool_params": {},
+    "model_choice": null,
+    "fallback_model": null,
+    "routing_config": {}
+  },
+  "failure_clusters": [],
+  "trials": [
+    {
+      "round": 1,
+      "name": "gepa_000_0",
+      "source": "gepa_like",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "GEPA mutation 0 targeting: completeness — ensure answers cover all parts of the question. Based on 8 feedback items.",
+      "critique": "",
+      "resource_versions": 3,
+      "trace_count": 15
+    },
+    {
+      "round": 1,
+      "name": "gepa_000_1",
+      "source": "gepa_like",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "GEPA mutation 1 targeting: factual grounding — ensure answers are accurate and evidence-based. Based on 8 feedback items.",
+      "critique": "",
+      "resource_versions": 4,
+      "trace_count": 20
+    },
+    {
+      "round": 1,
+      "name": "gepa_000_2",
+      "source": "gepa_like",
+      "phase": "minibatch",
+      "score": 0.14385714285714285,
+      "dimensions": {},
+      "mutation_notes": "GEPA mutation 2 targeting: format compliance — ensure answers follow the requested structure. Based on 8 feedback items.",
+      "critique": "",
+      "resource_versions": 5,
+      "trace_count": 25
+    }
+  ],
+  "suggestions": [
+    "No configuration changes improved over the baseline."
+  ],
+  "duration_seconds": 0.42,
+  "applied": false,
+  "optimizer_name": "gepa_like",
+  "early_stop_reason": "no improvement for 1 round(s) (patience=1, monitor=best_score)",
+  "dataset_sizes": {
+    "train": 10,
+    "fit_val": 8,
+    "holdout": 2,
+    "test": 0
+  },
+  "deployment_recommendation": {
+    "prompt_version": "v2_fit_12905a65554d",
+    "confidence": "no_improvement",
+    "deployment_recommendation": {
+      "rollout": "hold",
+      "weight": 0.0,
+      "monitoring_hours": 0
+    },
+    "monitoring": {
+      "metrics": [
+        "composite"
+      ],
+      "rollback_threshold": -0.03,
+      "rollback_instructions": "If 'composite' drops below baseline, rollback to You are a helpful AI assistant... (previous version)."
+    },
+    "expected_improvement": 0.0,
+    "baseline_score": 0.2867,
+    "projected_score": 0.2867
+  }
+}

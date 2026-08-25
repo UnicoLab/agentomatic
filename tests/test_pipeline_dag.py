@@ -131,7 +131,10 @@ class TestEngineDagExecution:
                 TransformStepConfig(
                     name="c",
                     code="return {'v': 3}",
-                    condition="len(ctx.input.query) > 100",  # never true
+                    # Never true, and evaluable: `ctx.input` is a dict, so the
+                    # attribute form this used to use raised AttributeError and
+                    # only counted as "false" because the engine swallowed it.
+                    condition="len(ctx.input.get('query', '')) > 100",
                 ),
             ]
         )
