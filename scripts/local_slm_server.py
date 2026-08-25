@@ -121,7 +121,11 @@ def _expected_keywords(briefing: str) -> list[str]:
     """
     sources: list[str] = []
     sources += re.findall(r"^\s*[-*]?\s*Expected(?:\s+answer)?:\s*(.+)$", briefing, re.MULTILINE)
-    sources += re.findall(r"^##\s*Expected answer\s*\n(.+)$", briefing, re.MULTILINE)
+    # ``to_datapoint`` renders the answer as its own markdown block, which the
+    # briefing indents under the label. Allow leading whitespace on both the
+    # header and the value, or the ground truth is missed entirely and the
+    # rewrite has nothing to fold in.
+    sources += re.findall(r"^[ \t]*##\s*Expected answer\s*\n[ \t]*(.+)$", briefing, re.MULTILINE)
 
     counts: dict[str, int] = {}
     for line in sources:

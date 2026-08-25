@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import difflib
 import os
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -106,6 +107,45 @@ class BaseMetric(ABC):
 # =====================================================================
 
 
+#: Header that opens the plain answer inside a rich expected reference.
+_EXPECTED_ANSWER_HEADER = re.compile(
+    r"^[ \t]*##[ \t]*Expected answer[ \t]*$", re.MULTILINE | re.IGNORECASE
+)
+#: Any other section header in such a reference, which ends the answer.
+_ANY_SECTION_HEADER = re.compile(r"^[ \t]*##[ \t]*\S", re.MULTILINE)
+
+
+def plain_expected(expected: str | None) -> str | None:
+    """Return the literal ground-truth answer inside an expected reference.
+
+    ``AgentExample.to_datapoint`` builds a *judge-facing* reference — judge
+    guidance, a rubric, an "## Expected answer" section, the structured
+    output as JSON. An LLM judge reads all of that. A deterministic metric
+    cannot: comparing a response against markdown headers scores near zero no
+    matter how right the answer is, so ``fit()`` over an ``AgentDataset``
+    reported "no improvement" forever, whatever the optimizer proposed.
+
+    Plain strings pass through untouched, so a hand-written dataset behaves
+    exactly as before.
+
+    Args:
+        expected: The expected value as the dataset carries it.
+
+    Returns:
+        Just the answer text, or ``expected`` when there is no such section.
+    """
+    if not expected:
+        return expected
+    opener = _EXPECTED_ANSWER_HEADER.search(expected)
+    if opener is None:
+        return expected
+    rest = expected[opener.end() :].lstrip("\n")
+    nxt = _ANY_SECTION_HEADER.search(rest)
+    body = rest[: nxt.start()] if nxt else rest
+    stripped = "\n".join(line.strip() for line in body.splitlines()).strip()
+    return stripped or expected
+
+
 class ExactMatchMetric(BaseMetric):
     """Simple string matching — no LLM required."""
 
@@ -126,6 +166,7 @@ class ExactMatchMetric(BaseMetric):
             return EvalResult(
                 metric_name=self.name, score=0.0, reason="No expected answer provided"
             )
+        expected = plain_expected(expected) or expected
 
         if self.fuzzy:
             ratio = difflib.SequenceMatcher(
@@ -160,8 +201,9 @@ class ContainsMetric(BaseMetric):
         if expected is None:
             return EvalResult(metric_name=self.name, score=0.0, reason="No expected answer")
 
+        expected = plain_expected(expected) or expected
         resp_lower = response.lower()
-        keywords = [kw.strip() for kw in expected.lower().split(",")]
+        keywords = [kw.strip() for kw in expected.lower().split(",") if kw.strip()]
         found = sum(1 for kw in keywords if kw in resp_lower)
         score = found / len(keywords) if keywords else 0.0
         return EvalResult(

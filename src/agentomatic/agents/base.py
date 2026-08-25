@@ -535,6 +535,19 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         if metrics is None:
             metrics = list(self._compile_metrics)
         if not metrics:
+            # A metric is a live Python object, so it cannot be written to
+            # ``config.json`` and does not come back with ``load()``. Say so
+            # when the saved metadata shows which ones were compiled in:
+            # otherwise "compile(metrics=...) first" reads as wrong advice to
+            # somebody who did exactly that before saving.
+            saved = [str(m) for m in (self.compiled_metadata.get("metrics") or [])]
+            if saved:
+                raise ValueError(
+                    f"No metrics available. This agent was compiled with "
+                    f"{saved} but metrics are live objects and do not survive "
+                    "save()/load() — re-supply them with "
+                    "compile(metrics=[...]) or evaluate(dataset, metrics=[...])."
+                )
             raise ValueError(
                 "No metrics provided. Pass metrics=... to evaluate() "
                 "or compile(metrics=...) first."
@@ -1068,6 +1081,11 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         - ``evaluation_history.json`` — past evaluation reports
         - ``fit_history.json`` — Keras-style ``History`` from the last ``fit()``
 
+        Metrics, the loss and the optimizer are live Python objects, so only
+        their *names* are recorded, in ``metadata.json``. A loaded agent can
+        serve and can report its past scores, but needs those objects supplied
+        again — ``compile(metrics=[...])`` — before ``fit()`` or ``evaluate()``.
+
         Args:
             path: Directory to save to.
         """
@@ -1132,6 +1150,11 @@ class BaseGraphAgent(ABC, Generic[StateT]):
 
     def load_compiled(self, path: str | Path) -> None:
         """Load compiled config from a saved directory.
+
+        Restores the tuned configuration, the compile metadata, and both
+        histories. Metrics, loss and optimizer are not restored — they are
+        live objects that were never serialised (see :meth:`save`) — so
+        recompile with them before ``fit()`` or ``evaluate()``.
 
         Args:
             path: Directory containing saved state.

@@ -129,6 +129,28 @@ def _clip(value: Any, limit: int = 400) -> str:
     return text[: limit - 1] + "…"
 
 
+def _labelled(label: str, value: Any, limit: int = 400, *, indent: str = "") -> str:
+    """Render ``label: value``, keeping a multi-line value under its label.
+
+    ``AgentExample.to_datapoint`` renders an expected answer as a markdown
+    block ("## Expected answer\n…"). Inlined after a label that produced
+
+    .. code-block:: text
+
+           Expected: ## Expected answer
+       OPT, banana
+
+    — a header mid-line, and the answer itself de-indented out of the item it
+    belongs to. That is the single field a rewrite model most needs to find,
+    so give a multi-line value its own indented block instead.
+    """
+    text = _clip(value, limit)
+    if "\n" not in text:
+        return f"{indent}{label}: {text}"
+    body = "\n".join(f"{indent}  {line}" if line.strip() else "" for line in text.splitlines())
+    return f"{indent}{label}:\n{body}"
+
+
 def _fmt_json(data: Any, limit: int = 800) -> str:
     try:
         text = json.dumps(data, ensure_ascii=False, indent=2, default=str)
@@ -204,7 +226,7 @@ def format_dataset_samples(samples: list[Any], *, max_items: int = 8) -> str:
             query = getattr(raw, "query", "")
             expected = getattr(raw, "expected_answer", None) or getattr(raw, "expected", "")
         lines.append(f"{i}. Q: {_clip(query, 220)}")
-        lines.append(f"   Expected: {_clip(expected, 220)}")
+        lines.append(_labelled("Expected", expected, 220, indent="   "))
     return "\n".join(lines)
 
 
@@ -231,7 +253,7 @@ def format_eval_io(
         score = float(fail.get("score", fail.get("avg_score", 0.0)) or 0.0)
         lines.append(f"\n**Failure {idx}** (score={score:.3f})")
         lines.append(f"- Input/query: {_clip(fail.get('query'), clip)}")
-        lines.append(f"- Expected: {_clip(fail.get('expected'), clip)}")
+        lines.append(_labelled("- Expected", fail.get("expected"), clip))
         lines.append(f"- Actual output: {_clip(fail.get('response'), clip)}")
         issues = fail.get("feedback") or fail.get("reason") or fail.get("details")
         if issues:
@@ -267,7 +289,7 @@ def format_eval_io(
             score = float(suc.get("score", suc.get("avg_score", 0.0)) or 0.0)
             lines.append(f"\n**Success {idx}** (score={score:.3f})")
             lines.append(f"- Input/query: {_clip(suc.get('query'), min(clip, 220))}")
-            lines.append(f"- Expected: {_clip(suc.get('expected'), min(clip, 220))}")
+            lines.append(_labelled("- Expected", suc.get("expected"), min(clip, 220)))
             lines.append(f"- Actual output: {_clip(suc.get('response'), min(clip, 220))}")
 
     return "\n".join(lines)
