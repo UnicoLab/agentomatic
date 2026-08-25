@@ -14,12 +14,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from agentomatic.middleware.pathutils import path_is_skipped
+from agentomatic.middleware.pathutils import PROBE_PATHS, path_is_skipped
 
 _SKIP_PATHS = {
-    "/health",
-    "/healthz",
-    "/readiness",
+    # Probe endpoints (see PROBE_PATHS) are added below: an orchestrator has
+    # no credentials, so a readiness probe that 401s keeps every pod out of
+    # service and the Deployment never rolls out.
+    *PROBE_PATHS,
     "/docs",
     "/openapi.json",
     "/redoc",

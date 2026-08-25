@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-#: Operational endpoints that infrastructure — not users — calls: liveness and
-#: readiness probes and the Prometheus scrape.
+#: Liveness/readiness probe endpoints — called by orchestrators, not users.
 #:
-#: Middleware must never rate-limit or bill these. A kubelet probing every few
-#: seconds and a scraper polling ``/metrics`` share one source IP with real
-#: traffic behind a NAT, ingress, or service mesh, so counting them against a
-#: per-IP budget makes probes flap to 429 under exactly the load where the
-#: pod must stay up — and blanks the metrics that would explain it.
-#:
-#: The set is deliberately wider than the routes this platform mounts today
-#: (it also covers the ``/healthz`` and ``/livez`` spellings) so operators who
-#: alias a conventional probe path are covered too.
-OPERATIONAL_PATHS: frozenset[str] = frozenset(
+#: These must never require credentials and must never be rate limited. A
+#: readiness probe that answers 401 keeps every pod out of service so the
+#: Deployment never rolls out; one that answers 429 under load restarts pods
+#: at exactly the wrong moment. The platform mounts ``/health``, ``/ready``
+#: and ``/readiness``; the ``/healthz``, ``/livez`` and ``/readyz`` spellings
+#: are included so an operator who aliases a conventional path is covered too.
+PROBE_PATHS: frozenset[str] = frozenset(
     {
         "/health",
         "/healthz",
@@ -23,9 +19,17 @@ OPERATIONAL_PATHS: frozenset[str] = frozenset(
         "/ready",
         "/readiness",
         "/readyz",
-        "/metrics",
     }
 )
+
+#: Everything infrastructure calls: the probes plus the Prometheus scrape.
+#:
+#: Middleware must not bill or throttle any of these. Behind a NAT, ingress,
+#: or service mesh the kubelet and the scraper share one source IP with real
+#: traffic, so counting them against a per-IP budget makes probes flap to 429
+#: under exactly the load where the pod must stay up — and blanks the metrics
+#: that would explain it.
+OPERATIONAL_PATHS: frozenset[str] = PROBE_PATHS | {"/metrics"}
 
 
 def path_is_skipped(path: str, skip_paths: set[str]) -> bool:

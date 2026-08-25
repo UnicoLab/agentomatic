@@ -30,9 +30,68 @@ from agentomatic.connections.models import (
     VectorConnectionConfig,
 )
 from agentomatic.connections.vector import VectorConnection
+from agentomatic.endpoints.auth import resolve_env
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+#: The field naming each config kind's connect target. A connection whose
+#: target is an unresolved ``${ENV}`` placeholder cannot possibly work.
+_TARGET_FIELDS: dict[type, str] = {
+    DatabaseConnectionConfig: "url",
+    HttpConnectionConfig: "base_url",
+    VectorConnectionConfig: "url",
+}
+
+
+def unresolved_env_vars(value: Any) -> list[str]:
+    """Return the ``${VAR}`` names in *value* that the environment does not set.
+
+    Args:
+        value: A config value; only strings can carry placeholders.
+
+    Returns:
+        The names of placeholders that resolve to nothing, in order.
+    """
+    import os
+    import re
+
+    if not isinstance(value, str) or "${" not in value:
+        return []
+    return [
+        name
+        for name in re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", value)
+        if not os.environ.get(name)
+    ]
+
+
+def _unconfigured_reason(config: Any) -> str | None:
+    """Explain why *config* cannot connect, or ``None`` if it looks usable.
+
+    Only reports the case that is unambiguously a *missing configuration*
+    rather than a broken one: the connect target is built entirely from
+    ``${ENV}`` placeholders that are unset, so it resolves to an empty string.
+
+    Args:
+        config: A connection config.
+
+    Returns:
+        A message naming the environment variables to set, else ``None``.
+    """
+    field = _TARGET_FIELDS.get(type(config))
+    if field is None:
+        return None
+    raw = getattr(config, field, "")
+    missing = unresolved_env_vars(raw)
+    if not missing:
+        return None
+    if resolve_env(raw).strip():
+        # Partially configured — let the driver report what is actually wrong.
+        return None
+    names = ", ".join(missing)
+    return f"{field} is unset — set {names} to enable it"
+
 
 #: Scope name used for connections shared across the whole platform.
 PLATFORM_SCOPE = "__platform__"
@@ -230,8 +289,22 @@ class ConnectionManager:
         return conns[0] if conns else None
 
     async def initialize(self) -> None:
-        """Initialise all connections in this scope."""
+        """Initialise all connections in this scope.
+
+        A connection whose target is nothing but unset ``${ENV}`` placeholders
+        is *unconfigured*, not broken: the scaffolded ``connections.py``
+        declares several as examples. Those are reported as a warning naming
+        the variables to set, rather than as an error carrying whatever the
+        driver made of an empty string ("Could not parse SQLAlchemy URL from
+        given URL string" told an operator nothing about which variable to
+        provide, and four such errors on every boot train people to skim past
+        the ones that matter).
+        """
         for name, conn in self._connections.items():
+            reason = _unconfigured_reason(getattr(conn, "config", None))
+            if reason:
+                logger.warning(f"Connection '{name}' not configured: {reason}")
+                continue
             try:
                 await conn.initialize()
             except Exception as exc:  # noqa: BLE001
