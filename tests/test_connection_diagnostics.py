@@ -18,6 +18,7 @@ from agentomatic.connections.manager import (
     unresolved_env_vars,
 )
 from agentomatic.connections.models import (
+    ConnectionPurpose,
     DatabaseConnectionConfig,
     HttpConnectionConfig,
     VectorConnectionConfig,
@@ -174,3 +175,90 @@ class TestHealthDistinguishesAbsentFromBroken:
 
         assert health["real"]["status"] == "healthy"
         await manager.close()
+
+
+class TestStorePrecedenceIsAnnounced:
+    """A MEMORY connection silently outranking DATABASE_URL loses data.
+
+    Both can be configured at once, and the connection wins. Left unsaid, an
+    operator who pointed DATABASE_URL at a managed Postgres reads "store
+    configured" and believes their threads live there — while they are going
+    wherever the connection points, which for the scaffolded MEMORY example is
+    a file inside the container that dies with it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_override_is_logged_as_a_warning(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from agentomatic import AgentPlatform
+        from agentomatic.connections.manager import register_connections
+        from agentomatic.core import platform as platform_mod
+
+        monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:secret@db:5432/prod")
+        monkeypatch.setenv("AG_MEM_URL", f"sqlite+aiosqlite:///{tmp_path / 'mem.db'}")
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        register_connections(
+            "scoped",
+            [
+                DatabaseConnectionConfig(
+                    name="memory",
+                    url="${AG_MEM_URL}",
+                    purpose=ConnectionPurpose.MEMORY,
+                )
+            ],
+        )
+        messages: list[str] = []
+        # Capture the call rather than adding a loguru sink: the platform
+        # reconfigures logging, which tears sinks down mid-test.
+        monkeypatch.setattr(
+            platform_mod.logger,
+            "warning",
+            lambda msg, *a, **k: messages.append(str(msg)),
+        )
+        platform = AgentPlatform(agents_dir=str(agents))
+        await platform._auto_derive_store_from_connections()  # noqa: SLF001
+
+        assert any("OVERRIDES" in m for m in messages), messages
+
+    @pytest.mark.asyncio
+    async def test_the_warning_never_prints_the_password(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from agentomatic import AgentPlatform
+        from agentomatic.connections.manager import register_connections
+        from agentomatic.core import platform as platform_mod
+
+        monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:hunter2@db:5432/prod")
+        monkeypatch.setenv("AG_MEM_URL2", f"sqlite+aiosqlite:///{tmp_path / 'mem2.db'}")
+        agents = tmp_path / "agents"
+        agents.mkdir()
+        register_connections(
+            "scoped2",
+            [
+                DatabaseConnectionConfig(
+                    name="memory",
+                    url="${AG_MEM_URL2}",
+                    purpose=ConnectionPurpose.MEMORY,
+                )
+            ],
+        )
+        messages: list[str] = []
+        # Capture the call rather than adding a loguru sink: the platform
+        # reconfigures logging, which tears sinks down mid-test.
+        monkeypatch.setattr(
+            platform_mod.logger,
+            "warning",
+            lambda msg, *a, **k: messages.append(str(msg)),
+        )
+        platform = AgentPlatform(agents_dir=str(agents))
+        await platform._auto_derive_store_from_connections()  # noqa: SLF001
+
+        assert not any("hunter2" in m for m in messages), "credential leaked into the log"
+
+    def test_the_url_helper_strips_credentials(self) -> None:
+        from agentomatic.core.platform import _safe_db_url
+
+        assert _safe_db_url("postgresql+asyncpg://u:pw@host:5432/db") == "host:5432/db"
+        assert _safe_db_url("sqlite+aiosqlite:///data.db") == "sqlite+aiosqlite:///data.db"
