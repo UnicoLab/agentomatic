@@ -3427,8 +3427,13 @@ full configuration surface (pooling, TTL/eviction, table name, shared engine).</
 </tbody>
 </table>
 <div class="admonition info">
-<p class="admonition-title">JSON Serialization</p>
-<p>The checkpointer automatically ensures all checkpoint and metadata values are JSON-serializable using a <code>default=str</code> fallback. Custom objects, datetimes, and bytes are converted to their string representation.</p>
+<p class="admonition-title">Serialization</p>
+<p>Checkpoints and metadata are serialized with LangGraph's own
+<code>JsonPlusSerializer</code>, so LangChain <code>BaseMessage</code> subclasses, pydantic
+models, dataclasses, datetimes, and bytes round-trip as themselves — a
+reloaded thread gives you back real <code>HumanMessage</code> / <code>AIMessage</code> objects,
+not their <code>repr()</code>. Payloads written before this used a lossy
+<code>default=str</code> fallback and are returned as-is on read (best effort).</p>
 </div>
 <hr />
 <h2 id="implementing-a-custom-backend">🛠️ Implementing a Custom Backend<a class="headerlink" href="#implementing-a-custom-backend" title="Permanent link">&para;</a></h2>

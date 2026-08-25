@@ -3615,6 +3615,17 @@
 </div>
 <h3 id="state-inspection-via-studio">State Inspection via Studio<a class="headerlink" href="#state-inspection-via-studio" title="Permanent link">&para;</a></h3>
 <p>The Studio adapter extracts state from the LangGraph checkpointer automatically:</p>
+<div class="admonition warning">
+<p class="admonition-title">Requires a checkpointer</p>
+<p>These endpoints read the graph's checkpointer, and nothing else writes
+checkpoints. An agent whose <code>build_graph</code> returns <code>self.new_graph().compile()</code>
+(the native <code>GraphBuilder</code> runtime) has no checkpointer, so <code>/state</code> returns
+<code>{}</code> and <code>/history</code> returns <code>[]</code> — Studio's State and History panels stay
+empty even though the thread's chat messages are persisted separately.
+To get thread state and time-travel, build the graph with LangGraph's
+<code>StateGraph</code> and compile it with <code>AgentomaticCheckpointer</code> as shown in
+<a href="../storage/#checkpointer-api">Storage</a>.</p>
+</div>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Get current thread state</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>curl<span class="w"> </span>http://localhost:8000/studio/agents/my_agent/threads/thread_001/state
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
@@ -3859,7 +3870,7 @@
     participant ST as BaseStore (Memory/SQL)
 
     LG-&gt;&gt;CP: aput(config, checkpoint, metadata)
-    CP-&gt;&gt;CP: _ensure_json_serializable(checkpoint)
+    CP-&gt;&gt;CP: encode_for_storage(checkpoint)
     CP-&gt;&gt;ST: save_checkpoint(thread_id, ns, id, data)
     ST--&gt;&gt;CP: saved
     CP--&gt;&gt;LG: RunnableConfig
@@ -3900,7 +3911,13 @@
 </span></code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Safe Serialization</p>
-<p>The checkpointer automatically handles non-JSON-serializable objects (datetimes, bytes, custom classes) via <code>_ensure_json_serializable()</code>. No extra configuration needed.</p>
+<p>The checkpointer automatically handles non-JSON-serializable objects — datetimes,
+bytes, custom classes, and LangChain <code>BaseMessage</code> objects (<code>HumanMessage</code>,
+<code>AIMessage</code>, <code>ToolMessage</code>, ...) — via LangGraph's own <code>JsonPlusSerializer</code>
+(<code>encode_for_storage()</code> / <code>decode_from_storage()</code>). Messages round-trip back
+into real message objects, not stringified reprs, so <code>add_messages</code> and
+<code>prompt | llm</code> chains keep working across checkpoint resumes. No extra
+configuration needed.</p>
 </div>
 <h3 id="replaying-from-checkpoints">Replaying from Checkpoints<a class="headerlink" href="#replaying-from-checkpoints" title="Permanent link">&para;</a></h3>
 <p>Time-travel lets you rewind execution to any checkpoint and replay from there:</p>

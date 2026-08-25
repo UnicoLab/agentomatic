@@ -2542,15 +2542,34 @@
 </tr>
 <tr>
 <td><code>all</code></td>
-<td><code>pip install agentomatic[all]</code></td>
-<td>Installs all components and drivers above</td>
+<td><code>pip install "agentomatic[all]"</code></td>
+<td>Everything except the vendor LLM drivers and the Chainlit UI — see the note below</td>
 </tr>
 </tbody>
 </table>
+<div class="admonition warning">
+<p class="admonition-title">What <code>all</code> does <em>not</em> include</p>
+<p><code>all</code> covers <code>langgraph</code>, <code>ollama</code>, <code>metrics</code>, <code>db</code>, <code>cli</code>, <code>studio</code>,
+<code>optimize</code>, <code>telemetry</code>, <code>dotenv</code>, <code>security</code>, <code>swarm</code> and <code>vector</code>.</p>
+<p>It deliberately leaves out the vendor LLM drivers — <code>openai</code>, <code>azure</code>,
+<code>vertex</code> — which follow the provider-agnostic principle: you install the
+SDK for the backend you actually use. It also leaves out <code>db-postgres</code>
+(an alternative to <code>db</code>) and <code>ui</code> (Chainlit), which is a heavy dependency.</p>
+<p>So <code>agentomatic ui</code> needs <code>pip install "agentomatic[ui]"</code> even after an
+<code>all</code> install. Add what you need alongside it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[all,openai,ui]&quot;</span>
+</span></code></pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Quote the extras in zsh/bash</p>
+<p>Square brackets are glob syntax in most shells, so quote them:
+<code>pip install "agentomatic[all]"</code>. Unquoted, zsh fails with
+<code>no matches found</code>.</p>
+</div>
 <div class="admonition note">
 <p class="admonition-title">Combining extras</p>
 <p>You can combine multiple extras in a single install command:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>langgraph,db,metrics<span class="o">]</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>langgraph,db,metrics<span class="o">]</span>
 </span></code></pre></div></p>
 </div>
 <hr />
@@ -2559,17 +2578,17 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="pip_1" name="__tabbed_2" type="radio" /><input id="uv_1" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="pip_1">pip</label><label for="uv_1">uv</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/UnicoLab/agentomatic.git
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>agentomatic
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all,dev]&quot;</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>pre-commit<span class="w"> </span>install<span class="w">  </span><span class="c1"># Installs git commit linter hooks</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/UnicoLab/agentomatic.git
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd</span><span class="w"> </span>agentomatic
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all,dev]&quot;</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>pre-commit<span class="w"> </span>install<span class="w">  </span><span class="c1"># Installs git commit linter hooks</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/UnicoLab/agentomatic.git
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd</span><span class="w"> </span>agentomatic
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>uv<span class="w"> </span>sync<span class="w"> </span>--all-extras
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>pre-commit<span class="w"> </span>install
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/UnicoLab/agentomatic.git
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nb">cd</span><span class="w"> </span>agentomatic
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>uv<span class="w"> </span>sync<span class="w"> </span>--all-extras
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>pre-commit<span class="w"> </span>install
 </span></code></pre></div>
 </div>
 </div>
@@ -2577,23 +2596,23 @@
 <hr />
 <h2 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h2>
 <p>Verify your local environment health, connectivity, and dependencies using the built-in diagnostic test:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>agentomatic<span class="w"> </span>doctor
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>agentomatic<span class="w"> </span>doctor
 </span></code></pre></div>
 <h3 id="expected-diagnostic-output">Expected Diagnostic Output<a class="headerlink" href="#expected-diagnostic-output" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>╭──────────────────── Agentomatic Doctor ────────────────────╮
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>│ ✅ Python         3.12.0                                   │
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>│ ✅ agentomatic    0.1.0                                    │
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>│ ✅ FastAPI        0.115.x                                  │
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>│ ✅ click          8.1.x                                    │
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>│ ✅ LangGraph      0.4.x                                   │
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>│ ✅ Ollama         connected                                │
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>│ ⬚  OpenAI        not installed                             │
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>│ ✅ Prometheus     0.21.x                                   │
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>│ ✅ SQLAlchemy     2.0.x                                    │
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>│ ✅ Chainlit       2.0.x                                    │
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>│ ✅ DeepEval       2.0.x                                    │
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>│ ✅ OpenTelemetry  1.20.x                                   │
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>╰────────────────────────────────────────────────────────────╯
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>╭──────────────────── Agentomatic Doctor ────────────────────╮
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>│ ✅ Python         3.12.0                                   │
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>│ ✅ agentomatic    0.1.0                                    │
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>│ ✅ FastAPI        0.115.x                                  │
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│ ✅ click          8.1.x                                    │
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>│ ✅ LangGraph      0.4.x                                   │
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│ ✅ Ollama         connected                                │
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│ ⬚  OpenAI        not installed                             │
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│ ✅ Prometheus     0.21.x                                   │
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>│ ✅ SQLAlchemy     2.0.x                                    │
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>│ ✅ Chainlit       2.0.x                                    │
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>│ ✅ DeepEval       2.0.x                                    │
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>│ ✅ OpenTelemetry  1.20.x                                   │
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>╰────────────────────────────────────────────────────────────╯
 </span></code></pre></div>
 <hr />
 <h2 id="troubleshooting">❓ Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
