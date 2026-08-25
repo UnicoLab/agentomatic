@@ -243,8 +243,13 @@ WORKDIR /app
 RUN python -m venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
+# ``db-postgres`` on top of ``all``: the ``all`` extra deliberately ships
+# only the SQLite driver, but the .env generated next to this Dockerfile
+# wires DB__URL to a DATABASE_URL that is usually Postgres — without the
+# driver that container starts and then fails with "No module named
+# 'asyncpg'" the moment persistence is switched on.
 RUN pip install --upgrade pip \\
-    && pip install "agentomatic[all]=={version}"
+    && pip install "agentomatic[all,db-postgres]=={version}"
 
 # ---- Runtime stage ----------------------------------------------------------
 FROM python:3.12-slim
@@ -348,8 +353,13 @@ WORKDIR /app
 # ``--target`` instead of a virtualenv: the runtime stage runs the distroless
 # image's own interpreter, which cannot use a venv built around a different
 # Python binary.  A plain directory on ``PYTHONPATH`` works with any 3.11.
+# ``db-postgres`` on top of ``all``: the ``all`` extra deliberately ships
+# only the SQLite driver, but the .env generated next to this Dockerfile
+# wires DB__URL to a DATABASE_URL that is usually Postgres — without the
+# driver that container starts and then fails with "No module named
+# 'asyncpg'" the moment persistence is switched on.
 RUN pip install --upgrade pip \\
-    && pip install --target=/app/deps "agentomatic[all]=={version}"
+    && pip install --target=/app/deps "agentomatic[all,db-postgres]=={version}"
 
 # Copy project sources into the build stage so they can be chowned + carried
 # into the runtime stage (distroless cannot chown at runtime — no shell).

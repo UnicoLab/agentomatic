@@ -75,7 +75,9 @@ class AlphaAgent(BaseAgent):
         except Exception as e:
             return Command(update={"error": str(e)}, goto=END)
 
-    async def run(self, input_data: Any, streaming: bool = False) -> AlphaOutput | AsyncGenerator[str, None]:
+    async def run(
+        self, input_data: Any, streaming: bool = False
+    ) -> AlphaOutput | AsyncGenerator[str, None]:
         """Run the Alpha agent."""
         # Convert input to proper format
         if hasattr(input_data, "query"):

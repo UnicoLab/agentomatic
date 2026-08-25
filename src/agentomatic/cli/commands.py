@@ -674,6 +674,15 @@ def run(
 
     from agentomatic import AgentPlatform
 
+    # ``AGENTOMATIC_*`` is the documented way to configure a deployment, and the
+    # image this repo ships runs `agentomatic run` (not `uvicorn main:app`).
+    # Every switch the scaffolded main.py reads is therefore honoured here too,
+    # so the two entrypoints cannot diverge. Silently dropping them was a
+    # security hazard specifically for the auth switches: a container started
+    # with AGENTOMATIC_ENABLE_AUTH=1 and an API key served an entirely
+    # unauthenticated API while looking correctly configured.
+    env_require_auth = _env_bool("AGENTOMATIC_REQUIRE_AUTH", False)
+    require_auth = require_auth_globally or env_require_auth
     kwargs: dict[str, Any] = {
         "plugins_dir": plugins_dir,
         "endpoints_dir": endpoints_dir,
@@ -686,13 +695,24 @@ def run(
         "enable_metrics": _env_bool("AGENTOMATIC_ENABLE_METRICS", True),
         "logs_history": _env_bool("AGENTOMATIC_LOGS_HISTORY", False),
         "allow_logsllm_analysis": _env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),
+        "enable_auth": _env_bool("AGENTOMATIC_ENABLE_AUTH", False),
+        "auth_api_key": os.getenv("AGENTOMATIC_API_KEY", ""),
+        "enable_jwt_auth": _env_bool("AGENTOMATIC_ENABLE_JWT", require_auth),
+        "enable_zero_trust": _env_bool("AGENTOMATIC_ENABLE_ZERO_TRUST", require_auth),
+        "enable_control_plane": _env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", False),
+        "control_token": os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
+        "enable_rate_limit": _env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
+        "rate_limit_trust_proxy_headers": _env_bool(
+            "AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS", False
+        ),
     }
-    if require_auth_globally:
+    if require_auth:
         # Auto-enable the zero-trust enforcer so the flag actually has effect.
         kwargs["enable_zero_trust"] = True
         kwargs["require_auth_globally"] = True
         # Without JWT (or API key), every request would be rejected.
-        kwargs.setdefault("enable_jwt_auth", True)
+        if not kwargs.get("enable_jwt_auth") and not kwargs.get("auth_api_key"):
+            kwargs["enable_jwt_auth"] = True
 
     # Auto-detect and enable UI
     if with_ui:

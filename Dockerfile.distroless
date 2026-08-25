@@ -3,13 +3,17 @@
 # built-in ``nonroot`` account (numeric UID 65532) so images honour
 # Kubernetes ``runAsNonRoot`` admission policies out of the box.
 
-# Build stage
-FROM python:3.12-slim AS builder
+# ---- Build stage ------------------------------------------------------------
+# Python 3.11 on purpose: ``distroless/python3-debian12`` ships Debian 12's
+# Python 3.11, and dependencies must be built for the interpreter that will
+# actually import them. Building on 3.12 produced an image that could not start
+# at all — the venv's ``bin/python`` symlinked to the builder's 3.12 binary,
+# which does not exist in the runtime stage, so the ENTRYPOINT was a dangling
+# symlink; and even resolved, cp312 wheels cannot be imported under 3.11.
+FROM python:3.11-slim AS builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Install system dependencies
@@ -18,40 +22,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install uv from PyPI at a pinned version. An unpinned `uv:latest` image made
+# builds irreproducible, and PyPI is already required by every other layer.
+ARG UV_VERSION=0.8.17
+RUN pip install --no-cache-dir "uv==${UV_VERSION}"
 
-# Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
-
-# Install dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
-
-# Copy source code and install
+# README.md is required: pyproject.toml declares it as the project readme, so
+# installing the project below fails without it.
+COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
+
+# ``--target`` instead of a virtualenv: the runtime stage runs the distroless
+# image's own interpreter, which cannot use a venv built around a different
+# Python binary. A plain directory on ``PYTHONPATH`` works with any 3.11.
+#
+# Extras matter here: a bare install ships core dependencies only, leaving the
+# image without sqlalchemy, langgraph, prometheus-client or pyjwt — /metrics
+# served nothing, DATABASE_URL failed with "No module named 'sqlalchemy'", and
+# JWT auth could not be enabled. ``db-postgres`` is named separately because
+# ``all`` deliberately carries only the SQLite driver.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv pip install --target=/app/deps ".[all,db-postgres]"
 
-# Ensure the runtime user (uid 65532 / nonroot) can read the venv and sources
-RUN chown -R 65532:65532 /app
-
-# Production stage — distroless, non-root by default
+# ---- Runtime stage ----------------------------------------------------------
 FROM gcr.io/distroless/python3-debian12:nonroot
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/app/.venv/bin:$PATH" \
-    VIRTUAL_ENV="/app/.venv"
+    PYTHONPATH="/app/deps"
 
 WORKDIR /app
 
-# Copy virtual environment and application from builder
-COPY --from=builder --chown=65532:65532 /app/.venv /app/.venv
+COPY --from=builder --chown=65532:65532 /app/deps /app/deps
 COPY --from=builder --chown=65532:65532 /app/src /app/src
 COPY --from=builder --chown=65532:65532 /app/pyproject.toml /app/
 
@@ -59,17 +63,16 @@ COPY --from=builder --chown=65532:65532 /app/pyproject.toml /app/
 # have to introspect the base image at admit-time.
 USER 65532:65532
 
-# Expose port
 EXPOSE 8000
 
-# Distroless has no shell, but it can execute binaries directly.  We
-# invoke the ``agentomatic`` console script (installed by uv into
-# ``/app/.venv/bin``) via the venv Python so both the plain and
-# distroless images boot through the same ``agentomatic run`` entrypoint.
-ENTRYPOINT ["/app/.venv/bin/python", "/app/.venv/bin/agentomatic"]
+# Distroless has no shell, so run the CLI as a module through the base image's
+# own interpreter; dependencies come from PYTHONPATH. Invoking the console
+# script directly would go through its shebang, which points at the builder's
+# interpreter and is not present here.
+ENTRYPOINT ["/usr/bin/python3", "-m", "agentomatic.cli.commands"]
 CMD ["run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
 
-# No shell and no curl in this image — hit /health with the venv Python
+# No shell and no curl in this image — hit /health with the base interpreter
 # instead (exec form, so no shell is needed to run this CMD either).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD ["/app/.venv/bin/python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)"]
+    CMD ["/usr/bin/python3", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)"]

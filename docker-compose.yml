@@ -1,52 +1,81 @@
+# =============================================================================
+# Agentomatic — local production-shaped stack
+#
+#   docker compose up --build          # platform on http://localhost:8000
+#   docker compose --profile db up -d  # …with Postgres-backed persistence
+#
+# One platform process serves every agent it discovers under ./agents — that
+# is the point of the product, so there is no per-agent service here. Features
+# are driven entirely by AGENTOMATIC_* env vars, exactly as in the image that
+# `agentomatic deploy` generates, so what you exercise locally is what ships.
+# =============================================================================
+
 services:
-  # Alpha Agent
-  alpha-agent:
-    build: .
-    container_name: alpha-agent
+  platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: agentomatic:latest
+    container_name: agentomatic-platform
+    restart: unless-stopped
     ports:
-      - "8001:8000"
+      - "${AGENTOMATIC_PORT:-8000}:8000"
     environment:
-      - AGENT_NAME=alpha
-      - PORT=8000
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-    command: ["agentomatic", "run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
+      AGENTOMATIC_TITLE: "${AGENTOMATIC_TITLE:-Agentomatic Platform}"
+      AGENTOMATIC_LOG_LEVEL: "${AGENTOMATIC_LOG_LEVEL:-INFO}"
+      # Studio, docs, health and metrics are on by default.
+      AGENTOMATIC_ENABLE_STUDIO: "${AGENTOMATIC_ENABLE_STUDIO:-1}"
+      AGENTOMATIC_ENABLE_METRICS: "${AGENTOMATIC_ENABLE_METRICS:-1}"
+      AGENTOMATIC_ENABLE_CONTROL_PLANE: "${AGENTOMATIC_ENABLE_CONTROL_PLANE:-1}"
+      # Opt-in hardening — set these in .env before exposing the port.
+      AGENTOMATIC_ENABLE_AUTH: "${AGENTOMATIC_ENABLE_AUTH:-0}"
+      AGENTOMATIC_API_KEY: "${AGENTOMATIC_API_KEY:-}"
+      AGENTOMATIC_CONTROL_TOKEN: "${AGENTOMATIC_CONTROL_TOKEN:-}"
+      AGENTOMATIC_ENABLE_RATE_LIMIT: "${AGENTOMATIC_ENABLE_RATE_LIMIT:-0}"
+      # Durable invocation history. Empty DATABASE_URL keeps it in-memory.
+      AGENTOMATIC_LOGS_HISTORY: "${AGENTOMATIC_LOGS_HISTORY:-0}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      # Bring your own model provider; nothing vendor-specific is baked in.
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:
-      - ./agents:/app/agents
-    networks:
-      - agentomatic-network
+      # Drop agents in and restart — no rebuild needed for iteration.
+      - ./agents:/app/agents:ro
+      - agentomatic-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks: [agentomatic]
 
-  # Beta Agent
-  beta-agent:
-    build: .
-    container_name: beta-agent
-    ports:
-      - "8002:8000"
+  # Enable with: docker compose --profile db up -d
+  # then point the platform at it by setting, in .env:
+  #   DATABASE_URL=postgresql+asyncpg://agentomatic:agentomatic@db:5432/agentomatic
+  #   AGENTOMATIC_LOGS_HISTORY=1
+  db:
+    profiles: ["db"]
+    image: postgres:16-alpine
+    container_name: agentomatic-db
+    restart: unless-stopped
     environment:
-      - AGENT_NAME=beta
-      - PORT=8000
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-    command: ["agentomatic", "run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
+      POSTGRES_USER: "${POSTGRES_USER:-agentomatic}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-agentomatic}"
+      POSTGRES_DB: "${POSTGRES_DB:-agentomatic}"
     volumes:
-      - ./agents:/app/agents
-    networks:
-      - agentomatic-network
+      - agentomatic-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentomatic}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [agentomatic]
 
-  # Nginx reverse proxy
-  nginx:
-    image: nginx:alpine
-    container_name: agentomatic-proxy
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - alpha-agent
-      - beta-agent
-    networks:
-      - agentomatic-network
+volumes:
+  agentomatic-data:
+  agentomatic-db:
 
 networks:
-  agentomatic-network:
+  agentomatic:
     driver: bridge

@@ -34,7 +34,7 @@ class TestDockerfileRendering:
         assert "USER appuser" in content
         # Installs from PyPI pinned to the current version (project image, not
         # the framework repo image) and launches the user's main.py.
-        assert 'pip install "agentomatic[all]==' in content
+        assert 'pip install "agentomatic[all,db-postgres]==' in content
         assert 'CMD ["uvicorn", "main:app"' in content
         assert "COPY --chown=appuser:appuser main.py ./main.py" in content
         assert "HEALTHCHECK" in content
@@ -45,14 +45,14 @@ class TestDockerfileRendering:
         from agentomatic._version import __version__
 
         content = deploy_mod.render_dockerfile()
-        assert f'pip install "agentomatic[all]=={__version__}"' in content
+        assert f'pip install "agentomatic[all,db-postgres]=={__version__}"' in content
 
     def test_distroless_uses_nonroot_numeric_uid(self) -> None:
         content = deploy_mod.render_dockerfile_distroless()
         assert "gcr.io/distroless/python3-debian12:nonroot" in content
         assert "USER 65532:65532" in content
         assert '"/usr/bin/python3"' in content
-        assert 'pip install --target=/app/deps "agentomatic[all]==' in content
+        assert 'pip install --target=/app/deps "agentomatic[all,db-postgres]==' in content
         assert '"main:app"' in content
 
     def test_copy_lines_only_include_existing(self, tmp_path: Path) -> None:
@@ -63,6 +63,20 @@ class TestDockerfileRendering:
         assert "COPY --chown=appuser:appuser agents/ ./agents/" in content
         # Non-existent dirs must not be emitted (would break docker build).
         assert "plugins/ ./plugins/" not in content
+
+    def test_generated_images_can_reach_postgres(self) -> None:
+        """The generated .env wires DB__URL, so the driver must be present.
+
+        Regression: the image installed ``agentomatic[all]``, which
+        deliberately ships only the SQLite driver. A deployment that set
+        ``DATABASE_URL`` to the Postgres URL the generated ``.env`` expects
+        started cleanly and then failed with "No module named 'asyncpg'" the
+        moment persistence was used.
+        """
+        for render in (deploy_mod.render_dockerfile, deploy_mod.render_dockerfile_distroless):
+            content = render()
+
+            assert "db-postgres" in content, f"{render.__name__} omits the Postgres driver"
 
 
 # =========================================================================

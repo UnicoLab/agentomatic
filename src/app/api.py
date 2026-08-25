@@ -296,7 +296,8 @@ def create_api_router() -> APIRouter:
     @log_api_call
     @rate_limit(max_calls=config.rate_limit_calls, window_seconds=config.rate_limit_window)
     async def invoke_agent_universal(
-        agent_name: str = Path(..., description="Agent name"), request: UniversalAgentInput = Body(...)
+        agent_name: str = Path(..., description="Agent name"),
+        request: UniversalAgentInput = Body(...),
     ):
         """Universal endpoint that can invoke any agent with proper input validation."""
         agent = agent_registry.get_agent(agent_name)

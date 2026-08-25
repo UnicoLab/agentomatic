@@ -16,23 +16,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install uv from PyPI at a pinned version.
+#
+# This used to be `COPY --from=ghcr.io/astral-sh/uv:latest`, which pulled
+# an unpinned tag: image contents changed under you between builds, and a
+# breaking uv release could break the build with no diff to show for it.
+# PyPI is already required by every other layer here, so sourcing uv from
+# it also drops a second registry from the build's dependency set.
+ARG UV_VERSION=0.8.17
+RUN pip install --no-cache-dir "uv==${UV_VERSION}"
 
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files first for cache efficiency
-COPY pyproject.toml uv.lock ./
+# Copy dependency files first for cache efficiency.
+# README.md is required: pyproject.toml declares it as the project readme,
+# so the build backend fails without it when uv installs the project below.
+COPY pyproject.toml uv.lock README.md ./
 
 # Install dependencies (without the project itself)
+# Extras matter here: a bare `uv sync` installs only the core dependencies, so
+# the image shipped without sqlalchemy, langgraph, prometheus-client or pyjwt —
+# /metrics served nothing, DATABASE_URL failed with "No module named
+# 'sqlalchemy'", and JWT auth could not be enabled at all. `all` restores those
+# and matches what `agentomatic deploy` builds. `db-postgres` is named
+# separately because `all` deliberately carries only the SQLite driver, and
+# this image is a deployment: the compose stack beside it offers Postgres.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
+    uv sync --frozen --no-install-project --no-dev --extra all --extra db-postgres
 
 # Copy source code and install the project
 COPY src/ ./src/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --extra all --extra db-postgres
 
 # Production stage
 FROM python:3.12-slim
