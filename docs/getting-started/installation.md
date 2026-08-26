@@ -40,10 +40,13 @@
 
 ## Full Install (Recommended)
 
-To enable all production features (including prompt optimization, database persistence, OpenTelemetry tracing, and the graphical Chainlit chat playground), install with the `all` extras flag:
+To enable the bundled production features (including prompt optimization,
+database persistence, OpenTelemetry tracing, and Studio), install with the
+`all` extras flag. Chainlit is intentionally separate; add the `ui` extra when
+you need the graphical chat playground.
 
 ```bash
-pip install agentomatic[all]
+pip install "agentomatic[all]"
 
 # Or with uv
 uv add agentomatic --extra all
@@ -57,17 +60,26 @@ If you prefer a lightweight install, you can select only the modules and depende
 
 | Extra Flag | Install Command | What It Enables |
 |---|---|---|
-| `langgraph` | `pip install agentomatic[langgraph]` | Direct support for LangGraph StateGraphs |
-| `ollama` | `pip install agentomatic[ollama]` | Local Ollama LLM provider integrations |
-| `openai` | `pip install agentomatic[openai]` | OpenAI API provider integrations |
-| `metrics` | `pip install agentomatic[metrics]` | Prometheus exporter metrics |
-| `db` | `pip install agentomatic[db]` | SQLAlchemy engines + local SQLite support |
-| `db-postgres` | `pip install agentomatic[db-postgres]` | SQLAlchemy async PostgreSQL client driver |
-| `cli` | `pip install agentomatic[cli]` | Rich terminal formatting + interactive select prompt controls |
-| `ui` | `pip install agentomatic[ui]` | Graphical Chainlit chat debug console |
-| `studio` | `pip install agentomatic[studio]` | Agentomatic Studio visual debugger |
-| `optimize` | `pip install agentomatic[optimize]` | DSPy-style optimizer loop + DeepEval validation |
-| `telemetry` | `pip install agentomatic[telemetry]` | OpenTelemetry APM tracing exporters |
+| `langgraph` | `pip install "agentomatic[langgraph]"` | Direct support for LangGraph StateGraphs |
+| `langchain` | `pip install "agentomatic[langchain]"` | LangChain and community integration helpers |
+| `ollama` | `pip install "agentomatic[ollama]"` | Local Ollama LLM provider integrations |
+| `openai` | `pip install "agentomatic[openai]"` | OpenAI API provider integrations |
+| `azure` | `pip install "agentomatic[azure]"` | Azure OpenAI provider integration |
+| `vertex` | `pip install "agentomatic[vertex]"` | Google Vertex AI provider integration |
+| `metrics` | `pip install "agentomatic[metrics]"` | Prometheus exporter metrics |
+| `db` | `pip install "agentomatic[db]"` | SQLAlchemy engines + local SQLite support |
+| `db-postgres` | `pip install "agentomatic[db-postgres]"` | SQLAlchemy async PostgreSQL client driver |
+| `cli` | `pip install "agentomatic[cli]"` | Rich terminal formatting + interactive select prompt controls |
+| `ui` | `pip install "agentomatic[ui]"` | Graphical Chainlit chat debug console |
+| `studio` | `pip install "agentomatic[studio]"` | Agentomatic Studio visual debugger |
+| `optimize` | `pip install "agentomatic[optimize]"` | DSPy-style optimizer loop + DeepEval validation |
+| `telemetry` | `pip install "agentomatic[telemetry]"` | OpenTelemetry APM tracing exporters |
+| `dotenv` | `pip install "agentomatic[dotenv]"` | Explicit `.env` loading support |
+| `security` | `pip install "agentomatic[security]"` | JWT, OAuth2, and cryptographic security features |
+| `swarm` | `pip install "agentomatic[swarm]"` | LangGraph swarm orchestration |
+| `vector` | `pip install "agentomatic[vector]"` | Local vector/embedding helper dependencies |
+| `docs` | `pip install "agentomatic[docs]"` | MkDocs/Mike documentation build toolchain |
+| `dev` | `pip install "agentomatic[dev]"` | Test, lint, typing, build, and release-development tools |
 | `all` | `pip install "agentomatic[all]"` | Everything except the vendor LLM drivers and the Chainlit UI — see the note below |
 
 !!! warning "What `all` does *not* include"
@@ -96,7 +108,7 @@ If you prefer a lightweight install, you can select only the modules and depende
 !!! note "Combining extras"
     You can combine multiple extras in a single install command:
     ```bash
-    pip install agentomatic[langgraph,db,metrics]
+    pip install "agentomatic[langgraph,db,metrics]"
     ```
 
 ---
@@ -134,32 +146,37 @@ agentomatic doctor
 ### Expected Diagnostic Output
 
 ```text
-╭──────────────────── Agentomatic Doctor ────────────────────╮
-│ ✅ Python         3.12.0                                   │
-│ ✅ agentomatic    0.1.0                                    │
-│ ✅ FastAPI        0.115.x                                  │
-│ ✅ click          8.1.x                                    │
-│ ✅ LangGraph      0.4.x                                   │
-│ ✅ Ollama         connected                                │
-│ ⬚  OpenAI        not installed                             │
-│ ✅ Prometheus     0.21.x                                   │
-│ ✅ SQLAlchemy     2.0.x                                    │
-│ ✅ Chainlit       2.0.x                                    │
-│ ✅ DeepEval       2.0.x                                    │
-│ ✅ OpenTelemetry  1.20.x                                   │
-╰────────────────────────────────────────────────────────────╯
+╭──────────────── 🩺 Environment Health Check ────────────────╮
+│ Component              │ Status │ Details                    │
+├────────────────────────┼────────┼────────────────────────────┤
+│ Python                 │ ✅     │ 3.11+                      │
+│ fastapi                │ ✅     │ installed                  │
+│ uvicorn                │ ✅     │ installed                  │
+│ pydantic               │ ✅     │ installed                  │
+│ loguru                 │ ✅     │ installed                  │
+│ httpx                  │ ✅     │ installed                  │
+│ langgraph [langgraph]  │ ✅/❌  │ installed or install hint  │
+│ sqlalchemy [db]        │ ✅/❌  │ installed or install hint  │
+│ Agents directory       │ ✅/❌  │ discovered agents / path   │
+│ Stacks directory       │ ✅/❌  │ discovered stacks / hint   │
+╰────────────────────────┴────────┴────────────────────────────╯
 ```
+
+Exact package versions and optional-extra rows vary by environment. `doctor`
+checks `langgraph`, `langchain_core`, `rich`, `questionary`, `chainlit`,
+`sqlalchemy`, `prometheus_client`, `dotenv`, JWT/crypto support, and swarm
+support when they are installed; it does not contact an LLM provider.
 
 ---
 
 ## ❓ Troubleshooting
 
 ??? question "Command `agentomatic` not found after install"
-    Make sure you installed the CLI extra: `pip install agentomatic[cli]` or `pip install agentomatic[all]`.
+    Make sure you installed the CLI extra: `pip install "agentomatic[cli]"` or `pip install "agentomatic[all]"`.
     If using a virtual environment, verify it's activated.
 
 ??? question "`ModuleNotFoundError: No module named 'langgraph'`"
-    LangGraph is optional. Install it with: `pip install agentomatic[langgraph]`.
+    LangGraph is optional. Install it with: `pip install "agentomatic[langgraph]"`.
     Class-based agents using `BaseGraphAgent` do NOT require LangGraph.
 
 !!! tip "Next Step"

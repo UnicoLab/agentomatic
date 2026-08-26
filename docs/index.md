@@ -36,7 +36,7 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
 !!! success "Why teams choose Agentomatic"
     - **Ship in minutes** — go from a Python function to a documented, streaming REST API with one command
     - **Debug visually** — Studio provides graph visualization, time-travel debugging, and live state editing
-    - **Scale with confidence** — built-in auth, rate limiting, metrics, telemetry, and PostgreSQL persistence
+    - **Scale with confidence** — built-in auth, rate limiting, metrics, telemetry, and optional PostgreSQL persistence
     - **Stay framework-agnostic** — switch between LangGraph, LangChain, Deep Agent, or plain Python without changing your infrastructure
 
 ---
@@ -51,7 +51,7 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
 
     ---
 
-    Drop a folder with `agent.py` (class-based) or `__init__.py` + `manifest` (functional) into `agents/`. Agentomatic generates **26 REST endpoints** per agent automatically — invoke, stream, chat, health, config, threads, feedback, HITL, A2A, and more.
+    Drop a folder with `agent.py` (class-based) or `__init__.py` + `manifest` (functional) into `agents/`. Agentomatic generates agent REST routes automatically — invoke, stream, chat, health, config, threads, feedback, HITL, A2A, and operational routes when their features are enabled.
 
     [:octicons-arrow-right-24: Agent Structure](guide/agent-structure.md)
 
@@ -229,7 +229,7 @@ app = platform.build()  # (2)!
 2. Builds a complete FastAPI application with routes, middleware, storage, and Studio
 3. Visit `http://localhost:8000/docs` for your auto-generated OpenAPI specification
 
-That's it. Every folder inside `agents/` becomes a full REST API with streaming, persistence, health checks, and documentation — **no router code, no endpoint wiring, no boilerplate**.
+That's it. Every folder inside `agents/` becomes a full REST API with streaming, health checks, and documentation — **no router code, no endpoint wiring, no boilerplate**. Add a durable storage backend when conversation or task state must survive process restarts.
 
 ---
 
@@ -320,7 +320,7 @@ graph TB
 === "pip (Recommended)"
 
     ```bash
-    pip install agentomatic[all]
+    pip install "agentomatic[all]"
     ```
 
 === "uv"

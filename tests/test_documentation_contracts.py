@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import ast
 import importlib
+import inspect
 import re
 import shlex
 from pathlib import Path
 
 from click.testing import CliRunner
 
+from agentomatic._version import __version__
 from agentomatic.cli.commands import cli
 from agentomatic.cli.templates import TEMPLATES
+from agentomatic.core.platform import AgentPlatform
+from agentomatic.core.router_factory import AgentInvokeResponse
+from agentomatic.tasks.models import TaskProgress, TaskRecord
 
 REPO = Path(__file__).parents[1]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -19,6 +24,7 @@ MARKDOWN_IMAGE = re.compile(r"!\[[^]]*\]\(([^\s)]+)(?:\s+[^)]*)?\)")
 HTML_IMAGE = re.compile(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\']', re.IGNORECASE)
 SHELL_FENCE = re.compile(r"```(?:bash|sh|shell|console)\n(.*?)```", re.DOTALL)
 PYTHON_FENCE = re.compile(r"```python\n(.*?)```", re.DOTALL)
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^]]*\]\(([^\s)]+)(?:\s+[^)]*)?\)")
 
 
 def _doc(path: str) -> str:
@@ -31,6 +37,14 @@ def test_cli_reference_lists_the_template_registry() -> None:
     commands = _doc("docs/cli/commands.md")
     for template in TEMPLATES:
         assert f"`{template}`" in commands or f"{template}|" in commands
+
+
+def test_cli_reference_lists_every_public_top_level_command() -> None:
+    """Keep discoverable aliases such as ``new`` out of documentation limbo."""
+    commands = _doc("docs/cli/commands.md")
+
+    for command in cli.commands:
+        assert f"agentomatic {command}" in commands
 
 
 def test_cli_reference_covers_public_run_flags() -> None:
@@ -71,6 +85,77 @@ def test_configuration_uses_current_auth_and_storage_variables() -> None:
     assert "AGENTOMATIC_AUTH_API_KEY" not in configuration
     assert "DATABASE_URL` / `AGENTOMATIC_DB_URL" in quickstart
     assert "sqlite:///data/threads.db" not in quickstart
+
+
+def test_configuration_reference_covers_every_platform_constructor_option() -> None:
+    """A page labelled complete must track the actual platform public API."""
+    configuration = _doc("docs/guide/configuration.md")
+
+    for name in inspect.signature(AgentPlatform.__init__).parameters:
+        if name != "self":
+            assert f"`{name}`" in configuration
+
+
+def test_install_and_deployment_guides_preserve_real_extra_and_release_contracts() -> None:
+    """Keep install instructions usable in shells and tied to the package release."""
+    installation = _doc("docs/getting-started/installation.md")
+    quickstart = _doc("docs/getting-started/quickstart.md")
+    deployment = _doc("docs/guide/deployment.md")
+
+    assert 'pip install "agentomatic[all]"' in installation
+    assert "Chainlit is intentionally separate" in installation
+    assert 'pip install "agentomatic[all,ui]"' in quickstart
+    assert f"agentomatic[all]=={__version__}" in deployment
+
+    import tomllib
+
+    with (REPO / "pyproject.toml").open("rb") as project_file:
+        extras = tomllib.load(project_file)["project"]["optional-dependencies"]
+    for extra in extras:
+        assert f"`{extra}`" in installation
+
+    for page in [REPO / "README.md", *(REPO / "docs").rglob("*.md")]:
+        assert not re.search(r"pip install agentomatic\[[^\]]+\]", page.read_text()), page
+
+
+def test_every_documentation_page_is_in_the_published_navigation() -> None:
+    """Avoid shipping orphaned guides that users cannot discover."""
+    nav_paths = set(
+        re.findall(r"^\s*-\s+[^:]+:\s+([^\s]+\.md)\s*$", _doc("mkdocs.yml"), re.MULTILINE)
+    )
+    page_paths = {
+        page.relative_to(REPO / "docs").as_posix() for page in (REPO / "docs").rglob("*.md")
+    }
+
+    assert nav_paths == page_paths
+
+
+def test_local_markdown_links_target_existing_documentation_sources() -> None:
+    """Catch stale relative Markdown links before a static deploy hides them."""
+    for page in (REPO / "docs").rglob("*.md"):
+        for target in MARKDOWN_LINK.findall(page.read_text(encoding="utf-8")):
+            source = target.split("#", maxsplit=1)[0]
+            if not source or source.startswith(("http://", "https://", "mailto:")):
+                continue
+            if source.endswith(".md"):
+                assert (page.parent / source).resolve().is_file(), (page, target)
+
+
+def test_frontend_guide_tracks_response_and_task_models() -> None:
+    """Keep the hand-written TypeScript shapes faithful to server envelopes."""
+    guide = _doc("docs/FRONTEND_API_GUIDE.md")
+
+    for field in AgentInvokeResponse.model_fields:
+        assert re.search(rf"\b{field}\s*[:?]", guide), field
+
+    for field in (*TaskProgress.model_fields, *TaskRecord.model_fields, "duration_ms"):
+        assert re.search(rf"\b{field}\s*[:?]", guide), field
+
+    assert 'mode: "sync" | "async" | "batch";' in guide
+    assert '"stream"' not in re.search(r"interface TaskRecord \{.*?\n\}", guide, re.DOTALL).group(
+        0
+    )
+    assert "`/api/v1/ingestors`" in guide
 
 
 def test_deployment_guide_matches_root_compose_contract() -> None:

@@ -445,7 +445,7 @@ flowchart TD
 | ML lifecycle (`compile/fit/evaluate`) | ✅ | ❌ |
 | `build_graph()` with `GraphBuilder` | ✅ | ❌ |
 | `input_to_state()` / `state_to_output()` | ✅ | ❌ |
-| Auto-generated 26 endpoints | ✅ | ✅ |
+| Auto-generated core agent routes | ✅ | ✅ |
 | Studio graph visualization | ✅ | ✅ |
 | Custom config (`config.py`) | ✅ | ✅ |
 | Custom schemas (`schemas.py`) | ✅ | ✅ |

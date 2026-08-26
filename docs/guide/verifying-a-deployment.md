@@ -102,7 +102,7 @@ is useful for verification but is not a substitute for a production log sink.
 | `a2a` | Agent-to-Agent task submit, poll and cancel |
 | `plugins` | Registry, model card, health, `predict`, `predict/batch`, reload |
 | `endpoints` | Registry, info, health, POST call, plus an optional browser-safe GET query contract (`--read-endpoint`) |
-| `ingestion` | The always-available Studio `/api/v1/ingestors` registry, plus `/api/v1/ingestion` and per-ingestor routes when an ingestor is deployed |
+| `ingestion` | The always-available platform `/api/v1/ingestors` registry, plus `/api/v1/ingestion` and per-ingestor routes when an ingestor is deployed |
 | `pipelines` | Registry, config, validate, visualize, run, and `validate-draft` |
 | `builder` | Opt-in Studio Builder lifecycle: save a visual endpoint→plugin field link, reload its persisted mapping, run it, then delete only the named disposable pipeline |
 | `schema-contracts` | Discovers every deployed agent, plugin, endpoint, ingestor and pipeline, verifies its published input/output schema, and exercises the corresponding live operation using the OpenAPI contract |

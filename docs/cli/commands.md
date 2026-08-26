@@ -36,7 +36,7 @@ Commands:
 !!! tip "Rich terminal output"
     Install the `cli` extra for beautiful Rich tables, trees, and panels:
     ```bash
-    pip install agentomatic[cli]
+    pip install "agentomatic[cli]"
     ```
     Without Rich, the CLI falls back to plain text output.
 
@@ -132,6 +132,34 @@ agentomatic init helper_bot --template full --force
   2. agentomatic run to start
   3. agentomatic test helper_bot to test
   4. Open http://localhost:8000/docs for API docs
+```
+
+---
+
+### `agentomatic new`
+
+Scaffold a complete standalone Agentomatic project. This is the concise alias
+for `agentomatic init --project`; use `init` when you only want to add an
+agent package to an existing `agents/` directory.
+
+```text
+Usage: agentomatic new [OPTIONS] NAME
+
+Arguments:
+  NAME  Project name (or target path)  [required]
+
+Options:
+  -d, --dir TEXT  Parent directory for the project
+  -f, --force     Overwrite existing files
+```
+
+```bash
+# Creates a project with main.py, component directories, pipelines, stacks,
+# and a production-oriented .env.example.
+agentomatic new support_platform
+
+# Place the project under a chosen parent directory.
+agentomatic new support_platform --dir services
 ```
 
 ---
@@ -255,7 +283,7 @@ Options:
 
 !!! warning "Studio requires the `studio` extra"
     ```bash
-    pip install agentomatic[studio]
+    pip install "agentomatic[studio]"
     ```
 
 ---
@@ -468,23 +496,24 @@ Options:
 ╭──────────────── 🩺 Environment Health Check ────────────────╮
 │ Component              │ Status │ Details                    │
 ├────────────────────────┼────────┼────────────────────────────┤
-│ Python                 │ ✅     │ 3.12.0                     │
-│ fastapi                │ ✅     │ 0.115.x                    │
-│ uvicorn                │ ✅     │ 0.34.x                     │
-│ pydantic               │ ✅     │ 2.10.x                     │
-│ loguru                 │ ✅     │ 0.7.x                      │
-│ httpx                  │ ✅     │ 0.28.x                     │
-│ langgraph [langgraph]  │ ✅     │ 0.4.x                      │
-│ langchain_core [lc]    │ ✅     │ 0.3.x                      │
-│ rich [cli]             │ ✅     │ 13.x                       │
-│ chainlit [ui]          │ ✅     │ 2.0.x                      │
-│ sqlalchemy [db]        │ ✅     │ 2.0.x                      │
-│ prometheus [metrics]   │ ✅     │ 0.21.x                     │
-│ Agents directory       │ ✅     │ 3 agent(s) in agents       │
+│ Python                 │ ✅     │ 3.11+                      │
+│ fastapi                │ ✅     │ installed                  │
+│ uvicorn                │ ✅     │ installed                  │
+│ pydantic               │ ✅     │ installed                  │
+│ loguru                 │ ✅     │ installed                  │
+│ httpx                  │ ✅     │ installed                  │
+│ langgraph [langgraph]  │ ✅/❌  │ installed or install hint  │
+│ sqlalchemy [db]        │ ✅/❌  │ installed or install hint  │
+│ Agents directory       │ ✅/❌  │ discovered agents / path   │
+│ Stacks directory       │ ✅/❌  │ discovered stacks / hint   │
 ╰────────────────────────┴────────┴────────────────────────────╯
 
 ✅ All core dependencies satisfied!
 ```
+
+The exact rows and versions are environment-dependent. The command also checks
+the optional LangChain, CLI, UI, metrics, dotenv, security, and swarm packages
+when applicable; it does not make a live LLM-provider request.
 
 !!! tip "Run doctor first"
     If anything is not working, `agentomatic doctor` is always the first diagnostic step. It identifies missing packages, incompatible versions, and unreachable services.

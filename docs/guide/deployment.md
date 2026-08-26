@@ -63,7 +63,7 @@ Declare what *your* project needs — a vendor LLM driver, a vector client, an
 in-house package — in `requirements.txt` next to `main.py`:
 
 ```txt title="requirements.txt"
-agentomatic[all]==1.10.0
+agentomatic[all]==1.11.0
 # This project's agents talk to a local OpenAI-compatible model server,
 # so it needs that client library.
 langchain-openai>=0.3

@@ -72,8 +72,14 @@ async def financial_transfer_node(state: dict):
 
 When this exception is thrown:
 1. Agentomatic intercepts the execution.
-2. The current `state_snapshot` is stored in the persistent database under `SuspendedStateModel`.
+2. When a thread store is configured, the current `state_snapshot` is saved through that store. A SQLAlchemy-backed store persists it in `SuspendedStateModel`; an in-memory store is lost on restart.
 3. The API immediately returns a `202 Accepted` status code with the approval details.
+
+!!! warning "HITL needs storage to resume"
+    The approval routes are mounted for every agent, but a suspension cannot be
+    listed, approved, or rejected without a configured thread store. Use a
+    durable store such as `SQLAlchemyStore` for production approvals; otherwise
+    the original request receives `202` but no resumable state is retained.
 
 **Response payload:**
 ```json

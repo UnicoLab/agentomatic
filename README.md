@@ -55,14 +55,14 @@ Build, trace, optimize, and time-travel debug production-ready AI agent APIs in 
 | 🧠 **Conversation Memory** | Automatic short-term session logic paired with long-term memory windowing. |
 | 📝 **Auto-Summarization** | Intelligent LLM-powered compression of excessively long conversations to save token limits. |
 | 📋 **Thread CRUD** | Full lifecycle management (`create`, `update`, `delete`, `clear`). |
-| 💬 **Message Persistence** | Every conversational turn is automatically saved to storage — ensuring history survives system restarts perfectly. |
+| 💬 **Message Persistence** | Configure a durable store to retain conversation turns and survive restarts; `MemoryStore` is for local development. |
 
 ## 🚀 Quick Start
 
 ### Install
 
 ```bash
-pip install agentomatic[all]
+pip install "agentomatic[all]"
 ```
 
 ### Create an Agent
@@ -507,7 +507,7 @@ Defaults to an in-memory store; install with `agentomatic[db]` (SQLite) or
 Built-in ChatGPT-like interface powered by Chainlit:
 
 ```bash
-pip install agentomatic[ui]
+pip install "agentomatic[ui]"
 agentomatic run --with-ui
 # → http://localhost:8000/chat
 ```

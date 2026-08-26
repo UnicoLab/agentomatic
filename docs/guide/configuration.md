@@ -7,33 +7,49 @@
 
 ---
 
-Agentomatic supports a layered configuration system. Settings can be defined via environment variables, `.env` files, Python code, or a combination. The platform resolves values using a clear priority hierarchy.
+Agentomatic has two configuration surfaces that deliberately do **not** silently
+merge into one another:
+
+- The generated `main.py` and `agentomatic run` consume documented
+  `AGENTOMATIC_*` deployment variables and pass them as explicit
+  `AgentPlatform` arguments.
+- `PlatformSettings` supplies nested provider, embedding, artifact, ingestion,
+  and audit settings to the subsystems that use it. It reads process
+  environment variables and `.env` files.
+
+Pass explicit `AgentPlatform(...)` arguments when configuring an application
+you construct yourself; do not assume that every `PlatformSettings` field
+changes every platform constructor argument.
 
 ---
 
 ## 🔀 Configuration Hierarchy
 
-Values are resolved in the following order of precedence (highest wins):
+For a `PlatformSettings` value, process environment variables override `.env`
+values, which override built-in defaults. Explicit Python constructor arguments
+are passed directly to `AgentPlatform` and therefore take precedence for that
+specific platform option.
 
 ```mermaid
 flowchart LR
-    A["Environment<br/>Variables"] --> B["Merged<br/>Configuration"]
-    C[".env File"] --> B
-    D["Python Code<br/>(constructor args)"] --> B
-    E["Built-in<br/>Defaults"] --> B
+    A["Explicit Python<br/>AgentPlatform arguments"] --> B["Platform configuration"]
+    C["Process environment"] --> D["PlatformSettings"]
+    E[".env file"] --> D
+    F["Built-in defaults"] --> D
+    D --> G["Settings-backed subsystems"]
 
-    style A fill:#c8e6c9,stroke:#388e3c
-    style C fill:#e1f5fe,stroke:#0288d1
-    style D fill:#fff3e0,stroke:#f57c00
-    style E fill:#f3e5f5,stroke:#7b1fa2
+    style A fill:#fff3e0,stroke:#f57c00
+    style C fill:#c8e6c9,stroke:#388e3c
+    style E fill:#e1f5fe,stroke:#0288d1
+    style F fill:#f3e5f5,stroke:#7b1fa2
 ```
 
-| Priority | Source | Example |
+| Priority | Surface | Example |
 |----------|--------|---------|
-| **1 (highest)** | Environment variables | `export AGENTOMATIC_LOG_LEVEL=DEBUG` |
-| **2** | `.env` file in project root | `AGENTOMATIC_LOG_LEVEL=DEBUG` |
-| **3** | Python constructor arguments | `AgentPlatform(log_level="DEBUG")` |
-| **4 (lowest)** | Built-in defaults | `"INFO"` |
+| **1** | Explicit platform arguments | `AgentPlatform(log_level="DEBUG")` |
+| **2** | Process environment | `export LLM__MODEL=...` or `export AGENTOMATIC_LOG_LEVEL=DEBUG` |
+| **3** | `.env` file in project root | `LLM__MODEL=...` |
+| **4 (lowest)** | Built-in defaults | `"INFO"`, `"mistral:7b"`, etc. |
 
 !!! tip "Production Best Practice"
     Use environment variables or `.env` files for deployment-specific values (secrets, URLs, ports). Use Python constructor arguments for structural decisions (middleware toggles, storage backend selection).
@@ -50,6 +66,9 @@ from agentomatic.storage import SQLAlchemyStore
 
 platform = AgentPlatform.from_folder(
     "agents/",
+    plugins_dir="plugins/",
+    endpoints_dir="endpoints/",
+    ingestion_dir="ingestion/",
     # -- Metadata --
     title="My Custom Agent Platform",
     description="Enterprise Assistant APIs",
@@ -72,11 +91,24 @@ platform = AgentPlatform.from_folder(
     enable_rate_limit=True,
     rate_limit_requests=100,
     rate_limit_window=60,
+    rate_limit_trust_proxy_headers=True,  # only behind a trusted proxy
     # -- Memory --
     max_history_messages=50,
     summarize_after=30,
     # -- Studio --
     enable_studio=False,
+    # -- Production security and operations --
+    enable_jwt_auth=True,
+    enable_zero_trust=True,
+    require_auth_globally=True,
+    enable_control_plane=True,
+    control_token="ops-secret",
+    # -- Tasks, connections, and plugin artifact lifecycle --
+    enable_tasks=True,
+    task_max_concurrency=8,
+    logs_history=True,
+    plugin_autoreload=True,
+    plugin_autoreload_interval=5.0,
 )
 ```
 
@@ -85,6 +117,9 @@ platform = AgentPlatform.from_folder(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `agents_dir` | `str \| Path` | `"agents/"` | Filesystem path to scan for agent packages. |
+| `plugins_dir` | `str \| Path` | `"plugins/"` | Filesystem path to scan for ML plugin packages. |
+| `endpoints_dir` | `str \| Path` | `"endpoints/"` | Filesystem path to scan for custom endpoint packages. |
+| `ingestion_dir` | `str \| Path` | `"ingestion/"` | Filesystem path to scan for ingestion packages. |
 | `title` | `str` | `"Agentomatic Platform"` | Display title shown in Swagger docs (`/docs`) and Redoc. |
 | `description` | `str` | `"Multi-agent API platform..."` | Description displayed in Swagger UI. |
 | `version` | `str` | `"1.0.0"` | Semantic version string shown in API docs and root. |
@@ -100,19 +135,39 @@ platform = AgentPlatform.from_folder(
 | `enable_rate_limit` | `bool` | `False` | Add rate-limiting middleware. |
 | `rate_limit_requests` | `int` | `100` | Max requests per window per client IP. |
 | `rate_limit_window` | `int` | `60` | Sliding window duration in seconds. |
+| `rate_limit_trust_proxy_headers` | `bool` | `False` | Trust `X-Forwarded-For` only when a trusted proxy overwrites it. |
 | `enable_metrics` | `bool` | `False` | Mount Prometheus metrics at `/metrics`. |
 | `enable_feedback` | `bool` | `True` | Enable feedback collection endpoints per agent. |
 | `enable_telemetry` | `bool` | `True` | Auto-configure OpenTelemetry tracing. |
-| `enable_studio` | `bool` | `False` | Mount the Studio debug API and UI at `/studio/`. |
+| `enable_studio` | `bool` | `False` | Mount the Studio debug API and UI at `/studio/` and `/studio/ui/`. |
 | `middleware` | `list[tuple] \| None` | `None` | Custom middleware list: `[(MiddlewareCls, {kwargs}), ...]`. |
 | `max_history_messages` | `int` | `50` | Maximum messages loaded into agent context. |
 | `summarize_after` | `int` | `30` | Message threshold before auto-summarization kicks in. |
+| `stack` | `str \| StackConfig \| None` | auto-detect | Active named stack or explicit stack configuration. |
+| `stacks_dir` | `str \| Path` | `"stacks/"` | Directory containing stack YAML files. |
+| `enable_jwt_auth` | `bool` | `False` | Enable JWT/OAuth2 bearer-token validation. |
+| `jwt_config` | `JWTConfig \| None` | `None` | JWT validation configuration; required with `enable_jwt_auth=True`. |
+| `enable_zero_trust` | `bool` | `False` | Enforce per-agent security policies. |
+| `require_auth_globally` | `bool` | `False` | Require authenticated claims for every agent request when zero trust is enabled. |
+| `enable_control_plane` | `bool` | `False` | Mount the production control-plane API. |
+| `control_token` | `str` | `""` | Optional secret required by mutating control-plane operations. |
+| `connections` | `list[Any] \| None` | `None` | Platform-wide database, vector, HTTP, or custom connection definitions. |
+| `enable_connections_context` | `bool` | `True` | Attach the routed agent's connection manager to `request.state.connections`. |
+| `enable_tasks` | `bool` | `True` | Enable the durable task/execution subsystem. |
+| `task_store` | `TaskStore \| None` | `None` | Optional durable task-store implementation. |
+| `task_max_concurrency` | `int` | `8` | Maximum concurrent task workers. |
+| `logs_history` | `bool` | `False` | Persist invocation history when a durable store is available. |
+| `allow_logsllm_analysis` | `bool` | `False` | Expose opt-in LLM analysis over persisted invocation logs. |
+| `plugin_autoreload` | `bool \| None` | settings / `False` | Watch artifact promotions and reload registered ML plugins safely. |
+| `plugin_autoreload_interval` | `float \| None` | settings / `5.0` | Seconds between artifact-pointer checks; must be greater than zero. |
 
 ---
 
 ## 🌐 Environment Variables Reference
 
-All platform settings can be overridden using environment variables. There are two systems:
+The generated project and `agentomatic run` expose deployment configuration
+through direct `AGENTOMATIC_*` variables. `PlatformSettings` is a separate,
+nested model used by the subsystems described below.
 
 ### Direct `AGENTOMATIC_` Variables
 
@@ -389,16 +444,13 @@ platform.run(
         ports:
           - "8000:8000"
         environment:
-          - APP_ENV=production
-          - LOG_LEVEL=WARNING
-          - LLM__PROVIDER=openai
-          - LLM__MODEL=gpt-4o
-          - LLM__OPENAI_API_KEY=${OPENAI_API_KEY}
-          - DB__URL=postgresql+asyncpg://postgres:secret@db:5432/agents
-          - FEATURES__ENABLE_AUTH=true
-          - AUTH__API_KEY=${API_KEY}
-          - FEATURES__ENABLE_RATE_LIMIT=true
-          - RATE_LIMIT__REQUESTS=200
+          - AGENTOMATIC_LOG_LEVEL=WARNING
+          - AGENTOMATIC_ENABLE_METRICS=true
+          - AGENTOMATIC_ENABLE_AUTH=true
+          - AGENTOMATIC_API_KEY=${API_KEY}
+          - AGENTOMATIC_ENABLE_RATE_LIMIT=true
+          - AGENTOMATIC_LOGS_HISTORY=true
+          - DATABASE_URL=postgresql+asyncpg://postgres:secret@db:5432/agents
         depends_on:
           - db
 
@@ -422,13 +474,11 @@ platform.run(
     metadata:
       name: agentomatic-config
     data:
-      APP_ENV: "production"
-      LOG_LEVEL: "WARNING"
-      LLM__PROVIDER: "vertex"
-      LLM__VERTEX_PROJECT: "my-gcp-project"
-      DB__URL: "postgresql+asyncpg://user:pass@pg-service:5432/agents"
-      FEATURES__ENABLE_AUTH: "true"
-      FEATURES__ENABLE_METRICS: "true"
+      AGENTOMATIC_LOG_LEVEL: "WARNING"
+      AGENTOMATIC_ENABLE_AUTH: "true"
+      AGENTOMATIC_ENABLE_METRICS: "true"
+      AGENTOMATIC_LOGS_HISTORY: "true"
+      DATABASE_URL: "postgresql+asyncpg://user:pass@pg-service:5432/agents"
     ```
 
 ---
@@ -439,7 +489,9 @@ platform.run(
     Check these common causes:
     
     1. **`.env` file location**: Must be in the project root (same directory as `main.py`)
-    2. **Variable prefix**: Platform variables must start with `AGENTOMATIC_` (e.g., `AGENTOMATIC_LOG_LEVEL`)
+    2. **Variable shape**: Generated-platform variables start with `AGENTOMATIC_`
+       (for example, `AGENTOMATIC_LOG_LEVEL`); `PlatformSettings` variables use
+       their documented nested form (for example, `LLM__MODEL`)
     3. **Priority**: Environment variables always override `.env` file values
     4. **Restart required**: `.env` changes require a server restart (no hot-reload)
 

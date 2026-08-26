@@ -193,7 +193,7 @@ See your agent's graph topology and execution flow in the visual debugger:
 agentomatic run --studio
 ```
 
-Then open **http://localhost:8000/studio/** in your browser. You'll see:
+Then open **http://localhost:8000/studio/ui/** in your browser. You'll see:
 
 - **Graph View** — Visual representation of your `retrieve → generate` pipeline
 - **State Panel** — Inspect the state at each node during execution

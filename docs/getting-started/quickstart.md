@@ -27,10 +27,11 @@ Before you begin, make sure you have the following:
 
 === "pip (Recommended)"
 
-    Install all features including Studio, Chat UI, database support, and optimization:
+    Install the bundled production features including Studio, database support,
+    and optimization. Add the separate `ui` extra if you also need Chainlit:
 
     ```bash
-    pip install agentomatic[all]
+    pip install "agentomatic[all,ui]"
     ```
 
 === "uv (Fast)"
@@ -489,7 +490,7 @@ Every registered agent gets a full suite of REST endpoints automatically:
 |--------|----------|-------------|
 | `POST` | `/api/v1/{agent}/invoke` | Synchronous invocation |
 | `POST` | `/api/v1/{agent}/invoke/stream` | SSE streaming invocation |
-| `POST` | `/api/v1/{agent}/chat` | Multi-turn conversation with thread persistence |
+| `POST` | `/api/v1/{agent}/chat` | Multi-turn conversation; persists thread history when a store is configured |
 | `GET` | `/api/v1/{agent}/health` | Agent health check |
 | `GET` | `/api/v1/{agent}/config` | Agent configuration |
 | `GET` | `/api/v1/{agent}/prompts` | Available prompt versions |
@@ -594,9 +595,9 @@ When Agentomatic receives a REST request and invokes your agent, it maps the req
 ??? question "`ModuleNotFoundError` when starting"
     This usually means a dependency is missing. Common fixes:
     ```bash
-    pip install agentomatic[langgraph]  # For LangGraph-based agents
-    pip install agentomatic[ollama]     # For Ollama LLM provider
-    pip install agentomatic[all]        # Install everything
+    pip install "agentomatic[langgraph]"  # For LangGraph-based agents
+    pip install "agentomatic[ollama]"     # For Ollama LLM provider
+    pip install "agentomatic[all,ui]"     # All bundled features plus Chainlit
     ```
 
 ??? question "Agent returns empty response"
@@ -645,4 +646,4 @@ Now that your first agent is running, explore these resources:
 | **[Middleware](../guide/middleware.md)** | Auth, rate limiting, metrics, and custom middleware |
 | **[Configuration](../guide/configuration.md)** | Platform settings, CORS, environment variables |
 | **[CLI Reference](../cli/commands.md)** | Every command and flag documented |
-| **[API Reference](../architecture/api-reference.md)** | All 26 endpoints with request/response schemas |
+| **[API Reference](../architecture/api-reference.md)** | Core and operational routes with request/response schemas |

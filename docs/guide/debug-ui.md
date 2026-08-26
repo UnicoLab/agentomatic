@@ -23,7 +23,7 @@ Agentomatic includes a built-in ChatGPT-like conversational interface powered by
 ### Install the UI Extra
 
 ```bash
-pip install agentomatic[ui]
+pip install "agentomatic[ui]"
 ```
 
 ### Launch Modes

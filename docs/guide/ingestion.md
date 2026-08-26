@@ -39,6 +39,7 @@ exposes:
 | `GET /api/v1/ingestion/{name}/info` | Ingestor metadata + input schema |
 | `GET /api/v1/ingestion/{name}/health` | Readiness/health |
 | `GET /api/v1/ingestion` | List all ingestors (the resource router is mounted when an ingestor is discovered) |
+| `GET /api/v1/ingestors` | Always-available platform registry for builder and deployment tooling |
 
 Async runs plug straight into the [unified task system](tasks.md), so you get
 progress percentages, live SSE event streams, cancellation, and webhooks for

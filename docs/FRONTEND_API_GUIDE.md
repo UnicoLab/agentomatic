@@ -33,6 +33,8 @@ interface AgentInvokeRequest {
 /** Maps to AgentInvokeResponse (router_factory.py) */
 interface AgentInvokeResponse {
   response: string;
+  /** Structured `state_to_output()` payload when the agent returns one. */
+  output: unknown | null;
   agent_type: string;
   thread_id: string | null;
   suggestions: string[];
@@ -86,11 +88,17 @@ interface FeedbackPayload {
 
 /** Maps to TaskProgress (tasks/models.py) */
 interface TaskProgress {
-  percent: number;                      // 0–100
+  percent: number | null;               // 0–100; null when indeterminate
   message: string;
-  current?: number | null;
+  current: number;
   total?: number | null;
-  stage?: string | null;
+  stage: string;
+}
+
+interface TaskRetryConfig {
+  max_attempts: number;                 // includes the first attempt
+  backoff: "fixed" | "linear" | "exponential";
+  base_delay: number;                   // seconds
 }
 
 /** Maps to TaskRecord.public_dict() (tasks/models.py) */
@@ -98,15 +106,23 @@ interface TaskRecord {
   id: string;                           // "task_..."
   target_type: "agent" | "plugin" | "pipeline" | "endpoint" | "ingestion";
   target: string;                       // resource name
-  mode: "sync" | "async" | "batch" | "stream";
+  mode: "sync" | "async" | "batch";
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   progress: TaskProgress;
-  result?: any;                         // populated once succeeded
-  error?: string | null;                // populated once failed
+  input: unknown | null;
+  batch: unknown[] | null;
+  result: unknown | null;               // populated once succeeded
+  error: string | null;                 // populated once failed
   created_at: number;
-  started_at?: number | null;
-  finished_at?: number | null;
-  duration_ms?: number | null;
+  started_at: number | null;
+  finished_at: number | null;
+  duration_ms: number | null;
+  metadata: Record<string, unknown>;
+  callback_url: string | null;
+  parent_id: string | null;
+  retry: TaskRetryConfig | null;
+  attempts: number;
+  checkpoints: Record<string, Record<string, unknown>>;
   links?: { status: string; events: string; result: string; cancel: string };
 }
 ```
@@ -462,10 +478,12 @@ const messages = await msgsRes.json();
 
 ---
 
-## Full Endpoint Reference
+## Core Endpoint Reference
 
-Every agent exposes **26 endpoints**. All paths below are relative to the
-agent prefix `/api/v1/{agent_name}`.
+The table below covers the 26 common endpoint paths relative to the agent
+prefix `/api/v1/{agent_name}`. The A2A cancellation route and operational
+routes are listed immediately after it because their availability depends on
+the active task, log-history, and optimization features.
 
 | # | Method   | Path                             | Request Body            | Description                       |
 |---|----------|----------------------------------|-------------------------|-----------------------------------|
@@ -495,6 +513,13 @@ agent prefix `/api/v1/{agent_name}`.
 | 24 | `POST`  | `/threads/{tid}/reject`          | —                       | Reject pending action             |
 | 25 | `POST`  | `/threads/{tid}/fork`            | —                       | Fork thread                       |
 | 26 | `GET`   | `/threads/{tid}/lineage`         | —                       | Thread lineage                    |
+
+| Method | Additional path | Description |
+|---|---|---|
+| `POST` | `/a2a/tasks/{task_id}/cancel` | Cancel an A2A task |
+| `GET` | `/logs`, `/logs/{id}`, `/logs/analysis` | Agent-scoped invocation-history queries when history is enabled |
+| `POST` | `/logs/analyze` | Analyze persisted agent logs when analysis is enabled |
+| `GET` | `/optimization-runs` | List persisted optimization runs when available |
 
 !!! info "Plus execution-mode routes"
     When the task engine is enabled (default), each agent also exposes
@@ -643,7 +668,7 @@ const result = await fetch("/api/v1/endpoints/ensemble/call", {
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| `GET` | `/api/v1/ingestion` | List registered ingestors (mounted when an ingestor is discovered) |
+| `GET` | `/api/v1/ingestors` | List registered ingestors (always available) |
 | `POST` | `/api/v1/ingestion/{name}/run` | Run an ingestion job (sync) |
 | `POST` | `/api/v1/ingestion/{name}/run/async` | Run as a tracked task |
 | `GET` | `/api/v1/ingestion/{name}/info` | Ingestor metadata / readiness |

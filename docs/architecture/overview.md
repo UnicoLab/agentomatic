@@ -27,7 +27,7 @@ graph TB
     subgraph "Agentomatic Platform Core"
         AP["AgentPlatform\nCentral orchestrator"]
         REG["AgentRegistry\nIn-memory agent store"]
-        RF["RouterFactory\nAuto-generated REST\n(26 endpoints per agent)"]
+        RF["RouterFactory\nAuto-generated agent REST routes"]
         SR["StudioRouter\nDebug API (/studio/*)"]
         MM["MemoryManager\nConversation history\nSummarization · Windowing"]
         FB["FeedbackCollector\nRatings · Corrections"]
@@ -152,12 +152,12 @@ An in-memory registry holding `RegisteredAgent` instances. Each agent carries:
 
 ### RouterFactory
 
-Auto-generates a full FastAPI router per agent with 26 endpoints:
+Auto-generates a full FastAPI router per agent. The core route families are:
 
 | Category | Endpoints | Description |
 |---|---|---|
 | **Execution** | `POST /invoke`, `POST /invoke/stream`, `POST /chat` | Sync, streaming, session-aware |
-| **A2A Protocol** | `GET /card`, `POST /a2a/tasks`, `GET /a2a/tasks/{id}` | Agent-to-agent interop |
+| **A2A Protocol** | `GET /card`, `POST /a2a/tasks`, `GET /a2a/tasks/{id}`, `POST /a2a/tasks/{id}/cancel` | Agent-to-agent interop and cancellation |
 | **Threads** | `POST /threads`, `GET /threads`, `GET /threads/{id}`, `PATCH /threads/{id}`, `DELETE /threads/{id}` | Full CRUD |
 | **Messages** | `GET /threads/{id}/messages`, `DELETE /threads/{id}/messages`, `GET /threads/{id}/summary` | History + summarization |
 | **HITL** | `GET /threads/{id}/pending`, `POST /threads/{id}/approve`, `POST /threads/{id}/reject` | Human-in-the-loop approval |
@@ -165,6 +165,7 @@ Auto-generates a full FastAPI router per agent with 26 endpoints:
 | **Feedback** | `POST /feedback`, `GET /feedback`, `GET /feedback/export` | User ratings + JSONL export |
 | **Inspection** | `GET /health`, `GET /config`, `GET /prompts` | Agent health + config |
 | **Optimization** | `POST /optimize/invoke` | Full-context pipeline for DeepEval |
+| **Optional operations** | `GET /logs...`, `GET /optimization-runs` | Persisted invocation history and optimization-run inspection when enabled |
 
 ### Studio Adapters
 
@@ -331,7 +332,7 @@ graph TD
 
     REG --> SCHEMA["Discover custom schemas\n(schemas.py module)"]
 
-    SCHEMA --> ROUTER["RouterFactory creates\n26 endpoints per agent"]
+    SCHEMA --> ROUTER["RouterFactory creates\nagent REST routes"]
 
     ROUTER --> STUDIO["Studio adapter resolved\n(LangGraph/LangChain/Generic)"]
 
@@ -475,7 +476,7 @@ spec:
 
 ---
 
-## Class-Agent Architecture (v0.7)
+## Class-Agent Architecture
 
 The **Class-Owned Graph Agent** system introduces an alternative agent paradigm: define agents as Python classes with an ML-inspired lifecycle, using a built-in graph runtime that requires no LangGraph dependency.
 
