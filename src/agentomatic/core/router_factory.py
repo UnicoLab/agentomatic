@@ -6,7 +6,7 @@ import json
 import time
 import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -491,9 +491,9 @@ def create_default_router(
         validator_input = getattr(_schema_validator, "request_model", None)
         validator_output = getattr(_schema_validator, "response_model", None)
         if _is_openapi_model(validator_input):
-            input_model = validator_input
+            input_model = cast(type[BaseModel], validator_input)
         if _is_openapi_model(validator_output):
-            output_model = validator_output
+            output_model = cast(type[BaseModel], validator_output)
 
     # ── Invocation log recorder (optional) ────────────────────────
     log_recorder = None

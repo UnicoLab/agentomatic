@@ -111,10 +111,9 @@ dev = [
     "pip-audit>=2.9",
     "twine>=6.0",
     "python-semantic-release>=10.0,<11",
-    # GitPython 3.1.45 removed Actor.name_email_regex, which is still used
-    # by python-semantic-release 10.6.1. Keep the release CLI functional
-    # until its upstream dependency constraint is corrected.
-    "GitPython>=3.1.30,<3.1.45",
+    # Keep the release environment on a supported, security-patched GitPython.
+    # ``scripts/run_semantic_release.py`` bridges a removed PSR compatibility API.
+    "GitPython>=3.1.60,<4",
     "mike>=2.2.0",
     "mkdocs-material>=9.7.6",
 ]

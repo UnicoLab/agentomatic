@@ -76,8 +76,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          current="$(uv run semantic-release version --print-last-released)"
-          next="$(uv run semantic-release version --print)"
+          current="$(uv run python scripts/run_semantic_release.py version --print-last-released)"
+          next="$(uv run python scripts/run_semantic_release.py version --print)"
           echo "Current version: ${current}"
           echo "Next version: ${next}"
 
@@ -88,13 +88,13 @@ jobs:
           fi
 
           if [ "${{ inputs.DRY_RUN }}" = "true" ]; then
-            uv run semantic-release --noop version
+            uv run python scripts/run_semantic_release.py --noop version
             echo "released=false" >> "$GITHUB_OUTPUT"
             echo "version=${next}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          uv run semantic-release version
+          uv run python scripts/run_semantic_release.py version
           echo "released=true" >> "$GITHUB_OUTPUT"
           echo "version=${next}" >> "$GITHUB_OUTPUT"
 
