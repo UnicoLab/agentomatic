@@ -1,7 +1,7 @@
 # Class-Based Agents
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Agent = Class · Node = Method · Graph = Internal Runtime</h3>
 </div>
 

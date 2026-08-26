@@ -3,7 +3,7 @@
 # Framework Lifecycle Makefile
 # ==============================================================================
 .DEFAULT_GOAL := help
-.PHONY: help install dev test lint format clean build publish docs
+.PHONY: help install dev test test-live lint audit format clean build publish docs
 
 # === Setup ===
 install: ## Install agentomatic (core)
@@ -16,6 +16,9 @@ dev: ## Install with ALL dev dependencies
 # === Quality ===
 lint: ## Run ruff linter
 	uv run ruff check src/agentomatic/ tests/
+
+audit: ## Fail on known vulnerabilities in the locked dependency set
+	uv run pip-audit --progress-spinner off
 
 format: ## Auto-format code
 	uv run ruff check --fix src/agentomatic/ tests/
@@ -32,13 +35,16 @@ precommit: ## Run all pre-commit hooks
 
 # === Testing ===
 test: ## Run all tests
-	uv run pytest tests/ -v
+	uv run pytest tests/ -m "not live" -v
+
+test-live: ## Run tests requiring a configured live model service
+	uv run pytest tests/ -m live -v --override-ini="addopts="
 
 test-cov: ## Run tests with coverage report
 	uv run pytest tests/ --cov=agentomatic --cov-report=html --cov-report=term --cov-report=xml -v
 
 test-quick: ## Run tests (fast, no verbose)
-	uv run pytest tests/ -q
+	uv run pytest tests/ -m "not live" -q
 
 test-watch: ## Run tests in watch mode (requires pytest-watch)
 	uv run ptw tests/ -- -v
@@ -107,7 +113,7 @@ version: ## Show package version
 structure: ## Show package structure
 	@find src/agentomatic -type f -name "*.py" | sort
 
-check-all: lint typecheck test docs-check ## Run all quality checks
+check-all: lint audit typecheck test docs-check ## Run all quality checks
 	@echo "✅ All checks passed!"
 
 check-ci: lint format-check typecheck test-cov docs-check ## Full CI parity check (lint + format-check + typecheck + coverage)

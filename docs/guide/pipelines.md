@@ -1,7 +1,7 @@
 # Agent Pipelines
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Compose Multi-Agent Workflows with Zero Boilerplate</h3>
 </div>
 
@@ -405,6 +405,17 @@ The code block executes with `ctx` in scope and must `return` a `dict`.
 Call a registered ML plugin's `predict()` mid-pipeline. The resolved input
 mapping is coerced into the plugin's declared input schema before inference,
 and the prediction is stored in the context for downstream steps.
+
+When a plugin, endpoint, or ingestor publishes a non-object JSON Schema (for
+example `RootModel[str]`), map its one value through `__root__`. Studio labels
+this target **Request body** and creates the same portable YAML:
+
+```yaml
+  - name: normalize
+    plugin: root_text_plugin
+    input:
+      __root__: "$.input.text"
+```
 
 ```yaml
 steps:

@@ -1,7 +1,7 @@
 # Storage Backends
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Pluggable Persistence Stack</h3>
 </div>
 

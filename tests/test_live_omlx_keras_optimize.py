@@ -83,7 +83,10 @@ def _omlx_available() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _omlx_available(), reason="oMLX server not reachable")
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(not _omlx_available(), reason="oMLX server not reachable"),
+]
 
 
 @pytest.fixture(autouse=True)

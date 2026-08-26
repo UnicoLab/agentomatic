@@ -9,9 +9,12 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
+from click.testing import CliRunner
 
+from agentomatic.cli.commands import cli
 from agentomatic.cli.templates import TEMPLATES, get_template_files
 
 # =========================================================================
@@ -31,6 +34,69 @@ class TestTemplateRegistry:
         for _name, desc in TEMPLATES.items():
             assert isinstance(desc, str)
             assert len(desc) > 5
+
+    def test_langchain_template_is_exposed_by_cli(self, tmp_path: Path) -> None:
+        """Every documented template must be accepted by ``agentomatic init``."""
+        result = CliRunner().invoke(
+            cli,
+            ["init", "chatbot", "--template", "langchain", "--dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "chatbot" / "agent.py").is_file()
+
+
+def test_run_project_path_honours_component_and_stack_flags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The documented ``run`` flags reach the generated ``main:app`` path."""
+    import agentomatic.cli.commands as commands
+
+    captured: dict[str, Any] = {}
+    env_keys = (
+        "AGENTOMATIC_AGENTS_DIR",
+        "AGENTOMATIC_PLUGINS_DIR",
+        "AGENTOMATIC_ENDPOINTS_DIR",
+        "AGENTOMATIC_INGESTION_DIR",
+        "AGENTOMATIC_STACKS_DIR",
+        "AGENTOMATIC_STACK",
+        "AGENTOMATIC_ENABLE_STUDIO",
+    )
+    for key in env_keys:
+        monkeypatch.setenv(key, commands.os.environ.get(key, ""))
+    monkeypatch.setattr(commands, "_has_project_main_app", lambda: True)
+    monkeypatch.setattr("uvicorn.run", lambda app, **kwargs: captured.update(app=app, **kwargs))
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "run",
+            "--agents-dir",
+            "custom-agents",
+            "--plugins-dir",
+            "custom-plugins",
+            "--endpoints-dir",
+            "custom-endpoints",
+            "--ingestion-dir",
+            "custom-ingestion",
+            "--stacks-dir",
+            "custom-stacks",
+            "--stack",
+            "local",
+            "--no-studio",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["app"] == "main:app"
+    assert captured["host"] == "0.0.0.0"
+    assert captured["port"] == 8000
+    assert commands.os.environ["AGENTOMATIC_AGENTS_DIR"] == "custom-agents"
+    assert commands.os.environ["AGENTOMATIC_PLUGINS_DIR"] == "custom-plugins"
+    assert commands.os.environ["AGENTOMATIC_ENDPOINTS_DIR"] == "custom-endpoints"
+    assert commands.os.environ["AGENTOMATIC_INGESTION_DIR"] == "custom-ingestion"
+    assert commands.os.environ["AGENTOMATIC_STACKS_DIR"] == "custom-stacks"
+    assert commands.os.environ["AGENTOMATIC_STACK"] == "local"
+    assert commands.os.environ["AGENTOMATIC_ENABLE_STUDIO"] == "0"
 
 
 class TestBasicTemplate:

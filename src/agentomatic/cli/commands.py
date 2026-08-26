@@ -551,14 +551,32 @@ def _sync_run_env_from_cli(
     title: str | None,
     log_level: str,
     require_auth_globally: bool,
+    agents_dir: str = "agents",
+    plugins_dir: str = "plugins",
+    endpoints_dir: str = "endpoints",
+    ingestion_dir: str = "ingestion",
+    stacks_dir: str = "stacks",
+    stack: str | None = None,
 ) -> None:
-    """Map CLI flags onto ``AGENTOMATIC_*`` env vars for ``main:app``."""
+    """Map CLI flags onto ``AGENTOMATIC_*`` env vars for ``main:app``.
+
+    The generated project entrypoint consumes these directory variables.  This
+    keeps its ``uvicorn main:app`` launch path behaviorally identical to the
+    programmatic ``AgentPlatform.from_folder`` fallback.
+    """
     os.environ["AGENTOMATIC_ENABLE_STUDIO"] = "1" if studio else "0"
     os.environ["AGENTOMATIC_LOG_LEVEL"] = log_level
+    os.environ["AGENTOMATIC_AGENTS_DIR"] = agents_dir
+    os.environ["AGENTOMATIC_PLUGINS_DIR"] = plugins_dir
+    os.environ["AGENTOMATIC_ENDPOINTS_DIR"] = endpoints_dir
+    os.environ["AGENTOMATIC_INGESTION_DIR"] = ingestion_dir
+    os.environ["AGENTOMATIC_STACKS_DIR"] = stacks_dir
     if title:
         os.environ["AGENTOMATIC_TITLE"] = title
     if require_auth_globally:
         os.environ["AGENTOMATIC_REQUIRE_AUTH"] = "1"
+    if stack:
+        os.environ["AGENTOMATIC_STACK"] = stack
     # Honour explicit env; default metrics on (parity with scaffolded main.py).
     if os.getenv("AGENTOMATIC_ENABLE_METRICS") is None:
         os.environ["AGENTOMATIC_ENABLE_METRICS"] = "1"
@@ -570,6 +588,7 @@ def _sync_run_env_from_cli(
 @click.option("--endpoints-dir", default="endpoints", help="Custom endpoints directory")
 @click.option("--ingestion-dir", default="ingestion", help="Ingestion packages directory")
 @click.option("--stacks-dir", default="stacks", help="Stack YAML directory")
+@click.option("--stack", default=None, help="Active stack name (overrides .agentomatic-stack)")
 @click.option("--host", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", type=int, default=8000, help="Port to listen on")
 @click.option("--reload", is_flag=True, help="Enable auto-reload")
@@ -612,6 +631,7 @@ def run(
     ssl_certfile: str | None,
     ssl_keyfile: str | None,
     require_auth_globally: bool,
+    stack: str | None = None,
 ) -> None:
     """Run the platform with Rich status output.
 
@@ -640,6 +660,12 @@ def run(
             title=title,
             log_level=log_level,
             require_auth_globally=require_auth_globally,
+            agents_dir=agents_dir,
+            plugins_dir=plugins_dir,
+            endpoints_dir=endpoints_dir,
+            ingestion_dir=ingestion_dir,
+            stacks_dir=stacks_dir,
+            stack=stack,
         )
         # ``uvicorn.run("main:app")`` resolves the import string against
         # ``sys.path``. When agentomatic is launched as a console script
@@ -672,6 +698,12 @@ def run(
 
     logger.info(f"Starting platform from {agents_dir} (plugins: {plugins_dir})...")
 
+    # ``AgentPlatform`` resolves the active stack from this environment
+    # variable before it discovers agents. Set it before construction so the
+    # stack default LLM is available during agent initialisation as well.
+    if stack:
+        os.environ["AGENTOMATIC_STACK"] = stack
+
     from agentomatic import AgentPlatform
 
     # ``AGENTOMATIC_*`` is the documented way to configure a deployment, and the
@@ -702,6 +734,8 @@ def run(
         "enable_control_plane": _env_bool("AGENTOMATIC_ENABLE_CONTROL_PLANE", False),
         "control_token": os.getenv("AGENTOMATIC_CONTROL_TOKEN", ""),
         "enable_rate_limit": _env_bool("AGENTOMATIC_ENABLE_RATE_LIMIT", False),
+        "rate_limit_requests": int(os.getenv("AGENTOMATIC_RATE_LIMIT_REQUESTS", "100")),
+        "rate_limit_window": int(os.getenv("AGENTOMATIC_RATE_LIMIT_WINDOW", "60")),
         "rate_limit_trust_proxy_headers": _env_bool(
             "AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS", False
         ),

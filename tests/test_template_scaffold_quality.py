@@ -278,6 +278,14 @@ def test_deepagent_template_names_its_missing_dependency() -> None:
     assert "from deepagents import create_deep_agent" in guarded
 
 
+def test_extraction_template_uses_the_pipeline_context_step_shape() -> None:
+    """Scaffolded extraction pipelines must address step outputs directly."""
+    pipeline = get_template_files("extraction", "extractor")["pipeline.yaml"]
+
+    assert "$.steps.to_md.path" in pipeline
+    assert "$.steps.to_md.output.path" not in pipeline
+
+
 def test_deepagent_scaffold_tells_the_user_to_install_it(tmp_path: Path) -> None:
     """``agentomatic init --template deepagent`` must surface the dependency."""
     result = subprocess.run(

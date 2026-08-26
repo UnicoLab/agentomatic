@@ -13,7 +13,10 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - "host.docker.internal:8000"
+          # The repository's packaged Docker platform publishes 8010 by
+          # default. Change this to 8000 only when Agentomatic itself runs
+          # directly on the host with that port.
+          - "host.docker.internal:8010"
         labels:
           service: agentomatic
 

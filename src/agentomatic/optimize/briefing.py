@@ -498,8 +498,15 @@ async def multipass_refine_prompt(
     passes = max(1, int(passes))
     notes: list[str] = []
     style = style or refine_style_for(model)
-    # Frontier models can use a bit more output budget on the draft.
-    draft_tokens = max_tokens if style == "slm" else max(max_tokens, 4000)
+    # A system-prompt rewrite should be concise.  Asking an on-device SLM for
+    # thousands of tokens turns a small revision into a multi-minute request
+    # (and makes a multi-pass optimisation needlessly serial).  Keep the
+    # caller-provided budget for frontier models, but cap local SLM drafts to
+    # a generous prompt-sized response.  The critique needs even less text.
+    # This is an output limit only; the complete briefing is still supplied as
+    # input, so the optimiser retains its full context.
+    draft_tokens = min(max_tokens, 768) if style == "slm" else max(max_tokens, 4000)
+    critique_tokens = min(draft_tokens, 384) if style == "slm" else min(max_tokens, 2000)
 
     role = (
         "You are an expert prompt engineer optimizing with a SMALL language model."
@@ -556,7 +563,7 @@ async def multipass_refine_prompt(
                 model,
                 critique_prompt,
                 temperature=min(temperature, 0.4),
-                max_tokens=min(max_tokens, 1500 if style == "slm" else 2000),
+                max_tokens=critique_tokens,
             )
         ).strip()
         notes.append(f"pass{turn}_critique chars={len(critique)}")

@@ -136,9 +136,8 @@ class BaseIngestor(Generic[InputT]):
         schema = self.get_input_schema()
         if isinstance(request, schema):
             return request
-        data = request if isinstance(request, dict) else {}
         try:
-            return schema(**data)
+            return schema.model_validate(request)
         except Exception:  # noqa: BLE001 - fall back to the raw payload
             return request
 

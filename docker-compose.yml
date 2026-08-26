@@ -1,13 +1,13 @@
 # =============================================================================
 # Agentomatic — local production-shaped stack
 #
-#   docker compose up --build          # platform on http://localhost:8000
+#   docker compose up --build          # API on http://localhost:8010
 #   docker compose --profile db up -d  # …with Postgres-backed persistence
 #
-# One platform process serves every agent it discovers under ./agents — that
-# is the point of the product, so there is no per-agent service here. Features
-# are driven entirely by AGENTOMATIC_* env vars, exactly as in the image that
-# `agentomatic deploy` generates, so what you exercise locally is what ships.
+# oMLX runs natively on Apple Silicon, so the container reaches the host's
+# OpenAI-compatible endpoint via host.docker.internal rather than running MLX
+# inside Linux. Override AGENTOMATIC_PORT=8000 when there is no host model
+# server occupying that port.
 # =============================================================================
 
 services:
@@ -19,7 +19,7 @@ services:
     container_name: agentomatic-platform
     restart: unless-stopped
     ports:
-      - "${AGENTOMATIC_PORT:-8000}:8000"
+      - "${AGENTOMATIC_PORT:-8010}:8000"
     environment:
       AGENTOMATIC_TITLE: "${AGENTOMATIC_TITLE:-Agentomatic Platform}"
       AGENTOMATIC_LOG_LEVEL: "${AGENTOMATIC_LOG_LEVEL:-INFO}"
@@ -27,20 +27,51 @@ services:
       AGENTOMATIC_ENABLE_STUDIO: "${AGENTOMATIC_ENABLE_STUDIO:-1}"
       AGENTOMATIC_ENABLE_METRICS: "${AGENTOMATIC_ENABLE_METRICS:-1}"
       AGENTOMATIC_ENABLE_CONTROL_PLANE: "${AGENTOMATIC_ENABLE_CONTROL_PLANE:-1}"
-      # Opt-in hardening — set these in .env before exposing the port.
-      AGENTOMATIC_ENABLE_AUTH: "${AGENTOMATIC_ENABLE_AUTH:-0}"
-      AGENTOMATIC_API_KEY: "${AGENTOMATIC_API_KEY:-}"
-      AGENTOMATIC_CONTROL_TOKEN: "${AGENTOMATIC_CONTROL_TOKEN:-}"
-      AGENTOMATIC_ENABLE_RATE_LIMIT: "${AGENTOMATIC_ENABLE_RATE_LIMIT:-0}"
+      # This is a production-shaped stack: do not start it exposed and
+      # unauthenticated. Compose fails before creating a container unless both
+      # secrets are supplied (for example through a local .env file).
+      AGENTOMATIC_REQUIRE_AUTH: "${AGENTOMATIC_REQUIRE_AUTH:-1}"
+      AGENTOMATIC_ENABLE_AUTH: "${AGENTOMATIC_ENABLE_AUTH:-1}"
+      AGENTOMATIC_API_KEY: "${AGENTOMATIC_API_KEY:?Set AGENTOMATIC_API_KEY before starting Docker}"
+      AGENTOMATIC_CONTROL_TOKEN: "${AGENTOMATIC_CONTROL_TOKEN:?Set AGENTOMATIC_CONTROL_TOKEN before starting Docker}"
+      AGENTOMATIC_ENABLE_RATE_LIMIT: "${AGENTOMATIC_ENABLE_RATE_LIMIT:-1}"
+      AGENTOMATIC_RATE_LIMIT_REQUESTS: "${AGENTOMATIC_RATE_LIMIT_REQUESTS:-100}"
+      AGENTOMATIC_RATE_LIMIT_WINDOW: "${AGENTOMATIC_RATE_LIMIT_WINDOW:-60}"
       # Durable invocation history. Empty DATABASE_URL keeps it in-memory.
       AGENTOMATIC_LOGS_HISTORY: "${AGENTOMATIC_LOGS_HISTORY:-0}"
+      # Optional JSONL audit sink. Point this at a durable mounted volume or
+      # let your log collector ingest stdout; an in-container path alone does
+      # not survive container replacement.
+      AGENTOMATIC_AUDIT_LOG: "${AGENTOMATIC_AUDIT_LOG:-}"
       DATABASE_URL: "${DATABASE_URL:-}"
-      # Bring your own model provider; nothing vendor-specific is baked in.
+      # OTLP is opt-in: point at the collector reachable from this container
+      # (for Docker Desktop, commonly http://host.docker.internal:4317).
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-agentomatic}"
+      # Bring your own cloud-provider credentials if the agents need them.
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      # Host oMLX defaults. They are harmless when agents use another provider.
+      OMLX_BASE_URL: "${OMLX_BASE_URL:-http://host.docker.internal:8000/v1}"
+      OMLX_API_KEY: "${OMLX_API_KEY:-kurwamac}"
+      AGENTOMATIC_TASK_MODEL: "omlx/${AGENTOMATIC_LIVE_MODEL:-Qwen3.5-9B-MLX-4bit}"
+    command:
+      ["agentomatic", "run", "--agents-dir", "agents", "--host", "0.0.0.0", "--port", "8000"]
     volumes:
-      # Drop agents in and restart — no rebuild needed for iteration.
-      - ./agents:/app/agents:ro
+      # A runnable sample makes `docker compose up` verifiable immediately.
+      # Set AGENTOMATIC_AGENT_MOUNT=./agents for your own project directory.
+      - ${AGENTOMATIC_AGENT_MOUNT:-./e2e_demo/agents}:/app/agents:ro
+      # Optional resources follow the same discovery contract as a production
+      # project. The bundled deterministic fixtures make the full API surface
+      # locally verifiable; override each mount with your project's directory.
+      - ${AGENTOMATIC_PLUGINS_MOUNT:-./e2e_demo/plugins}:/app/plugins:ro
+      - ${AGENTOMATIC_ENDPOINTS_MOUNT:-./e2e_demo/endpoints}:/app/endpoints:ro
+      - ${AGENTOMATIC_INGESTION_MOUNT:-./e2e_demo/ingestion}:/app/ingestion:ro
+      # Studio's visual builder persists validated pipeline YAML here, so this
+      # is deliberately writable. Keep code-bearing agent/plugin/endpoint
+      # mounts read-only; pipeline definitions are the controlled editable
+      # deployment artifact. Mount your managed pipeline directory here.
+      - ${AGENTOMATIC_PIPELINES_MOUNT:-./e2e_demo/pipelines}:/app/pipelines
       - agentomatic-data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

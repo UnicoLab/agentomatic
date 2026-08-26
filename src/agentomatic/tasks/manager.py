@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -40,6 +40,13 @@ from .store import InMemoryTaskStore, TaskStore
 
 if TYPE_CHECKING:
     from .dispatchers import Dispatcher
+
+
+InputValidator = Callable[[str, Any], Any]
+
+
+class TaskInputValidationError(ValueError):
+    """Raised when a resource rejects a task payload before it is queued."""
 
 
 class TaskManager:
@@ -64,6 +71,7 @@ class TaskManager:
         self._max_concurrency = max_concurrency
         self._default_batch_concurrency = default_batch_concurrency
         self._dispatchers: dict[TargetType, Dispatcher] = {}
+        self._input_validators: dict[TargetType, InputValidator] = {}
         self._running: dict[str, asyncio.Task[Any]] = {}
         self._cancel_requested: set[str] = set()
         self._subscribers: dict[str, list[asyncio.Queue[TaskEvent]]] = {}
@@ -75,6 +83,15 @@ class TaskManager:
     def register_dispatcher(self, target_type: TargetType, dispatcher: Dispatcher) -> None:
         """Register the runner used for a given resource type."""
         self._dispatchers[target_type] = dispatcher
+
+    def register_input_validator(self, target_type: TargetType, validator: InputValidator) -> None:
+        """Register a synchronous pre-queue validator for one resource type.
+
+        Dispatchers remain responsible for execution. Validators run before a
+        task record is saved so invalid payloads cannot appear as queued or
+        misleadingly successful work in the durable task board.
+        """
+        self._input_validators[target_type] = validator
 
     @property
     def supported_targets(self) -> list[str]:
@@ -141,6 +158,13 @@ class TaskManager:
                 f"No dispatcher registered for target_type '{ttype.value}'. "
                 f"Supported: {self.supported_targets}"
             )
+
+        validator = self._input_validators.get(ttype)
+        if validator is not None:
+            if batch is not None:
+                batch = [validator(target, item) for item in batch]
+            else:
+                input = validator(target, input)
 
         retry_config: TaskRetryConfig | None
         if retry is None:

@@ -190,6 +190,46 @@ class ScorerEndpoint(BaseEndpoint[ScoreRequest, ScoreResponse]):
         return ScoreResponse(label=aggregated["label"], confidence=aggregated["score"])
 ```
 
+## HTTP methods and browser-safe input
+
+`POST` is the default endpoint method and receives the typed request as JSON.
+You may expose read-only endpoint logic with `GET` or `HEAD`; their typed input
+is automatically published as **query parameters**, not a request body. This
+matters for browser clients, which are forbidden from sending a body with a
+`GET` or `HEAD` request.
+
+```python
+class LookupEndpoint(BaseEndpoint[ScoreRequest, ScoreResponse]):
+    endpoint_name = "lookup"
+    path = "/score"
+    methods = ["GET", "POST"]
+
+    async def handle(self, request: ScoreRequest) -> ScoreResponse:
+        return ScoreResponse(label=request.text, confidence=1.0)
+```
+
+Both operations use the same Pydantic contract:
+
+```bash
+# GET / HEAD use URL query parameters
+curl "http://localhost:8000/api/v1/endpoints/lookup/score?text=hello"
+
+# POST (and other write methods) use a JSON body
+curl -X POST http://localhost:8000/api/v1/endpoints/lookup/score \
+  -H "Content-Type: application/json" -d '{"text":"hello"}'
+```
+
+For query methods, repeat an array field (`?tag=red&tag=blue`) and encode an
+object-valued field as JSON (`?filters={"region":"eu"}`; URL-encode it in
+real clients). Agentomatic validates both forms against the same input model.
+
+The Studio **Endpoints** page reads each registered method directly from
+OpenAPI. If an endpoint exposes more than one method, choose the method in the
+card; its input form and output summary update to that operation's live schema.
+The Pipeline Builder and Task Board use the same discovery flow when an
+endpoint is selected, so a `GET`-only endpoint still exposes its real input and
+output fields for mapping and independent testing.
+
 ## Custom logic
 
 Override `handle` for anything beyond fan-out — call upstreams conditionally,

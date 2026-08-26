@@ -1,7 +1,7 @@
 # Input & Output Schemas
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Declaring Strong Types and Boundary Validation for AI Agents</h3>
 </div>
 

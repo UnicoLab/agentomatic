@@ -127,11 +127,11 @@ def create_platform() -> AgentPlatform:
     require_auth = _env_bool("AGENTOMATIC_REQUIRE_AUTH", False)
     try:
         return AgentPlatform.from_folder(
-            "agents/",
-            plugins_dir="plugins/",
-            endpoints_dir="endpoints/",
-            ingestion_dir="ingestion/",
-            stacks_dir="stacks/",
+            os.getenv("AGENTOMATIC_AGENTS_DIR", "agents/"),
+            plugins_dir=os.getenv("AGENTOMATIC_PLUGINS_DIR", "plugins/"),
+            endpoints_dir=os.getenv("AGENTOMATIC_ENDPOINTS_DIR", "endpoints/"),
+            ingestion_dir=os.getenv("AGENTOMATIC_INGESTION_DIR", "ingestion/"),
+            stacks_dir=os.getenv("AGENTOMATIC_STACKS_DIR", "stacks/"),
             # Pipelines are auto-discovered from ../pipelines/ (sibling of agents/).
             # stack="local",              # or set via .agentomatic-stack / STACK env
             title=os.getenv("AGENTOMATIC_TITLE", "{display} Platform"),

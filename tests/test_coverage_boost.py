@@ -373,6 +373,12 @@ class TestRateLimitMiddleware:
         assert "Rate limit exceeded" in resp.json()["detail"]
         assert "Retry-After" in resp.headers
 
+    def test_retry_after_rounds_up_to_an_expired_sliding_window(self):
+        """Clients that honour the integer header must not retry too early."""
+        from agentomatic.middleware.rate_limit import RateLimitMiddleware
+
+        assert RateLimitMiddleware._retry_after_seconds(window=2, now=100.8, oldest_hit=100.0) == 2
+
     def test_rate_limit_headers(self):
         client = TestClient(self._make_app(max_requests=10))
         resp = client.get("/api/test")

@@ -83,9 +83,9 @@ and platform `logs_history` / `allow_logsllm_analysis`. See the optimization gui
 | Command | Purpose |
 | --- | --- |
 | `agentomatic new NAME` | Scaffold a full project (alias for `init --project`) |
-| `agentomatic init NAME [--project] [--template basic\\|full\\|class\\|rag\\|chatbot\\|coordinator\\|extraction\\|deepagent\\|legacy_dict\\|ingestion\\|langchain]` | Scaffold an agent (or project) |
+| `agentomatic init NAME [--project] [--template basic\\|class\\|full\\|coordinator\\|pipeline\\|rag\\|chatbot\\|deepagent\\|custom\\|legacy_dict\\|langchain\\|plugin\\|endpoint\\|connection\\|ingestion\\|extraction]` | Scaffold an agent (or project) |
 | `agentomatic add connection\\|ingestion NAME` | Add components to an existing agent |
-| `agentomatic run [--studio/--no-studio] [--with-ui] [--port 8000] [--ssl-certfile ...] [--require-auth-globally]` | Start the platform (prefers `main:app` when present) |
+| `agentomatic run [--agents-dir DIR] [--plugins-dir DIR] [--endpoints-dir DIR] [--ingestion-dir DIR] [--stacks-dir DIR] [--stack NAME] [--studio/--no-studio] [--with-ui] [--port 8000] [--ssl-certfile ...] [--require-auth-globally]` | Start the platform (prefers `main:app` when present) |
 | `agentomatic deploy [--profile full\\|minimal] [--minimal] [--distroless] [--stack NAME]` | Generate Dockerfile/compose/.env |
 | `agentomatic demo` | Run a self-contained demo platform + Studio |
 | `agentomatic list` / `inspect NAME` / `doctor` | Discover, inspect, diagnose |

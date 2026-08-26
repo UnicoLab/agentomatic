@@ -583,6 +583,18 @@ class TestGlobalAuthLockStaysServable:
         with pytest.raises(RuntimeError, match="forged/unsigned JWTs"):
             platform.build()
 
+    def test_api_key_auth_without_a_secret_refuses_to_boot(self):
+        """A typo in a production environment must not silently disable auth."""
+        import tempfile
+        from pathlib import Path
+
+        from agentomatic import AgentPlatform
+
+        tmp = Path(tempfile.mkdtemp())
+        platform = AgentPlatform(agents_dir=tmp / "agents", enable_auth=True)
+        with pytest.raises(RuntimeError, match="requires a non-empty auth_api_key"):
+            platform.build()
+
 
 class TestJwtConfigFromEnvironmentAndStack:
     """Verified JWT auth must be reachable from a container's environment.

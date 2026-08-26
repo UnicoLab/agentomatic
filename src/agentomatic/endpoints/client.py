@@ -112,15 +112,47 @@ class UpstreamClient:
                 except Exception:  # noqa: BLE001
                     data = resp.text
                 ok = resp.is_success
-                if not ok:
-                    last_error = f"HTTP {resp.status_code}"
-                self._observe(ok, time.perf_counter() - t0)
+                if ok:
+                    self._observe(True, time.perf_counter() - t0)
+                    return UpstreamResult(
+                        upstream=self.name,
+                        ok=True,
+                        status_code=resp.status_code,
+                        data=data,
+                        duration_ms=(time.perf_counter() - t0) * 1000,
+                    )
+
+                last_error = f"HTTP {resp.status_code}"
+                # A gateway overload, upstream timeout, or rate limit is
+                # normally transient. Retrying these statuses is as important
+                # as retrying a dropped TCP connection. Do not retry client
+                # contract failures (other 4xx responses): a duplicate call
+                # cannot make an invalid payload valid.
+                retryable_status = resp.status_code in {408, 425, 429} or resp.status_code >= 500
+                if retryable_status and attempt < self.config.max_retries:
+                    retry_after = resp.headers.get("Retry-After")
+                    try:
+                        delay = max(0.0, min(float(retry_after), 30.0))
+                    except (TypeError, ValueError):
+                        delay = 0.5 * (2**attempt)
+                    logger.warning(
+                        "Upstream '{}' returned {}; retrying in {:.1f}s (attempt {}/{})",
+                        self.name,
+                        resp.status_code,
+                        delay,
+                        attempt + 1,
+                        self.config.max_retries,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                self._observe(False, time.perf_counter() - t0)
                 return UpstreamResult(
                     upstream=self.name,
-                    ok=ok,
+                    ok=False,
                     status_code=resp.status_code,
                     data=data,
-                    error=None if ok else last_error,
+                    error=last_error,
                     duration_ms=(time.perf_counter() - t0) * 1000,
                 )
             except Exception as exc:  # noqa: BLE001

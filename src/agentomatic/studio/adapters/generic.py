@@ -2,8 +2,8 @@
 
 Provides a best-effort Studio experience for agents that don't use
 LangGraph. Generates synthetic graph topologies, captures execution
-traces with timing data, and maintains an in-memory state/history
-store.
+traces with timing data, and uses the configured platform store to retain
+those traces across API-worker and platform restarts.
 
 This adapter ensures that *every* agent gets useful Studio information
 even if the underlying framework doesn't expose graph APIs.
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import time
 import traceback
+import uuid
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -48,10 +49,11 @@ class GenericAdapter(StudioAdapter):
       topology that updates in real-time during execution.
     - **Trace-based SSE** — Captures execution timing, input/output
       payloads, and exceptions as ``StudioRunEvent`` objects.
-    - **In-memory state** — Stores the last input/output for each
-      thread so the State tab always shows useful information.
-    - **Execution history** — Maintains a per-thread history of all
-      executions for the History tab.
+    - **Captured state** — Stores the last input/output for each thread so
+      the State tab always shows useful information. Captured run state is
+      durable when Agentomatic has a configured store.
+    - **Execution history** — Maintains a per-thread history of all executions
+      for the History tab, persisting them when a store is available.
 
     Args:
         agent: The registered agent with a ``node_fn``.
@@ -66,7 +68,8 @@ class GenericAdapter(StudioAdapter):
         super().__init__(agent.name)
         self._agent = agent
         self._store = store
-        # In-memory trace store: thread_id → list of state snapshots
+        # Local caches make just-completed traces available without a storage
+        # round trip. The configured store is the durable source of truth.
         self._state_store: dict[str, dict[str, Any]] = {}
         self._history_store: dict[str, list[StudioCheckpoint]] = defaultdict(list)
         self._execution_counter: dict[str, int] = defaultdict(int)
@@ -75,13 +78,70 @@ class GenericAdapter(StudioAdapter):
         self._custom_state_fn = getattr(agent, "_studio_state_fn", None)
         self._custom_stream_fn = getattr(agent, "_studio_stream_fn", None)
 
+    @property
+    def _checkpoint_namespace(self) -> str:
+        """Keep generic traces separate from framework-native checkpoints."""
+        return f"studio:generic:{self.agent_name}"
+
+    @staticmethod
+    def _as_str(value: Any, fallback: str) -> str:
+        return value if isinstance(value, str) and value else fallback
+
+    def _checkpoint_from_record(self, record: dict[str, Any]) -> StudioCheckpoint | None:
+        """Translate a durable storage record into Studio's public shape."""
+        checkpoint = record.get("checkpoint")
+        checkpoint_id = record.get("checkpoint_id")
+        if not isinstance(checkpoint, dict) or not isinstance(checkpoint_id, str):
+            return None
+        metadata = record.get("metadata")
+        parent_id = record.get("parent_checkpoint_id")
+        return StudioCheckpoint(
+            id=checkpoint_id,
+            thread_id=self._as_str(record.get("thread_id"), "default"),
+            step=metadata.get("step", 0) if isinstance(metadata, dict) else 0,
+            state=checkpoint,
+            metadata=metadata if isinstance(metadata, dict) else {},
+            parent_id=parent_id if isinstance(parent_id, str) else None,
+            timestamp=self._as_str(record.get("created_at"), _now_iso()),
+        )
+
+    async def _stored_checkpoint(
+        self,
+        thread_id: str,
+        checkpoint_id: str,
+    ) -> StudioCheckpoint | None:
+        """Look up a persisted trace without making storage an execution dependency."""
+        if not self._store:
+            return None
+        try:
+            record = await self._store.get_checkpoint(
+                thread_id,
+                self._checkpoint_namespace,
+                checkpoint_id,
+            )
+            return self._checkpoint_from_record(record) if isinstance(record, dict) else None
+        except Exception as exc:  # noqa: BLE001 - debugging remains useful during DB outages.
+            logger.warning(
+                "Studio could not read generic checkpoint '{}' for '{}': {}",
+                checkpoint_id,
+                self.agent_name,
+                exc,
+            )
+            return None
+
+    async def _latest_stored_checkpoint(self, thread_id: str) -> StudioCheckpoint | None:
+        """Return the latest durable generic trace, if storage is configured."""
+        return await self._stored_checkpoint(thread_id, "")
+
     # ------------------------------------------------------------------
     # Capabilities
     # ------------------------------------------------------------------
 
     @property
     def capabilities(self) -> list[str]:
-        caps = ["streaming", "traces"]
+        # Generic traces can be durable when a platform store is configured;
+        # manual state mutation remains a best-effort adapter capability.
+        caps = ["streaming", "traces", "state", "checkpoints"]
         if self._custom_graph_fn is not None:
             caps.append("graph")
         if self._custom_state_fn is not None:
@@ -148,6 +208,34 @@ class GenericAdapter(StudioAdapter):
 
         thread_id = (config or {}).get("configurable", {}).get("thread_id", "default")
 
+        # Generic agents do not have a framework-native continuation API, but
+        # their trace history records the exact input that produced each
+        # checkpoint. Replaying a checkpoint must therefore invoke that stored
+        # input, rather than silently running the empty request supplied by the
+        # Studio replay button. This is a true re-execution (not a claim that
+        # an arbitrary node can resume midway through a graph).
+        if checkpoint_id:
+            checkpoint = next(
+                (
+                    item
+                    for item in self._history_store.get(thread_id, [])
+                    if item.id == checkpoint_id
+                ),
+                None,
+            )
+            if checkpoint is None:
+                checkpoint = await self._stored_checkpoint(thread_id, checkpoint_id)
+            checkpoint_input = (
+                checkpoint.state.get("input")
+                if checkpoint is not None and isinstance(checkpoint.state, dict)
+                else None
+            )
+            if not isinstance(checkpoint_input, dict):
+                raise ValueError(
+                    f"Checkpoint '{checkpoint_id}' is unavailable for thread '{thread_id}'"
+                )
+            state = dict(checkpoint_input)
+
         # Emit node_start for the agent
         yield StudioRunEvent(
             event="node_start",
@@ -201,30 +289,53 @@ class GenericAdapter(StudioAdapter):
         # Normalize result
         output = result if isinstance(result, dict) else {"response": str(result)}
 
-        # Store state for later inspection
+        recorded_at = _now_iso()
+
+        # Store state for immediate inspection.
         self._state_store[thread_id] = {
             "last_input": state,
             "last_output": output,
-            "updated_at": _now_iso(),
+            "updated_at": recorded_at,
         }
 
-        # Record in history
-        self._execution_counter[thread_id] += 1
-        step = self._execution_counter[thread_id]
-        self._history_store[thread_id].append(
-            StudioCheckpoint(
-                id=f"trace_{thread_id}_{step}",
-                thread_id=thread_id,
-                step=step,
-                state={"input": state, "output": output},
-                metadata={
-                    "duration_ms": duration,
-                    "framework": self._agent.manifest.framework,
-                },
-                parent_id=(f"trace_{thread_id}_{step - 1}" if step > 1 else None),
-                timestamp=_now_iso(),
-            )
+        # Record each finished execution as a UUID-addressed checkpoint. A
+        # counter alone collides after a process restart, so the parent is
+        # resolved from either the local cache or durable store.
+        previous = self._history_store.get(thread_id, [])
+        parent = previous[-1] if previous else await self._latest_stored_checkpoint(thread_id)
+        step = (parent.step if parent is not None else 0) + 1
+        trace = StudioCheckpoint(
+            id=f"trace_{uuid.uuid4().hex}",
+            thread_id=thread_id,
+            step=step,
+            state={"input": state, "output": output},
+            metadata={
+                "duration_ms": duration,
+                "framework": self._agent.manifest.framework,
+                "step": step,
+            },
+            parent_id=parent.id if parent is not None else None,
+            timestamp=recorded_at,
         )
+        self._execution_counter[thread_id] = step
+        self._history_store[thread_id].append(trace)
+        if self._store:
+            try:
+                await self._store.save_checkpoint(
+                    thread_id,
+                    self._checkpoint_namespace,
+                    trace.id,
+                    trace.parent_id,
+                    trace.state,
+                    trace.metadata,
+                )
+            except Exception as exc:  # noqa: BLE001 - do not make tracing break an agent run.
+                logger.warning(
+                    "Studio could not persist generic trace '{}' for '{}': {}",
+                    trace.id,
+                    self.agent_name,
+                    exc,
+                )
 
         # Emit a trace event with full execution details
         yield StudioRunEvent(
@@ -274,8 +385,18 @@ class GenericAdapter(StudioAdapter):
             except Exception as exc:
                 logger.warning(f"Custom state function failed: {exc}")
 
-        # Use in-memory trace store
+        # Use the local snapshot first, then rebuild it from the latest durable
+        # trace after a worker or platform restart.
         stored = self._state_store.get(thread_id, {})
+        if not stored:
+            checkpoint = await self._latest_stored_checkpoint(thread_id)
+            if checkpoint is not None and isinstance(checkpoint.state, dict):
+                stored = {
+                    "last_input": checkpoint.state.get("input"),
+                    "last_output": checkpoint.state.get("output"),
+                    "updated_at": checkpoint.timestamp,
+                }
+                self._state_store[thread_id] = stored
         return StudioStateSnapshot(
             thread_id=thread_id,
             agent_name=self.agent_name,
@@ -305,7 +426,24 @@ class GenericAdapter(StudioAdapter):
     # ------------------------------------------------------------------
 
     async def get_history(self, thread_id: str) -> list[StudioCheckpoint]:
-        return list(reversed(self._history_store.get(thread_id, [])))
+        local = {item.id: item for item in self._history_store.get(thread_id, [])}
+        if self._store:
+            try:
+                records = await self._store.list_checkpoints(
+                    thread_id,
+                    self._checkpoint_namespace,
+                )
+                for record in records:
+                    checkpoint = self._checkpoint_from_record(record)
+                    if checkpoint is not None:
+                        local[checkpoint.id] = checkpoint
+            except Exception as exc:  # noqa: BLE001 - history remains useful from the local cache.
+                logger.warning(
+                    "Studio could not list generic traces for '{}': {}",
+                    self.agent_name,
+                    exc,
+                )
+        return sorted(local.values(), key=lambda item: item.timestamp, reverse=True)
 
     # ------------------------------------------------------------------
     # Internal helpers

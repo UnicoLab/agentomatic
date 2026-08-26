@@ -38,7 +38,7 @@ exposes:
 | `POST /api/v1/ingestion/{name}/run/async` | Submit as a background **task**, return a pollable id |
 | `GET /api/v1/ingestion/{name}/info` | Ingestor metadata + input schema |
 | `GET /api/v1/ingestion/{name}/health` | Readiness/health |
-| `GET /api/v1/ingestion` | List all ingestors |
+| `GET /api/v1/ingestion` | List all ingestors (the resource router is mounted when an ingestor is discovered) |
 
 Async runs plug straight into the [unified task system](tasks.md), so you get
 progress percentages, live SSE event streams, cancellation, and webhooks for

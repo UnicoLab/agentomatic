@@ -1,7 +1,7 @@
 # Delegation & Multi-Agent Orchestration
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Chain Agents Together with Zero Boilerplate</h3>
 </div>
 
@@ -475,14 +475,15 @@ result = await swarm.ainvoke(
 | Pattern | Status | Description |
 |---------|--------|-------------|
 | `handoff` | :white_check_mark: Stable | Uses `langgraph-swarm` for agent-to-agent handoffs. Requires `pip install langgraph-swarm`. |
-| `supervisor` | :construction: Planned | A central supervisor node dispatches to the appropriate agent. |
-| `round_robin` | :construction: Planned | Cycles through agents in registration order. |
+| `supervisor` | :white_check_mark: Stable | Dispatches to `swarm_agent`, `route_to`, or `agent` from the input; defaults to the first registered agent. |
+| `round_robin` | :white_check_mark: Stable | Cycles through registered agents in registration order, safely across concurrent callers. |
 
-!!! warning "Supervisor & round-robin patterns"
-    The `supervisor` and `round_robin` patterns return a placeholder that
-    raises `NotImplementedError` when invoked. Use the `handoff` pattern for
-    production workloads, or implement a custom `StateGraph` with supervisor
-    routing.
+!!! tip "Built-in runnable patterns"
+    `supervisor` and `round_robin` accept any runnable exposing `invoke` /
+    `ainvoke` (including compiled LangGraph graphs) or a plain callable. Use
+    `swarm.ainvoke(...)` for async-only agents. For supervisor routing, supply
+    one of `swarm_agent`, `route_to`, or `agent` in the input with a registered
+    agent name.
 
 ---
 

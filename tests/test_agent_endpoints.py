@@ -206,7 +206,15 @@ class TestPlatformEndpoints:
     def test_openapi_json(self, client):
         r = client.get("/openapi.json")
         assert r.status_code == 200
-        assert "paths" in r.json()
+        schema = r.json()
+        assert "paths" in schema
+        operation_ids = [
+            operation["operationId"]
+            for path_item in schema["paths"].values()
+            for method, operation in path_item.items()
+            if method in {"get", "post", "put", "patch", "delete"}
+        ]
+        assert len(operation_ids) == len(set(operation_ids))
 
     def test_health_aggregated(self, client):
         r = client.get("/health")

@@ -351,5 +351,15 @@ register_connections(
 
 Each connection acquisition emits `agentomatic_connection_calls_total`
 (labelled by connection name and status). Health for every scope is available
-through the control plane at `GET /api/v1/control/connections`. See the
+through the control plane at `GET /api/v1/control/connections`. When the
+platform has a configured persistence store, that response also includes a
+probeable `storage` database entry under the `__platform__` scope. SQLAlchemy
+storage URLs are redacted before they are returned, so credentials are never
+shown in Studio or the control API. See the
 [Observability guide](observability.md).
+
+The same rule applies to every managed connection, including custom connection
+types: control-plane summaries and per-connection probes expose only a
+small, allow-listed operational contract. Configured URLs/DSNs, headers,
+arbitrary health metadata, and raw driver errors are never returned to Studio
+or API callers.

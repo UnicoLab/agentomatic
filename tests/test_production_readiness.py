@@ -149,6 +149,43 @@ def test_otel_setup_does_not_attach_console_exporter_by_default(monkeypatch) -> 
     )
 
 
+def test_otel_http_endpoint_uses_plaintext_grpc(monkeypatch) -> None:
+    """A local collector URL must not be incorrectly sent TLS traffic."""
+    pytest.importorskip("opentelemetry.sdk")
+    from agentomatic.observability import telemetry
+
+    if not telemetry.HAS_OTEL:  # pragma: no cover - depends on extras
+        pytest.skip("OpenTelemetry not installed")
+
+    captured: dict[str, Any] = {}
+
+    class _Exporter:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+    class _Provider:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def add_span_processor(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4317")
+    monkeypatch.setattr(
+        "opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter",
+        _Exporter,
+    )
+    monkeypatch.setattr(telemetry, "TracerProvider", _Provider)
+    monkeypatch.setattr(telemetry, "BatchSpanProcessor", lambda exporter: exporter)
+    monkeypatch.setattr(telemetry.trace, "set_tracer_provider", lambda _provider: None)
+    monkeypatch.setattr(telemetry.trace, "get_tracer", lambda _name: object())
+
+    telemetry.setup_telemetry(app=None, service_name="test-svc")
+
+    assert captured["endpoint"] == "collector:4317"
+    assert captured["insecure"] is True
+
+
 # =====================================================================
 # `agentomatic run` can import the project's main.py
 # =====================================================================
@@ -305,6 +342,20 @@ def test_all_extra_contents_match_what_the_docs_claim() -> None:
     for deliberately_excluded in ("openai", "azure", "vertex", "db-postgres", "ui"):
         assert deliberately_excluded in extras, f"{deliberately_excluded} extra vanished"
         assert deliberately_excluded not in included
+
+
+def test_telemetry_extra_includes_a_real_otlp_exporter() -> None:
+    """An OTLP endpoint must ship traces instead of silently using console output."""
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    with (root / "pyproject.toml").open("rb") as fh:
+        extras = tomllib.load(fh)["project"]["optional-dependencies"]
+
+    telemetry = " ".join(extras["telemetry"])
+    assert "opentelemetry-exporter-otlp-proto-grpc" in telemetry
+    assert "opentelemetry-exporter-otlp-proto-http" in telemetry
 
 
 def test_platform_marks_plugin_loaded_even_if_subclass_forgets_super(tmp_path) -> None:

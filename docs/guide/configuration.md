@@ -1,7 +1,7 @@
 # Configuration Reference
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Platform, Agent, and Environment Configuration</h3>
 </div>
 
@@ -116,24 +116,28 @@ All platform settings can be overridden using environment variables. There are t
 
 ### Direct `AGENTOMATIC_` Variables
 
-These map directly to `AgentPlatform` constructor parameters:
+These are the deployment variables consumed by the generated `main.py` and by
+`agentomatic run`. For an explicit `AgentPlatform(...)` constructor, pass the
+corresponding Python argument instead. The CLI flags take precedence for the
+directory, host, port, and stack values passed to `agentomatic run`.
 
 | Variable | Maps To | Default | Description |
 |----------|---------|---------|-------------|
-| `AGENTOMATIC_PORT` | `run(port=...)` | `8000` | Server bind port |
-| `AGENTOMATIC_HOST` | `run(host=...)` | `0.0.0.0` | Server bind address |
-| `AGENTOMATIC_API_PREFIX` | `api_prefix` | `/api/v1` | Global URL prefix |
-| `AGENTOMATIC_LOG_LEVEL` | `log_level` | `INFO` | Log verbosity |
-| `AGENTOMATIC_ENABLE_AUTH` | `enable_auth` | `false` | Toggle authentication |
-| `AGENTOMATIC_AUTH_API_KEY` | `auth_api_key` | `""` | Secret API key |
-| `AGENTOMATIC_ENABLE_RATE_LIMIT` | `enable_rate_limit` | `false` | Toggle rate limiting |
-| `AGENTOMATIC_RATE_LIMIT_REQUESTS` | `rate_limit_requests` | `100` | Max requests/window |
-| `AGENTOMATIC_RATE_LIMIT_WINDOW` | `rate_limit_window` | `60` | Window duration (seconds) |
-| `AGENTOMATIC_ENABLE_METRICS` | `enable_metrics` | `false` | Toggle Prometheus metrics |
-| `AGENTOMATIC_CORS_ORIGINS` | `cors_origins` | `*` | Comma-separated origins |
+| `AGENTOMATIC_HOST` / `AGENTOMATIC_PORT` | `main.py` `__main__` | `0.0.0.0` / `8000` | Server bind values; `agentomatic run` exposes `--host` / `--port` |
+| `AGENTOMATIC_AGENTS_DIR` | `agents_dir` | `agents/` | Agent package directory in generated `main.py` |
+| `AGENTOMATIC_PLUGINS_DIR` / `AGENTOMATIC_ENDPOINTS_DIR` / `AGENTOMATIC_INGESTION_DIR` | component directories | `plugins/` / `endpoints/` / `ingestion/` | Auto-discovery directories in generated `main.py` |
+| `AGENTOMATIC_STACKS_DIR` / `AGENTOMATIC_STACK` | stack discovery / active stack | `stacks/` / unset | Stack YAML directory and selected stack |
+| `AGENTOMATIC_TITLE` / `AGENTOMATIC_LOG_LEVEL` | `title` / `log_level` | project title / `INFO` | Platform title and log verbosity |
+| `AGENTOMATIC_ENABLE_STUDIO` / `AGENTOMATIC_ENABLE_METRICS` | feature switches | `true` / `true` | Mount Studio and metrics |
+| `AGENTOMATIC_ENABLE_AUTH` / `AGENTOMATIC_API_KEY` | API-key authentication | `false` / empty | Enable API-key auth and set its secret |
+| `AGENTOMATIC_ENABLE_JWT` / `AGENTOMATIC_REQUIRE_AUTH` | JWT / global auth | `false` / `false` | Enable JWT and require credentials globally |
+| `AGENTOMATIC_ENABLE_CONTROL_PLANE` / `AGENTOMATIC_CONTROL_TOKEN` | control plane | `true` / empty in generated `main.py`; `false` in CLI fallback | Mount control-plane routes and protect mutations |
+| `AGENTOMATIC_ENABLE_RATE_LIMIT` / `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS` | rate limiting | `false` / `false` | Enable the limiter; trust forwarded client IPs only behind a trusted proxy |
+| `AGENTOMATIC_LOGS_HISTORY` / `DATABASE_URL` | invocation history / storage | `false` / empty | Persist logs and threads using an async SQLAlchemy URL |
 | `AGENTOMATIC_ARTIFACT_ROOT` | `artifact_root` | `.local/artifacts` | Versioned plugin/model artifact bundles |
 | `AGENTOMATIC_RUNS_ROOT` | `runs_root` | `.local/runs` | Scratch directory for pipeline/task outputs |
 | `AGENTOMATIC_AUDIT_LOG` | `audit_log` | `""` (disabled) | JSONL op-audit sink path (non-PII metadata only) |
+| `AGENTOMATIC_AUDIT_HASH_KEY` | — | API key or process-local key | HMAC key for audit correlation references |
 | `AGENTOMATIC_CHUNK_SIZE_TOKENS` | `chunk_size_tokens` | `1200` | Default ingestion chunk size |
 | `AGENTOMATIC_CHUNK_OVERLAP_TOKENS` | `chunk_overlap_tokens` | `150` | Default ingestion chunk overlap |
 | `AGENTOMATIC_MIN_QUALITY_SCORE` | `min_quality_score` | `0.70` | Ingestion quality warning threshold |
@@ -145,6 +149,8 @@ The `PlatformSettings` Pydantic model supports **nested environment variables** 
 === "LLM Settings"
 
     ```bash
+    # PlatformSettings uses no prefix: nested values use __.
+    # The generated main.py separately consumes the AGENTOMATIC_* variables above.
     # LLM provider configuration
     export LLM__PROVIDER=openai
     export LLM__MODEL=gpt-4o

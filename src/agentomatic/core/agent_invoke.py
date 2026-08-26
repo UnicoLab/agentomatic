@@ -57,13 +57,25 @@ def build_invoke_state(
         :func:`invoke_registered_agent`.
     """
     if hasattr(payload, "model_dump"):
-        data = payload.model_dump()
+        dumped = payload.model_dump()
+        # Pydantic ``RootModel`` serialises to its native scalar / list value,
+        # not a mapping.  Keep that value explicit in the otherwise dict-based
+        # agent state instead of calling ``.get`` on it below.
+        data = dict(dumped) if isinstance(dumped, dict) else {"__root__": dumped}
     elif isinstance(payload, dict):
         data = dict(payload)
     else:
-        data = {"query": payload}
+        # Native root request schemas (for example ``RootModel[str]``) need
+        # the exact request body available to agent code.  ``__root__`` is the
+        # stable bridge between a scalar HTTP body and Agentomatic's mapping
+        # state contract.
+        data = {"__root__": payload}
 
     query = data.get("query") or data.get("current_query") or ""
+    if not query and isinstance(data.get("__root__"), str):
+        # Retain chat/memory compatibility for a root string without hiding
+        # the original native input from ``input_to_state``.
+        query = data["__root__"]
     if not query:
         for key, val in data.items():
             if key.endswith("_query") and isinstance(val, str):

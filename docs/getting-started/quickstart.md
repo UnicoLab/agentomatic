@@ -116,6 +116,7 @@ agents/my_chatbot/
     | `deepagent` | Deep Agent with planning, tools, subagents |
     | `custom` | Framework-agnostic — no LangGraph dependency |
     | `legacy_dict` | Legacy functional agent — `manifest` + `node_fn` |
+    | `langchain` | LangChain-native agent with `ChatPromptTemplate` integration |
     | `plugin` | ML Model Plugin with REST endpoints |
     | `endpoint` / `connection` / `ingestion` / `extraction` | Ops / RAG building blocks |
 
@@ -526,11 +527,17 @@ Set these in your `.env` file or export them in your shell:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENTOMATIC_AGENTS_DIR` | `agents` | Directory to scan for agent packages |
+| `AGENTOMATIC_AGENTS_DIR` | `agents` | Agent directory used by scaffolded `main.py`; use `agentomatic run --agents-dir` for the direct CLI path |
+| `AGENTOMATIC_PLUGINS_DIR` | `plugins` | Plugin directory used by scaffolded `main.py` |
+| `AGENTOMATIC_ENDPOINTS_DIR` | `endpoints` | Custom-endpoint directory used by scaffolded `main.py` |
+| `AGENTOMATIC_INGESTION_DIR` | `ingestion` | Ingestor directory used by scaffolded `main.py` |
+| `AGENTOMATIC_STACKS_DIR` | `stacks` | Stack YAML directory used by scaffolded `main.py` |
+| `AGENTOMATIC_STACK` | — | Active stack name; equivalent to `agentomatic run --stack NAME` |
 | `AGENTOMATIC_HOST` | `0.0.0.0` | Server bind address |
 | `AGENTOMATIC_PORT` | `8000` | Server bind port |
 | `AGENTOMATIC_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `AGENTOMATIC_DB_URL` | `sqlite:///data/threads.db` | Database URL for thread persistence |
+| `DATABASE_URL` / `AGENTOMATIC_DB_URL` | — | Optional async SQLAlchemy URL for durable thread/log history; enable `AGENTOMATIC_LOGS_HISTORY=1` to record invocations |
+| `AGENTOMATIC_API_KEY` | — | API key when `AGENTOMATIC_ENABLE_AUTH=1` |
 | `OPENAI_API_KEY` | — | Required for OpenAI-based agents |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API base URL |
 

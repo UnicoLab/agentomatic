@@ -1,13 +1,15 @@
 # Scaffolding Templates
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Agent Scaffolding and Project Generation</h3>
 </div>
 
 ---
 
-Agentomatic ships with **14 templates** for rapid agent creation. Each template generates a complete, runnable agent package with the right files, structure, and boilerplate for your use case.
+Agentomatic ships with **16 templates** for rapid agent and component
+creation. They generate the appropriate runnable package or workflow artefact
+for the selected use case.
 
 ---
 
@@ -30,7 +32,9 @@ Agentomatic ships with **14 templates** for rapid agent creation. Each template 
     agentomatic init my_agent --template basic
     ```
 
-Both commands create the agent folder at `agents/my_agent/` with all necessary files.
+For agent templates, both commands create `agents/my_agent/`. Integration and
+pipeline templates use their own auto-discovered directories; see [Component
+and integration templates](#component-and-integration-templates).
 
 ---
 
@@ -39,18 +43,28 @@ Both commands create the agent folder at `agents/my_agent/` with all necessary f
 | Template | Framework | Graph | Config | Tools | Custom API | Best For |
 |----------|:---------:|:-----:|:------:|:-----:|:----------:|----------|
 | **`basic`** | Built-in | ✅ | ❌ | ❌ | ❌ | Quick prototyping and learning |
+| **`class`** | Built-in | ✅ | ❌ | ❌ | ❌ | Alias for `basic` |
 | **`full`** | Built-in | ✅ | ✅ | ✅ | ✅ | Production agents with all overrides |
+| **`coordinator`** | Built-in | ✅ | ✅ | ❌ | ❌ | Delegating work to specialist agents |
+| **`pipeline`** | YAML | — | — | — | — | Multi-step workflows across components |
 | **`rag`** | Built-in | ✅ | ❌ | ❌ | ❌ | Knowledge bases, Q&A over documents |
 | **`chatbot`** | Built-in | ✅ | ❌ | ❌ | ❌ | Conversational agents with memory |
 | **`deepagent`** | LangGraph | ❌¹ | ❌ | ✅ | ❌ | Autonomous planning with sub-agents |
 | **`custom`** | Custom | ❌ | ❌ | ❌ | ❌ | Framework-agnostic, minimal deps |
 | **`legacy_dict`** | LangGraph | ✅ | ❌ | ❌ | ❌ | Legacy functional agent (3 files) |
-| **`plugin`** | N/A | ❌ | ❌ | ❌ | ❌ | ML Model Plugins with REST endpoints |
+| **`langchain`** | LangChain | ✅ | ❌ | ❌ | ❌ | LangChain-native prompt and message workflows |
+| **`plugin`** | Plugin | — | — | — | ✅ | ML model plugins with REST endpoints |
+| **`endpoint`** | HTTP | — | — | — | ✅ | Wrapping an external model or service |
+| **`connection`** | Connection | — | — | — | — | Per-agent database and HTTP connections |
+| **`ingestion`** | Ingestion | — | — | — | ✅ | Packaging document ingestion as a task |
+| **`extraction`** | Built-in | ✅ | ❌ | ❌ | ❌ | Parallel markdown extraction workflows |
 
 ¹ *Deep agent uses `agent.py` with `create_deep_agent()` instead of `build_graph()`*
 
-!!! note "All class-based templates use `AgentGraph`"
-    Templates `basic`, `full`, `rag`, and `chatbot` generate `BaseGraphAgent` subclasses that use agentomatic's built-in `AgentGraph` runtime — **no LangGraph dependency required**.
+!!! note "Core class-agent templates use `AgentGraph`"
+    The `basic`, `full`, `rag`, `chatbot`, `coordinator`, and `extraction`
+    templates generate `BaseGraphAgent` subclasses backed by agentomatic's
+    built-in `AgentGraph` runtime — **no LangGraph dependency required**.
 
 ---
 
@@ -161,7 +175,9 @@ agents/my_agent/
     ```
 
 !!! warning "Custom Router Override"
-    When `api.py` is present and exports a `router`, **all 12 auto-generated endpoints are dropped**. Remove `api.py` to restore the default REST API.
+    When `api.py` is present and exports a `router`, the generated per-agent
+    API is replaced by that router. Remove `api.py` to restore the default
+    REST API.
 
 ---
 
@@ -230,6 +246,7 @@ agentomatic init researcher --template deepagent
 agents/researcher/
 ├── __init__.py          # Manifest + graph_fn + node_fn
 ├── agent.py             # Deep agent definition with tools
+├── llm.py               # Stack-aware LLM helpers
 ├── config.py            # Pydantic config
 ├── prompts.json         # v1/v2 prompt templates
 ├── .env.example         # Environment variable template
@@ -324,7 +341,11 @@ agentomatic init helper --template legacy_dict
 
 ```text
 agents/helper/
-├── __init__.py          # Manifest + node_fn entrypoint
+├── __init__.py          # Manifest + graph-invoking node_fn
+├── graph.py             # Compiled LangGraph definition
+├── nodes.py             # Async graph node functions
+├── prompts.json         # Prompt templates
+├── langgraph.json       # LangGraph Studio configuration
 ├── .env.example         # Environment config
 └── README.md            # Agent documentation
 ```
@@ -342,21 +363,18 @@ agents/helper/
         slug="agent-helper",
         description="Helper agent",
         intent_keywords=["helper", "assist"],
-        framework="custom",
+        framework="langgraph",
     )
 
     async def node_fn(state: dict[str, Any]) -> dict[str, Any]:
-        """Process the user's request and return a response."""
-        query = state.get("current_query", "")
-        return {
-            "response": f"Processed: {query}",
-            "agent_type": "helper",
-            "suggestions": [],
-        }
+        from .graph import get_graph
+        return await get_graph().ainvoke(state)
     ```
 
 !!! tip "When to use `legacy_dict`"
-    Use this template when you want the simplest possible agent — a single async function with no graph, no class, no state management. Perfect for wrappers around external APIs.
+    Use this template when you need the established module-level LangGraph
+    layout (`manifest`, `graph.py`, and `nodes.py`) rather than a
+    class-based agent. It is useful for migrating existing LangGraph code.
 
 ---
 
@@ -369,13 +387,16 @@ agentomatic init my_classifier --template plugin
 ```
 
 ```text
-agents/my_classifier/
-├── agent.py             # BaseMLPlugin subclass
-├── .env.example         # Environment config
+plugins/my_classifier/
+├── __init__.py          # Plugin package marker
+├── plugin.py            # BaseMLPlugin subclass
+├── dataset.jsonl        # Sample train/eval data
+├── train.py / eval.py / optimize.py / predict.py
+├── Makefile             # Training and evaluation shortcuts
 └── README.md            # Plugin documentation
 ```
 
-??? example "Generated `agent.py`"
+??? example "Generated `plugin.py`"
 
     ```python
     """ML Plugin: my_classifier."""
@@ -410,12 +431,44 @@ agents/my_classifier/
     ```
 
 !!! info "ML Plugin Features"
-    Plugins get automatic REST endpoints (`/predict`, `/health`, `/model-card`) and can be deployed alongside agents in the same platform. See [ML Plugins](ml-plugins.md) for the full guide.
+Plugins get automatic REST endpoints (`/predict`, `/health`, `/model-card`) and can be deployed alongside agents in the same platform. See [ML Plugins](ml-plugins.md) for the full guide.
+
+---
+
+### Component and integration templates
+
+These templates scaffold platform components rather than a conventional agent.
+When no `--dir` is supplied, `plugin`, `endpoint`, `ingestion`, and `pipeline`
+are written to their auto-discovered top-level directories; `connection` stays
+under `agents/` because it belongs to one agent.
+
+| Template | Default location | Main file | Purpose |
+|----------|------------------|-----------|---------|
+| `endpoint` | `endpoints/<name>/` | `endpoint.py` | Call and aggregate external model services |
+| `connection` | `agents/<name>/` | `connections.py` | Define authenticated database and HTTP connections |
+| `ingestion` | `ingestion/<name>/` | `ingestor.py` | Package an ingestion workflow as a task job |
+| `pipeline` | `pipelines/<name>/` | `pipeline.yaml` | Compose agents and components into a workflow |
+| `extraction` | `agents/<name>/` | `agent.py` | Extract scoped markdown and provide a companion pipeline |
+
+### `langchain` — LangChain-native agent
+
+Use this when the agent should own LangChain prompt and message primitives while
+remaining discoverable through Agentomatic's standard REST and Studio paths.
+
+```bash
+agentomatic init support_agent --template langchain
+```
+
+The generated package includes `agent.py`, `llm.py`, `prompts.json`, and
+`langgraph.json`. See [LangChain / LangGraph Adapter](langchain-adapter.md) for
+the runtime bridge and message conversion helpers.
 
 ---
 
 !!! note "This is the `basic` template pattern"
-    The code below shows the class-based agent structure generated by `agentomatic init analyzer --template basic`. All class-based templates (`basic`, `full`, `rag`, `chatbot`) generate this pattern.
+    The tree below is the complete output of `agentomatic init analyzer
+    --template basic`. Other class-agent templates add files specific to their
+    capabilities.
 
 ```bash
 agentomatic init analyzer --template basic
@@ -423,17 +476,19 @@ agentomatic init analyzer --template basic
 
 ```text
 agents/analyzer/
-├── __init__.py          # AgentManifest + node_fn for auto-discovery
+├── __init__.py          # AgentManifest card
 ├── agent.py             # BaseGraphAgent subclass with build_graph()
-├── llm.py               # LLM configuration
+├── llm.py               # Stack-aware LLM helpers
 ├── prompts.json         # Prompt templates
-├── dataset.jsonl        # Sample training/test dataset
-├── train.py             # ML-like training script
+├── langgraph.json       # LangGraph Studio configuration
 ├── .env.example         # Environment config
 └── README.md            # Agent documentation
 ```
 
-??? example "Generated `agent.py`"
+??? example "Example `agent.py` customization"
+
+    This illustrates extending the generated class agent; the exact scaffold
+    is intentionally smaller and contains only the `process` node.
 
     ```python
     """Class-based agent: analyzer."""
@@ -515,45 +570,6 @@ agents/analyzer/
             return state.output
     ```
 
-??? example "Generated `dataset.jsonl`"
-
-    ```jsonl
-    {"id": "analyzer_001", "split": "train", "input": {"request": "Help me with task planning"}, "expected_output": {"response": "Here is a plan..."}, "metadata": {"domain": "general", "difficulty": "easy"}}
-    {"id": "analyzer_002", "split": "train", "input": {"request": "Summarize this document"}, "expected_output": {"response": "Summary: ..."}, "metadata": {"domain": "general", "difficulty": "medium"}}
-    {"id": "analyzer_003", "split": "test", "input": {"request": "Analyze the risks"}, "expected_output": {"response": "Risks identified: ..."}, "metadata": {"domain": "general", "difficulty": "hard"}}
-    ```
-
-??? example "Generated `train.py` (flat `TrainCliSettings` + staged comment)"
-
-    Scaffolded class agents use a flat script: settings → agent →
-    [`train_and_report`](optimization.md) (full abstraction). The same file
-    includes a **commented staged Keras-like** example
-    (`load_data` → `build_default_metrics` → `compile_agent` → `fit_agent` →
-    `evaluate_agent`) for full control — both tiers share the same primitives.
-
-    ```python
-    from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
-    from agents.analyzer.agent import AnalyzerAgent
-
-    cli = TrainCliSettings.parse()  # AGENTOMATIC_* env + --help CLI flags
-    result = train_and_report(
-        agent,
-        config=cli.to_train_config(
-            agent_name="analyzer",
-            agent_dir=HERE,
-            stacks_dir=ROOT / "stacks",
-            env_path=ROOT / ".env",
-            required_keys=["response"],
-            judge_dimensions=["relevance", "accuracy", "structure"],
-        ),
-    )
-    print_train_result(result)
-    ```
-
-    Matching `eval.py` uses `EvalCliSettings` → `evaluate_and_report` →
-    `print_eval_result`. See [Prompt Optimization](optimization.md) for both
-    tiers and the full knob table.
-
 !!! info "No LangGraph Required"
     Class agents use the built-in `AgentGraph` runtime. Wire your graph in `build_graph()` using `new_graph()` — no need for `langgraph` or `StateGraph`.
 
@@ -605,7 +621,8 @@ flowchart TD
 
 ## 📁 Common Files
 
-All templates (except `custom` and `deepagent`) include these common files:
+Most **agent** templates include these common files (component and pipeline
+templates intentionally have a smaller, purpose-specific layout):
 
 | File | Purpose |
 |------|---------|

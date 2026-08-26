@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -159,6 +160,39 @@ async def test_call_openai_reasoning_model_uses_max_completion_tokens(
     assert create["max_completion_tokens"] == 128
     assert "max_tokens" not in create
     assert "temperature" not in create
+
+
+@pytest.mark.asyncio
+async def test_openai_completion_has_a_coroutine_level_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stuck compatible endpoint must not outlive the caller deadline."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-unit-test")
+    cancelled = False
+
+    class _SlowCompletions:
+        async def create(self, **kwargs: Any) -> Any:
+            nonlocal cancelled
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+
+    class _SlowClient:
+        chat = MagicMock(completions=_SlowCompletions())
+
+        async def __aenter__(self) -> _SlowClient:
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+    with patch("openai.AsyncOpenAI", return_value=_SlowClient()):
+        text = await LLMCaller.call("openai/gpt-4o-mini", "hi", timeout=0.01)
+
+    assert text == ""
+    assert cancelled is True
 
 
 @pytest.mark.asyncio

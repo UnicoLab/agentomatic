@@ -16,6 +16,7 @@ Options:
   --help     Show this message and exit.
 
 Commands:
+  add           Add connections or ingestion components to an existing project.
   init          Scaffold a new agent from a template.
   new           Scaffold a full project (alias for init --project).
   run           Start the platform server.
@@ -45,7 +46,7 @@ Commands:
 
 | Category | Commands | Purpose |
 |----------|----------|---------|
-| **Scaffold** | [`init`](#agentomatic-init) | Create new agents from templates |
+| **Scaffold** | [`init`](#agentomatic-init), [`add`](#agentomatic-add) | Create agents and add project components |
 | **Run** | [`run`](#agentomatic-run), [`demo`](#agentomatic-demo) | Start the platform server |
 | **Debug** | [`test`](#agentomatic-test), [`ui`](#agentomatic-ui) | Interactive testing and chat UI |
 | **Inspect** | [`list`](#agentomatic-list), [`inspect`](#agentomatic-inspect), [`doctor`](#agentomatic-doctor) | Discover, validate, and diagnose |
@@ -53,6 +54,7 @@ Commands:
 | **Deploy** | [`deploy`](#agentomatic-deploy) | Generate container artefacts (full/minimal profiles) |
 | **Agents** | [`agents-guide`](#agentomatic-agents-guide) | Bootstrap a coding agent with an Agentomatic primer |
 | **Stacks** | [`stack init`](#agentomatic-stack-init), [`stack list`](#agentomatic-stack-list) | Multi-environment stack management |
+| **Pipelines** | [`pipeline`](#agentomatic-pipeline) | Inspect, validate, visualize, and execute pipelines |
 
 ---
 
@@ -69,7 +71,7 @@ Arguments:
   NAME  Agent name (snake_case)  [required]
 
 Options:
-  -t, --template [basic|full|rag|chatbot|deepagent|custom|legacy_dict|plugin]
+  -t, --template [basic|class|full|coordinator|pipeline|rag|chatbot|deepagent|custom|legacy_dict|plugin|endpoint|connection|ingestion|extraction|langchain]
                           Template to use (interactive picker if omitted)
   -d, --dir TEXT          Agents parent directory  [default: agents]
   -f, --force             Overwrite existing agent directory
@@ -80,13 +82,21 @@ Options:
 | Template | Description |
 |----------|-------------|
 | `basic` | Minimal class-based agent (recommended) — quick start |
+| `class` | Alias for the basic class-based agent |
 | `chatbot` | Conversational class-based agent with memory |
 | `rag` | RAG class-based agent — retrieve → generate pipeline |
 | `full` | All features: class agent with config, schemas, api, tools, prompts |
+| `coordinator` | Orchestrator that routes requests to specialist agents |
+| `pipeline` | Multi-step YAML workflow that chains agents and components |
 | `deepagent` | Deep Agent with planning, tools, subagents |
 | `custom` | Framework-agnostic — no LangGraph dependency |
 | `legacy_dict` | Legacy functional agent — `__init__.py` with `manifest` + `node_fn` |
 | `plugin` | ML Model Plugin — wrap classical ML models with REST endpoints |
+| `endpoint` | Custom endpoint wrapper for an external model or service |
+| `connection` | Per-agent authenticated database and HTTP service connections |
+| `ingestion` | Document-ingestion package runnable as a task job |
+| `extraction` | Scope-parameterized markdown extraction agent for fan-out pipelines |
+| `langchain` | LangChain-native agent with `ChatPromptTemplate` integration |
 
 #### Examples
 
@@ -126,6 +136,41 @@ agentomatic init helper_bot --template full --force
 
 ---
 
+### `agentomatic add`
+
+Add a component without regenerating or overwriting an existing agent package.
+
+```bash
+# Add per-agent database / HTTP connection definitions
+agentomatic add connection support_agent --dir agents
+
+# Create a task-capable ingestor under ingestion/pdf_docs/
+agentomatic add ingestion pdf_docs
+```
+
+`add connection` writes `connections.py` inside an existing agent. `add
+ingestion` delegates to the ingestion template and writes under `ingestion/`,
+never under `agents/`.
+
+---
+
+### `agentomatic pipeline`
+
+Inspect, validate, visualize, and execute YAML/Python pipelines from the
+project root:
+
+```bash
+agentomatic pipeline list
+agentomatic pipeline validate support_flow
+agentomatic pipeline visualize support_flow
+agentomatic pipeline run support_flow --input '{"query":"hello"}'
+```
+
+Use `--dir PATH` to point at a different project root; `run` and `validate`
+also accept `--agents-dir PATH` when agent packages are elsewhere.
+
+---
+
 ## Run Commands
 
 ### `agentomatic run`
@@ -147,6 +192,10 @@ Usage: agentomatic run [OPTIONS]
 Options:
   --agents-dir TEXT    Agents folder to scan  [default: agents]
   --plugins-dir TEXT   Plugins folder to scan  [default: plugins]
+  --endpoints-dir TEXT Custom endpoint folder to scan  [default: endpoints]
+  --ingestion-dir TEXT Ingestion packages folder to scan  [default: ingestion]
+  --stacks-dir TEXT    Stack YAML folder  [default: stacks]
+  --stack TEXT         Active stack name (overrides .agentomatic-stack)
   --host TEXT          Bind address  [default: 0.0.0.0]
   --port INTEGER       Bind port  [default: 8000]
   --reload             Auto-reload on code or config file changes
@@ -154,6 +203,9 @@ Options:
   --log-level TEXT     Log level (DEBUG, INFO, WARNING, ERROR)  [default: INFO]
   --with-ui, --ui     Mount the Chainlit chat UI at /chat
   --studio/--no-studio Enable/disable Agentomatic Studio at /studio/ui/ (default: on)
+  --ssl-certfile TEXT  PEM-encoded TLS certificate
+  --ssl-keyfile TEXT   Private key matching --ssl-certfile
+  --require-auth-globally Require authenticated JWT claims for every agent request
 ```
 
 #### Examples

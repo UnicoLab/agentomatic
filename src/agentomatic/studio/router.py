@@ -144,6 +144,15 @@ def create_studio_router(
     """
     router = APIRouter(prefix="/studio", tags=["Studio Debug API"])
     tracker = RunTracker()
+    # Studio adapters commonly keep per-thread trace state and checkpoints in
+    # memory.  They must therefore be long-lived for the life of this router:
+    # resolving a new adapter for every request makes a successful state edit
+    # appear to work in the response but vanish on the following GET.
+    #
+    # Keep the registered-agent identity beside each adapter.  A registry
+    # reload can replace that object under the same name, in which case the
+    # cache is refreshed automatically rather than retaining stale user code.
+    adapter_cache: dict[str, tuple[Any, Any]] = {}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -159,10 +168,20 @@ def create_studio_router(
             )
         return agent
 
+    def _adapter_for(agent: Any):
+        """Return the live Studio adapter for *agent*, refreshing after reload."""
+        cached = adapter_cache.get(agent.name)
+        if cached is not None and cached[0] is agent:
+            return cached[1]
+
+        adapter = resolve_adapter(agent, store)
+        adapter_cache[agent.name] = (agent, adapter)
+        return adapter
+
     def _get_adapter(name: str):
-        """Resolve the agent and its Studio adapter."""
+        """Resolve the agent and its live Studio adapter."""
         agent = _resolve_agent(name)
-        return agent, resolve_adapter(agent, store)
+        return agent, _adapter_for(agent)
 
     # ==================================================================
     # Discovery endpoints
@@ -187,7 +206,7 @@ def create_studio_router(
         """List all registered agents with their debugging capabilities."""
         infos: list[StudioAgentInfo] = []
         for _name, agent in registry.all().items():
-            adapter = resolve_adapter(agent, store)
+            adapter = _adapter_for(agent)
             infos.append(
                 StudioAgentInfo(
                     name=agent.name,
@@ -409,9 +428,9 @@ def create_studio_router(
     ) -> StudioStateSnapshot:
         """Apply a partial state update to a thread.
 
-        Delegates to the agent's Studio adapter. LangGraph agents
-        persist changes via the graph checkpointer; other agents
-        update the in-memory trace store.
+        Delegates to the agent's Studio adapter. LangGraph agents persist
+        changes via the graph checkpointer; other adapters apply a local
+        best-effort override while their captured run traces stay durable.
         """
         _agent, adapter = _get_adapter(name)
         result = await adapter.update_state(thread_id, body.updates)
@@ -523,8 +542,9 @@ def create_studio_router(
     async def get_history(name: str, thread_id: str) -> list[StudioCheckpoint]:
         """List checkpoint or execution history for a thread.
 
-        LangGraph agents return real checkpoint history. Other agents
-        return execution trace history from the in-memory store.
+        LangGraph agents return real checkpoint history. Other agents return
+        execution traces, persisted through the configured platform store when
+        one is available.
         """
         _agent, adapter = _get_adapter(name)
         return await adapter.get_history(thread_id)
@@ -548,6 +568,16 @@ def create_studio_router(
         # Studio-only controls should not leak into agent input.
         for studio_only in ("breakpoints", "checkpoint_id"):
             payload.pop(studio_only, None)
+        # The Studio run API is an object envelope, whereas a published agent
+        # input may be a RootModel scalar or array.  Preserve that native value
+        # as the conventional mapping-state root key used across pipelines.
+        agent_input = payload.pop("agent_input", None)
+        # ``None`` may itself be a valid RootModel value.  ``model_fields_set``
+        # distinguishes an omitted envelope field from an explicitly supplied
+        # JSON null, so Studio retains the same body semantics as the public
+        # invoke endpoint for every root schema.
+        if "agent_input" in request.model_fields_set:
+            payload["__root__"] = agent_input
         return build_invoke_state(
             payload,
             default_thread_id=thread_id,

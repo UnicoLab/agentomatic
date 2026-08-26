@@ -78,7 +78,12 @@ class UpstreamConfig(BaseModel):
     )
     auth: UpstreamAuthConfig = Field(default_factory=UpstreamAuthConfig)
     timeout: float = Field(30.0, gt=0, description="Per-request timeout in seconds.")
-    max_retries: int = Field(2, ge=0, le=10, description="Retry attempts on transport errors.")
+    max_retries: int = Field(
+        2,
+        ge=0,
+        le=10,
+        description="Retry attempts on transport errors and transient HTTP 408/425/429/5xx responses.",
+    )
     verify_ssl: bool = Field(True, description="Verify TLS certificates.")
     weight: float = Field(1.0, gt=0, description="Relative weight for aggregation/voting.")
     metadata: dict[str, Any] = Field(default_factory=dict)

@@ -1,7 +1,7 @@
 # Agent Structure & Overrides
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Directory Conventions, Discovery, and Customization Reference</h3>
 </div>
 

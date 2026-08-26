@@ -25,12 +25,17 @@ from .context import TaskContext
 from .dispatchers import (
     TargetNotFoundError,
     make_agent_dispatcher,
+    make_agent_input_validator,
     make_endpoint_dispatcher,
+    make_endpoint_input_validator,
     make_ingestion_dispatcher,
+    make_ingestion_input_validator,
     make_pipeline_dispatcher,
+    make_pipeline_input_validator,
     make_plugin_dispatcher,
+    make_plugin_input_validator,
 )
-from .manager import TaskManager
+from .manager import TaskInputValidationError, TaskManager
 from .models import (
     TargetType,
     TaskEvent,
@@ -63,6 +68,7 @@ __all__ = [
     "TaskContext",
     "TaskEvent",
     "TaskManager",
+    "TaskInputValidationError",
     "TaskProgress",
     "TaskRecord",
     "TaskRetryConfig",
@@ -75,10 +81,15 @@ __all__ = [
     "get_task_context",
     "install_task_progress_bridge",
     "make_agent_dispatcher",
+    "make_agent_input_validator",
     "make_endpoint_dispatcher",
+    "make_endpoint_input_validator",
     "make_ingestion_dispatcher",
+    "make_ingestion_input_validator",
     "make_pipeline_dispatcher",
+    "make_pipeline_input_validator",
     "make_plugin_dispatcher",
+    "make_plugin_input_validator",
     "report_stage",
     "report_stage_sync",
     "reset_task_context",

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
+import secrets
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +21,25 @@ _DEFAULT_MAX_JSON_CHARS = 32_000
 _DEFAULT_MAX_STRING_CHARS = 8_000
 _DEFAULT_MAX_DEPTH = 6
 _DEFAULT_MAX_LIST_ITEMS = 50
+_AUDIT_REFERENCE_KEY = (
+    os.getenv("AGENTOMATIC_AUDIT_HASH_KEY")
+    or os.getenv("AGENTOMATIC_API_KEY")
+    or secrets.token_hex(32)
+).encode("utf-8")
+
+
+def _audit_thread_reference(thread_id: str | None) -> str | None:
+    """Return a stable, non-reversible reference suitable for an audit sink.
+
+    Conversation identifiers can be user-provided and are therefore not safe
+    audit metadata.  Retain a short correlation reference without copying the
+    source value to a file or external SIEM.
+    """
+    if not thread_id:
+        return None
+    return hmac.new(_AUDIT_REFERENCE_KEY, thread_id.encode("utf-8"), hashlib.sha256).hexdigest()[
+        :16
+    ]
 
 
 def truncate_for_storage(
@@ -210,11 +233,12 @@ class InvocationLogRecorder:
             meta["pipeline"] = pipeline_name
 
         try:
+            run_id = run_id or f"run_{uuid.uuid4().hex[:12]}"
             entry = await self._store.create_invocation_log(
                 agent_name=name,
                 resource_type=rtype,
                 thread_id=thread_id,
-                run_id=run_id or f"run_{uuid.uuid4().hex[:12]}",
+                run_id=run_id,
                 endpoint=endpoint,
                 input_data=truncate_for_storage(_safe_dump(input_data)),
                 output_data=truncate_for_storage(_safe_dump(output_data)),
@@ -223,6 +247,28 @@ class InvocationLogRecorder:
                 duration_ms=duration_ms,
                 status=status,
             )
+            # The durable invocation record is also the canonical safe audit
+            # event: it contains only bounded metadata and a generated run ID,
+            # never raw request bodies or credentials.  File-sink failure must
+            # not affect a serving request, just like DB log failure above.
+            try:
+                from agentomatic.observability.audit import emit_audit_event
+
+                emit_audit_event(
+                    agent=name,
+                    op=f"{rtype}:{endpoint}",
+                    request_id=run_id,
+                    outcome={"ok": "success", "suspended": "suspended"}.get(status, "error"),
+                    latency_ms=duration_ms,
+                    extra={
+                        "resource_type": rtype,
+                        "thread_ref": _audit_thread_reference(thread_id),
+                    },
+                )
+            except Exception as audit_exc:  # noqa: BLE001 - audit must not break serving.
+                logger.warning(
+                    "Failed to emit audit event for '{}:{}': {}", rtype, name, audit_exc
+                )
             return entry
         except Exception as exc:  # noqa: BLE001
             logger.warning(

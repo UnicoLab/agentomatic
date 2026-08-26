@@ -1,7 +1,7 @@
 <div align="center">
 
 <p align="center">
-  <img src="assets/logo.png" width="300" alt="agentomatic">
+  <img src="docs/assets/logo.png" width="300" alt="agentomatic">
 </p>
 
 # ⚡ Agentomatic
@@ -38,7 +38,7 @@ Build, trace, optimize, and time-travel debug production-ready AI agent APIs in 
 | 🧱 **Composable Pipelines** | Chain agents, plugins, endpoints, ingestors, transforms, loops, and sub-pipelines with typed data-passing, conditionals, retries, rollback/compensation, and schema enforcement. |
 | 🗄️ **Pluggable Storage** | Use `MemoryStore`, `SQLAlchemy`, or plug in your own custom persistence layer. |
 | 🔐 **Enterprise Middleware** | High-performance pipeline with JWT Auth, dynamic rate limiting, and Prometheus telemetry — all toggleable. |
-| 📦 **Scaffolding Templates** | Jumpstart with 14 templates: `basic`/`class`, `full`, `coordinator`, `pipeline`, `rag`, `chatbot`, `deepagent`, `custom`, `legacy_dict`, `plugin`, `endpoint`, `connection`, `ingestion`, `extraction`. |
+| 📦 **Scaffolding Templates** | Jumpstart with 16 templates: `basic`/`class`, `full`, `coordinator`, `pipeline`, `rag`, `chatbot`, `deepagent`, `custom`, `legacy_dict`, `langchain`, `plugin`, `endpoint`, `connection`, `ingestion`, `extraction`. |
 | 🧬 **Class-Based Agents** | Define agents as Python classes with a **Keras-style ML lifecycle**: `compile()` → `fit()` (epochs, `verbose`, callbacks, `validation_data`) → `evaluate()` → `transform()`, returning a real `History` object. |
 | 🤖 **A2A Protocol** | True Agent-to-Agent communication flows integrated out of the box. |
 | 🔌 **Framework Agnostic** | Fully supports LangGraph, LangChain, or raw Python execution logic. |
@@ -142,20 +142,30 @@ agentomatic init my_agent --template <template>
 | Template | Description |
 |----------|-------------|
 | `basic` | Minimal class-based agent (recommended) — quick start |
+| `class` | Alias for the basic class-based agent |
 | `full` | All override files — class agent with config, schemas, api, tools, prompts |
+| `coordinator` | Orchestrator that routes requests to specialist agents |
+| `pipeline` | Multi-step YAML workflow that chains agents and components |
 | `rag` | RAG class-based agent — retrieve → generate pipeline |
 | `chatbot` | Conversational class-based agent with memory |
 | `deepagent` | Deep Agent — planning, tools, subagents (requires deepagents package) |
 | `custom` | Framework-agnostic — no LangGraph dependency |
 | `legacy_dict` | Legacy functional agent — 3 files (`__init__`, graph, nodes) |
+| `langchain` | LangChain-native agent with `ChatPromptTemplate` integration |
 | `plugin` | ML Model Plugin — wrap classical ML models with REST endpoints |
+| `endpoint` | Custom endpoint wrapper for an external model or service |
+| `connection` | Per-agent authenticated database and HTTP service connections |
+| `ingestion` | Document-ingestion package runnable as a task job |
+| `extraction` | Scope-parameterized markdown extraction agent for fan-out pipelines |
 
 ## 🖥️ CLI
 
 ```
 ⚡ Agentomatic — Drop agents, not code
 
-  init <name>      Scaffold a new agent from template
+  init <name>      Scaffold an agent package from a template
+  new <name>       Scaffold a complete project (alias for init --project)
+  add              Add a connection or ingestion component to a project
   run              Start the platform server
   run --studio     Start with Agentomatic Studio visual debugger 🎨
   run --with-ui    Start with Chainlit chat interface 💬
@@ -167,6 +177,9 @@ agentomatic init my_agent --template <template>
   optimize <name>  Run prompt optimization
   ui               Launch Chainlit debug UI standalone
   pipeline         Pipeline management commands
+  stack            Multi-environment stack management
+  deploy           Generate Docker deployment files
+  agents-guide     Emit an Agentomatic primer for coding agents
 ```
 
 ## 🧬 Class-Based Agents (NEW)
@@ -851,11 +864,12 @@ make dev  # Installs all deps + pre-commit hooks
 
 # Quality
 make lint          # Ruff linter
+make audit         # Known-vulnerability audit of locked dependencies
 make format        # Auto-format
 make typecheck     # Mypy
 make test          # All tests
 make test-cov      # With coverage
-make check-all     # lint + typecheck + test
+make check-all     # lint + dependency audit + typecheck + test
 
 # Docs
 make docs-serve    # Local docs server

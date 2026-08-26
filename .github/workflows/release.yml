@@ -72,10 +72,31 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9
-        with:
-          github_token: ${{ steps.app-token.outputs.token }}
-          root_options: ${{ inputs.DRY_RUN && '--noop' || '' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          current="$(uv run semantic-release version --print-last-released)"
+          next="$(uv run semantic-release version --print)"
+          echo "Current version: ${current}"
+          echo "Next version: ${next}"
+
+          if [ "${next}" = "${current}" ]; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "version=${current}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ inputs.DRY_RUN }}" = "true" ]; then
+            uv run semantic-release --noop version
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "version=${next}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          uv run semantic-release version
+          echo "released=true" >> "$GITHUB_OUTPUT"
+          echo "version=${next}" >> "$GITHUB_OUTPUT"
 
       - name: Show release info
         run: |
@@ -201,6 +222,7 @@ jobs:
         run: |
           echo "📦 Wheel contents (studio static files):"
           python -m zipfile -l dist/*.whl | grep "studio/static" | head -20 || echo "(no studio files found)"
+          uv run python scripts/verify_wheel_studio.py dist/*.whl
 
       - name: Publish to PyPI
         id: publish
@@ -240,10 +262,10 @@ jobs:
           fetch-depth: 0
           ref: main
 
-      - name: Publish GitHub Release
-        uses: python-semantic-release/publish-action@v9
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release view "v${{ needs.semantic-release.outputs.new_version }}"
 
   # ─────────────────────────────────────────────────────────────
   # 5. DEPLOY DOCS — Build and deploy versioned documentation

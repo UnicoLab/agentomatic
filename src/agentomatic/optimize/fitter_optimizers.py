@@ -107,6 +107,21 @@ _MIPRO_PERSPECTIVES: list[str] = [
     "Focus on improving step-by-step reasoning instructions.",
 ]
 
+
+def _prompt_generation_tokens(model: Any, requested: int) -> int:
+    """Keep local SLM prompt mutations bounded without limiting cloud models.
+
+    Prompt candidates are configuration text, not long-form answers.  Local
+    oMLX/Ollama models therefore get a prompt-sized output budget; otherwise a
+    handful of serial candidates can occupy a production optimiser for many
+    minutes.  Explicit cloud/frontier model configurations retain the caller's
+    requested limit.
+    """
+    if isinstance(model, str) and model.lower().startswith(("omlx/", "ollama/")):
+        return min(requested, 768)
+    return requested
+
+
 # =====================================================================
 # ABC
 # =====================================================================
@@ -937,7 +952,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             self.model,
             prompt,
             temperature=0.8,
-            max_tokens=2000,
+            max_tokens=_prompt_generation_tokens(self.model, 2000),
         )
         return extract_prompt_text(raw, fallback=current_prompt)
 
@@ -972,7 +987,7 @@ class MIPROLikeOptimizer(BaseFitterOptimizer):
             self.model,
             prompt,
             temperature=0.5,
-            max_tokens=2000,
+            max_tokens=_prompt_generation_tokens(self.model, 2000),
         )
         return extract_prompt_text(result, fallback="")
 
@@ -1287,7 +1302,7 @@ class GEPALikeOptimizer(BaseFitterOptimizer):
             self.rewrite_model,
             prompt,
             temperature=0.7,
-            max_tokens=2000,
+            max_tokens=_prompt_generation_tokens(self.rewrite_model, 2000),
         )
         return extract_prompt_text(raw, fallback=current_prompt)
 

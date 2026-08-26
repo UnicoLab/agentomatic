@@ -41,10 +41,11 @@ COPY src/ ./src/
 # Extras matter here: a bare install ships core dependencies only, leaving the
 # image without sqlalchemy, langgraph, prometheus-client or pyjwt — /metrics
 # served nothing, DATABASE_URL failed with "No module named 'sqlalchemy'", and
-# JWT auth could not be enabled. ``db-postgres`` is named separately because
-# ``all`` deliberately carries only the SQLite driver.
+# JWT auth could not be enabled. ``db-postgres`` and ``openai`` are named
+# separately because ``all`` deliberately omits provider SDKs and the
+# PostgreSQL driver.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --target=/app/deps ".[all,db-postgres]"
+    uv pip install --target=/app/deps ".[all,db-postgres,openai]"
 
 # ---- Runtime stage ----------------------------------------------------------
 FROM gcr.io/distroless/python3-debian12:nonroot

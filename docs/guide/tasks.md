@@ -1,9 +1,10 @@
 # Tasks & Execution Modes
 
 Agentomatic ships a **unified task subsystem** that lets you run *any* platform
-resource — an agent, an ML plugin, a pipeline, or a custom endpoint — in
-**synchronous**, **asynchronous (background)**, **batch**, or **streaming**
-modes, all through one consistent API.
+resource — an agent, an ML plugin, a pipeline, a custom endpoint, or an
+ingestor — in **synchronous**, **asynchronous (background)**, or **batch**
+modes, all through one consistent API. Every task also exposes a separate
+Server-Sent Events progress stream.
 
 Every submission returns the same [`TaskRecord`](#taskrecord) shape, so your
 frontend can submit work, poll status, subscribe to live progress, fetch the
@@ -126,7 +127,9 @@ is enabled by default (`enable_tasks=True`).
 
 === "Batch"
 
-    Provide `batch` (a list of inputs). Items run with bounded concurrency and
+Provide `batch` (a list of inputs). Each item uses the selected resource's
+published JSON Schema and may therefore be an object, array, or scalar value.
+Items run with bounded concurrency and
     the task reports `done/total` progress. The result is a list aligned to the
     inputs (failed items become `{"error": "..."}`).
 
@@ -155,6 +158,24 @@ is enabled by default (`enable_tasks=True`).
         "callback_url": "https://myapp.example.com/hooks/task-done"
       }'
     ```
+
+### Resource input validation happens before queueing
+
+`POST /tasks` applies the exact same published input contract as a resource's
+native run route. This includes a custom agent schema (or the standard invoke
+request), plugin prediction schemas, custom-endpoint schemas, and ingestor
+schemas. The same check is applied independently to every batch item. A
+malformed payload returns `422`, and an unknown resource returns `404`,
+**before** creating a durable task record. This prevents the Task Board from
+showing invalid work as queued or failed later.
+
+Pipelines always require an object input. Their declared `input_schema` remains
+advisory by default, exactly as it is for `POST /pipelines/{name}/run`; set
+`strict_schema: true` to reject declared missing or mistyped inputs with `422`
+before queueing.
+
+Use the resource's Studio schema panel or `GET /studio/agents/{agent}/schemas`
+to inspect the current deployed input and output contract before submitting work.
 
 ### Polling status
 

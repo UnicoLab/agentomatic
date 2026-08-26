@@ -8,17 +8,31 @@ on:
     branches: [main]
     paths:
       - "**.py"
+      - "Dockerfile*"
+      - "docker-compose.yml"
+      - ".dockerignore"
       - "pyproject.toml"
       - "uv.lock"
       - "tests/**"
+      - "docs/**"
+      - "mkdocs.yml"
+      - "scripts/**"
+      - "README.md"
       - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "**.py"
+      - "Dockerfile*"
+      - "docker-compose.yml"
+      - ".dockerignore"
       - "pyproject.toml"
       - "uv.lock"
       - "tests/**"
+      - "docs/**"
+      - "mkdocs.yml"
+      - "scripts/**"
+      - "README.md"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
 
@@ -56,7 +70,29 @@ jobs:
         run: uv run ruff format --check src/agentomatic/ tests/
 
   # ─────────────────────────────────────────────────────
-  # 2. TEST — Multi-Python matrix with coverage
+  # 2. SECURITY — Audit the complete locked deployment set
+  # ─────────────────────────────────────────────────────
+  security:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install locked dependencies
+        run: uv sync --all-extras --group dev --group docs
+
+      - name: Audit known vulnerabilities
+        run: uv run pip-audit --progress-spinner off
+
+  # ─────────────────────────────────────────────────────
+  # 3. TEST — Multi-Python matrix with coverage
   # ─────────────────────────────────────────────────────
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -84,7 +120,7 @@ jobs:
             --cov=agentomatic \
             --cov-report=xml \
             --cov-report=term \
-            -m "not slow" \
+            -m "not slow and not live" \
             --override-ini="addopts="
         timeout-minutes: 15
 
@@ -109,7 +145,7 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────────
-  # 3. TYPECHECK — Mypy static analysis
+  # 4. TYPECHECK — Mypy static analysis
   # ─────────────────────────────────────────────────────
   typecheck:
     name: Type Check
@@ -131,7 +167,7 @@ jobs:
         run: uv run mypy src/agentomatic/ --ignore-missing-imports
 
   # ─────────────────────────────────────────────────────
-  # 4. DOCS — Verify documentation builds cleanly
+  # 5. DOCS — Verify documentation builds cleanly
   # ─────────────────────────────────────────────────────
   docs:
     name: Docs Build
@@ -153,7 +189,7 @@ jobs:
         run: uv run mkdocs build --strict
 
   # ─────────────────────────────────────────────────────
-  # 5. SMOKE — Import and basic runtime validation
+  # 6. SMOKE — Import and basic runtime validation
   # ─────────────────────────────────────────────────────
   smoke:
     name: Import Smoke Test
@@ -197,11 +233,11 @@ jobs:
           uv run agentomatic doctor
 
   # ─────────────────────────────────────────────────────
-  # 6. BUILD — Validate package builds correctly
+  # 7. BUILD — Validate package builds correctly
   # ─────────────────────────────────────────────────────
   build:
     name: Build Package
-    needs: [lint, test, typecheck, docs, smoke]
+    needs: [lint, security, test, typecheck, docs, smoke]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -221,6 +257,10 @@ jobs:
           echo "📦 Wheel contents:"
           python -m zipfile -l dist/*.whl | head -30
           echo "📊 Total files: $(python -m zipfile -l dist/*.whl | wc -l)"
+          uv run python scripts/verify_wheel_studio.py dist/*.whl
+
+      - name: Validate distribution metadata
+        run: uv run twine check dist/*
 
       - name: Upload dist
         uses: actions/upload-artifact@v4

@@ -20,6 +20,8 @@ class TestProjectScaffold:
         files = get_project_files("demo_app")
         assert "main.py" in files
         assert "AgentPlatform.from_folder" in files["main.py"]
+        assert 'os.getenv("AGENTOMATIC_AGENTS_DIR", "agents/")' in files["main.py"]
+        assert 'os.getenv("AGENTOMATIC_STACKS_DIR", "stacks/")' in files["main.py"]
         assert "pipelines_dir=" not in files["main.py"]
         assert "_platform = create_platform()" in files["main.py"]
         assert "stacks/local.yaml" in files

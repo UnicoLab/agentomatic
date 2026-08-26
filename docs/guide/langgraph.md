@@ -1,7 +1,7 @@
 # LangGraph Integration Guide
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Build Production-Grade Agent Workflows with LangGraph + Agentomatic</h3>
 </div>
 

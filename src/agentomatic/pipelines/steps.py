@@ -217,6 +217,34 @@ def _normalize_output(result: Any) -> dict[str, Any]:
     return {"response": str(result)}
 
 
+# Pipeline mappings are normally `{field: value}` records.  A Pydantic
+# RootModel publishes a scalar/array schema instead, so it has no field name
+# to map.  This explicit, portable key lets YAML and Builder users connect a
+# pipeline value to that real request body without inventing a fake model field.
+ROOT_INPUT_MAPPING_KEY = "__root__"
+
+
+def _resolve_resource_input(
+    mapping: Any,
+    ctx: PipelineContext,
+    input_schema: type[Any],
+) -> Any:
+    """Resolve a resource mapping, preserving non-object request bodies."""
+    if mapping and mapping.mappings:
+        payload = ctx.resolve_mapping(mapping.mappings)
+    else:
+        payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+
+    try:
+        schema = input_schema.model_json_schema()
+    except Exception:  # noqa: BLE001 - third-party schema metadata is optional
+        return payload
+    is_root_schema = schema.get("type") != "object" and not schema.get("properties")
+    if is_root_schema and isinstance(payload, dict) and ROOT_INPUT_MAPPING_KEY in payload:
+        return payload[ROOT_INPUT_MAPPING_KEY]
+    return payload
+
+
 # ---------------------------------------------------------------------------
 # Endpoint Step
 # ---------------------------------------------------------------------------
@@ -260,10 +288,7 @@ async def execute_endpoint_step(
         )
 
     try:
-        if config.input and config.input.mappings:
-            payload = ctx.resolve_mapping(config.input.mappings)
-        else:
-            payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+        payload = _resolve_resource_input(config.input, ctx, endpoint.get_input_schema())
 
         kwargs: dict[str, Any] = {}
         if config.upstreams:
@@ -369,10 +394,7 @@ async def execute_plugin_step(
         )
 
     try:
-        if config.input and config.input.mappings:
-            payload = ctx.resolve_mapping(config.input.mappings)
-        else:
-            payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+        payload = _resolve_resource_input(config.input, ctx, plugin.get_input_schema())
 
         # Coerce the raw payload into the plugin's declared input schema.
         input_schema = plugin.get_input_schema()
@@ -483,10 +505,7 @@ async def execute_ingestion_step(
     try:
         from agentomatic.ingestion.context import NullIngestionContext
 
-        if config.input and config.input.mappings:
-            payload = ctx.resolve_mapping(config.input.mappings)
-        else:
-            payload = dict(ctx.current) if ctx.current else dict(ctx.input)
+        payload = _resolve_resource_input(config.input, ctx, ingestor.get_input_schema())
 
         result = await asyncio.wait_for(
             ingestor.run(payload, NullIngestionContext()),

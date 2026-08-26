@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -87,6 +88,37 @@ class TestInvocationLogRecorder:
         listed = await store.list_invocation_logs(agent_name="echo")
         assert len(listed) == 1
         assert listed[0]["id"] == entry["id"]
+
+    @pytest.mark.asyncio
+    async def test_records_a_safe_audit_event(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Every durable invocation has an audit event with a correlation ID."""
+        emitted: list[dict[str, object]] = []
+
+        def capture(**kwargs: object) -> dict[str, object]:
+            emitted.append(kwargs)
+            return kwargs
+
+        monkeypatch.setattr("agentomatic.observability.audit.emit_audit_event", capture)
+        await InvocationLogRecorder(MemoryStore()).record(
+            agent_name="echo",
+            endpoint="invoke",
+            input_data={"secret": "never copied into audit metadata"},
+            thread_id="member@example.test",
+            status="ok",
+            duration_ms=12.5,
+        )
+
+        assert len(emitted) == 1
+        event = emitted[0]
+        assert event["agent"] == "echo"
+        assert event["op"] == "agent:invoke"
+        assert str(event["request_id"]).startswith("run_")
+        assert event["outcome"] == "success"
+        assert event["latency_ms"] == 12.5
+        assert event["extra"]["resource_type"] == "agent"
+        assert re.fullmatch(r"[0-9a-f]{16}", str(event["extra"]["thread_ref"]))
+        assert "secret" not in str(emitted)
+        assert "member@example.test" not in str(emitted)
 
     @pytest.mark.asyncio
     async def test_swallows_store_errors(self) -> None:

@@ -37,7 +37,7 @@ GREETINGS = [
     "Hey! Great to see you! 🎉",
     "Greetings, human! 🤖 How can I help?",
     "Welcome! I'm your friendly neighborhood AI. 🌟",
-    "Hi! I'm running on agentomatic v0.4.1 — all systems go! 🚀",
+    "Hi! I'm running on Agentomatic — all systems go! 🚀",
 ]
 
 

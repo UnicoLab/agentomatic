@@ -1,0 +1,34 @@
+name: production_flow
+description: Exercise ingestion, endpoint, plugin, and delegated-agent steps end to end.
+input_schema:
+  query:
+    type: str
+    default: Verify the production pipeline through the Builder.
+strict_schema: true
+defaults:
+  query: Verify the production pipeline through the Builder.
+steps:
+  - name: ingest
+    ingestion: documents
+    input:
+      source: $.input.query
+  - name: enrich
+    endpoint: enricher
+    input:
+      text: $.input.query
+  - name: score
+    plugin: length_scorer
+    input:
+      text: $.steps.enrich.text
+  - name: root_echo
+    plugin: root_echo
+    input:
+      __root__: $.input.query
+  - name: research
+    agent: researcher
+    input:
+      current_query: $.steps.enrich.text
+  - name: write
+    agent: writer
+    input:
+      current_query: $.steps.research.response

@@ -51,6 +51,8 @@ telemetry = [
     "opentelemetry-sdk>=1.20",
     "opentelemetry-instrumentation-fastapi>=0.40",
     "opentelemetry-instrumentation-httpx>=0.40",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+    "opentelemetry-exporter-otlp-proto-http>=1.20",
 ]
 dotenv = ["python-dotenv>=1.0"]
 security = ["pyjwt[crypto]>=2.8", "cryptography>=42.0"]
@@ -71,6 +73,7 @@ dev = [
     "mypy>=1.13",
     "pre-commit>=4.0",
     "build>=1.0",
+    "pip-audit>=2.9",
     "twine>=6.0",
 ]
 
@@ -105,8 +108,13 @@ dev = [
     "mypy>=1.13",
     "pre-commit>=4.0",
     "build>=1.0",
+    "pip-audit>=2.9",
     "twine>=6.0",
-    "python-semantic-release>=9.0",
+    "python-semantic-release>=10.0,<11",
+    # GitPython 3.1.45 removed Actor.name_email_regex, which is still used
+    # by python-semantic-release 10.6.1. Keep the release CLI functional
+    # until its upstream dependency constraint is corrected.
+    "GitPython>=3.1.30,<3.1.45",
     "mike>=2.2.0",
     "mkdocs-material>=9.7.6",
 ]
@@ -177,9 +185,17 @@ known-first-party = ["agentomatic"]
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --strict-markers"
+# Live model checks are an explicit deployment gate, not part of the
+# deterministic repository suite. Auto-running them merely because a local
+# server happens to be listening makes ``pytest`` duration/provider-dependent.
+# Run them intentionally with ``--override-ini='addopts=' -m live``.
+addopts = "-ra -q --strict-markers -m 'not live'"
 testpaths = ["tests"]
-pythonpath = ["src"]
+# ``agentomatic`` is a src-layout package, while the legacy Studio schema
+# fixtures intentionally import the repository's ``src.agents`` package.
+# Include both roots so `uv run pytest` and CI resolve the same modules without
+# a caller-specific PYTHONPATH workaround.
+pythonpath = [".", "src"]
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow",

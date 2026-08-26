@@ -32,6 +32,7 @@ import os
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
+from urllib.parse import urlparse
 
 from loguru import logger
 
@@ -163,7 +164,18 @@ def setup_telemetry(
                 OTLPSpanExporter,
             )
 
-            exporter: SpanExporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+            # OTLP gRPC endpoints are conventionally configured as either
+            # ``host:4317`` (TLS) or ``http://host:4317`` (plaintext). The
+            # exporter does not consistently infer the latter across SDK
+            # versions, which caused a local collector to receive TLS bytes
+            # and reject every span. Normalize the endpoint and make the
+            # security mode explicit; ``https://`` remains TLS.
+            parsed = urlparse(otlp_endpoint)
+            grpc_endpoint = f"{parsed.netloc}{parsed.path}" if parsed.scheme else otlp_endpoint
+            exporter: SpanExporter = OTLPSpanExporter(
+                endpoint=grpc_endpoint,
+                insecure=parsed.scheme == "http",
+            )
             provider.add_span_processor(BatchSpanProcessor(exporter))
             logger.info(f"📡 OTEL traces → {otlp_endpoint}")
         except ImportError:

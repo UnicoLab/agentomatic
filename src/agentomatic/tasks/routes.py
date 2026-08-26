@@ -17,16 +17,14 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from .manager import TaskInputValidationError, TaskManager
 from .models import TargetType, TaskStatus
-
-if TYPE_CHECKING:
-    from .manager import TaskManager
 
 _TAG = "Tasks"
 
@@ -34,11 +32,17 @@ _TAG = "Tasks"
 class TaskSubmitRequest(BaseModel):
     """Request body for submitting a task."""
 
-    target_type: TargetType = Field(description="agent | plugin | pipeline | endpoint")
+    target_type: TargetType = Field(description="agent | plugin | pipeline | endpoint | ingestion")
     target: str = Field(description="Name of the resource to run.")
     input: Any = Field(default=None, description="Single input payload.")
     batch: list[Any] | None = Field(default=None, description="Batch of input payloads.")
-    mode: str = Field(default="async", description="async | sync | batch | stream")
+    mode: Literal["async", "sync", "batch"] = Field(
+        default="async",
+        description=(
+            "async | sync | batch. Task progress is streamed separately via "
+            "GET /tasks/{task_id}/events."
+        ),
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
     callback_url: str | None = Field(default=None, description="Webhook for completion.")
     wait: bool = Field(default=False, description="Block until the task is terminal.")
@@ -83,6 +87,10 @@ def create_task_router(manager: TaskManager) -> APIRouter:
                     callback_url=request.callback_url,
                     retry=request.retry,
                 )
+        except TaskInputValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         payload = record.public_dict()

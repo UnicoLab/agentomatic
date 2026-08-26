@@ -21,7 +21,11 @@ from agentomatic.optimize.briefing import (
 )
 from agentomatic.optimize.config import PromptRuntimeConfig
 from agentomatic.optimize.context import OptimizationContext
-from agentomatic.optimize.fitter_optimizers import RewriteOptimizer, resolve_fitter_optimizer
+from agentomatic.optimize.fitter_optimizers import (
+    RewriteOptimizer,
+    _prompt_generation_tokens,
+    resolve_fitter_optimizer,
+)
 from agentomatic.optimize.search_space import PromptSearchSpace
 
 
@@ -126,12 +130,18 @@ def test_extract_prompt_text_strips_fence_and_separator() -> None:
     assert extract_prompt_text(raw) == "Be concise."
 
 
+def test_local_prompt_mutations_use_a_bounded_output_budget() -> None:
+    assert _prompt_generation_tokens("omlx/Qwen3.5-9B", 2000) == 768
+    assert _prompt_generation_tokens("ollama/qwen3", 2000) == 768
+    assert _prompt_generation_tokens("openai/gpt-4.1", 2000) == 2000
+
+
 @pytest.mark.asyncio
 async def test_multipass_refine_prompt_calls_llm_three_times_for_slm() -> None:
-    calls: list[str] = []
+    calls: list[tuple[str, dict[str, object]]] = []
 
     async def fake_call(model, prompt, **kwargs):  # noqa: ANN001, ANN003
-        calls.append(prompt)
+        calls.append((prompt, kwargs))
         if "CRITIQUE" in prompt:
             return "- Missing keyword FOUR\n"
         return "---\nImproved prompt mentioning FOUR\n"
@@ -149,10 +159,11 @@ async def test_multipass_refine_prompt_calls_llm_three_times_for_slm() -> None:
 
     assert prompt == "Improved prompt mentioning FOUR"
     assert len(calls) == 3  # draft, critique, revise
-    assert any("DRAFT" in c for c in calls)
-    assert any("CRITIQUE" in c for c in calls)
-    assert any("REVISE" in c for c in calls)
-    assert any("SMALL language model" in c for c in calls)
+    assert any("DRAFT" in c[0] for c in calls)
+    assert any("CRITIQUE" in c[0] for c in calls)
+    assert any("REVISE" in c[0] for c in calls)
+    assert any("SMALL language model" in c[0] for c in calls)
+    assert [call[1]["max_tokens"] for call in calls] == [768, 384, 768]
     assert len(notes) == 3
 
 

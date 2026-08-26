@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
@@ -20,12 +22,13 @@ from agentomatic.endpoints import (
     UpstreamConfig,
 )
 from agentomatic.endpoints.auth import UpstreamAuthenticator, resolve_env
-from agentomatic.endpoints.client import MultiModelClient
+from agentomatic.endpoints.client import MultiModelClient, UpstreamClient
 from agentomatic.endpoints.models import (
     EndpointCallRequest,
     EndpointCallResponse,
     UpstreamResult,
 )
+from agentomatic.endpoints.router import create_endpoint_router
 
 # ---------------------------------------------------------------------------
 # Env interpolation + auth headers
@@ -68,6 +71,39 @@ async def test_auth_headers_basic():
     cfg = UpstreamAuthConfig(type=AuthType.BASIC, username="user", password="pass")
     headers = await UpstreamAuthenticator(cfg).headers(client=None)
     assert headers["Authorization"].startswith("Basic ")
+
+
+async def test_upstream_retries_transient_http_statuses(monkeypatch):
+    """429/5xx responses should have the same resilience as network failures."""
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(503, request=request)
+        return httpx.Response(200, json={"ok": True}, request=request)
+
+    client = UpstreamClient(
+        UpstreamConfig(name="retryable", base_url="https://upstream.test", max_retries=1)
+    )
+    client._client = httpx.AsyncClient(
+        base_url="https://upstream.test",
+        transport=httpx.MockTransport(handler),
+    )
+
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr("agentomatic.endpoints.client.asyncio.sleep", no_sleep)
+    try:
+        result = await client.request({"query": "retry"})
+    finally:
+        await client.aclose()
+
+    assert calls == 2
+    assert result.ok is True
+    assert result.data == {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +221,93 @@ def test_endpoint_info():
     assert info["name"] == "echo"
     assert info["path"] == "/echo"
     assert info["methods"] == ["POST"]
+
+
+class ReadEndpoint(BaseEndpoint[_In, _Out]):
+    """A browser-safe custom endpoint with a query-bound contract."""
+
+    endpoint_name = "read"
+    path = "/value"
+    methods = ["GET"]
+
+    async def handle(self, request):
+        return _Out(echoed=request.text)
+
+
+class ReadWriteEndpoint(ReadEndpoint):
+    endpoint_name = "read_write"
+    methods = ["GET", "POST"]
+
+
+class _ComplexReadIn(BaseModel):
+    text: str
+    tags: list[str] = []
+    metadata: dict[str, str] = {}
+
+
+class ComplexReadEndpoint(BaseEndpoint[_ComplexReadIn, _ComplexReadIn]):
+    """Exercises Studio's array and JSON-object query encoding."""
+
+    endpoint_name = "complex_read"
+    path = "/search"
+    methods = ["GET"]
+
+    async def handle(self, request):
+        return request
+
+
+def _endpoint_app(endpoint: BaseEndpoint) -> FastAPI:
+    app = FastAPI()
+    app.include_router(
+        create_endpoint_router(endpoint),
+        prefix=f"/api/v1/endpoints/{endpoint.endpoint_name}",
+    )
+    return app
+
+
+def test_get_endpoint_accepts_browser_safe_query_parameters() -> None:
+    """GET input must not require the JSON body a browser is forbidden to send."""
+    with TestClient(_endpoint_app(ReadEndpoint())) as client:
+        response = client.get("/api/v1/endpoints/read/value", params={"text": "from-query"})
+        assert response.status_code == 200, response.text
+        assert response.json() == {"echoed": "from-query"}
+
+        operation = client.get("/openapi.json").json()["paths"]["/api/v1/endpoints/read/value"][
+            "get"
+        ]
+        assert "requestBody" not in operation
+        assert operation["parameters"][0]["name"] == "text"
+        assert operation["parameters"][0]["in"] == "query"
+
+
+def test_endpoint_can_expose_get_and_post_with_their_correct_contracts() -> None:
+    """A mixed endpoint remains callable from Studio for either chosen method."""
+    with TestClient(_endpoint_app(ReadWriteEndpoint())) as client:
+        get_response = client.get("/api/v1/endpoints/read_write/value", params={"text": "get"})
+        post_response = client.post("/api/v1/endpoints/read_write/value", json={"text": "post"})
+
+        assert get_response.json() == {"echoed": "get"}
+        assert post_response.json() == {"echoed": "post"}
+
+
+def test_get_endpoint_parses_repeated_and_json_encoded_query_values() -> None:
+    """Complex SchemaForm values remain usable with browser-safe GET requests."""
+    with TestClient(_endpoint_app(ComplexReadEndpoint())) as client:
+        response = client.get(
+            "/api/v1/endpoints/complex_read/search",
+            params=[
+                ("text", "from-query"),
+                ("tags", "first"),
+                ("tags", "second"),
+                ("metadata", '{"source":"studio"}'),
+            ],
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "text": "from-query",
+            "tags": ["first", "second"],
+            "metadata": {"source": "studio"},
+        }
 
 
 # ---------------------------------------------------------------------------

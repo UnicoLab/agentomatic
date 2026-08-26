@@ -28,6 +28,7 @@ Example
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -605,7 +606,12 @@ async def _call_openai(
     client = openai.AsyncOpenAI(**client_kwargs)
     async with client as c:
         try:
-            response = await c.chat.completions.create(**kwargs)
+            # The SDK timeout is delegated to its HTTP transport.  A stalled
+            # compatible server can leave a request open beyond that timeout,
+            # particularly while a local model is saturated.  Keep a coroutine
+            # level deadline as the production backstop so callers (and an
+            # optimiser with many calls) cannot wait indefinitely.
+            response = await asyncio.wait_for(c.chat.completions.create(**kwargs), timeout=timeout)
         except Exception as exc:  # noqa: BLE001
             # Retry once without temperature / response_format for picky models.
             msg = str(exc).lower()
@@ -621,7 +627,7 @@ async def _call_openai(
                 retried = True
             if not retried:
                 raise
-            response = await c.chat.completions.create(**kwargs)
+            response = await asyncio.wait_for(c.chat.completions.create(**kwargs), timeout=timeout)
 
         choice = response.choices[0]
         message = choice.message

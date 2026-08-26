@@ -109,9 +109,7 @@ def install_task_progress_bridge(platform: Any) -> None:
     global _INSTALLED
     if _INSTALLED:
         return
-    manager = getattr(platform, "task_manager", None) or getattr(
-        platform, "_task_manager", None
-    )
+    manager = getattr(platform, "task_manager", None) or getattr(platform, "_task_manager", None)
     if manager is None:
         logger.debug("Task progress bridge skipped — no task manager")
         return

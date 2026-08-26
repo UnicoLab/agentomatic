@@ -218,6 +218,22 @@ class TestIngestionRoutes:
             assert body["chunks"] > 0
             assert body["collection"] == "kb"
 
+    def test_run_openapi_contract_has_typed_input_and_output(self):
+        """The independently callable ingestor route must publish both sides."""
+        from fastapi.testclient import TestClient
+
+        with TestClient(_build_app()) as client:
+            operation = client.get("/openapi.json").json()["paths"]["/api/v1/ingestion/docs/run"][
+                "post"
+            ]
+            request_ref = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+            response_ref = operation["responses"]["200"]["content"]["application/json"]["schema"][
+                "$ref"
+            ]
+            assert request_ref.endswith("IngestionRequest")
+            assert response_ref.endswith("IngestionResult")
+            assert operation.get("parameters", []) == []
+
     def test_run_async_as_task(self):
         import time
 

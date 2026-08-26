@@ -11,8 +11,8 @@ The harness is deployment-agnostic: point it at ``agentomatic run``, at
 
 Usage::
 
-    python scripts/e2e_verify.py --base-url http://localhost:8000 \
-        --agent ag_basic --plugin scorer --pipeline basic_flow \
+    uv run python scripts/e2e_verify.py --base-url http://localhost:8000 \
+        --agent my_agent --plugin scorer --pipeline basic_flow \
         --api-key secret --control-token tok --json report.json
 
 Exit code is ``0`` only when every check passes.
@@ -27,6 +27,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -34,6 +35,11 @@ import httpx
 _RATE_LIMIT_RETRIES = 3
 #: Cap on a single Retry-After wait, so a long window cannot stall the run.
 _RATE_LIMIT_MAX_WAIT = 65.0
+#: ``Retry-After`` is an integer number of seconds.  The in-memory limiter
+#: truncates a fractional remaining window, so a half-second cushion can wake
+#: the verifier *before* the oldest request has expired and produce a false
+#: second 429 under concurrent load.
+_RATE_LIMIT_RETRY_PAD = 1.1
 
 #: Task statuses that mean the work finished successfully.
 _TERMINAL_OK = frozenset({"completed", "succeeded", "success"})
@@ -53,6 +59,39 @@ _ALL_STEP_TYPES = (
     "loop",
     "sub_pipeline",
 )
+
+
+def discover_agent(base_url: str, api_key: str, timeout: float) -> str | None:
+    """Return one registered agent for a no-argument deployment probe.
+
+    The verifier used to default to a fixture-only ``ag_basic`` name.  That
+    made a perfectly healthy deployment look broken when its agent directory
+    used any other name.  Discover from the public registry instead; callers
+    can still pass ``--agent`` to choose the exact contract to exercise.
+    """
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["X-Api-Key"] = api_key
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        response = httpx.get(
+            f"{base_url.rstrip('/')}/api/v1/agents",
+            headers=headers,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception:  # noqa: BLE001 - main reports an actionable CLI error
+        return None
+
+    agents = payload.get("agents", payload) if isinstance(payload, dict) else payload
+    if isinstance(agents, dict):
+        names = [name for name in agents if isinstance(name, str) and name]
+    elif isinstance(agents, list):
+        names = [item.get("name") or item.get("slug") for item in agents if isinstance(item, dict)]
+    else:
+        names = []
+    return next((name for name in names if isinstance(name, str) and name), None)
 
 
 def _collect_step_types(steps: Any, into: set[str]) -> None:
@@ -146,11 +185,13 @@ class Verifier:
         base_url: str,
         api_key: str = "",
         control_token: str = "",
-        agent: str = "ag_basic",
-        plugin: str = "scorer",
-        pipeline: str = "basic_flow",
-        endpoint: str = "echo",
+        agent: str = "",
+        plugin: str = "",
+        pipeline: str = "",
+        endpoint: str = "",
+        read_endpoint: str = "",
         ingestor: str = "",
+        builder_smoke_name: str = "",
         timeout: float = 30.0,
         expect_auth: bool = False,
         expect_studio: bool = True,
@@ -162,7 +203,9 @@ class Verifier:
         self.plugin = plugin
         self.pipeline = pipeline
         self.endpoint = endpoint
+        self.read_endpoint = read_endpoint
         self.ingestor = ingestor
+        self.builder_smoke_name = builder_smoke_name
         self.expect_auth = expect_auth
         self.expect_studio = expect_studio
         self.report = Report()
@@ -206,7 +249,7 @@ class Verifier:
             if attempt == _RATE_LIMIT_RETRIES - 1:
                 return resp
             delay = float(resp.headers.get("Retry-After") or 1)
-            time.sleep(min(delay, _RATE_LIMIT_MAX_WAIT) + 0.5)
+            time.sleep(min(delay, _RATE_LIMIT_MAX_WAIT) + _RATE_LIMIT_RETRY_PAD)
         return None
 
     def check(
@@ -283,7 +326,7 @@ class Verifier:
             if attempt == _RATE_LIMIT_RETRIES - 1:
                 self.report.add(group, name, False, f"{path} — still rate limited")
                 return events
-            time.sleep(min(retry_after, _RATE_LIMIT_MAX_WAIT) + 0.5)
+            time.sleep(min(retry_after, _RATE_LIMIT_MAX_WAIT) + _RATE_LIMIT_RETRY_PAD)
         else:  # pragma: no cover - loop always breaks or returns
             return events
         if not events:
@@ -343,7 +386,15 @@ class Verifier:
             self.report.add(group, name, False, f"{path} — {type(exc).__name__}: {exc}")
         return events, raw_lines, None
 
-    def await_task(self, group: str, name: str, submitted: Any, *, timeout: float = 30.0) -> Any:
+    def await_task(
+        self,
+        group: str,
+        name: str,
+        submitted: Any,
+        *,
+        timeout: float = 30.0,
+        expected_terminal_statuses: frozenset[str] | None = None,
+    ) -> Any:
         """Poll a 202-submitted task to a terminal state and return its record.
 
         Args:
@@ -351,10 +402,14 @@ class Verifier:
             name: Human-readable check name.
             submitted: Decoded body of the 202 response.
             timeout: Seconds to wait for a terminal status.
+            expected_terminal_statuses: Terminal statuses that constitute a
+                successful verification. Ordinary work defaults to succeeded;
+                a deliberate cancellation expects cancelled instead.
 
         Returns:
             The final task record, or ``None`` when it never completed.
         """
+        expected = expected_terminal_statuses or _TERMINAL_OK
         task_id = None
         if isinstance(submitted, dict):
             task_id = submitted.get("id") or submitted.get("task_id")
@@ -371,16 +426,30 @@ class Verifier:
                 except Exception:  # noqa: BLE001
                     record = None
                 status = (record or {}).get("status")
-                if status in _TERMINAL_OK or status in _TERMINAL_BAD:
+                if status in expected or status in _TERMINAL_BAD:
                     break
             time.sleep(0.4)
         status = (record or {}).get("status")
-        if status not in _TERMINAL_OK:
+        if status not in expected:
             err = (record or {}).get("error")
             self.report.add(group, name, False, f"status={status!r} error={err!r}")
             return record
         self.report.add(group, name, True)
         return record
+
+    @staticmethod
+    def task_id_from(payload: Any) -> str | None:
+        """Return a unified task id from one of the supported response shapes."""
+        if not isinstance(payload, dict):
+            return None
+        task_id = payload.get("id") or payload.get("task_id")
+        return task_id if isinstance(task_id, str) and task_id else None
+
+    def delete_created_task(self, group: str, name: str, submitted: Any) -> None:
+        """Remove only a terminal task record created by this verifier."""
+        task_id = self.task_id_from(submitted)
+        if task_id:
+            self.check(group, name, "DELETE", f"/api/v1/tasks/{task_id}", expect=(200, 204))
 
     # -- groups ----------------------------------------------------------
 
@@ -542,6 +611,143 @@ class Verifier:
             "" if ok else f"index.html → {getattr(resp, 'status_code', 'transport error')}",
         )
 
+    def verify_live_schema_contracts(self) -> None:
+        """Verify every deployed resource publishes Studio's live contracts.
+
+        The React views intentionally derive their request forms from the
+        platform rather than hard-code fixture fields.  A successful call to a
+        named fixture is not enough: this catches a plugin, endpoint method,
+        or agent added to a real deployment without the OpenAPI/schema contract
+        its independent Studio tester needs.
+        """
+        g = "schema-contracts"
+        document = self.check(g, "GET OpenAPI schema source", "GET", "/openapi.json")
+        paths = document.get("paths", {}) if isinstance(document, dict) else {}
+
+        def operation(path: str, method: str, *, request: bool) -> None:
+            item = paths.get(path) if isinstance(paths, dict) else None
+            spec = item.get(method.lower()) if isinstance(item, dict) else None
+            problems: list[str] = []
+            if not isinstance(spec, dict):
+                problems.append("operation missing")
+            else:
+                if request and not spec.get("requestBody"):
+                    problems.append("JSON request schema missing")
+                responses = spec.get("responses", {})
+                success = (
+                    next(
+                        (
+                            response
+                            for code, response in responses.items()
+                            if str(code).startswith("2")
+                        ),
+                        None,
+                    )
+                    if isinstance(responses, dict)
+                    else None
+                )
+                content = success.get("content", {}) if isinstance(success, dict) else {}
+                if not isinstance(content, dict) or "application/json" not in content:
+                    problems.append("JSON success schema missing")
+            self.report.add(
+                g,
+                f"OpenAPI {method.upper()} {path}",
+                not problems,
+                "; ".join(problems),
+            )
+
+        def list_items(path: str, key: str) -> list[dict[str, Any]]:
+            payload = self.check(g, f"GET {path}", "GET", path)
+            raw = (
+                payload
+                if isinstance(payload, list)
+                else payload.get(key, [])
+                if isinstance(payload, dict)
+                else []
+            )
+            return (
+                [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+            )
+
+        for agent in list_items("/studio/agents", "agents"):
+            name = agent.get("name") or agent.get("slug")
+            if not isinstance(name, str) or not name:
+                self.report.add(g, "Studio agent has name", False, repr(agent))
+                continue
+            schemas = self.check(
+                g,
+                f"GET agent schemas {name}",
+                "GET",
+                f"/studio/agents/{quote(name, safe='')}/schemas",
+            )
+            valid = (
+                isinstance(schemas, dict)
+                and isinstance(schemas.get("input_schema"), dict)
+                and isinstance(schemas.get("output_schema"), dict)
+            )
+            self.report.add(
+                g, f"Agent schema payload {name}", valid, "input_schema/output_schema required"
+            )
+            operation(f"/api/v1/{quote(name, safe='')}/invoke", "POST", request=True)
+
+        for plugin in list_items("/api/v1/plugins", "plugins"):
+            name = plugin.get("name")
+            if isinstance(name, str) and name:
+                operation(f"/api/v1/plugins/{quote(name, safe='')}/predict", "POST", request=True)
+
+        for endpoint in list_items("/api/v1/endpoints", "endpoints"):
+            name = endpoint.get("name")
+            endpoint_path = endpoint.get("path")
+            methods = endpoint.get("methods")
+            if (
+                not isinstance(name, str)
+                or not isinstance(endpoint_path, str)
+                or not isinstance(methods, list)
+            ):
+                self.report.add(g, "Endpoint contract metadata", False, repr(endpoint))
+                continue
+            full_path = f"/api/v1/endpoints/{quote(name, safe='')}{endpoint_path}"
+            for method in methods:
+                if isinstance(method, str) and method:
+                    # GET/HEAD inputs correctly live in OpenAPI query
+                    # parameters, while all other interactive endpoint methods
+                    # must publish a JSON request body for SchemaForm.
+                    operation(full_path, method, request=method.upper() not in {"GET", "HEAD"})
+
+        for ingestor in list_items("/api/v1/ingestors", "ingestors"):
+            name = ingestor.get("name")
+            if isinstance(name, str) and name:
+                operation(f"/api/v1/ingestion/{quote(name, safe='')}/run", "POST", request=True)
+
+        for pipeline in list_items("/api/v1/pipelines", "pipelines"):
+            name = pipeline.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            config = self.check(
+                g,
+                f"GET pipeline schema {name}",
+                "GET",
+                f"/api/v1/pipelines/{quote(name, safe='')}/config",
+            )
+            valid = (
+                isinstance(config, dict)
+                and isinstance(config.get("input_schema"), (dict, type(None)))
+                and isinstance(config.get("output_schema"), (dict, type(None)))
+            )
+            self.report.add(
+                g,
+                f"Pipeline schema payload {name}",
+                valid,
+                "input_schema/output_schema must be object or null",
+            )
+            # Pipeline execution uses a parameterised FastAPI route, unlike
+            # dynamically registered agent/plugin/endpoint names above.
+            operation("/api/v1/pipelines/{name}/run", "POST", request=True)
+
+        # The Connections view shares one parameterised, redacted contract for
+        # every database/vector/service probe.
+        operation("/api/v1/control/connections/{scope}/{name}", "GET", request=False)
+
     def verify_agent_rest(self) -> None:
         """The documented agent REST contract."""
         g = "agent-rest"
@@ -596,6 +802,7 @@ class Verifier:
             ok,
             "" if ok else f"batch result was {results!r}",
         )
+        self.delete_created_task(g, "DELETE invoke/batch task", submitted)
         # A batch body that names the item list wrongly, or carries no items,
         # must be rejected — never accepted as a zero-item "succeeded" batch.
         self.check(
@@ -723,19 +930,44 @@ class Verifier:
             },
             expect=(200, 201, 202),
         )
-        tid = None
-        if isinstance(task, dict):
-            tid = task.get("id") or task.get("task_id") or (task.get("task") or {}).get("id")
+        tid = self.task_id_from(task)
+        if not tid and isinstance(task, dict):
+            nested = task.get("task")
+            tid = nested.get("id") if isinstance(nested, dict) else None
         if tid:
             self.report.add(g, "a2a task id", True)
             self.check(g, "GET a2a task", "GET", f"{base}/tasks/{tid}")
-            self.check(
+            # A fast local agent can complete between task creation and this
+            # cancellation request.  In that race the API correctly returns
+            # 409 rather than changing an already-succeeded task into a
+            # cancelled one.  Verify that terminal state instead of treating
+            # the expected race as an end-to-end failure.
+            cancel_response = self._req("POST", f"{base}/tasks/{tid}/cancel")
+            if cancel_response is None:
+                self.report.add(g, "POST a2a cancel", False, "request failed")
+                expected_statuses = frozenset({"cancelled"})
+            elif cancel_response.status_code in (200, 202):
+                self.report.add(g, "POST a2a cancel", True)
+                expected_statuses = frozenset({"cancelled"})
+            elif cancel_response.status_code == 409:
+                self.report.add(g, "POST a2a cancel", True, "task already terminal")
+                expected_statuses = _TERMINAL_OK | frozenset({"cancelled"})
+            else:
+                body = cancel_response.text[:300]
+                self.report.add(
+                    g,
+                    "POST a2a cancel",
+                    False,
+                    f"POST {base}/tasks/{tid}/cancel → {cancel_response.status_code}: {body}",
+                )
+                expected_statuses = frozenset({"cancelled"})
+            self.await_task(
                 g,
-                "POST a2a cancel",
-                "POST",
-                f"{base}/tasks/{tid}/cancel",
-                expect=(200, 202, 409),
+                "a2a cancellation preserves a terminal state",
+                task,
+                expected_terminal_statuses=expected_statuses,
             )
+            self.delete_created_task(g, "DELETE a2a task", {"id": tid})
         else:
             self.report.add(g, "a2a task id", False, f"no task id in {task}")
 
@@ -744,6 +976,15 @@ class Verifier:
         g = "plugins"
         p = self.plugin
 
+        if not p:
+            # An empty registry is valid for an agents-only deployment. The
+            # component-specific contract below is deliberately opt-in so a
+            # fresh project does not fail by probing invented placeholder
+            # names such as ``scorer``.
+            self.check(g, "GET /api/v1/plugins", "GET", "/api/v1/plugins")
+            self.report.skip(g, "plugin routes", "no plugin configured")
+            return
+
         def _list(payload: Any) -> str:
             items = payload if isinstance(payload, list) else payload.get("plugins", [])
             if not items:
@@ -751,9 +992,6 @@ class Verifier:
             return ""
 
         self.check(g, "GET /api/v1/plugins", "GET", "/api/v1/plugins", validate=_list)
-        if not p:
-            self.report.skip(g, "plugin routes", "no plugin configured")
-            return
         self.check(g, "GET model_card", "GET", f"/api/v1/plugins/{p}/model_card")
         self.check(g, "GET plugin health", "GET", f"/api/v1/plugins/{p}/health")
         self.check(
@@ -772,6 +1010,7 @@ class Verifier:
             expect=(202,),
         )
         self.await_task(g, "predict/batch completes", submitted)
+        self.delete_created_task(g, "DELETE predict/batch task", submitted)
         self.check(
             g,
             "POST plugin reload",
@@ -785,29 +1024,58 @@ class Verifier:
         g = "endpoints"
         self.check(g, "GET /api/v1/endpoints", "GET", "/api/v1/endpoints")
         e = self.endpoint
-        if not e:
+        if e:
+            self.check(g, "GET endpoint info", "GET", f"/api/v1/endpoints/{e}/info")
+            self.check(g, "GET endpoint health", "GET", f"/api/v1/endpoints/{e}/health")
+            self.check(
+                g,
+                "POST endpoint call",
+                "POST",
+                f"/api/v1/endpoints/{e}/call",
+                json_body={"text": "shout"},
+            )
+        else:
             self.report.skip(g, "endpoint routes", "no endpoint configured")
+        read_name = self.read_endpoint
+        if not read_name:
             return
-        self.check(g, "GET endpoint info", "GET", f"/api/v1/endpoints/{e}/info")
-        self.check(g, "GET endpoint health", "GET", f"/api/v1/endpoints/{e}/health")
+        info = self.check(
+            g,
+            "GET-only endpoint info",
+            "GET",
+            f"/api/v1/endpoints/{read_name}/info",
+        )
+        path = info.get("path") if isinstance(info, dict) else None
+        methods = (
+            {str(method).upper() for method in info.get("methods", [])}
+            if isinstance(info, dict)
+            else set()
+        )
+        if not isinstance(path, str) or "GET" not in methods:
+            self.report.add(
+                g, "GET-only endpoint contract", False, "endpoint must publish a GET path"
+            )
+            return
         self.check(
             g,
-            "POST endpoint call",
-            "POST",
-            f"/api/v1/endpoints/{e}/call",
-            json_body={"payload": {"text": "shout"}},
+            "GET-only endpoint query call",
+            "GET",
+            f"/api/v1/endpoints/{read_name}{path}?text=browser-schema-contract",
+            validate=lambda body: (
+                "response is not a JSON object" if not isinstance(body, dict) else ""
+            ),
         )
 
     def verify_ingestion(self) -> None:
         """Ingestion registry and run routes."""
         g = "ingestion"
-        self.check(g, "GET /api/v1/ingestion", "GET", "/api/v1/ingestion")
-        # The Studio bundle uses the /ingestors alias — both must exist.
+        # The Studio bundle uses this registry alias even without an ingestor.
         self.check(g, "GET /api/v1/ingestors", "GET", "/api/v1/ingestors")
         i = self.ingestor
         if not i:
             self.report.skip(g, "ingestor routes", "no ingestor configured")
             return
+        self.check(g, "GET /api/v1/ingestion", "GET", "/api/v1/ingestion")
         self.check(g, "GET ingestor info", "GET", f"/api/v1/ingestion/{i}/info")
         self.check(g, "GET ingestor health", "GET", f"/api/v1/ingestion/{i}/health")
 
@@ -830,6 +1098,11 @@ class Verifier:
     def verify_pipelines(self) -> None:
         """Pipeline discovery, validation, visualisation and execution."""
         g = "pipelines"
+        p = self.pipeline
+        if not p:
+            self.check(g, "GET /api/v1/pipelines", "GET", "/api/v1/pipelines")
+            self.report.skip(g, "pipeline routes", "no pipeline configured")
+            return
 
         def _list(payload: Any) -> str:
             items = payload if isinstance(payload, list) else payload.get("pipelines", [])
@@ -838,10 +1111,6 @@ class Verifier:
             return ""
 
         self.check(g, "GET /api/v1/pipelines", "GET", "/api/v1/pipelines", validate=_list)
-        p = self.pipeline
-        if not p:
-            self.report.skip(g, "pipeline routes", "no pipeline configured")
-            return
         self.check(g, "GET pipeline config", "GET", f"/api/v1/pipelines/{p}/config")
         self.check(g, "GET pipeline validate", "GET", f"/api/v1/pipelines/{p}/validate")
 
@@ -867,6 +1136,100 @@ class Verifier:
             "/api/v1/pipelines/validate-draft",
             json_body={"yaml": "name: draft_check\nsteps:\n  - agent: " + self.agent + "\n"},
         )
+
+    def verify_builder_lifecycle(self) -> None:
+        """Prove a Studio-authored draft can persist, reload, execute and delete.
+
+        This is deliberately opt-in: saving an arbitrary name in a production
+        pipeline directory would be inappropriate.  The Docker fixture passes
+        a dedicated ``--builder-smoke-name`` and supplies the endpoint/plugin
+        resources used by the visual field-link draft.
+        """
+        g = "builder"
+        name = self.builder_smoke_name
+        if not name:
+            self.report.skip(g, "builder lifecycle", "no --builder-smoke-name supplied")
+            return
+        if not self.endpoint or not self.plugin:
+            self.report.skip(
+                g,
+                "builder lifecycle",
+                "requires --endpoint and --plugin for the visual-link draft",
+            )
+            return
+
+        draft = {
+            "name": name,
+            "description": "Disposable deployment verification pipeline.",
+            "steps": [
+                {
+                    "name": "enrich",
+                    "endpoint": self.endpoint,
+                    "input": {"text": "builder field-link source"},
+                },
+                {
+                    "name": "score",
+                    "plugin": self.plugin,
+                    "input": {"text": "$.steps.enrich.text"},
+                },
+            ],
+        }
+        encoded_name = quote(name, safe="")
+        saved = self.check(
+            g,
+            "POST save visual-link draft",
+            "POST",
+            f"/api/v1/pipelines/{encoded_name}",
+            json_body={"pipeline": draft},
+            validate=lambda payload: (
+                "save response was not valid"
+                if not isinstance(payload, dict) or payload.get("valid") is not True
+                else ""
+            ),
+        )
+        if not isinstance(saved, dict) or saved.get("valid") is not True:
+            return
+
+        try:
+            config = self.check(
+                g, "GET saved Builder draft", "GET", f"/api/v1/pipelines/{encoded_name}/config"
+            )
+            raw_input = (
+                ((config or {}).get("steps") or [{}, {}])[1].get("input")
+                if isinstance(config, dict)
+                else None
+            )
+            mappings = (
+                raw_input.get("mappings", raw_input) if isinstance(raw_input, dict) else None
+            )
+            self.report.add(
+                g,
+                "visual field link persisted",
+                isinstance(mappings, dict) and mappings.get("text") == "$.steps.enrich.text",
+                ""
+                if isinstance(mappings, dict) and mappings.get("text") == "$.steps.enrich.text"
+                else f"mapping={mappings!r}",
+            )
+            self.check(
+                g,
+                "POST run saved Builder draft",
+                "POST",
+                f"/api/v1/pipelines/{encoded_name}/run",
+                json_body={"input": {}},
+                validate=lambda payload: (
+                    "Builder draft did not succeed"
+                    if not isinstance(payload, dict) or payload.get("status") != "success"
+                    else ""
+                ),
+            )
+        finally:
+            self.check(
+                g,
+                "DELETE saved Builder draft",
+                "DELETE",
+                f"/api/v1/pipelines/{encoded_name}",
+                expect=(200, 204),
+            )
 
     def verify_every_pipeline(self) -> None:
         """Run *every* published pipeline, not just the sampled one.
@@ -934,7 +1297,21 @@ class Verifier:
         somebody else's marker is a leak.
         """
         g = "isolation"
+        # The persistent-store branch submits two concurrent batches.  Do not
+        # let a verifier that has already exercised other real resources turn
+        # a legitimate rate limit into a fake isolation failure.  The normal
+        # deployment still uses 24 callers; a lower advertised remaining
+        # budget scales the fan-out while retaining a real concurrent test.
         fanout = 24
+        remaining = self._remaining_budget()
+        if remaining is not None:
+            fanout = min(fanout, max(2, (remaining - 4) // 2))
+        self.report.add(
+            g,
+            "concurrency budget",
+            fanout >= 2,
+            f"{fanout} parallel callers" if remaining is not None else "rate limit not advertised",
+        )
         run = f"{int(time.time()):x}"
 
         def marker(i: int) -> str:
@@ -1004,9 +1381,55 @@ class Verifier:
         )
 
     def verify_tasks(self) -> None:
-        """Async task manager routes."""
+        """Async task manager routes for every deployed resource type.
+
+        The specialised ``/invoke/async`` route below proves the legacy
+        agent sugar works.  Studio's Task Board uses the generic ``/tasks``
+        route instead, so explicit component flags also exercise that route
+        for plugins, endpoints, ingestors, and pipelines.  These inputs
+        intentionally mirror the fixture payloads used by their direct route
+        checks above; a deployment that does not opt into a resource name is
+        never asked to run an unknown workload.
+        """
         g = "tasks"
         self.check(g, "GET /api/v1/tasks", "GET", "/api/v1/tasks")
+
+        # The Task Board submits through this generic route.  When an agent
+        # publishes required inputs, it must reject an incomplete payload
+        # *before* persisting or running a task, just like its /invoke route.
+        agent_schemas = self._req(
+            "GET", f"/studio/agents/{quote(self.agent, safe='')}/schemas"
+        )
+        input_schema: Any = None
+        if agent_schemas is not None and agent_schemas.status_code == 200:
+            try:
+                input_schema = agent_schemas.json().get("input_schema")
+            except Exception:  # noqa: BLE001
+                input_schema = None
+        required_fields = (
+            input_schema.get("required", []) if isinstance(input_schema, dict) else []
+        )
+        if isinstance(required_fields, list) and required_fields:
+            invalid_task = self._req(
+                "POST",
+                "/api/v1/tasks",
+                json_body={"target_type": "agent", "target": self.agent, "input": {}},
+            )
+            self.report.add(
+                g,
+                "generic task enforces required agent input",
+                invalid_task is not None and invalid_task.status_code == 422,
+                ""
+                if invalid_task is not None and invalid_task.status_code == 422
+                else f"→ {getattr(invalid_task, 'status_code', 'transport error')}",
+            )
+        else:
+            self.report.skip(
+                g,
+                "generic task required-input rejection",
+                "selected agent publishes no required input fields",
+            )
+
         created = self.check(
             g,
             "POST agent invoke/async",
@@ -1027,6 +1450,76 @@ class Verifier:
         self.check(g, "GET task result", "GET", f"/api/v1/tasks/{task_id}/result", expect=(200,))
         self.check(g, "DELETE task", "DELETE", f"/api/v1/tasks/{task_id}", expect=(200, 204))
 
+        def verify_generic_task(
+            label: str,
+            target_type: str,
+            target: str,
+            input_payload: dict[str, Any],
+        ) -> None:
+            """Submit, inspect and remove one real Task Board workload."""
+            submitted = self.check(
+                g,
+                f"POST generic {label} task (sync)",
+                "POST",
+                "/api/v1/tasks",
+                json_body={
+                    "target_type": target_type,
+                    "target": target,
+                    "input": input_payload,
+                    "mode": "sync",
+                    "wait": True,
+                },
+                expect=(200,),
+                validate=lambda payload: (
+                    "task did not succeed"
+                    if not isinstance(payload, dict) or payload.get("status") not in _TERMINAL_OK
+                    else ""
+                ),
+            )
+            task_id = (submitted or {}).get("id") or (submitted or {}).get("task_id")
+            if not task_id:
+                self.report.add(g, f"generic {label} task id", False, f"no task id in {submitted}")
+                return
+            self.check(
+                g, f"GET generic {label} task result", "GET", f"/api/v1/tasks/{task_id}/result"
+            )
+            self.check(
+                g,
+                f"DELETE generic {label} task",
+                "DELETE",
+                f"/api/v1/tasks/{task_id}",
+                expect=(200, 204),
+            )
+
+        if self.plugin:
+            verify_generic_task(
+                "plugin",
+                "plugin",
+                self.plugin,
+                {"text": "generic task plugin e2e"},
+            )
+        if self.endpoint:
+            verify_generic_task(
+                "endpoint",
+                "endpoint",
+                self.endpoint,
+                {"text": "generic task endpoint e2e"},
+            )
+        if self.ingestor:
+            verify_generic_task(
+                "ingestor",
+                "ingestion",
+                self.ingestor,
+                {"source": "inline://generic task ingestor e2e"},
+            )
+        if self.pipeline:
+            verify_generic_task(
+                "pipeline",
+                "pipeline",
+                self.pipeline,
+                {"query": "generic task pipeline e2e"},
+            )
+
     def verify_control_plane(self) -> None:
         """Control-plane read and mutate routes."""
         g = "control-plane"
@@ -1038,7 +1531,57 @@ class Verifier:
         self.check(g, "GET control/agents", "GET", "/api/v1/control/agents")
         self.check(g, "GET control/agent", "GET", f"/api/v1/control/agents/{self.agent}")
         self.check(g, "GET control/endpoints", "GET", "/api/v1/control/endpoints")
-        self.check(g, "GET control/connections", "GET", "/api/v1/control/connections")
+
+        def _connection_probe_contract(document: Any) -> str:
+            """Keep the schema-driven Connections page tied to real OpenAPI."""
+            try:
+                schema = document["paths"]["/api/v1/control/connections/{scope}/{name}"]["get"][
+                    "responses"
+                ]["200"]["content"]["application/json"]["schema"]
+            except (KeyError, TypeError):
+                return "missing GET connection probe response schema"
+            reference = schema.get("$ref") if isinstance(schema, dict) else ""
+            return (
+                ""
+                if isinstance(reference, str) and reference.endswith("/ControlConnectionProbe")
+                else (f"unexpected connection probe schema: {schema!r}")
+            )
+
+        self.check(
+            g,
+            "OpenAPI connection probe contract",
+            "GET",
+            "/openapi.json",
+            validate=_connection_probe_contract,
+        )
+        connections = self.check(
+            g, "GET control/connections", "GET", "/api/v1/control/connections"
+        )
+        if isinstance(connections, list):
+            first = next(
+                (
+                    (str(scope.get("scope")), str(name))
+                    for scope in connections
+                    if isinstance(scope, dict)
+                    for name in (scope.get("connections") or {})
+                ),
+                None,
+            )
+            if first is None:
+                self.report.skip(g, "GET control/connection probe", "no configured connections")
+            else:
+                scope, name = first
+                self.check(
+                    g,
+                    "GET control/connection probe",
+                    "GET",
+                    f"/api/v1/control/connections/{quote(scope, safe='')}/{quote(name, safe='')}",
+                    validate=lambda payload: (
+                        "missing connection result"
+                        if not isinstance(payload, dict) or payload.get("connection") != name
+                        else ""
+                    ),
+                )
         self.check(g, "GET control/health", "GET", "/api/v1/control/health")
         self.check(g, "GET control/config", "GET", "/api/v1/control/config")
         self.check(g, "GET control/metrics/summary", "GET", "/api/v1/control/metrics/summary")
@@ -1135,7 +1678,8 @@ class Verifier:
                 if got.status_code != 429 or attempt == _RATE_LIMIT_RETRIES - 1:
                     return got
                 time.sleep(
-                    min(float(got.headers.get("Retry-After") or 1), _RATE_LIMIT_MAX_WAIT) + 0.5
+                    min(float(got.headers.get("Retry-After") or 1), _RATE_LIMIT_MAX_WAIT)
+                    + _RATE_LIMIT_RETRY_PAD
                 )
             return got
 
@@ -1177,6 +1721,12 @@ class Verifier:
         g = "errors"
         for name, method, path, body in (
             ("unknown agent", "POST", "/api/v1/definitely_not_an_agent/invoke", {"query": "x"}),
+            (
+                "unknown generic agent task",
+                "POST",
+                "/api/v1/tasks",
+                {"target_type": "agent", "target": "definitely_not_an_agent", "input": {"query": "x"}},
+            ),
             ("unknown plugin", "GET", "/api/v1/plugins/nope/model_card", None),
             ("unknown pipeline", "GET", "/api/v1/pipelines/nope/config", None),
             ("unknown endpoint", "GET", "/api/v1/endpoints/nope/info", None),
@@ -1335,18 +1885,28 @@ class Verifier:
         self.verify_platform()
         self.verify_studio()
         self.verify_agent_rest()
+        # Keep the concurrent isolation proof before the rest of the
+        # resource matrix.  It still follows the thread-store probe in
+        # verify_agent_rest, while a rate-limited deployment has enough
+        # capacity for meaningful parallel callers.
+        self.verify_isolation()
         self.verify_a2a()
         self.verify_plugins()
         self.verify_endpoints()
         self.verify_ingestion()
         self.verify_pipelines()
+        self.verify_builder_lifecycle()
         self.verify_every_pipeline()
-        self.verify_isolation()
         self.verify_tasks()
         self.verify_logs_history()
         self.verify_optimize()
         self.verify_metrics()
         self.verify_rate_limit()
+        # This enumerates every registered resource and can legitimately make
+        # dozens of requests. Keep it after the fixed-window isolation and
+        # rate-limit checks so their concurrent probes do not inherit the
+        # matrix's already-spent request budget.
+        self.verify_live_schema_contracts()
         self.verify_auth()
         self.verify_error_contract()
         # Control plane last: it toggles agent availability.
@@ -1364,11 +1924,25 @@ def main() -> int:
     ap.add_argument("--base-url", default="http://127.0.0.1:8000")
     ap.add_argument("--api-key", default="")
     ap.add_argument("--control-token", default="")
-    ap.add_argument("--agent", default="ag_basic")
-    ap.add_argument("--plugin", default="scorer")
-    ap.add_argument("--pipeline", default="basic_flow")
-    ap.add_argument("--endpoint", default="echo")
+    ap.add_argument(
+        "--agent",
+        default="",
+        help="Agent to exercise (defaults to the first registered agent)",
+    )
+    ap.add_argument("--plugin", default="", help="Deployed plugin name to verify")
+    ap.add_argument("--pipeline", default="", help="Deployed pipeline name to verify")
+    ap.add_argument("--endpoint", default="", help="Deployed endpoint name to verify")
+    ap.add_argument(
+        "--read-endpoint",
+        default="",
+        help="GET-only endpoint to verify with a browser-safe query contract",
+    )
     ap.add_argument("--ingestor", default="")
+    ap.add_argument(
+        "--builder-smoke-name",
+        default="",
+        help="Disposable pipeline name for the opt-in Builder save/reload/run/delete check",
+    )
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--expect-auth", action="store_true")
     ap.add_argument("--no-studio", action="store_true")
@@ -1392,15 +1966,24 @@ def main() -> int:
                 pass
             time.sleep(1.0)
 
+    agent = args.agent or discover_agent(args.base_url, args.api_key, args.timeout)
+    if not agent:
+        ap.error(
+            "Could not discover an agent from /api/v1/agents. "
+            "Pass --agent NAME and ensure the server is reachable/authenticated."
+        )
+
     v = Verifier(
         base_url=args.base_url,
         api_key=args.api_key,
         control_token=args.control_token,
-        agent=args.agent,
+        agent=agent,
         plugin=args.plugin,
         pipeline=args.pipeline,
         endpoint=args.endpoint,
+        read_endpoint=args.read_endpoint,
         ingestor=args.ingestor,
+        builder_smoke_name=args.builder_smoke_name,
         timeout=args.timeout,
         expect_auth=args.expect_auth,
         expect_studio=not args.no_studio,

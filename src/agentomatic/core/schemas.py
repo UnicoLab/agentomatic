@@ -131,14 +131,15 @@ class SchemaValidator:
         """Whether a response schema is configured."""
         return self.response_model is not None
 
-    def validate_input(self, data: dict[str, Any]) -> dict[str, Any]:
+    def validate_input(self, data: Any) -> Any:
         """Validate and coerce input data against the request model.
 
         Args:
-            data: Raw input dictionary.
+            data: Raw input. This may be a scalar or array for a Pydantic
+                ``RootModel`` request contract.
 
         Returns:
-            Validated data as a dictionary.
+            Validated input in the schema's native shape.
 
         Raises:
             ValidationError: If the data does not match the schema.

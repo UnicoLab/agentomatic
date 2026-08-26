@@ -527,8 +527,9 @@ here — see [Platform Features](guide/platform-features.md#invocation-log-histo
 
 ### Control Plane
 
-Mounted at `{api_prefix}/control` when `enable_control_plane=True`. Mutating
-calls require the `X-Control-Token` header if a `control_token` is configured.
+Mounted at `{api_prefix}/control` when `enable_control_plane=True`. Every call
+uses the platform's normal API-key or JWT policy; mutating calls additionally
+require the `X-Control-Token` header if a `control_token` is configured.
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
@@ -536,7 +537,8 @@ calls require the `X-Control-Token` header if a `control_token` is configured.
 | `GET` | `/api/v1/control/agents` | Agents with health, effective auth policy, connections |
 | `GET` | `/api/v1/control/agents/{name}` | Single-agent operational detail |
 | `GET` | `/api/v1/control/endpoints` | Registered custom endpoints |
-| `GET` | `/api/v1/control/connections` | Connection health by scope |
+| `GET` | `/api/v1/control/connections` | Redacted connection health by scope |
+| `GET` | `/api/v1/control/connections/{scope}/{name}` | Run one named connection probe (redacted result) |
 | `GET` | `/api/v1/control/health` | Aggregate health (agents + connections) |
 | `GET` | `/api/v1/control/metrics/summary` | Coarse counters for dashboards |
 | `GET` | `/api/v1/control/config` | Sanitised feature/config snapshot |
@@ -546,13 +548,14 @@ calls require the `X-Control-Token` header if a `control_token` is configured.
 
 ```typescript
 // Overview + agent list
-const info = await fetch("/api/v1/control").then((r) => r.json());
-const agents = await fetch("/api/v1/control/agents").then((r) => r.json());
+const headers = { "X-API-Key": API_KEY };
+const info = await fetch("/api/v1/control", { headers }).then((r) => r.json());
+const agents = await fetch("/api/v1/control/agents", { headers }).then((r) => r.json());
 
 // Drain an agent (requires control token when configured)
 await fetch("/api/v1/control/agents/fraud_agent/disable", {
   method: "POST",
-  headers: { "X-Control-Token": CONTROL_TOKEN },
+  headers: { ...headers, "X-Control-Token": CONTROL_TOKEN },
 });
 ```
 
@@ -569,7 +572,8 @@ interface ControlAgentInfo {
   allowed_roles: string[];
   allowed_scopes: string[];
   connections: string[];
-  health: Record<string, any>;
+  /** Safe readiness signals only; custom health-check data is not exposed. */
+  health: Record<string, unknown>;
 }
 
 /** Maps to ControlEndpointInfo */
@@ -584,11 +588,26 @@ interface ControlEndpointInfo {
   ready: boolean;
 }
 
+/** Safe operational fields only — URLs, headers, and raw driver errors are never returned. */
+interface ControlConnectionHealth {
+  status: string;
+  connection?: string;
+  kind?: string;
+  purpose?: string;
+  backend?: string;
+  provider?: string;
+  detail?: string;
+  error?: string;
+}
+
 /** Maps to ControlConnectionInfo */
 interface ControlConnectionInfo {
   scope: string;
-  connections: Record<string, any>;
+  connections: Record<string, ControlConnectionHealth>;
 }
+
+/** `GET /api/v1/control/connections/{scope}/{name}` */
+type ControlConnectionProbe = ControlConnectionHealth;
 ```
 
 ### Custom Endpoints
@@ -624,7 +643,7 @@ const result = await fetch("/api/v1/endpoints/ensemble/call", {
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| `GET` | `/api/v1/ingestion` | List registered ingestors |
+| `GET` | `/api/v1/ingestion` | List registered ingestors (mounted when an ingestor is discovered) |
 | `POST` | `/api/v1/ingestion/{name}/run` | Run an ingestion job (sync) |
 | `POST` | `/api/v1/ingestion/{name}/run/async` | Run as a tracked task |
 | `GET` | `/api/v1/ingestion/{name}/info` | Ingestor metadata / readiness |
@@ -655,9 +674,9 @@ const status = await fetch("/api/v1/status").then((r) => r.json());
 ```
 
 !!! tip "Auth for platform surfaces"
-    When JWT auth is enabled, send the same `Authorization: Bearer <token>`
-    header used for agent calls. The control plane's **mutating** routes
-    additionally require `X-Control-Token` when a control token is configured.
+    Send the same API-key or `Authorization: Bearer <token>` credentials used
+    for agent calls. The control plane's **mutating** routes additionally
+    require `X-Control-Token` when a control token is configured.
 
 ---
 

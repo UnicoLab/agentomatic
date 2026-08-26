@@ -320,22 +320,30 @@ class ConnectionManager:
         the message names the variable that would switch it on.
         """
         results: dict[str, Any] = {}
-        for name, conn in self._connections.items():
-            config = getattr(conn, "config", None)
-            reason = _unconfigured_reason(config)
-            if reason:
-                results[name] = {
-                    "connection": name,
-                    "kind": str(getattr(config, "kind", "unknown")),
-                    "status": "not_configured",
-                    "detail": reason,
-                }
-                continue
-            try:
-                results[name] = await conn.health_check()
-            except Exception as exc:  # noqa: BLE001
-                results[name] = {"connection": name, "status": "error", "error": str(exc)}
+        for name in self._connections:
+            results[name] = await self.health_check_connection(name)
         return results
+
+    async def health_check_connection(self, name: str) -> dict[str, Any]:
+        """Probe one named connection without touching the rest of the scope."""
+        conn = self._connections.get(name)
+        if conn is None:
+            raise KeyError(f"Connection '{name}' is not registered in scope '{self.scope}'")
+        config = getattr(conn, "config", None)
+        reason = _unconfigured_reason(config)
+        if reason:
+            return {
+                "connection": name,
+                "kind": str(getattr(config, "kind", "unknown")),
+                "status": "not_configured",
+                "detail": reason,
+            }
+        try:
+            return await conn.health_check()
+        except Exception as exc:  # noqa: BLE001
+            # Callers that expose health should sanitise external errors. This
+            # normalized shape also keeps aggregate and per-connection probes aligned.
+            return {"connection": name, "status": "error", "error": str(exc)}
 
     async def close(self) -> None:
         """Close all connections in this scope."""

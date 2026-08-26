@@ -18,6 +18,7 @@ We enforce strict code quality via pre-commit hooks and CI:
 
 ```bash
 make lint          # Ruff linter
+make audit         # Known-vulnerability audit of locked dependencies
 make format        # Auto-format
 make typecheck     # Mypy type checking
 make test          # Run all tests

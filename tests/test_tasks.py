@@ -306,6 +306,18 @@ class TestTaskRoutes:
             assert resp.status_code == 202
             assert "id" in resp.json()
 
+    def test_submit_rejects_nonexistent_stream_execution_mode(self):
+        """Progress is streamed from ``/events``; it is not an execution mode."""
+        from fastapi.testclient import TestClient
+
+        app, _ = _build_task_app()
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/v1/tasks",
+                json={"target_type": "agent", "target": "x", "input": {}, "mode": "stream"},
+            )
+            assert resp.status_code == 422
+
     def test_unknown_target_type_400(self):
         from fastapi.testclient import TestClient
 

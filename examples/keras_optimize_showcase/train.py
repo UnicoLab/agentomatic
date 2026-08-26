@@ -127,8 +127,7 @@ class _MarkerMetric(CustomMetric):
         for rung, threshold in zip(("r1", "r2", "r3"), TEMP_RUNGS, strict=True):
             if rung not in resp:
                 reasons.append(
-                    f"response is missing the '{rung}' marker "
-                    f"(temperature must be <= {threshold})"
+                    f"response is missing the '{rung}' marker (temperature must be <= {threshold})"
                 )
         return EvalResult(
             metric_name=self.name,
@@ -150,9 +149,7 @@ def build_metrics() -> tuple[list[Any], MetricLoss, _MarkerMetric]:
     def _resp_contains(token: str) -> Any:
         return CallableMetric(
             token,
-            (lambda t: (lambda ex, pred: 1.0 if t in str(pred.get("response", "")) else 0.0))(
-                token
-            ),
+            (lambda t: lambda ex, pred: 1.0 if t in str(pred.get("response", "")) else 0.0)(token),
         )
 
     banana_m = _resp_contains(MARKER)
@@ -194,8 +191,22 @@ def build_metrics() -> tuple[list[Any], MetricLoss, _MarkerMetric]:
 # epochs instead of jumping to the coldest value in a single round.
 PARAM_GRID: dict[str, list[float]] = {
     "temperature": [
-        0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35,
-        0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.02, 0.0,
+        0.7,
+        0.65,
+        0.6,
+        0.55,
+        0.5,
+        0.45,
+        0.4,
+        0.35,
+        0.3,
+        0.25,
+        0.2,
+        0.15,
+        0.1,
+        0.05,
+        0.02,
+        0.0,
     ]
 }
 
@@ -401,7 +412,9 @@ def run_mode(
         max_trials=max_trials,
     )
     print(f"⏱️  Fit took {time.perf_counter() - t0:.1f}s")
-    print(f"🧗 Curriculum: difficulty reached {curriculum.agent.difficulty if curriculum.agent else '?'}")
+    print(
+        f"🧗 Curriculum: difficulty reached {curriculum.agent.difficulty if curriculum.agent else '?'}"
+    )
     print_history(history)
 
     # ── 5. What did the optimizer change? ──────────────────────────────
@@ -420,7 +433,9 @@ def run_mode(
 
     # ── 6. Evaluate on held-out test split ─────────────────────────────
     report = agent.evaluate(dataset.test, metrics)
-    print(f"\n✅ Test evaluation: {json.dumps({k: round(v, 3) for k, v in report.scores.items()})}")
+    print(
+        f"\n✅ Test evaluation: {json.dumps({k: round(v, 3) for k, v in report.scores.items()})}"
+    )
 
     # ── 7. Interactive HolySheet report (chart + prompt evolution) ─────
     fit_result = getattr(agent, "_last_fit_result", None)
@@ -509,7 +524,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-trials", type=int, default=6)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--report-dir", default=None, help="Directory for the HTML report(s)")
-    parser.add_argument("--augment", action="store_true", help="LLM-augment the seed dataset first")
+    parser.add_argument(
+        "--augment", action="store_true", help="LLM-augment the seed dataset first"
+    )
     parser.add_argument("--n-examples", type=int, default=30, help="Augmented dataset target size")
     parser.add_argument(
         "--model",

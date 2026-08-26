@@ -138,13 +138,24 @@ class StudioRunRequest(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    query: str = Field(..., description="User query or input text")
+    # A Studio-run agent may publish a structured input model that has no
+    # chat-shaped `query` field at all (for example a classifier or extractor).
+    # Keep the transport envelope permissive and preserve its declared extras;
+    # the agent's own schema remains the authoritative validator.
+    query: str = Field("", description="User query or input text (optional for structured inputs)")
     user_id: str = Field("default-user", description="User identifier")
     thread_id: str | None = Field(
         default=None, description="Thread ID for conversation continuity"
     )
     context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
+    agent_input: Any | None = Field(
+        default=None,
+        description=(
+            "Native scalar or array input for an agent RootModel schema. "
+            "Studio converts it to state.__root__ before invocation."
+        ),
+    )
     prompt_version: str = Field("v1", description="Prompt version to use")
     breakpoints: list[str] = Field(
         default_factory=list,

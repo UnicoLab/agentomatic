@@ -68,6 +68,70 @@ def _platform(tmp_path) -> AgentPlatform:
 
 
 class TestAgentExecutionModes:
+    def test_generic_task_rejects_invalid_agent_input_before_queueing(self, tmp_path):
+        """The generic task board must enforce the same required fields as /invoke."""
+        with TestClient(_platform(tmp_path).build()) as client:
+            rejected = client.post(
+                "/api/v1/tasks",
+                json={"target_type": "agent", "target": "echo", "input": {}},
+            )
+
+            assert rejected.status_code == 422
+            assert "query" in rejected.text
+            assert client.get("/api/v1/tasks").json()["total"] == 0
+
+    def test_generic_task_rejects_unknown_agent_before_queueing(self, tmp_path):
+        with TestClient(_platform(tmp_path).build()) as client:
+            rejected = client.post(
+                "/api/v1/tasks",
+                json={"target_type": "agent", "target": "missing", "input": {"query": "x"}},
+            )
+
+            assert rejected.status_code == 404
+            assert "missing" in rejected.text
+            assert client.get("/api/v1/tasks").json()["total"] == 0
+
+    def test_generic_task_uses_the_agent_custom_input_schema(self, tmp_path):
+        """Custom schemas are validated and coerced before queued task execution."""
+        from agentomatic.core.schemas import SchemaValidator
+
+        class CustomTaskInput(BaseModel):
+            prompt: str
+            priority: int = Field(default=1, ge=1, le=5)
+
+        platform = AgentPlatform(
+            agents_dir=tmp_path / "agents",
+            plugins_dir=tmp_path / "plugins",
+            endpoints_dir=tmp_path / "endpoints",
+            ingestion_dir=tmp_path / "ingestion",
+            enable_studio=False,
+        )
+        platform.register_agent(
+            AgentManifest(name="custom", slug="custom", description="Custom", version="1.0.0"),
+            node_fn=_echo_node,
+            schema_validator=SchemaValidator(request_model=CustomTaskInput),
+        )
+
+        with TestClient(platform.build()) as client:
+            rejected = client.post(
+                "/api/v1/tasks",
+                json={"target_type": "agent", "target": "custom", "input": {}},
+            )
+            assert rejected.status_code == 422
+            assert "prompt" in rejected.text
+
+            accepted = client.post(
+                "/api/v1/tasks",
+                json={
+                    "target_type": "agent",
+                    "target": "custom",
+                    "input": {"prompt": "hello"},
+                    "wait": True,
+                },
+            )
+            assert accepted.status_code == 200
+            assert accepted.json()["input"] == {"prompt": "hello", "priority": 1}
+
     def test_invoke_async(self, tmp_path):
         with TestClient(_platform(tmp_path).build()) as client:
             resp = client.post("/api/v1/echo/invoke/async", json={"query": "hi"})

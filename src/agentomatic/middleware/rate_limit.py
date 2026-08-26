@@ -6,6 +6,7 @@ Configured via ``RATE_LIMIT__REQUESTS`` and ``RATE_LIMIT__WINDOW_SECONDS``.
 
 from __future__ import annotations
 
+import math
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
@@ -63,6 +64,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
+    @staticmethod
+    def _retry_after_seconds(*, window: float, now: float, oldest_hit: float) -> int:
+        """Return a safe integral delay until a sliding-window slot opens."""
+        return max(math.ceil(window - (now - oldest_hit)), 1)
+
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
@@ -77,11 +83,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._hits[key] = [t for t in self._hits[key] if now - t < self._window]
 
         if len(self._hits[key]) >= self._max:
-            retry_after = int(self._window - (now - self._hits[key][0]))
+            # HTTP Retry-After is integral seconds.  Rounding down tells a
+            # caller to retry before the oldest sliding-window hit expires;
+            # round up so the advertised delay is always safe to honour.
+            retry_after = self._retry_after_seconds(
+                window=self._window, now=now, oldest_hit=self._hits[key][0]
+            )
             return JSONResponse(
-                {"detail": "Rate limit exceeded", "retry_after": max(retry_after, 1)},
+                {"detail": "Rate limit exceeded", "retry_after": retry_after},
                 status_code=429,
-                headers={"Retry-After": str(max(retry_after, 1))},
+                headers={"Retry-After": str(retry_after)},
             )
 
         self._hits[key].append(now)

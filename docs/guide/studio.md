@@ -28,30 +28,184 @@ agentomatic run --studio
 
 The unified platform starts serving your API endpoints at `http://localhost:8000` and the Studio UI at `http://localhost:8000/studio/ui/`.
 
-!!! tip "Quick Demo"
+The setup screen verifies the live `/studio/info` and `/studio/agents` contracts
+before it opens a workspace. A generic health endpoint is not sufficient for
+Studio: it cannot provide schema-driven forms, graph topology, SSE execution,
+or task controls. If either contract is unavailable, start the deployment with
+`--studio` and fix the reported authentication or connection error; Studio does
+not substitute sample agents.
+
+!!! tip "Temporary scaffold — not production validation"
     Want to try Studio without setting up any agents? Use the built-in demo command:
 
     ```bash
     agentomatic demo
     ```
 
-    This scaffolds a temporary demo agent and launches the platform with Studio enabled, giving you an instant hands-on experience with graph visualization, streaming, and state inspection.
+    This scaffolds a temporary demo agent and launches the platform with Studio enabled, giving you an instant hands-on experience with graph visualization, streaming, and state inspection. It is not a substitute for deployment validation: use the [deployment verifier](verifying-a-deployment.md) against real agents, connections, storage, and model endpoints before release.
 
 ---
 
 
-## Schema-driven input forms
+## Schema-driven forms and live contracts
 
-Studio fetches `GET /studio/agents/{name}/schemas` and renders a dynamic
-**SchemaForm** from the agent's JSON Schema (same idea as LangGraph Studio).
+Studio never invents a fixed request body for a resource. It renders the
+inputs that the running platform actually declares, then displays the matching
+output contract beside the result:
 
-- Required fields, types, and descriptions come from `input_schema`
-- Form ↔ Raw JSON toggle for power users
-- `output_schema` is shown as a read-only summary so you know what to expect
-  while debugging
+Chat is equally live-only: it requires a selected agent returned by the active
+deployment and never creates a placeholder assistant. When a completed run
+returns structured state without a textual response, Studio says so and points
+to the execution logs and Graph State; it does not generate a plausible answer
+in the browser.
 
-Declare schemas in `agents/<name>/schemas.py` (`CustomInvokeRequest` /
-`CustomInvokeResponse` or `<Agent>Request` / `<Agent>Response` Pydantic models).
+When authentication is enabled, the setup screen keeps the API key only in the
+current browser tab session so a normal refresh can restore the workspace, but
+closing the tab removes the secret. Studio migrates and removes the legacy
+long-lived browser copy on first use. The non-secret server URL may still be
+remembered for convenience.
+
+Conversation records are durable too. The sidebar lists the selected agent's
+`/api/v1/{agent}/threads` records after connection or agent selection; opening
+one fetches its server messages, and creating or deleting a conversation calls
+that same API. Reloading Studio therefore restores real conversations instead
+of fabricating browser-only thread identifiers. If durable thread storage is
+unavailable, Studio reports the API error and does not silently start a local
+conversation.
+
+| Surface | Contract source | What Studio renders |
+|---|---|---|
+| Agent Chat and Graph | `GET /studio/agents/{name}/schemas` | Agent input/output schemas and provenance |
+| Plugins, endpoints, and ingestors | The operation request/response schemas and documented path/query/header parameters in `GET /openapi.json` | Resource-specific form, Dict, or Raw JSON request editor |
+| Pipelines | The pipeline's published `input_schema` / `output_schema` | Pipeline input form plus step statuses and durations |
+| Pipeline Builder | Live agent, plugin, endpoint, ingestor, and sub-pipeline contracts | Available target fields and sensible upstream output mappings |
+| Task Board | Live resource contracts plus `GET /api/v1/tasks` | Submit, poll, cancel, inspect, and remove durable task records |
+
+In the **Pipeline Builder**, selecting any agent, plugin, endpoint, ingestor,
+or sub-pipeline step opens its editable inspector. It shows the live **Accepts** and
+**Produces** fields, limits the visual connection chooser to that resource's
+real input fields, and exposes matching upstream outputs. Sub-pipeline
+contracts come from that pipeline's published `input_schema` and
+`output_schema`; the other resource contracts come from Studio or OpenAPI.
+For a **Map** step, the inspector distinguishes the selected agent's per-item
+input contract from the map's actual aggregate result. Downstream links can
+choose `items`, `by_key`, `count`, or `succeeded`—the fields the pipeline
+runtime really emits—rather than incorrectly treating one agent response as
+the whole fan-out result.
+Click an output and target field and choose **Link fields**, or drag the output
+onto the target. Studio creates the mapping, renders the field link on the
+canvas, and records a referenced `$.steps.<name>` output as an explicit DAG
+upstream dependency. The serialized YAML remains standard and portable.
+Existing pipeline steps use the same inspector, so they can be reviewed and
+edited without falling back to YAML.
+From the operational **Pipelines** page, choose **Edit in Builder** to load
+that exact deployed pipeline into this editor. Builder fetches the current
+server configuration after navigation (it does not pass a stale browser copy),
+then lets you change cards, mappings, dependencies, and test input before
+saving or using **Save & Run**.
+The same schema-aware routing is available for outputs: select a field the
+step produces and a declared pipeline output to create a visual route. Adding
+a child step to a parallel container opens that child's inspector immediately,
+so configuration never requires finding an unconfigured card manually.
+The Builder's **Save & Run** dialog uses that draft pipeline input schema too;
+it offers the same Form, Dict, and Raw JSON modes used by operational resource
+pages rather than requiring a hand-written test payload. Before an author has
+declared a pipeline input schema, it derives a clearly labelled **Suggested
+test input** form from the unconnected fields in the draft's live resource
+contracts. Fields already supplied by a step, default, or shared context stay
+out of that form; an explicit pipeline schema always takes precedence.
+
+Every schema form offers **Form**, **Dict**, and **Raw JSON** modes for object
+contracts. A service that publishes a root scalar or array (for example a
+Pydantic `RootModel[str]` or `RootModel[list[Item]]`) receives its native
+single-value editor. Its native `/invoke` route receives that value unchanged.
+Studio carries the value in its run envelope and exposes it to the agent as
+`state["__root__"]`, the same convention used by pipeline mappings. **Raw JSON**
+remains available for every schema shape. Required values are validated before a
+real request is started, including nested object fields and object values within
+arrays. The validation message names the exact path (for example,
+`context.region` or `items[1].id`), so an operator can fix the request without
+reading a backend `422` response.
+
+Agent runs use the same live schema rather than requiring a chat-shaped
+`query`. A structured agent can declare fields such as `label` and `priority`
+only; Studio forwards those fields unchanged and supplies an empty query to
+the execution envelope solely for framework compatibility.
+
+For an OpenAPI operation with both a JSON body and parameters, Studio composes
+one form from the complete live contract. It sends body fields as JSON, query
+fields in the URL, header fields as headers, and path fields after URL-encoding
+them. Where a scalar or array body also has transport parameters, Studio shows
+the body as a clearly labelled **Request body** field and preserves it exactly.
+If a parameter name collides with an object-body field, Studio gives the
+parameter a clear location-prefixed form name rather than silently sending it
+to the wrong place.
+
+When a field declares multiple non-null `oneOf` or `anyOf` shapes, the Form
+view shows an **Input shape** selector and renders the chosen branch. Nullable
+fields remain a single control; the selector is reserved for genuinely
+different request structures. Dict and Raw JSON remain available for advanced
+or recursive contracts. Enum choices retain the JSON type published by the
+service (for example `0`, `false`, or an object choice are not coerced to
+strings), and a `const` value is displayed as a fixed contract field. Raw JSON
+validation accepts any valid union branch instead of assuming the first branch.
+
+If a resource is discovered but its live contract cannot be read, Studio shows
+the resource-specific contract error and disables its test action. It does not
+quietly substitute an empty payload: refresh after fixing the deployed
+OpenAPI/pipeline configuration, then test against the recovered schema.
+The Builder follows the same rule for its palette: a failed resource discovery
+is shown as a visible warning with **Retry live resources**, never as a silent
+empty inventory.
+
+The **Pipelines**, **Plugins**, **Custom Endpoints**, and **Ingestors** pages
+also provide an in-place **Refresh** action. It re-discovers the running
+resource inventory and its current schemas without reconnecting Studio, while
+leaving independently displayed results available for review. Use it after a
+deployment changes a plugin, endpoint, ingestor, or pipeline contract.
+
+The **Connections** view shows the safe backend/provider metadata, any
+configuration guidance returned for an unconfigured connection, and the status
+from the last independently-run live probe. It never shows a URL, DSN, request
+headers, or raw driver exception.
+
+The embedded production UI keeps its SPA document revalidatable (`Cache-Control:
+no-cache`) while cache-busting hashed JavaScript and CSS chunks are immutable
+for one year. This keeps new deployments visible immediately without making
+operators re-download unchanged Builder, Graph, or Chat code.
+
+Studio loads each workspace on demand. If a browser has retained an obsolete
+chunk during a deployment, the workspace shows a clear recovery message with a
+**Reload Studio** action instead of leaving the page blank. Reloading obtains
+the revalidated application shell and its current chunk manifest.
+
+The **Plugins** view also exposes the live **Reload** action from each
+plugin's API, then displays the returned loaded status and model-card snapshot.
+The **Ingestors** view runs each registered `/run` route independently and
+shows the standard `IngestionResult` output schema and real result.
+
+The **Task Board** is the operational surface for asynchronous, synchronous,
+and batch work. Select a live agent, plugin, pipeline, endpoint, or ingestor;
+Studio then loads its deployed input contract before submission. Active records
+refresh only while work is queued or running, and task details retain the real
+input, progress, result, duration, attempts, or failure message returned by
+the durable task API. Operators can cancel non-terminal work and remove only
+terminal records. For a batch, **Use current form as first item** converts the
+schema-form value into an editable one-item JSON array; duplicate or adjust
+that item for the remaining records. The editor accepts object, array, and
+scalar JSON items whenever the selected live contract does. See [Tasks & Execution Modes](tasks.md)
+for the API and SSE event protocol.
+
+If an operation publishes no input schema, Studio explicitly says so and
+starts with an empty object; **it does not fabricate a `{ "query": ... }`
+payload**. Use Dict or Raw JSON in that case to provide the resource's actual
+contract. Output schemas remain visible as a compact reference while debugging.
+
+Declare agent schemas in `agents/<name>/schemas.py`
+(`CustomInvokeRequest` / `CustomInvokeResponse` or `<Agent>Request` /
+`<Agent>Response` Pydantic models). Plugin, endpoint, and ingestor schemas are normally
+their request and response Pydantic models, which Agentomatic exposes through
+OpenAPI automatically.
 
 ## Framework Support
 
@@ -61,13 +215,15 @@ Agentomatic Studio uses a **universal adapter system** to provide the best possi
 |---|:---:|:---:|:---:|:---:|:---:|
 | Graph Topology | ✅ Real graph | ✅ Real graph + planning nodes | ✅ LCEL extraction or synthetic chain | ✅ Synthetic linear | ✅ Custom graph |
 | SSE Node Streaming | ✅ `astream_events` | ✅ `astream_events` + subagent events | ✅ `astream_events` (v2) | ✅ Trace-based | ✅ Custom stream |
-| Time-Travel History | ✅ Checkpointer | ✅ Checkpointer | ✅ In-memory traces | ✅ In-memory traces | ✅ In-memory traces |
-| State Inspection | ✅ Checkpointer | ✅ Checkpointer | ✅ Message + I/O capture | ✅ Last I/O capture | ✅ Custom provider |
+| Time-Travel History | ✅ Checkpointer | ✅ Checkpointer | ✅ Store-backed traces* | ✅ Store-backed traces* | ✅ Custom provider |
+| State Inspection | ✅ Checkpointer | ✅ Checkpointer | ✅ Captured I/O* | ✅ Captured I/O* | ✅ Custom provider |
 | State Mutation | ✅ `aupdate_state` | ✅ `aupdate_state` | ⚠️ In-memory only | ⚠️ In-memory only | ⚠️ In-memory only |
 | Breakpoints | ✅ `interrupt_before` | ✅ Interrupt + middleware | ❌ | ❌ | ❌ |
 | HITL Support | ✅ Native | ✅ Native + resume | ❌ | ❌ | ❌ |
 | Subagent Tracking | ❌ | ✅ `subagent_start/end` | ❌ | ❌ | ❌ |
 | Task Planning | ❌ | ✅ `task_update` events | ❌ | ❌ | ❌ |
+
+\* Durable whenever Agentomatic is configured with a persistent store such as PostgreSQL. Without one, the adapter keeps the same information in its in-process cache for local development.
 
 !!! tip "Using LangChain Deep Agents?"
     See the dedicated **[Deep Agent Integration Guide](deep-agents.md)** for setup, subagent tracking, HITL interrupts, and the `deepagent` scaffold template.
@@ -300,16 +456,24 @@ When you execute an agent query, the **Graph View** maps directly to your agent'
 Agentomatic records every execution step for historical replay.
 
 - **History View**: The **Time Travel** tab lists all past checkpoints (LangGraph) or execution traces (other frameworks).
-- **Replay**: Click **"Replay from here"** on any snapshot to branch your thread and resume from that state.
+- **Replay**: Click **"Replay from here"** on any snapshot. LangGraph resumes
+  through its checkpointer. For a generic adapter, Studio re-executes the
+  stored input for that trace in the same thread; it does not claim to resume
+  inside an arbitrary user function.
 
 !!! warning "Framework limitations"
-    Full checkpoint-based time-travel is available for **LangGraph** agents only. Other frameworks use in-memory trace stores which provide history viewing but limited replay capabilities.
+    Full checkpoint-based time-travel is available for **LangGraph** agents
+    only. Other frameworks replay a trace's original input (persisted when a
+    platform store is configured); they cannot resume a node halfway through
+    execution.
 
 ### 3. Conditional Breakpoints
 
 Freeze execution before a critical node (LangGraph only).
 
-- **Setting Breakpoints**: Right-click any node in the Graph View → **"Add Breakpoint"**.
+- **Setting Breakpoints**: Click the breakpoint marker on a node in the Graph
+  View. Studio only enables it when the selected deployment advertises
+  server-side breakpoint support.
 - **Execution**: The graph pauses before the target node. The node pulses, and the thread is suspended.
 - **Resuming**: Resume execution or edit the state before continuing.
 
@@ -320,7 +484,17 @@ During a breakpoint pause or HITL interrupt, you can mutate the graph state.
 - **State View**: Navigate to the **State** tab in the Debug Console.
 - **Editing**: Click **"Edit State"**, modify the JSON, and click **"Save"**.
 - **LangGraph**: Changes are persisted via `graph.aupdate_state()`.
-- **Other frameworks**: Changes are stored in the in-memory trace store.
+- **Other frameworks**: Captured execution state and trace history are stored
+  in the configured Agentomatic store. Manual state edits remain in the
+  adapter's local cache because they do not have a framework-native mutation
+  API.
+
+!!! note "Generic trace durability"
+    With a configured Agentomatic store (for example PostgreSQL), captured
+    generic and LangChain traces, their I/O snapshots, and replay inputs
+    survive worker and platform restarts. Manual state edits remain local to
+    the worker. Use a checkpointer-backed LangGraph agent when you need native
+    state mutation, breakpoint resume, or a durable mid-graph continuation.
 
 ---
 
@@ -468,7 +642,7 @@ graph TB
 | `/studio/agents/{name}/schemas` | GET | Input/output JSON schemas |
 | `/studio/agents/{name}/runs/stream` | POST | SSE-streamed execution |
 | `/studio/agents/{name}/threads/{tid}/state` | GET | Thread state snapshot |
-| `/studio/agents/{name}/threads/{tid}/state` | POST | Update thread state (LangGraph: persistent) |
+| `/studio/agents/{name}/threads/{tid}/state` | POST | Update thread state (LangGraph: persistent; other adapters: best-effort local override) |
 | `/studio/agents/{name}/threads/{tid}/history` | GET | Checkpoint/trace history |
 
 ---

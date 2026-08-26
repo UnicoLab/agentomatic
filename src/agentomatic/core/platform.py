@@ -82,15 +82,19 @@ def _mount_agent_router(app: FastAPI, agent: RegisteredAgent, name: str, api_pre
 def _generate_unique_id(route: APIRoute) -> str:
     """Generate a clean, stable OpenAPI ``operationId`` for a route.
 
-    Combines the first tag (when present) with the route name to produce
-    readable client-codegen identifiers instead of FastAPI's verbose,
-    path-derived defaults.
+    Includes the normalised path and HTTP methods as well as the first tag.
+    A single agent router can be mounted under both its folder name and slug
+    for Studio compatibility; using only the tag and endpoint name makes
+    those otherwise distinct operations collide in generated clients.
     """
     tag = route.tags[0] if route.tags else ""
     slug = "".join(ch if ch.isalnum() else "_" for ch in str(tag)).strip("_").lower()
-    if slug:
-        return f"{slug}_{route.name}"
-    return route.name
+    path = "".join(ch if ch.isalnum() else "_" for ch in route.path).strip("_").lower()
+    methods = "_".join(
+        sorted(method.lower() for method in route.methods if method not in {"HEAD", "OPTIONS"})
+    )
+    parts = [part for part in (slug, path, methods, route.name) if part]
+    return "_".join(parts)
 
 
 def _minimal_openapi_paths(routes: Any) -> dict[str, Any]:
@@ -930,10 +934,15 @@ class AgentPlatform:
         """Create the task manager and register a dispatcher per resource type."""
         from agentomatic.tasks.dispatchers import (
             make_agent_dispatcher,
+            make_agent_input_validator,
             make_endpoint_dispatcher,
+            make_endpoint_input_validator,
             make_ingestion_dispatcher,
+            make_ingestion_input_validator,
             make_pipeline_dispatcher,
+            make_pipeline_input_validator,
             make_plugin_dispatcher,
+            make_plugin_input_validator,
         )
         from agentomatic.tasks.manager import TaskManager
         from agentomatic.tasks.models import TargetType
@@ -943,14 +952,26 @@ class AgentPlatform:
             max_concurrency=self._task_max_concurrency,
         )
         manager.register_dispatcher(TargetType.AGENT, make_agent_dispatcher(self._registry))
+        manager.register_input_validator(
+            TargetType.AGENT, make_agent_input_validator(self._registry)
+        )
         manager.register_dispatcher(
             TargetType.PLUGIN, make_plugin_dispatcher(self._plugin_registry)
+        )
+        manager.register_input_validator(
+            TargetType.PLUGIN, make_plugin_input_validator(self._plugin_registry)
         )
         manager.register_dispatcher(
             TargetType.ENDPOINT, make_endpoint_dispatcher(self._endpoint_registry)
         )
+        manager.register_input_validator(
+            TargetType.ENDPOINT, make_endpoint_input_validator(self._endpoint_registry)
+        )
         manager.register_dispatcher(
             TargetType.INGESTION, make_ingestion_dispatcher(self._ingestion_registry)
+        )
+        manager.register_input_validator(
+            TargetType.INGESTION, make_ingestion_input_validator(self._ingestion_registry)
         )
         # ``self._pipelines`` is populated in-place during build(); the pipeline
         # dispatcher reads it lazily at call time so late-discovered pipelines
@@ -964,6 +985,9 @@ class AgentPlatform:
                 ingestors=self._ingestion_registry,
                 plugins=self._plugin_registry,
             ),
+        )
+        manager.register_input_validator(
+            TargetType.PIPELINE, make_pipeline_input_validator(self._pipelines)
         )
         from agentomatic.tasks.progress import install_task_progress_bridge
 
@@ -998,6 +1022,12 @@ class AgentPlatform:
         Returns:
             Configured :class:`~fastapi.FastAPI` application.
         """
+        if self._enable_auth and not self._auth_api_key:
+            raise RuntimeError(
+                "enable_auth=True requires a non-empty auth_api_key. "
+                "Set AGENTOMATIC_API_KEY or disable API-key authentication explicitly."
+            )
+
         platform = self  # capture for closure
 
         # Ensure agents directory is importable BEFORE build so
@@ -1336,7 +1366,7 @@ class AgentPlatform:
             # — or API-key auth guards the platform instead. Raised outside the
             # try below so the misconfiguration is not silently swallowed.
             if self._require_auth_globally and not jwt_cfg.jwks_url:
-                if not self._enable_auth:
+                if not self._enable_auth or not self._auth_api_key:
                     raise RuntimeError(
                         "require_auth_globally=True but JWT signature verification "
                         "is not configured (no jwks_url) and API-key auth is "
@@ -1643,12 +1673,26 @@ class AgentPlatform:
             except Exception as exc:  # noqa: BLE001
                 return {"status": "error", "error": str(exc)}
 
+        def _public_liveness(result: Any) -> dict[str, str]:
+            """Reduce extension health output for the unauthenticated probe.
+
+            ``/health`` is intentionally unauthenticated so Kubernetes and
+            load balancers can use it without holding application credentials.
+            Agent, endpoint, ingestor, and storage health checks are extension
+            points, though, and their raw output can contain connection URLs,
+            provider errors, or configuration.  Public liveness needs only a
+            status; authenticated control/status APIs remain available for
+            operator diagnostics.
+            """
+            health = result if isinstance(result, dict) else {}
+            return {"status": str(health.get("status", "unknown"))}
+
         @app.get("/health", tags=["Platform"])
         async def health() -> dict[str, Any]:
             """Aggregate health across all resources + storage."""
             agents: dict[str, Any] = {}
             for name, agent in self._registry.all().items():
-                agents[name] = await _timed_health(name, agent.health_check())
+                agents[name] = _public_liveness(await _timed_health(name, agent.health_check()))
 
             # Plugin health
             plugins: dict[str, Any] = {}
@@ -1661,17 +1705,23 @@ class AgentPlatform:
             # Custom endpoint health
             endpoints: dict[str, Any] = {}
             for name, endpoint in self._endpoint_registry.list_endpoints().items():
-                endpoints[name] = await _timed_health(f"endpoint:{name}", endpoint.health_check())
+                endpoints[name] = _public_liveness(
+                    await _timed_health(f"endpoint:{name}", endpoint.health_check())
+                )
 
             # Ingestor health
             ingestors: dict[str, Any] = {}
             for name, ingestor in self._ingestion_registry.list_ingestors().items():
-                ingestors[name] = await _timed_health(f"ingestor:{name}", ingestor.health_check())
+                ingestors[name] = _public_liveness(
+                    await _timed_health(f"ingestor:{name}", ingestor.health_check())
+                )
 
             # Storage health
             storage_health: dict[str, Any] = {"status": "not_configured"}
             if self._store:
-                storage_health = await _timed_health("storage", self._store.health_check())
+                storage_health = _public_liveness(
+                    await _timed_health("storage", self._store.health_check())
+                )
 
             def _all_ok(section: dict[str, Any], *, ok: tuple[str, ...]) -> bool:
                 return all(v.get("status") in ok for v in section.values())
@@ -1841,7 +1891,12 @@ class AgentPlatform:
 
                 studio_router = create_studio_router(
                     registry=self._registry,
-                    store=self._store,
+                    # A DATABASE_URL or MEMORY connection can create the
+                    # store during lifespan startup.  Pass the same lazy
+                    # resolver used by the agent routers so Studio adapters
+                    # receive that production store rather than build-time
+                    # ``None``.
+                    store=_LazyStoreProxy(self),
                     platform_title=self.title,
                     platform_version=self.version,
                 )

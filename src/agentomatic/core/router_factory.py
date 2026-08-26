@@ -485,6 +485,15 @@ def create_default_router(
     _schema_validator = None
     if agent and agent.schema_validator:
         _schema_validator = agent.schema_validator
+        # Programmatically registered agents do not have a ``schemas.py``
+        # module to discover above.  Their validator is still the published
+        # request contract, including a RootModel request body.
+        validator_input = getattr(_schema_validator, "request_model", None)
+        validator_output = getattr(_schema_validator, "response_model", None)
+        if _is_openapi_model(validator_input):
+            input_model = validator_input
+        if _is_openapi_model(validator_output):
+            output_model = validator_output
 
     # ── Invocation log recorder (optional) ────────────────────────
     log_recorder = None

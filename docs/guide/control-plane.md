@@ -5,7 +5,8 @@ operating your platform at runtime — inspect agents, endpoints, and
 connections; drain or re-enable individual agents; toggle maintenance mode;
 and read a sanitised configuration snapshot.
 
-It is opt-in and can be protected by a shared secret.
+It is opt-in and follows the platform's normal API authentication policy. A
+separate shared secret protects its mutating operations.
 
 ## Enabling
 
@@ -22,42 +23,58 @@ app = platform.build()
 Routes are mounted under `/api/v1/control`.
 
 !!! warning "Protect the control plane"
-    Mutating endpoints require the `X-Control-Token` header to match
-    `control_token`. Leave `control_token` empty only in trusted local
+    Reads use the same API-key or JWT policy as the rest of the platform.
+    Mutating endpoints additionally require the `X-Control-Token` header to
+    match `control_token`. Leave `control_token` empty only in trusted local
     environments. In production, also place it behind network policy / auth.
 
 ## Introspection endpoints
 
 | Method & Path | Description |
 | ------------- | ----------- |
-| `GET /api/v1/control` | High-level platform overview (counts, uptime, maintenance). |
-| `GET /api/v1/control/agents` | List agents with auth requirements, connections, and health. |
+| `GET /api/v1/control` | High-level platform overview (counts, uptime, maintenance, and the non-secret `control_token_required` mutation requirement). |
+| `GET /api/v1/control/agents` | List agents with auth requirements, connections, and safe readiness signals. |
 | `GET /api/v1/control/agents/{name}` | Detail for a single agent. |
 | `GET /api/v1/control/endpoints` | List registered custom endpoints. |
-| `GET /api/v1/control/connections` | Connection health grouped by scope. |
-| `GET /api/v1/control/health` | Aggregate health across agents + connections. |
+| `GET /api/v1/control/connections` | Redacted connection health grouped by scope. |
+| `GET /api/v1/control/connections/{scope}/{name}` | Run one named connection probe; returns the same redacted health contract. |
+| `GET /api/v1/control/health` | Aggregate health across agents + connections (safe, redacted readiness signals). |
 | `GET /api/v1/control/metrics/summary` | Coarse operational counters. |
 | `GET /api/v1/control/config` | Sanitised effective configuration. |
 
 ```bash
-curl http://localhost:8000/api/v1/control | jq
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" \
+  http://localhost:8000/api/v1/control | jq
 ```
+
+Connection diagnostics deliberately include only safe operational fields
+(`status`, name, kind, purpose, backend/provider, and a sanitised error).
+They never return configured URLs/DSNs, request headers, or arbitrary driver
+metadata. Use server logs and the returned error id for detailed diagnostics.
+
+The overview deliberately reveals only whether a control token is required;
+it never reveals the token itself. Studio uses that flag to keep Drain and
+Maintenance controls disabled until an operator supplies `X-Control-Token` in
+the current browser session, avoiding a misleading 401-after-click workflow.
 
 ## Operations (mutating)
 
-These require the control token.
+These require the control token, plus the normal API credentials whenever
+platform authentication is enabled.
 
 === "Drain an agent"
     Stop routing traffic to a single agent (its routes return `503`):
 
     ```bash
     curl -X POST http://localhost:8000/api/v1/control/agents/fraud_agent/disable \
+      -H "X-API-Key: $AGENTOMATIC_API_KEY" \
       -H "X-Control-Token: $CONTROL_TOKEN"
     ```
 
 === "Re-enable an agent"
     ```bash
     curl -X POST http://localhost:8000/api/v1/control/agents/fraud_agent/enable \
+      -H "X-API-Key: $AGENTOMATIC_API_KEY" \
       -H "X-Control-Token: $CONTROL_TOKEN"
     ```
 
@@ -67,6 +84,7 @@ These require the control token.
 
     ```bash
     curl -X POST http://localhost:8000/api/v1/control/maintenance \
+      -H "X-API-Key: $AGENTOMATIC_API_KEY" \
       -H "X-Control-Token: $CONTROL_TOKEN" \
       -H "Content-Type: application/json" \
       -d '{"enabled": true}'

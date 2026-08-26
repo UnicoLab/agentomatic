@@ -1,7 +1,7 @@
 # Testing Your Agents
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Confidence through Automated Testing</h3>
 </div>
 
@@ -740,8 +740,13 @@ def test_save_and_load_round_trip():
 ### Basic Commands
 
 ```bash
-# Run all tests
-uv run pytest tests/ --override-ini='addopts='
+# Run the deterministic suite (unit, API, schema, and integration tests).
+# The marker is explicit here (and is also the repository default).
+uv run pytest -m "not live"
+
+# Run the explicitly requested real local-model suites separately. See the
+# Optimization guide for the required oMLX / OpenAI-compatible variables.
+uv run pytest -m live --override-ini='addopts='
 
 # Run a specific test file
 uv run pytest tests/test_my_agent.py -v
@@ -784,11 +789,16 @@ A minimal CI step for GitHub Actions:
 - name: Run tests
   run: |
     uv run pytest tests/ \
+      -m "not live" \
       --override-ini='addopts=' \
       --cov=agentomatic \
       --cov-report=xml \
       -q
 ```
+
+For a production deployment gate, run the [deployment verifier](verifying-a-deployment.md)
+against the built service as a separate job. It uses real configured agents,
+storage, connections, and model routes instead of a test double.
 
 ---
 

@@ -124,6 +124,26 @@ def test_api_key_auth_covers_every_route_except_the_reviewed_allowlist(tmp_path)
     )
 
 
+def test_public_liveness_never_exposes_extension_health_details(tmp_path) -> None:
+    """The deliberately public probe may reveal availability, never secrets."""
+
+    platform = _build_platform(tmp_path)
+    agent = platform.registry.get("echo_agent")
+    assert agent is not None
+
+    def _broken_graph() -> None:
+        raise RuntimeError("provider failed with TOPSECRET")
+
+    agent.graph_fn = _broken_graph
+    with TestClient(platform.build()) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["agents"]["echo_agent"] == {"status": "healthy"}
+    assert "TOPSECRET" not in str(payload)
+
+
 def test_jwt_auth_covers_every_route_except_the_reviewed_allowlist(tmp_path) -> None:
     """The JWT middleware keeps its own skip list, so it needs its own sweep."""
     platform = _build_platform(

@@ -54,9 +54,7 @@ def render(curves: list[tuple[str, list[float]]], out: Path) -> None:
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
         f'viewBox="0 0 {W} {H}" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">'
     )
-    parts.append(
-        f'<rect width="{W}" height="{H}" fill="#0d1117" rx="12"/>'
-    )
+    parts.append(f'<rect width="{W}" height="{H}" fill="#0d1117" rx="12"/>')
 
     # gridlines + y labels
     for g in range(6):
@@ -84,9 +82,7 @@ def render(curves: list[tuple[str, list[float]]], out: Path) -> None:
     # lines
     for mode, vals in curves:
         color = COLORS.get(mode, COLORS["default"])
-        pts = " ".join(
-            f"{x_for(i, n):.1f},{y_for(v):.1f}" for i, v in enumerate(vals)
-        )
+        pts = " ".join(f"{x_for(i, n):.1f},{y_for(v):.1f}" for i, v in enumerate(vals))
         parts.append(
             f'<polyline points="{pts}" fill="none" stroke="{color}" '
             f'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'

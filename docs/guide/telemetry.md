@@ -1,7 +1,7 @@
 # Telemetry & Feedback
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Observability and Reinforcement Loop</h3>
 </div>
 

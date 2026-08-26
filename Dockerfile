@@ -39,16 +39,17 @@ COPY pyproject.toml uv.lock README.md ./
 # the image shipped without sqlalchemy, langgraph, prometheus-client or pyjwt —
 # /metrics served nothing, DATABASE_URL failed with "No module named
 # 'sqlalchemy'", and JWT auth could not be enabled at all. `all` restores those
-# and matches what `agentomatic deploy` builds. `db-postgres` is named
-# separately because `all` deliberately carries only the SQLite driver, and
-# this image is a deployment: the compose stack beside it offers Postgres.
+# and matches what `agentomatic deploy` builds. `db-postgres` and `openai` are
+# named separately because `all` deliberately omits provider SDKs and the
+# PostgreSQL driver. The local compose stack supports both Postgres and an
+# OpenAI-compatible host oMLX endpoint.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev --extra all --extra db-postgres
+    uv sync --frozen --no-install-project --no-dev --extra all --extra db-postgres --extra openai
 
 # Copy source code and install the project
 COPY src/ ./src/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --extra all --extra db-postgres
+    uv sync --frozen --no-dev --extra all --extra db-postgres --extra openai
 
 # Production stage
 FROM python:3.12-slim
@@ -80,9 +81,12 @@ COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser pyproject.toml ./
 
-# Create necessary directories
+# Create only the writable directories. The virtual environment and source
+# tree are already copied with the right owner above; recursively chowning
+# all of /app walks thousands of dependency files and turns each production
+# rebuild into a multi-minute no-op layer.
 RUN mkdir -p /app/logs /app/tmp /app/agents \
-    && chown -R appuser:appuser /app
+    && chown appuser:appuser /app/logs /app/tmp /app/agents
 
 # Switch to non-root user
 USER appuser

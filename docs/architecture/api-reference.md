@@ -12,6 +12,7 @@ These endpoints are global — not scoped to a specific agent.
 |---|---|---|
 | `GET` | `/` | Platform info and version |
 | `GET` | `/health` | Aggregated health check |
+| `GET` | `/ready` | Lightweight liveness/readiness probe |
 | `GET` | `/readiness` | Kubernetes readiness probe |
 | `GET` | `/status` | Unified status dashboard (HTML) |
 | `GET` | `/api/v1/status` | Unified platform status (JSON) |
@@ -30,7 +31,7 @@ These endpoints are global — not scoped to a specific agent.
 | `GET`/`POST` | `/api/v1/plugins[/{name}/predict]` | ML plugins — list, model card, predict |
 | `GET`/`POST` | `/api/v1/pipelines[/{name}/run\|/validate\|/visualize]` | Pipelines — list, run, validate, visualize |
 | `GET`/`POST` | `/api/v1/ingestion[/{name}/run]` | Ingestors — list, info, health, run |
-| `GET`/`POST` | `/api/v1/endpoints[/{name}{path}]` | Custom endpoints — list, call |
+| Declared by endpoint | `/api/v1/endpoints[/{name}{path}]` | Custom endpoints — list, call; `GET`/`HEAD` input is query-bound and write-method input is JSON |
 | `GET`/`POST` | `/api/v1/logs[/{id}\|/analyze\|/analysis]` | Invocation logs across resources (`?resource=` + `name=`; when `logs_history` on) |
 | `GET`/`POST` | `/api/v1/control[/...]` | Control plane (when enabled) |
 
@@ -101,15 +102,15 @@ curl http://localhost:8000/api/v1/agents
 **Response:**
 ```json
 {
-  "agents": [
-    {
+  "agents": {
+    "my_agent": {
       "name": "my_agent",
       "slug": "my-agent",
       "description": "A helpful assistant",
       "version": "1.0.0",
       "framework": "langgraph"
     }
-  ]
+  }
 }
 ```
 

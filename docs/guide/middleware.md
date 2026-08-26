@@ -1,7 +1,7 @@
 # Middleware Stack
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Pipeline Security, Scaling, Monitoring, and Extensibility</h3>
 </div>
 
@@ -141,7 +141,7 @@ Content-Type: application/json
 
 !!! warning "Security Best Practices"
     - Never commit API keys to version control
-    - Use environment variables: `export AGENTOMATIC_AUTH_API_KEY=sk_prod_...`
+    - Use environment variables: `export AGENTOMATIC_API_KEY=sk_prod_...`
     - Rotate keys regularly
     - Use different keys for development, staging, and production
 

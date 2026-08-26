@@ -43,6 +43,24 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 # Directory containing the built React app (index.html, static/js, static/css)
 STATIC_DIR = Path(__file__).parent / "static"
 
+# Vite names every production chunk with a content hash.  Browsers may cache
+# those files indefinitely because a changed chunk necessarily has a new URL;
+# the SPA document itself must remain revalidatable so it can point at the new
+# set after a deployment.
+_IMMUTABLE_ASSET_SUFFIXES = frozenset(
+    {".js", ".css", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".woff", ".woff2"}
+)
+_IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+_HTML_CACHE_CONTROL = "no-cache"
+
+
+def _studio_cache_headers(filename: str, file_path: Path) -> dict[str, str]:
+    """Return deployment-safe cache headers for Studio shell and chunks."""
+    if file_path.suffix.lower() in _IMMUTABLE_ASSET_SUFFIXES and filename.startswith("assets/"):
+        return {"Cache-Control": _IMMUTABLE_CACHE_CONTROL}
+    return {"Cache-Control": _HTML_CACHE_CONTROL}
+
+
 # ── Informative error page ───────────────────────────────────────────
 _ASSETS_MISSING_HTML = """\
 <!doctype html>
@@ -207,7 +225,12 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
         )
 
     # Serve root-level assets (favicon, manifest, robots.txt, etc.)
-    @app.get(f"{prefix}/{{filename:path}}", response_model=None, include_in_schema=False)
+    @app.api_route(
+        f"{prefix}/{{filename:path}}",
+        methods=["GET", "HEAD"],
+        response_model=None,
+        include_in_schema=False,
+    )
     async def studio_spa(
         request: Request,
         filename: str,
@@ -215,10 +238,23 @@ def mount_studio_ui(app: FastAPI, path_prefix: str = "/studio/ui") -> None:
         """Serve Studio UI files or fallback to index.html for SPA routing."""
         # Try to serve the exact file
         file_path = STATIC_DIR / filename
-        if filename and file_path.is_file() and file_path.resolve().is_relative_to(STATIC_DIR):
-            return FileResponse(str(file_path))
+        # Package installers can link site-packages files into a shared cache.
+        # Compare resolved paths on *both* sides; otherwise an asset is safe
+        # but falsely fails containment and receives the SPA HTML instead.
+        if (
+            filename
+            and file_path.is_file()
+            and file_path.resolve().is_relative_to(STATIC_DIR.resolve())
+        ):
+            return FileResponse(
+                str(file_path),
+                headers=_studio_cache_headers(filename, file_path),
+            )
         # SPA fallback: serve index.html for any non-file path
-        return FileResponse(str(STATIC_DIR / "index.html"))
+        return FileResponse(
+            str(STATIC_DIR / "index.html"),
+            headers={"Cache-Control": _HTML_CACHE_CONTROL},
+        )
 
     # Redirect /studio/ui to /studio/ui/ for consistency
     @app.get(prefix, include_in_schema=False)

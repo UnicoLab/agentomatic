@@ -1181,6 +1181,7 @@ A ready-to-run showcase lives in
 no few-shot), a fake 20-example dataset, and a `train.py` that runs the exact
 Keras workflow from the docs:
 
+```python
 from agentomatic import (
     BaseGraphAgent,
     EarlyStopping,

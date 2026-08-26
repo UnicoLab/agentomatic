@@ -29,7 +29,17 @@ exporters:
 service:
   telemetry:
     metrics:
-      address: 0.0.0.0:8888
+      level: detailed
+      # Collector v0.123+ uses SDK metric readers. The old ``address`` key
+      # now prevents startup, leaving the entire trace pipeline unavailable.
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+                without_type_suffix: true
+                without_units: true
   pipelines:
     traces:
       receivers: [otlp]

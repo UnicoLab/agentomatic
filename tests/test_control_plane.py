@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agentomatic import AgentManifest, AgentPlatform
-from agentomatic.connections.manager import reset_connections
+from agentomatic.connections.manager import PLATFORM_SCOPE, get_connections, reset_connections
 from agentomatic.endpoints import BaseEndpoint
 
 
@@ -67,6 +67,7 @@ def test_control_info(client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["platform"] == "Control Test"
+    assert data["control_token_required"] is True
     assert data["version"] == "9.9.9"
     assert data["agent_count"] == 1
     assert data["endpoint_count"] == 1
@@ -120,6 +121,77 @@ def test_control_health(client):
     resp = client.get("/api/v1/control/health")
     assert resp.status_code == 200
     assert "agents" in resp.json()
+
+
+def test_control_connection_diagnostics_never_expose_health_check_secrets(client):
+    """Control reads must not turn custom health data into a secret leak."""
+
+    class _SensitiveConnection:
+        name = "private_service"
+        config = None
+
+        async def health_check(self):
+            return {
+                "connection": self.name,
+                "kind": "custom",
+                "status": "unhealthy",
+                "url": "postgresql://operator:TOPSECRET@db.internal/app",
+                "headers": {"Authorization": "Bearer TOPSECRET"},
+                "error": "Cannot connect to postgresql://operator:TOPSECRET@db.internal/app",
+            }
+
+    get_connections(PLATFORM_SCOPE)._connections[_SensitiveConnection.name] = (
+        _SensitiveConnection()
+    )
+
+    listed = client.get("/api/v1/control/connections")
+    assert listed.status_code == 200
+    entry = listed.json()[0]["connections"]["private_service"]
+    probe = client.get("/api/v1/control/connections/__platform__/private_service")
+    assert probe.status_code == 200
+    for payload in (entry, probe.json()):
+        assert payload["connection"] == "private_service"
+        assert payload["status"] == "unhealthy"
+        assert "TOPSECRET" not in str(payload)
+        assert "url" not in payload
+        assert "headers" not in payload
+
+
+def test_control_health_never_exposes_agent_or_connection_health_secrets(client, platform):
+    """The aggregate readiness endpoint has the same redaction contract."""
+
+    def _broken_graph():
+        raise RuntimeError("graph setup failed with token TOPSECRET")
+
+    class _SensitiveConnection:
+        name = "private_service"
+        config = None
+
+        async def health_check(self):
+            return {
+                "connection": self.name,
+                "status": "unhealthy",
+                "url": "postgresql://operator:TOPSECRET@db.internal/app",
+                "error": "Cannot connect with TOPSECRET",
+            }
+
+    agent = platform._registry.get("echo_agent")
+    assert agent is not None
+    agent.graph_fn = _broken_graph
+    get_connections(PLATFORM_SCOPE)._connections[_SensitiveConnection.name] = (
+        _SensitiveConnection()
+    )
+
+    agent_detail = client.get("/api/v1/control/agents/echo_agent")
+    aggregate = client.get("/api/v1/control/health")
+    assert agent_detail.status_code == aggregate.status_code == 200
+    for payload in (agent_detail.json(), aggregate.json()):
+        assert "TOPSECRET" not in str(payload)
+
+    health = aggregate.json()
+    assert health["agents"]["echo_agent"]["graph_ready"] is False
+    assert "graph_error" not in health["agents"]["echo_agent"]
+    assert "url" not in health["connections"][PLATFORM_SCOPE]["private_service"]
 
 
 # ---------------------------------------------------------------------------

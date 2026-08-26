@@ -1,7 +1,7 @@
 # Installation
 
 <div align="center">
-  <img src="../assets/logo.png" width="200" alt="agentomatic logo">
+  <img src="../../assets/logo.png" width="200" alt="agentomatic logo">
   <h3>Getting Started Stack</h3>
 </div>
 

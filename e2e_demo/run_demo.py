@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end demo server for agentomatic v0.4.1.
+"""End-to-end demo server for the current Agentomatic release.
 
 Tests:
   ✅ Package import (without extras)
@@ -28,7 +28,7 @@ from agentomatic._version import __version__
 
 # ── Step 1: Test bare import ─────────────────────────────────────────
 print("=" * 60)
-print("  🧪 Agentomatic v0.4.1 — E2E Demo")
+print(f"  🧪 Agentomatic v{__version__} — E2E Demo")
 print("=" * 60)
 
 print("\n1️⃣  Testing bare import...")

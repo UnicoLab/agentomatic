@@ -10,8 +10,8 @@ copyright: Copyright &copy; 2024-2026 UnicoLab
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/logo.png
-  favicon: assets/logo.png
+  logo: assets/agentomatic-mark.svg
+  favicon: assets/agentomatic-mark.svg
   font:
     text: Inter
     code: JetBrains Mono
@@ -39,6 +39,7 @@ theme:
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
     - navigation.top
     - navigation.footer
     - navigation.path
@@ -48,6 +49,9 @@ theme:
     - content.tabs.link
     - content.code.copy
     - content.code.annotate
+    - content.action.edit
+    - content.action.view
+    - content.footnote.tooltips
     - content.tooltips
     - toc.follow
   icon:

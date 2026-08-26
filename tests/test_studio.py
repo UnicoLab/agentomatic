@@ -413,6 +413,10 @@ class TestModels:
         assert req.user_id == "default-user"
         assert req.breakpoints == []
 
+        structured = StudioRunRequest(classification="billing", priority=2)
+        assert structured.query == ""
+        assert structured.classification == "billing"
+
         req2 = StudioRunRequest(
             query="test",
             user_id="user_1",
@@ -550,6 +554,15 @@ class TestRouterIntegration:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_create_run_accepts_a_structured_input_without_query(self, client):
+        """Studio must not reject a valid live schema solely for lacking `query`."""
+        response = client.post(
+            "/studio/agents/test_agent/runs",
+            json={"classification": "billing", "priority": 2},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["input"]["classification"] == "billing"
+
     def test_get_run_not_found(self, client):
         response = client.get("/studio/agents/test_agent/runs/nonexistent")
         assert response.status_code == 404
@@ -561,6 +574,19 @@ class TestRouterIntegration:
         assert data["thread_id"] == "t1"
         assert data["agent_name"] == "test_agent"
         assert data["state"] == {}  # GenericAdapter returns empty on first access
+
+    def test_update_state_persists_for_the_router_lifetime(self, client):
+        """The Debug view must read back a state edit on its next request."""
+        updated = client.post(
+            "/studio/agents/test_agent/threads/t1/state",
+            json={"updates": {"audit_marker": "persisted"}},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["state"]["audit_marker"] == "persisted"
+
+        fetched = client.get("/studio/agents/test_agent/threads/t1/state")
+        assert fetched.status_code == 200
+        assert fetched.json()["state"]["audit_marker"] == "persisted"
 
     def test_get_history_no_store(self, client):
         response = client.get("/studio/agents/test_agent/threads/t1/history")
@@ -997,6 +1023,68 @@ class TestGenericAdapter:
         assert "node_start" in event_types
         assert "node_end" in event_types
         assert "trace" in event_types
+
+    @pytest.mark.asyncio
+    async def test_replay_uses_the_stored_checkpoint_input(self):
+        """Generic Studio replay re-runs the original input, not an empty envelope."""
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        node = AsyncMock(return_value={"response": "hello"})
+        agent = self._make_agent(node_fn=node)
+        adapter = GenericAdapter(agent)
+        config = {"configurable": {"thread_id": "t1"}}
+
+        async for _event in adapter.stream_execution({"current_query": "original"}, config=config):
+            pass
+        history = await adapter.get_history("t1")
+        assert len(history) == 1
+
+        async for _event in adapter.stream_execution(
+            {"current_query": "incorrect empty replay"},
+            config=config,
+            checkpoint_id=history[0].id,
+        ):
+            pass
+
+        assert node.await_count == 2
+        assert node.await_args_list[-1].args[0]["current_query"] == "original"
+
+    @pytest.mark.asyncio
+    async def test_history_state_and_replay_survive_adapter_recreation_with_a_store(self):
+        """Generic traces use the configured store, not a single worker's cache."""
+        from agentomatic.storage import MemoryStore
+        from agentomatic.studio.adapters.generic import GenericAdapter
+
+        node = AsyncMock(return_value={"response": "stored"})
+        agent = self._make_agent(node_fn=node)
+        store = MemoryStore()
+        config = {"configurable": {"thread_id": "restart-thread"}}
+        original = GenericAdapter(agent, store)
+
+        async for _event in original.stream_execution(
+            {"current_query": "survives restart"}, config=config
+        ):
+            pass
+        checkpoint = (await original.get_history("restart-thread"))[0]
+
+        restarted = GenericAdapter(agent, store)
+        history = await restarted.get_history("restart-thread")
+        state = await restarted.get_state("restart-thread")
+
+        assert [item.id for item in history] == [checkpoint.id]
+        assert state is not None
+        assert state.state["last_input"]["current_query"] == "survives restart"
+        assert state.state["last_output"] == {"response": "stored"}
+
+        async for _event in restarted.stream_execution(
+            {"current_query": "ignored replay envelope"},
+            config=config,
+            checkpoint_id=checkpoint.id,
+        ):
+            pass
+
+        assert node.await_count == 2
+        assert node.await_args_list[-1].args[0]["current_query"] == "survives restart"
 
 
 class TestDecorators:

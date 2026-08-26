@@ -17,6 +17,7 @@ from loguru import logger
 from agentomatic.core.errors import client_safe_detail
 
 from .context import NullIngestionContext
+from .models import IngestionResult
 from .registry import IngestionRegistry
 
 if TYPE_CHECKING:
@@ -59,29 +60,29 @@ def _mount_ingestor(
     input_schema = ingestor.get_input_schema()
 
     @router.get(f"/{name}/info", summary=f"Info for {name}")
-    async def info(_ingestor: Any = ingestor) -> dict[str, Any]:
+    async def info() -> dict[str, Any]:
         """Return ingestor metadata."""
-        return _ingestor.info()
+        return ingestor.info()
 
     @router.get(f"/{name}/health", summary=f"Health for {name}")
-    async def health(_ingestor: Any = ingestor) -> dict[str, Any]:
+    async def health() -> dict[str, Any]:
         """Return ingestor health."""
-        return await _ingestor.health_check()
+        return await ingestor.health_check()
 
-    async def run_endpoint(request: Any, _ingestor: Any = ingestor) -> Any:
+    async def run_endpoint(request: Any) -> Any:
         """Run the ingestor synchronously and return the result."""
         t0 = time.perf_counter()
         try:
-            result = await _ingestor.run(request, NullIngestionContext())
+            result = await ingestor.run(request, NullIngestionContext())
         except Exception as exc:  # noqa: BLE001
             duration = (time.perf_counter() - t0) * 1000
-            logger.error(f"Ingestor '{_ingestor.ingestor_name}' failed: {exc}")
+            logger.error(f"Ingestor '{ingestor.ingestor_name}' failed: {exc}")
             if log_recorder is not None:
                 from agentomatic.logs.helpers import record_invocation
 
                 await record_invocation(
                     resource_type="ingestion",
-                    resource_name=_ingestor.ingestor_name,
+                    resource_name=ingestor.ingestor_name,
                     endpoint="run",
                     input_data=request,
                     error=str(exc),
@@ -94,13 +95,13 @@ def _mount_ingestor(
                 detail=client_safe_detail(exc, context="Ingestion failed"),
             ) from exc
         duration = (time.perf_counter() - t0) * 1000
-        logger.debug(f"Ingestor '{_ingestor.ingestor_name}' ran in {duration:.1f}ms")
+        logger.debug(f"Ingestor '{ingestor.ingestor_name}' ran in {duration:.1f}ms")
         if log_recorder is not None:
             from agentomatic.logs.helpers import record_invocation
 
             await record_invocation(
                 resource_type="ingestion",
-                resource_name=_ingestor.ingestor_name,
+                resource_name=ingestor.ingestor_name,
                 endpoint="run",
                 input_data=request,
                 output_data=result,
@@ -113,7 +114,15 @@ def _mount_ingestor(
     sig = inspect.signature(run_endpoint)
     params = list(sig.parameters.values())
     params[0] = params[0].replace(annotation=input_schema)
-    setattr(run_endpoint, "__signature__", sig.replace(parameters=params))
+    # ``BaseIngestor.run`` always normalises its result to IngestionResult.
+    # Advertise that stable response model instead of the implementation's
+    # internal ``Any`` return annotation so OpenAPI clients (including Studio)
+    # can render the live output contract alongside the input form.
+    setattr(
+        run_endpoint,
+        "__signature__",
+        sig.replace(parameters=params, return_annotation=IngestionResult),
+    )
     router.add_api_route(
         f"/{name}/run",
         run_endpoint,

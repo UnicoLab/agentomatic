@@ -26,7 +26,7 @@ from fastapi.testclient import TestClient
 
 from agentomatic import AgentManifest, AgentPlatform
 
-_BUNDLE_DIR = Path(__file__).resolve().parents[1] / ("src/agentomatic/studio/static/static/js")
+_STATIC_DIR = Path(__file__).resolve().parents[1] / "src/agentomatic/studio/static"
 
 # Paths the bundle builds dynamically in ways the static extractor cannot see
 # (or that are intentionally probed with a fallback). Keep this list tiny and
@@ -40,11 +40,40 @@ _EXTRACTOR_BLIND_SPOTS: frozenset[str] = frozenset()
 
 
 def _find_bundle() -> Path | None:
-    """Return the shipped Studio JS bundle, if the UI assets are present."""
-    if not _BUNDLE_DIR.is_dir():
+    """Return the JS entrypoint referenced by the shipped Studio document.
+
+    The Studio build is produced independently, so accept its actual asset layout
+    rather than coupling this regression check to a particular bundler's legacy
+    ``static/js/main.*.js`` naming convention.
+    """
+    index = _STATIC_DIR / "index.html"
+    if not index.is_file():
         return None
-    bundles = sorted(_BUNDLE_DIR.glob("main.*.js"))
-    return bundles[0] if bundles else None
+    match = re.search(r'<script[^>]+src="([^"]+\.js)"', index.read_text(encoding="utf-8"))
+    if match is None:
+        return None
+    return _STATIC_DIR / match.group(1).removeprefix("/studio/ui/")
+
+
+def _find_bundles() -> list[Path]:
+    """Return every shipped JavaScript chunk, including lazy view chunks.
+
+    The entrypoint is intentionally small: Graph, Builder, and operational
+    pages are deferred until an operator selects them.  Route-alignment checks
+    must cover those chunks too, otherwise a broken endpoint can hide behind a
+    navigation click even while the initial Studio screen is healthy.
+    """
+    return sorted((_STATIC_DIR / "assets").glob("*.js"))
+
+
+def _frontend_api_paths() -> set[str]:
+    """Collect API paths from the entrypoint and every lazy-loaded chunk."""
+    paths: set[str] = set()
+    for bundle in _find_bundles():
+        paths.update(
+            extract_frontend_api_paths(bundle.read_text(encoding="utf-8", errors="replace"))
+        )
+    return paths
 
 
 def _parse_concat_chain(text: str, quote_index: int) -> tuple[str, int]:
@@ -243,17 +272,19 @@ def _matches(frontend_path: str, backend_path: str) -> bool:
 def test_studio_bundle_is_present() -> None:
     """The packaged Studio UI assets must ship with the wheel."""
     assert _find_bundle() is not None, (
-        f"No Studio JS bundle found under {_BUNDLE_DIR}. The Studio UI is "
+        f"No Studio JS bundle found under {_STATIC_DIR}. The Studio UI is "
         "expected to be synced into the package."
     )
+    assert _find_bundles(), "No Studio JavaScript chunks were packaged"
 
 
 def test_extractor_finds_a_meaningful_number_of_paths() -> None:
     """Guard the parser itself — a silent regex break would void this suite."""
-    bundle = _find_bundle()
-    assert bundle is not None
-    paths = extract_frontend_api_paths(bundle.read_text(encoding="utf-8", errors="replace"))
-    assert len(paths) >= 25, f"extractor found only {len(paths)} paths — parser likely broke"
+    paths = _frontend_api_paths()
+    # Vite's optimizer coalesces several request expressions. Keep the floor
+    # at the observed production bundle surface so a parser regression remains
+    # detectable across both eager and lazy chunks.
+    assert len(paths) >= 15, f"extractor found only {len(paths)} paths — parser likely broke"
     # Spot-check a few well-known calls the UI certainly makes.
     assert "/studio/agents" in paths
     assert "/api/v1/control/agents" in paths
@@ -265,11 +296,7 @@ def test_every_frontend_api_path_exists_on_the_backend(backend_route_templates) 
     A failure here means the checked-in UI bundle and the Python backend have
     drifted: the UI will 404 at runtime against this version of the platform.
     """
-    bundle = _find_bundle()
-    assert bundle is not None
-    frontend_paths = extract_frontend_api_paths(
-        bundle.read_text(encoding="utf-8", errors="replace")
-    )
+    frontend_paths = _frontend_api_paths()
 
     missing = sorted(
         fe
@@ -287,9 +314,7 @@ def test_studio_debug_api_paths_are_all_under_the_studio_prefix(
     backend_route_templates,
 ) -> None:
     """Sanity: the Studio calls we protect with auth really are /studio/*."""
-    bundle = _find_bundle()
-    assert bundle is not None
-    paths = extract_frontend_api_paths(bundle.read_text(encoding="utf-8", errors="replace"))
+    paths = _frontend_api_paths()
     studio_paths = {p for p in paths if p.startswith("/studio")}
     assert studio_paths, "expected the UI to call the Studio debug API"
     # None of them are the public UI shell — those are asset requests, not

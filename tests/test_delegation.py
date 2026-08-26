@@ -10,12 +10,12 @@ Tests cover:
   - AgentDelegator.create_handoffs()
   - SwarmOrchestrator registration and agent listing
   - SwarmOrchestrator.create_swarm() with unknown pattern
-  - SwarmPlaceholder behaviour for unimplemented patterns
+  - Executable supervisor and round-robin swarm patterns
 """
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -302,33 +302,43 @@ class TestSwarmOrchestratorCreateSwarm:
         with pytest.raises(ImportError, match="langgraph-swarm"):
             orch.create_swarm(pattern="handoff")
 
-    def test_supervisor_pattern_returns_placeholder(self):
+    def test_supervisor_pattern_routes_to_a_named_agent(self):
         from agentomatic.delegation.swarm import SwarmOrchestrator
 
         orch = SwarmOrchestrator()
-        orch.register_agent("a", MagicMock())
-        orch.register_agent("b", MagicMock())
+        first = MagicMock()
+        second = MagicMock()
+        first.invoke.return_value = {"handled_by": "a"}
+        second.invoke.return_value = {"handled_by": "b"}
+        orch.register_agent("a", first)
+        orch.register_agent("b", second)
 
         result = orch.create_swarm(pattern="supervisor")
 
         assert result.pattern == "supervisor"
         assert sorted(result.agents) == ["a", "b"]
-        with pytest.raises(NotImplementedError):
-            result.invoke({"input": "test"})
+        assert result.invoke({"route_to": "b", "input": "test"}) == {"handled_by": "b"}
+        second.invoke.assert_called_once_with({"route_to": "b", "input": "test"})
 
-    def test_round_robin_pattern_returns_placeholder(self):
+    def test_round_robin_pattern_cycles_through_agents(self):
         from agentomatic.delegation.swarm import SwarmOrchestrator
 
         orch = SwarmOrchestrator()
-        orch.register_agent("x", MagicMock())
+        first = MagicMock()
+        second = MagicMock()
+        first.invoke.return_value = "first"
+        second.invoke.return_value = "second"
+        orch.register_agent("first", first)
+        orch.register_agent("second", second)
 
         result = orch.create_swarm(pattern="round_robin")
 
         assert result.pattern == "round_robin"
-        with pytest.raises(NotImplementedError):
-            result("test")
+        assert result("one") == "first"
+        assert result("two") == "second"
+        assert result("three") == "first"
 
-    def test_supervisor_placeholder_repr(self):
+    def test_supervisor_runnable_repr(self):
         from agentomatic.delegation.swarm import SwarmOrchestrator
 
         orch = SwarmOrchestrator()
@@ -337,8 +347,21 @@ class TestSwarmOrchestratorCreateSwarm:
         result = orch.create_swarm(pattern="supervisor")
         repr_str = repr(result)
 
-        assert "supervisor" in repr_str
+        assert "RunnableSwarm" in repr_str
         assert "agent1" in repr_str
+
+    @pytest.mark.asyncio
+    async def test_supervisor_awaits_an_async_runnable(self):
+        from agentomatic.delegation.swarm import SwarmOrchestrator
+
+        async_agent = MagicMock()
+        async_agent.ainvoke = AsyncMock(return_value={"handled_by": "async"})
+        orch = SwarmOrchestrator()
+        orch.register_agent("async", async_agent)
+
+        swarm = orch.create_swarm(pattern="supervisor")
+        assert await swarm.ainvoke({"swarm_agent": "async"}) == {"handled_by": "async"}
+        async_agent.ainvoke.assert_awaited_once_with({"swarm_agent": "async"})
 
     def test_create_swarm_selects_specific_agents(self):
         """Should only include explicitly listed agents."""

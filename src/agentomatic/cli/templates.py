@@ -1,7 +1,8 @@
 """Agent scaffolding templates.
 
 Each template is a dict mapping relative file paths to their content.
-Templates: basic, full, rag, chatbot, custom, deepagent, legacy_dict.
+Templates include class agents, pipelines, integrations, and LangChain-native
+agents; ``TEMPLATES`` is the authoritative public registry.
 """
 
 from __future__ import annotations
@@ -2713,7 +2714,7 @@ are extracted concurrently::
             backoff: exponential
             base_delay: 1.0
           input:
-            markdown: $.steps.to_md.output.path
+            markdown: $.steps.to_md.path
 """
 from __future__ import annotations
 
@@ -2847,7 +2848,7 @@ steps:
         backoff: exponential
         base_delay: 1.0
       input:
-        markdown: $.steps.to_md.output.path
+        markdown: $.steps.to_md.path
 
 on_error: fail_fast
 timeout: 300.0

@@ -114,7 +114,7 @@ class TaskRecord(BaseModel):
     id: str = Field(default_factory=lambda: f"task_{uuid.uuid4().hex[:16]}")
     target_type: TargetType
     target: str = Field(description="Name of the agent/plugin/pipeline/endpoint.")
-    mode: str = Field(default="async", description="sync|async|batch|stream.")
+    mode: str = Field(default="async", description="sync|async|batch.")
     status: TaskStatus = TaskStatus.QUEUED
     progress: TaskProgress = Field(default_factory=TaskProgress)
 

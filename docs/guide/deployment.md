@@ -103,7 +103,7 @@ Install only the extras you use. Common production combinations:
 
 ```bash
 # Core + Postgres (async) + JWT auth + metrics/tracing
-pip install 'agentomatic[db,security,observability]'
+pip install 'agentomatic[db,security,metrics,telemetry]'
 
 # Add a vector store client for RAG agents (pick your provider)
 pip install qdrant-client            # or chromadb, weaviate-client, pinecone-client
@@ -116,7 +116,7 @@ pip install redis
 | --- | --- | --- |
 | `db` | SQLAlchemy async + drivers | Database connections, SQL memory store |
 | `security` | PyJWT + JWKS | Inbound JWT/OAuth2, zero-trust |
-| `observability` | prometheus-client, OpenTelemetry SDK | Metrics + tracing |
+| `metrics` / `telemetry` | Prometheus client / OpenTelemetry SDK + OTLP exporters | Metrics + tracing |
 | `ui` | Chainlit | Optional chat debug UI |
 
 !!! note "Async database drivers"
@@ -176,6 +176,54 @@ agentomatic deploy --minimal --stack remote          # shorthand
     `AGENTOMATIC_LOG_LEVEL=WARNING`; the REST API, health, metrics, and auth
     stay enabled. The image still installs `agentomatic[all]`, so no required
     functionality is dropped — minimal just doesn't mount the Studio routes.
+
+### Local Docker with a host oMLX server
+
+On Apple Silicon, oMLX runs natively on the host rather than inside the Linux
+container. The repository's root `docker-compose.yml` is configured for that
+topology: it publishes Agentomatic on port **8010** to avoid oMLX's usual host
+port 8000, and connects to `host.docker.internal:8000/v1` from the container.
+
+```bash
+# Start your local oMLX OpenAI-compatible server first.
+export OMLX_API_KEY="your-local-omlx-key"
+# Agentomatic uses the provider-prefixed model spec, even though oMLX itself
+# advertises the raw model id from /v1/models.
+export AGENTOMATIC_LIVE_MODEL="omlx/Qwen3.5-9B-MLX-4bit"  # optional override
+export AGENTOMATIC_API_KEY="$(openssl rand -hex 32)"
+export AGENTOMATIC_CONTROL_TOKEN="$(openssl rand -hex 32)"
+docker compose up --build
+```
+
+The Compose stack is deliberately fail-closed: it requires an API key and a
+separate control-plane token, enables global authentication, and turns on
+rate limiting. Put the variables in a local `.env` file (never commit it) for
+repeatable starts. Health checks remain public; all Studio and API calls need
+the API key.
+
+The compose file mounts agents, plugins, endpoints, and ingestors read-only so
+a fresh checkout has a runnable verification deployment. Pipeline definitions
+are the deliberate exception: `/app/pipelines` is read-write because Studio's
+validated visual builder saves and runs the exact YAML draft there. Mount a
+durable, access-controlled directory for it in production; a read-only mount
+returns a clear `409` rather than pretending that a builder save succeeded.
+Mount your own agent directory before deployment:
+
+```bash
+AGENTOMATIC_AGENT_MOUNT=./agents docker compose up --build
+```
+
+Verify the API and the model route independently:
+
+```bash
+curl http://localhost:8010/health
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" http://localhost:8010/api/v1/agents
+docker compose exec platform /app/.venv/bin/python -c '
+import asyncio
+from agentomatic.optimize.llm_caller import LLMCaller
+print(asyncio.run(LLMCaller.call("omlx/Qwen3.5-9B-MLX-4bit", "Reply with OK.", max_tokens=8)))
+'
+```
 
 `deploy/` also includes a ready observability stack
 (`deploy/observability/`) with Prometheus + OTel + Grafana.
@@ -515,7 +563,7 @@ Run it:
 
 === "CLI"
     ```bash
-    agentomatic run agents/ --host 0.0.0.0 --port 8000
+    agentomatic run --agents-dir agents/ --host 0.0.0.0 --port 8000
     ```
 
 !!! tip "Scaffolded `main.py` matches `agentomatic run`"
@@ -617,26 +665,29 @@ Point the collector/Prometheus at your app's `/metrics` and OTLP endpoint (see
 ## 8. Operate at runtime (control plane)
 
 The control plane (mounted at `{api_prefix}/control`) lets you inspect and
-operate the platform without redeploying. Mutating calls require the
-`X-Control-Token` header when `control_token` is set.
+operate the platform without redeploying. It follows the platform's normal
+authentication policy: in the production Compose profile, send
+`X-API-Key` on **every** control-plane request. Mutating calls additionally
+require `X-Control-Token` when `control_token` is set.
 
 ```bash
 # Overview + per-agent health, effective auth policy, declared connections
-curl -H "X-Control-Token: $CONTROL_TOKEN" https://api.example.com/api/v1/control
-curl -H "X-Control-Token: $CONTROL_TOKEN" https://api.example.com/api/v1/control/agents
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" https://api.example.com/api/v1/control
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" https://api.example.com/api/v1/control/agents
 
-# Connection health per scope, and custom endpoints
-curl https://api.example.com/api/v1/control/connections
-curl https://api.example.com/api/v1/control/endpoints
+# Connection health per scope (including durable platform storage), and custom endpoints
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" https://api.example.com/api/v1/control/connections
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" https://api.example.com/api/v1/control/connections/__platform__/storage
+curl -H "X-API-Key: $AGENTOMATIC_API_KEY" https://api.example.com/api/v1/control/endpoints
 
 # Drain a single agent (returns 503 for its routes), then re-enable
-curl -X POST -H "X-Control-Token: $CONTROL_TOKEN" \
+curl -X POST -H "X-API-Key: $AGENTOMATIC_API_KEY" -H "X-Control-Token: $CONTROL_TOKEN" \
   https://api.example.com/api/v1/control/agents/fraud_agent/disable
-curl -X POST -H "X-Control-Token: $CONTROL_TOKEN" \
+curl -X POST -H "X-API-Key: $AGENTOMATIC_API_KEY" -H "X-Control-Token: $CONTROL_TOKEN" \
   https://api.example.com/api/v1/control/agents/fraud_agent/enable
 
 # Platform-wide maintenance mode
-curl -X POST -H "X-Control-Token: $CONTROL_TOKEN" \
+curl -X POST -H "X-API-Key: $AGENTOMATIC_API_KEY" -H "X-Control-Token: $CONTROL_TOKEN" \
   -H "Content-Type: application/json" -d '{"enabled": true}' \
   https://api.example.com/api/v1/control/maintenance
 ```
@@ -654,7 +705,7 @@ WORKDIR /app
 
 # Install dependencies first for layer caching
 COPY pyproject.toml README.md ./
-RUN pip install 'agentomatic[db,security,observability]' qdrant-client redis
+RUN pip install 'agentomatic[db,security,metrics,telemetry]' qdrant-client redis
 
 # App code (agents/, endpoints/, pipelines/, main.py)
 COPY . .
@@ -701,13 +752,15 @@ volumes:
 
 | Endpoint | Purpose | Auth |
 | --- | --- | --- |
-| `GET /health` | Liveness (always fast, unauthenticated) | none (skip-path) |
+| `GET /health` | Liveness (always fast, unauthenticated; status-only diagnostics) | none (skip-path) |
 | `GET /api/v1/{agent}/health` | Per-agent liveness | per policy |
-| `GET /api/v1/control/health` | Aggregate health (agents + connections) | control token |
+| `GET /api/v1/control/health` | Aggregate health (agents + connections) | per policy (not control token) |
 | `GET /api/v1/status` | Whole-platform status JSON (all resources + task engine) | per policy |
 | `GET /status` | Human-readable HTML status dashboard | per policy |
 
-Use `/health` for Kubernetes liveness probes and
+Use `/health` for Kubernetes liveness probes. It intentionally exposes only
+resource status signals; use an authenticated control-plane or status request
+when an operator needs diagnostics. Use
 `/api/v1/control/health` for a deeper readiness gate. The unified
 [`/status` dashboard](status.md) is the fastest way for operators to see the
 health of every agent, plugin, pipeline, endpoint, ingestor, storage, and the
@@ -724,7 +777,7 @@ readinessProbe:
 
 ## Production checklist
 
-- [ ] Installed only the extras you need (`db`, `security`, `observability`, provider clients).
+- [ ] Installed only the extras you need (`db`, `security`, `metrics`, `telemetry`, provider clients).
 - [ ] All credentials come from `${ENV}` — no secrets committed.
 - [ ] `enable_jwt_auth=True` with a real `jwks_url`, `issuer`, and `audience`.
 - [ ] `enable_zero_trust=True` and every agent has an explicit `security` policy.

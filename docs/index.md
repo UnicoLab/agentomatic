@@ -3,24 +3,26 @@ hide:
   - navigation
 ---
 
-# Agentomatic
-
-<div align="center">
-  <p align="center">
-    <img src="assets/logo.png" width="300" alt="agentomatic logo">
-  </p>
-
-  <h3>Drop agents, not code. ⚡</h3>
-  <p><b>The zero-code multi-agent API platform framework.</b><br>
-  Turn any Python function, LangGraph workflow, LangChain pipeline, or Deep Agent into a production-ready microservice — with auto-discovery, SSE streaming, thread persistence, visual debugging, and prompt optimization. Every agent, plugin, pipeline, endpoint, and ingestor is automatically callable <b>sync, async, batch, streaming, or as a tracked background task</b>, with a unified task board and a whole-platform status dashboard.</p>
-
-  <p>
+<div class="docs-hero">
+  <div class="docs-hero__copy">
+    <p class="docs-hero__eyebrow">Agent platform for production systems</p>
+    <h1>Agentomatic</h1>
+    <p class="docs-hero__lead">Drop agents, not code.</p>
+    <p>Turn Python functions, LangGraph workflows, LangChain pipelines, and Deep Agents into observable, production-ready services. Every component is discoverable, streamable, and ready for real operations.</p>
+    <p class="docs-hero__actions">
+      <a class="md-button md-button--primary" href="getting-started/quickstart/">Start building</a>
+      <a class="md-button" href="guide/deployment/">Deploy locally</a>
+    </p>
+    <p class="docs-hero__proof">
     <a href="https://pypi.org/project/agentomatic/"><img src="https://img.shields.io/pypi/v/agentomatic.svg" alt="PyPI version"></a>
     <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
     <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
-    <img src="https://img.shields.io/badge/tests-1185%20passing-brightgreen.svg" alt="Tests passing">
-    <img src="https://img.shields.io/badge/framework-LangGraph%20%7C%20LangChain%20%7C%20Deep%20Agent%20%7C%20Python-purple.svg" alt="Frameworks">
-  </p>
+    <img src="https://img.shields.io/badge/tests-continuously%20verified-brightgreen.svg" alt="Tests continuously verified">
+    </p>
+  </div>
+  <div class="docs-hero__art" aria-hidden="true">
+    <img src="assets/logo.png" alt="" width="512" height="512">
+  </div>
 </div>
 
 ---

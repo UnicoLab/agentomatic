@@ -44,12 +44,17 @@ We use **[Ruff](https://docs.astral.sh/ruff/)** for both linting and formatting:
 # Check for lint errors
 make lint
 
+# Audit the locked dependency set for known vulnerabilities
+make audit
+
 # Auto-fix and format
 make format
 ```
 
 !!! important "CI Enforcement"
-    The CI pipeline runs `ruff check` and `ruff format --check`. PRs with lint errors will fail.
+    The CI pipeline runs `ruff check`, `ruff format --check`, and `pip-audit` against
+    the complete locked dependency set. PRs with lint errors or known vulnerable
+    dependencies will fail.
 
 ### Conventions
 

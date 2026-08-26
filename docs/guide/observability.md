@@ -18,7 +18,7 @@ from agentomatic import AgentPlatform
 platform = AgentPlatform(
     title="My Agents",
     enable_metrics=True,   # exposes GET /metrics for Prometheus
-    enable_tracing=True,   # emits OTLP spans
+    enable_telemetry=True, # emits OTLP spans
 )
 app = platform.build()
 ```
@@ -64,8 +64,10 @@ _Agentomatic_) with panels for request throughput/latency, agent invocations,
 custom endpoint and upstream calls, connection acquisitions, and error rates.
 
 !!! tip "Scrape target"
-    Prometheus scrapes `host.docker.internal:8000/metrics` by default. Adjust
-    the target in `prometheus/prometheus.yml` if your app runs elsewhere.
+    Prometheus scrapes `host.docker.internal:8010/metrics` by default, matching
+    the repository's packaged Docker platform. Adjust the target to `:8000`
+    when Agentomatic itself runs directly on the host with that port, or to
+    your service DNS name in a shared container network.
 
 ## Metrics reference
 
@@ -118,3 +120,31 @@ agent invocation, endpoint call, and connection acquisition is logged with
 contextual detail, so local development and production share the same
 observable behaviour. See [Telemetry & Feedback](telemetry.md) for
 request-level telemetry and user feedback capture.
+
+### Durable operation audit trail
+
+When invocation history is enabled (`AGENTOMATIC_LOGS_HISTORY=1` with a
+persistent store), every persisted agent, pipeline, plugin, endpoint, and
+ingestion invocation also emits a safe audit event. It includes the generated
+run correlation ID, resource, operation, outcome, and latency — never raw
+request payloads or credentials. Conversation IDs are represented by a
+one-way short `thread_ref`, not their original values.
+
+Set `AGENTOMATIC_AUDIT_HASH_KEY` to a separately managed, high-entropy secret
+when audit references must remain stable across API-key rotation. Otherwise
+the configured API key is used as the HMAC key; with neither configured, the
+reference is process-local only.
+
+Configure a JSONL sink on a durable mounted volume or a log-forwarder-managed
+path; do not point it at a container-only directory if the audit trail must
+survive replacement:
+
+```bash
+AGENTOMATIC_AUDIT_LOG=/var/log/agentomatic/audit.jsonl
+AGENTOMATIC_LOGS_HISTORY=1
+DATABASE_URL=postgresql+asyncpg://user:password@db/agentomatic
+```
+
+The sink rotates at 20 MB and retains 90 days locally. Production deployments
+should also collect stdout/audit records in their central logging or SIEM
+system; filesystem retention is a safety layer, not a replacement for one.

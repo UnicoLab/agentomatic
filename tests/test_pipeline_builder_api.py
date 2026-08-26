@@ -304,6 +304,23 @@ class TestSavePipeline:
             detail = resp.json()["detail"]
             assert any("ghost" in e for e in detail["errors"])
 
+    def test_save_rejects_recursive_sub_pipeline(self, tmp_path: Path) -> None:
+        """Studio hides this choice; the REST API must enforce it as well."""
+        draft = {
+            "name": "recursive",
+            "steps": [{"name": "again", "sub_pipeline": "recursive"}],
+        }
+        with TestClient(_pipeline_app(tmp_path)) as client:
+            validation = client.post("/api/v1/pipelines/validate-draft", json={"pipeline": draft})
+            assert validation.status_code == 200
+            assert validation.json()["valid"] is False
+            assert any("cycle" in error.lower() for error in validation.json()["errors"])
+
+            resp = client.post("/api/v1/pipelines/recursive", json={"pipeline": draft})
+            assert resp.status_code == 422
+            assert any("cycle" in error.lower() for error in resp.json()["detail"]["errors"])
+            assert not (tmp_path / "pipelines" / "recursive.yaml").exists()
+
     def test_save_requires_persistence_dir(self, tmp_path: Path) -> None:
         registry = _registry()
         router = create_pipeline_router({}, registry, api_prefix="/api/v1")
@@ -313,6 +330,19 @@ class TestSavePipeline:
             resp = client.post("/api/v1/pipelines/demo", json={"pipeline": _DRAFT})
             assert resp.status_code == 400
             assert "not configured" in resp.json()["detail"]["message"]
+
+    def test_save_read_only_storage_returns_actionable_conflict(self, tmp_path: Path) -> None:
+        """A hardened container must not expose an internal OSError as HTTP 500."""
+        pipeline_dir = tmp_path / "pipelines"
+        pipeline_dir.mkdir()
+        pipeline_dir.chmod(0o555)
+        try:
+            with TestClient(_pipeline_app(tmp_path)) as client:
+                resp = client.post("/api/v1/pipelines/demo", json={"pipeline": _DRAFT})
+            assert resp.status_code == 409
+            assert "read-write" in resp.json()["detail"]["message"]
+        finally:
+            pipeline_dir.chmod(0o755)
 
     def test_save_rejects_unsafe_name(self, tmp_path: Path) -> None:
         draft = {"name": "..evil", "steps": [{"name": "t", "transform": "return {}"}]}

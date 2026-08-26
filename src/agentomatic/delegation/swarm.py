@@ -6,6 +6,8 @@ and round-robin distribution across registered agents.
 
 from __future__ import annotations
 
+import inspect
+from threading import Lock
 from typing import Any
 
 from loguru import logger
@@ -173,29 +175,22 @@ class SwarmOrchestrator:
     def _create_supervisor_swarm(self, agents: dict[str, Any]) -> Any:
         """Create a supervisor-pattern swarm.
 
-        The supervisor pattern uses a central routing node that dispatches
-        to the appropriate agent based on the current state.
+        The returned runnable dispatches to the agent selected by the input's
+        ``swarm_agent``, ``route_to``, or ``agent`` key (in that order). When
+        no routing hint is supplied, it uses the first registered agent.
 
         Args:
             agents: Mapping of agent name to compiled graph.
 
         Returns:
-            A placeholder that raises NotImplementedError with guidance.
+            A runnable supervisor swarm.
         """
-        logger.warning(
-            "Supervisor pattern is not yet fully implemented. Returning a placeholder. Agents: {}",
+        logger.info(
+            "Creating supervisor swarm with {} agents: {}",
+            len(agents),
             sorted(agents.keys()),
         )
-        return _SwarmPlaceholder(
-            pattern="supervisor",
-            agents=sorted(agents.keys()),
-            message=(
-                "The 'supervisor' swarm pattern requires a custom "
-                "StateGraph with a router node. See the agentomatic docs "
-                "for guidance on implementing supervisor orchestration, or "
-                "use the 'handoff' pattern with langgraph-swarm."
-            ),
-        )
+        return _RunnableSwarm(pattern="supervisor", agents=agents)
 
     def _create_round_robin_swarm(self, agents: dict[str, Any]) -> Any:
         """Create a round-robin distribution swarm.
@@ -206,60 +201,82 @@ class SwarmOrchestrator:
             agents: Mapping of agent name to compiled graph.
 
         Returns:
-            A placeholder that raises NotImplementedError with guidance.
+            A runnable round-robin swarm.
         """
-        logger.warning(
-            "Round-robin pattern is not yet fully implemented. "
-            "Returning a placeholder. Agents: {}",
+        logger.info(
+            "Creating round-robin swarm with {} agents: {}",
+            len(agents),
             sorted(agents.keys()),
         )
-        return _SwarmPlaceholder(
-            pattern="round_robin",
-            agents=sorted(agents.keys()),
-            message=(
-                "The 'round_robin' swarm pattern is not yet implemented. "
-                "Consider using the 'handoff' pattern with langgraph-swarm "
-                "or implementing a custom StateGraph with sequential routing."
-            ),
-        )
+        return _RunnableSwarm(pattern="round_robin", agents=agents)
 
 
-class _SwarmPlaceholder:
-    """Placeholder for swarm patterns that are not yet fully implemented.
+class _RunnableSwarm:
+    """Small runnable wrapper for the built-in swarm patterns.
 
-    Raises NotImplementedError when invoked, with guidance on alternatives.
+    It deliberately accepts any LangGraph/LangChain-compatible runnable:
+    objects exposing ``invoke`` / ``ainvoke`` as well as plain callables. The
+    implementation is dependency-free, so teams that do not install
+    ``langgraph-swarm`` still have production-safe supervisor and round-robin
+    dispatching.
 
     Args:
-        pattern: The swarm pattern name.
-        agents: List of agent names included.
-        message: Human-readable guidance message.
+        pattern: ``supervisor`` or ``round_robin``.
+        agents: Mapping of stable agent names to compatible runnables.
     """
 
-    def __init__(
-        self,
-        pattern: str,
-        agents: list[str],
-        message: str,
-    ) -> None:
+    def __init__(self, *, pattern: str, agents: dict[str, Any]) -> None:
         self.pattern = pattern
-        self.agents = agents
-        self.message = message
+        self._agents = dict(agents)
+        self.agents = list(self._agents)
+        self._next_index = 0
+        self._lock = Lock()
 
-    def invoke(self, *args: Any, **kwargs: Any) -> Any:
-        """Raise NotImplementedError with guidance.
+    def _select(self, input_data: Any) -> tuple[str, Any]:
+        """Select the target runnable for one invocation."""
+        if self.pattern == "round_robin":
+            with self._lock:
+                name = self.agents[self._next_index]
+                self._next_index = (self._next_index + 1) % len(self.agents)
+            return name, self._agents[name]
 
-        Raises:
-            NotImplementedError: Always, with instructions for alternatives.
+        selected = None
+        if isinstance(input_data, dict):
+            for key in ("swarm_agent", "route_to", "agent"):
+                if input_data.get(key):
+                    selected = str(input_data[key])
+                    break
+        name = selected or self.agents[0]
+        agent = self._agents.get(name)
+        if agent is None:
+            raise ValueError(
+                f"Supervisor selected unknown agent '{name}'. Available: {self.agents}"
+            )
+        return name, agent
+
+    def invoke(self, input: Any, **kwargs: Any) -> Any:  # noqa: A002
+        """Synchronously dispatch one input to the selected swarm agent.
+
+        Async-only runnables must be called through :meth:`ainvoke` so their
+        coroutine is never leaked or run in an accidental event loop.
         """
-        raise NotImplementedError(self.message)
+        name, agent = self._select(input)
+        call = getattr(agent, "invoke", agent)
+        result = call(input, **kwargs)
+        if inspect.isawaitable(result):
+            raise TypeError(f"Swarm agent '{name}' is async-only; call swarm.ainvoke(...)")
+        return result
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Raise NotImplementedError with guidance.
+    async def ainvoke(self, input: Any, **kwargs: Any) -> Any:  # noqa: A002
+        """Asynchronously dispatch one input to the selected swarm agent."""
+        _name, agent = self._select(input)
+        call = getattr(agent, "ainvoke", None) or getattr(agent, "invoke", agent)
+        result = call(input, **kwargs)
+        return await result if inspect.isawaitable(result) else result
 
-        Raises:
-            NotImplementedError: Always, with instructions for alternatives.
-        """
-        raise NotImplementedError(self.message)
+    def __call__(self, input: Any, **kwargs: Any) -> Any:  # noqa: A002
+        """Alias :meth:`invoke` for callable-style use."""
+        return self.invoke(input, **kwargs)
 
     def __repr__(self) -> str:
-        return f"SwarmPlaceholder(pattern={self.pattern!r}, agents={self.agents!r})"
+        return f"RunnableSwarm(pattern={self.pattern!r}, agents={self.agents!r})"

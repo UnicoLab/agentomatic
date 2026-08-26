@@ -180,11 +180,13 @@ else:  # pragma: no cover
 
     AI_MODE_REQUESTS = AI_MODE_DURATION = AI_LLM_TOKENS = AI_LLM_CALLS = AI_LLM_DURATION = (
         AI_LLM_TTFT
-    ) = AI_LLM_THINKING = AI_LLM_STRUCTURE_ERRORS = AI_LLM_OUTCOMES = AI_REGISTRY = AI_COMPONENT = (
-        AI_PIPELINE_RUNS
-    ) = AI_PIPELINE_DURATION = AI_PLUGIN_CALLS = AI_PLUGIN_DURATION = AI_INGESTION_RUNS = (
-        AI_INGESTION_DURATION
-    ) = AI_ENDPOINT_CALLS = AI_ENDPOINT_DURATION = AI_TASK_EVENTS = AI_TASKS_ACTIVE = _N()
+    ) = AI_LLM_THINKING = AI_LLM_STRUCTURE_ERRORS = AI_LLM_OUTCOMES = AI_REGISTRY = (
+        AI_COMPONENT
+    ) = AI_PIPELINE_RUNS = AI_PIPELINE_DURATION = AI_PLUGIN_CALLS = AI_PLUGIN_DURATION = (
+        AI_INGESTION_RUNS
+    ) = AI_INGESTION_DURATION = AI_ENDPOINT_CALLS = AI_ENDPOINT_DURATION = AI_TASK_EVENTS = (
+        AI_TASKS_ACTIVE
+    ) = _N()
 
 
 _UUIDISH = re.compile(r"^[0-9a-fA-F-]{8,}$")
@@ -470,9 +472,7 @@ def record_assistant_structure_error(*, llm: Any = None, model: str = "unknown")
     AI_LLM_STRUCTURE_ERRORS.labels(
         provider=provider, model=resolved_model, agent="assistant"
     ).inc()
-    AI_LLM_OUTCOMES.labels(
-        provider=provider, model=resolved_model, outcome="format_error"
-    ).inc()
+    AI_LLM_OUTCOMES.labels(provider=provider, model=resolved_model, outcome="format_error").inc()
     try:
         from agentomatic.observability.metrics import record_structure_error
 

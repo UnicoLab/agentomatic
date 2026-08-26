@@ -157,9 +157,7 @@ class MarkerAgent(BaseGraphAgent[MarkerState]):
         ]
 
     def respond(self, state: MarkerState) -> MarkerState:
-        prompt = self._prompt_with_few_shot(
-            self.resolve_system_prompt(default=self.system_prompt)
-        )
+        prompt = self._prompt_with_few_shot(self.resolve_system_prompt(default=self.system_prompt))
         temperature = self._resolve_temperature(state)
         prompt_lower = prompt.lower()
 

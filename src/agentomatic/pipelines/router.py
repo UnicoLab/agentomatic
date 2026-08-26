@@ -297,8 +297,24 @@ def create_pipeline_router(
         # Update the existing source file in place when known, otherwise
         # write to the canonical pipelines/ directory.
         target = _pipeline_paths.get(name) or (_pipelines_dir / f"{name}.yaml")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(pipeline_to_yaml(config), encoding="utf-8")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(pipeline_to_yaml(config), encoding="utf-8")
+        except OSError as exc:
+            # A production deployment often mounts source folders read-only.
+            # Return an actionable client error instead of an uncaught 500;
+            # the Compose deployment deliberately makes /app/pipelines
+            # writable for Studio-authored definitions.
+            raise HTTPException(
+                409,
+                detail={
+                    "message": (
+                        f"Pipeline storage is not writable at '{target}'. "
+                        "Mount the pipeline directory read-write to save from Studio."
+                    ),
+                    "errors": [str(exc)],
+                },
+            ) from exc
 
         all_pipelines[name] = config
         _pipeline_paths[name] = target.resolve()
@@ -329,7 +345,19 @@ def create_pipeline_router(
                     break
         if target is None or not target.exists():
             raise HTTPException(404, f"Pipeline '{name}' not found")
-        target.unlink()
+        try:
+            target.unlink()
+        except OSError as exc:
+            raise HTTPException(
+                409,
+                detail={
+                    "message": (
+                        f"Pipeline storage is not writable at '{target}'. "
+                        "Mount the pipeline directory read-write to delete from Studio."
+                    ),
+                    "errors": [str(exc)],
+                },
+            ) from exc
         all_pipelines.pop(name, None)
         _pipeline_paths.pop(name, None)
         logger.info(f"🗑  Pipeline API: deleted '{name}' ({target})")

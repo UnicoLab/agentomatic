@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ControlInfo(BaseModel):
@@ -19,6 +19,10 @@ class ControlInfo(BaseModel):
     plugin_count: int
     pipeline_count: int
     connection_scopes: int
+    control_token_required: bool = Field(
+        default=False,
+        description="Whether control-plane mutation endpoints require X-Control-Token",
+    )
 
 
 class ControlAgentInfo(BaseModel):
@@ -55,6 +59,31 @@ class ControlConnectionInfo(BaseModel):
 
     scope: str
     connections: dict[str, Any] = Field(default_factory=dict)
+
+
+class ControlConnectionProbe(BaseModel):
+    """Stable OpenAPI contract for a single live connection probe.
+
+    Connection health implementations can contain arbitrary driver metadata,
+    including URLs and credentials.  The control plane therefore exposes an
+    explicit, safe operational contract rather than passing implementation
+    details through to API clients and Studio.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(default="unknown", description="Current health status")
+    connection: str | None = Field(default=None, description="Registered connection name")
+    kind: str | None = Field(
+        default=None, description="Connection kind, such as database or vector"
+    )
+    purpose: str | None = Field(default=None, description="Declared application purpose")
+    backend: str | None = Field(default=None, description="Active backend implementation")
+    provider: str | None = Field(default=None, description="External provider, when applicable")
+    detail: str | None = Field(
+        default=None, description="Safe configuration guidance, when available"
+    )
+    error: str | None = Field(default=None, description="Sanitised diagnostic when unhealthy")
 
 
 class ToggleResponse(BaseModel):

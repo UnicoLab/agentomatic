@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import inspect
+import json
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Request
 from loguru import logger
+from pydantic import ValidationError
 
 from agentomatic.core.errors import client_safe_detail
 from agentomatic.endpoints.base import BaseEndpoint
@@ -28,6 +30,57 @@ def _observe_endpoint(name: str, status: str, elapsed: float) -> None:
         ENDPOINT_DURATION.labels(endpoint=name).observe(elapsed)
     except Exception:  # noqa: BLE001 - metrics are optional
         pass
+
+
+def _is_collection(annotation: Any) -> bool:
+    """Whether a query-model field needs all repeated values, not just one."""
+    origin = get_origin(annotation)
+    if origin in {list, set, tuple, frozenset}:
+        return True
+    return any(_is_collection(item) for item in get_args(annotation))
+
+
+def _decode_json_query_value(value: Any) -> Any:
+    """Decode the object/array representation used by URL query strings."""
+    if isinstance(value, str) and value[:1] in {"{", "["}:
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    if isinstance(value, list):
+        return [_decode_json_query_value(item) for item in value]
+    return value
+
+
+def _query_openapi_parameters(input_schema: type[Any]) -> list[dict[str, Any]]:
+    """Build query parameter docs from a Pydantic model for runtime routes."""
+    schema = input_schema.model_json_schema()
+    definitions = schema.get("$defs", {})
+
+    def inline_local_refs(value: Any) -> Any:
+        if isinstance(value, list):
+            return [inline_local_refs(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        if value.get("$ref", "").startswith("#/$defs/"):
+            name = value["$ref"].rsplit("/", 1)[-1]
+            resolved = definitions.get(name)
+            if isinstance(resolved, dict):
+                return inline_local_refs(
+                    {**resolved, **{k: v for k, v in value.items() if k != "$ref"}}
+                )
+        return {key: inline_local_refs(item) for key, item in value.items()}
+
+    required = set(schema.get("required", []))
+    return [
+        {
+            "name": name,
+            "in": "query",
+            "required": name in required,
+            "schema": inline_local_refs(field_schema),
+        }
+        for name, field_schema in schema.get("properties", {}).items()
+    ]
 
 
 def create_endpoint_router(
@@ -139,24 +192,67 @@ def create_endpoint_router(
         finally:
             _observe_endpoint(endpoint.endpoint_name, status, time.perf_counter() - t0)
 
-    # Rewrite the signature so FastAPI extracts the correct Pydantic schemas.
-    sig = inspect.signature(call_endpoint)
-    params = list(sig.parameters.values())
-    params[0] = params[0].replace(annotation=input_schema)
-    setattr(
-        call_endpoint,
-        "__signature__",
-        sig.replace(parameters=params, return_annotation=output_schema),
-    )
+    def _apply_typed_signature(handler: Any, *, query: bool = False) -> None:
+        """Expose the endpoint's Pydantic contract to FastAPI/OpenAPI.
 
-    router.add_api_route(
-        endpoint.path,
-        call_endpoint,
-        methods=endpoint.methods,
-        response_model=output_schema,
-        summary=f"Invoke the '{endpoint.endpoint_name}' endpoint",
-        description=endpoint.endpoint_description,
-    )
+        A JSON request body is correct for write operations. Browsers cannot
+        send a body with ``GET`` or ``HEAD`` however, so read-only endpoint
+        methods must be modelled as query parameters. This also lets Studio
+        generate a usable form from the served OpenAPI document.
+        """
+        sig = inspect.signature(handler)
+        params = list(sig.parameters.values())
+        params[0] = params[0].replace(
+            annotation=input_schema,
+            default=Query(...) if query else inspect.Parameter.empty,
+        )
+        setattr(
+            handler,
+            "__signature__",
+            sig.replace(parameters=params, return_annotation=output_schema),
+        )
+
+    methods = {str(method).upper() for method in endpoint.methods}
+    query_methods = sorted(method for method in methods if method in {"GET", "HEAD"})
+    body_methods = sorted(method for method in methods if method not in {"GET", "HEAD"})
+    if body_methods:
+        _apply_typed_signature(call_endpoint)
+        router.add_api_route(
+            endpoint.path,
+            call_endpoint,
+            methods=body_methods,
+            response_model=output_schema,
+            summary=f"Invoke the '{endpoint.endpoint_name}' endpoint",
+            description=endpoint.endpoint_description,
+        )
+
+    if query_methods:
+
+        async def call_endpoint_from_query(request: Request) -> Any:
+            """Validate browser-safe query parameters with the endpoint model."""
+            raw_input: dict[str, Any] = {}
+            for name, field in input_schema.model_fields.items():
+                values = request.query_params.getlist(name)
+                if not values:
+                    continue
+                raw_input[name] = _decode_json_query_value(
+                    values if _is_collection(field.annotation) else values[-1]
+                )
+            try:
+                endpoint_request = input_schema.model_validate(raw_input)
+            except ValidationError as exc:
+                raise HTTPException(status_code=422, detail=exc.errors()) from exc
+            return await call_endpoint(endpoint_request)
+
+        router.add_api_route(
+            endpoint.path,
+            call_endpoint_from_query,
+            methods=query_methods,
+            response_model=output_schema,
+            summary=f"Invoke the '{endpoint.endpoint_name}' endpoint",
+            description=endpoint.endpoint_description,
+            openapi_extra={"parameters": _query_openapi_parameters(input_schema)},
+        )
 
     # Async + batch execution modes via the task system.
     if task_manager is not None:
