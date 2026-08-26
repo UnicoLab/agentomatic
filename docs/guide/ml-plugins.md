@@ -200,9 +200,30 @@ next predict after reload uses the fresh weights — no process restart.
 Set the root via ``AGENTOMATIC_ARTIFACT_ROOT`` (default ``.local/artifacts``).
 Rollback is one call: ``registry.rollback(prior_version)``.
 
-Agentomatic does not watch artifact pointers automatically. For deterministic
-promotion, call the authenticated reload endpoint after moving the `current`
-pointer, or restart the deployment through your normal rollout process.
+### Automatic reload after promotion
+
+For a long-running service that owns its artifact volume, enable the polling
+watcher before deployment:
+
+```bash
+export AGENTOMATIC_PLUGIN_AUTORELOAD=1
+export AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL=5  # seconds; default 5
+```
+
+The watcher records the active artifact version at startup, then reloads every
+registered plugin once whenever `ArtifactRegistry.promote()` changes the
+`current` version. It serializes platform predictions with the reload, so a
+request cannot observe a partly-loaded model. If a plugin load fails, its prior
+in-memory state and readiness stay active; the broken promoted version is
+logged once and is not retried until a new version is promoted. Use the
+authenticated reload endpoint for an explicit retry after repairing an
+artifact.
+
+This is per process: in a multi-replica deployment every replica needs the
+same mounted artifact root and the flag enabled, or your deploy controller must
+call `POST /api/v1/plugins/reload` on each replica. The version pointer is the
+change signal, so publish immutable version directories and promote/rollback
+through `ArtifactRegistry` rather than editing files within the active bundle.
 
 ## Framework Agnosticism
 

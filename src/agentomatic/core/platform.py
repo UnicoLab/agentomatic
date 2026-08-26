@@ -300,6 +300,9 @@ class AgentPlatform:
         # --- Invocation log history + optional LLM analysis ---
         logs_history: bool = False,
         allow_logsllm_analysis: bool = False,
+        # --- Plugin artifact lifecycle ---
+        plugin_autoreload: bool | None = None,
+        plugin_autoreload_interval: float | None = None,
     ) -> None:
         """Initialise the platform.
 
@@ -350,6 +353,11 @@ class AgentPlatform:
                 into ``store``.
             allow_logsllm_analysis: When ``True``, expose LLM log-analysis
                 endpoints that score recent logs and return recommendations.
+            plugin_autoreload: Watch the versioned artifact ``current`` pointer
+                and reload plugins after a promotion. ``None`` uses
+                ``AGENTOMATIC_PLUGIN_AUTORELOAD`` / platform settings.
+            plugin_autoreload_interval: Polling interval in seconds. ``None``
+                uses ``AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL`` / settings.
         """
         # Apply the requested level before anything is logged.  Construction
         # and ``build()`` narrate settings loading, discovery, and every mount,
@@ -370,6 +378,12 @@ class AgentPlatform:
         self.cors_origins = cors_origins or ["*"]
         self.log_level = log_level
         self.settings = settings
+        if plugin_autoreload is None or plugin_autoreload_interval is None:
+            from agentomatic.config.settings import get_settings
+
+            plugin_settings = settings or get_settings()
+        else:
+            plugin_settings = settings
 
         # Storage — do NOT eagerly install MemoryStore when logs_history is on.
         # That used to preempt lifespan auto-derive from MEMORY connections /
@@ -378,6 +392,19 @@ class AgentPlatform:
         self._logs_history = logs_history
         self._allow_logsllm_analysis = allow_logsllm_analysis
         self._provisional_memory_store = False
+        self._plugin_autoreload = (
+            bool(getattr(plugin_settings, "plugin_autoreload", False))
+            if plugin_autoreload is None
+            else plugin_autoreload
+        )
+        self._plugin_autoreload_interval = (
+            float(getattr(plugin_settings, "plugin_autoreload_interval", 5.0))
+            if plugin_autoreload_interval is None
+            else plugin_autoreload_interval
+        )
+        if self._plugin_autoreload_interval <= 0:
+            raise ValueError("plugin_autoreload_interval must be greater than zero")
+        self._plugin_autoreloader: Any | None = None
 
         # Middleware config
         self._enable_logging = enable_logging
@@ -1149,6 +1176,16 @@ class AgentPlatform:
                 except Exception as e:
                     logger.error(f"  ❌ Failed to load plugin '{name}': {e}")
 
+            # --- Start plugin artifact watcher ---
+            if platform._plugin_autoreload and platform._plugin_registry.count:
+                from agentomatic.plugins import PluginAutoReloader
+
+                platform._plugin_autoreloader = PluginAutoReloader(
+                    platform._plugin_registry,
+                    interval=platform._plugin_autoreload_interval,
+                )
+                await platform._plugin_autoreloader.start()
+
             # --- Start custom endpoints ---
             if platform._endpoint_registry.count:
                 logger.info("🌐 Starting custom endpoints...")
@@ -1242,6 +1279,10 @@ class AgentPlatform:
                 set_fit_store(None)
             except Exception:  # noqa: BLE001
                 pass
+
+            if platform._plugin_autoreloader is not None:
+                await platform._plugin_autoreloader.stop()
+                platform._plugin_autoreloader = None
 
             # Stop custom endpoints
             for name, endpoint in platform._endpoint_registry.list_endpoints().items():
@@ -2107,6 +2148,8 @@ class AgentPlatform:
             "task_max_concurrency": self._task_max_concurrency,
             "logs_history": self._logs_history,
             "allow_logsllm_analysis": self._allow_logsllm_analysis,
+            "plugin_autoreload": self._plugin_autoreload,
+            "plugin_autoreload_interval": self._plugin_autoreload_interval,
         }
         if self._stack_arg:
             config["stack"] = self._stack_arg

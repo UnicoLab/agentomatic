@@ -286,8 +286,8 @@ def test_production_guides_do_not_advertise_removed_or_unavailable_features() ->
     stacks = _doc("docs/guide/stacks.md")
     platform_features = _doc("docs/guide/platform-features.md")
 
-    assert "AGENTOMATIC_PLUGIN_AUTORELOAD" not in plugins
-    assert "call the authenticated reload endpoint" in plugins
+    assert "AGENTOMATIC_PLUGIN_AUTORELOAD=1" in plugins
+    assert "prior\nin-memory state and readiness stay active" in plugins
     assert "install from git / editable checkout" not in providers
     assert re.search(
         r"\| `google_genai` \|\s+—\s+\|[^|]+\|\s+—\s+\|\s+Not available\s+\|",

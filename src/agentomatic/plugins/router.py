@@ -70,7 +70,7 @@ def create_plugin_router(
 
         start_time = time.perf_counter()
         try:
-            result = await plugin.predict(request)
+            result = await plugin.invoke(request)
 
             duration = (time.perf_counter() - start_time) * 1000
             logger.debug(f"Plugin '{plugin.plugin_name}' inference completed in {duration:.2f}ms")

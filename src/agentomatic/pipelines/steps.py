@@ -405,7 +405,7 @@ async def execute_plugin_step(
             model_input = payload
 
         result = await asyncio.wait_for(
-            plugin.predict(model_input),
+            plugin.invoke(model_input),
             timeout=config.timeout,
         )
         output = _normalize_output(result)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import typing
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +38,11 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
     def __init__(self) -> None:
         self._is_loaded = False
         self._loaded_at: str | None = None
+        # Platform invocation paths and reloads share this lock.  A plugin can
+        # contain mutable native-model state, so letting a prediction race a
+        # model swap can expose a partially initialised model to production
+        # traffic.
+        self._operation_lock = asyncio.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -115,22 +121,43 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         return ArtifactRegistry().current_dir()
 
     async def reload_model(self) -> dict[str, Any]:
-        """Reload model weights from the current artifact pointer.
+        """Reload model weights from the current artifact pointer safely.
 
-        Marks the plugin unloaded, re-calls :meth:`load_model`, and returns
-        a status dict suitable for the reload REST API. Pipeline ``plugin:``
-        steps always resolve the live registry instance, so they pick up the
-        freshly loaded weights automatically.
+        Reloading is serialized with platform predictions.  If loading raises,
+        the plugin object's shallow state is restored, preserving the prior
+        working model and readiness state.  Standard plugins assign a new
+        model object in ``load_model``; plugins that mutate an existing model
+        in place should construct a replacement object first and assign it
+        only after it is ready.
 
         Returns:
             Status dict with name, version, loaded flag, loaded_at, model_card.
         """
-        self._is_loaded = False
-        self._loaded_at = None
-        await self.load_model()
-        # Stamp even when a subclass overrides load_model without calling super().
-        self.mark_loaded()
-        return self.info(include_model_card=True)
+        async with self._operation_lock:
+            previous_state = self.__dict__.copy()
+            try:
+                # A subclass that omits ``super().load_model()`` still gets a
+                # fresh timestamp through ``mark_loaded`` below.
+                self._loaded_at = None
+                await self.load_model()
+                self.mark_loaded()
+            except Exception:
+                self.__dict__.clear()
+                self.__dict__.update(previous_state)
+                raise
+            return self.info(include_model_card=True)
+
+    async def invoke(self, inputs: InputT) -> OutputT:
+        """Run a prediction serialized with model reloads.
+
+        Platform routers, task dispatchers, and pipeline steps use this method
+        instead of calling :meth:`predict` directly.  Direct user calls to an
+        overridden ``predict`` remain supported for backwards compatibility.
+        """
+        async with self._operation_lock:
+            if not self.is_loaded:
+                raise RuntimeError(f"Plugin '{self.plugin_name}' is not loaded")
+            return await self.predict(inputs)
 
     def info(self, *, include_model_card: bool = False) -> dict[str, Any]:
         """Return a serialisable status snapshot for list/reload APIs.

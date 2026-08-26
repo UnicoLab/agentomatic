@@ -135,6 +135,8 @@ directory, host, port, and stack values passed to `agentomatic run`.
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` / `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS` | rate limiting | `false` / `false` | Enable the limiter; trust forwarded client IPs only behind a trusted proxy |
 | `AGENTOMATIC_LOGS_HISTORY` / `DATABASE_URL` | invocation history / storage | `false` / empty | Persist logs and threads using an async SQLAlchemy URL |
 | `AGENTOMATIC_ARTIFACT_ROOT` | `artifact_root` | `.local/artifacts` | Versioned plugin/model artifact bundles |
+| `AGENTOMATIC_PLUGIN_AUTORELOAD` | `plugin_autoreload` | `false` | Watch the promoted artifact version and reload plugins safely |
+| `AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL` | `plugin_autoreload_interval` | `5` | Seconds between artifact-pointer checks |
 | `AGENTOMATIC_RUNS_ROOT` | `runs_root` | `.local/runs` | Scratch directory for pipeline/task outputs |
 | `AGENTOMATIC_AUDIT_LOG` | `audit_log` | `""` (disabled) | JSONL op-audit sink path (non-PII metadata only) |
 | `AGENTOMATIC_AUDIT_HASH_KEY` | — | API key or process-local key | HMAC key for audit correlation references |

@@ -256,7 +256,7 @@ def make_plugin_dispatcher(registry: PluginRegistry) -> Dispatcher:
         except Exception:  # noqa: BLE001 - fall back to raw payload
             inputs = payload
         await ctx.report(message=f"Running plugin '{target}'")
-        result = await plugin.predict(inputs)
+        result = await plugin.invoke(inputs)
         return _to_jsonable(result)
 
     return run

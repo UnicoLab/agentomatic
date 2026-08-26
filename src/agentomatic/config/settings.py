@@ -125,6 +125,19 @@ class PlatformSettings(BaseSettings):
         description="Root for versioned plugin/model artifact bundles",
         validation_alias=AliasChoices("AGENTOMATIC_ARTIFACT_ROOT", "artifact_root"),
     )
+    plugin_autoreload: bool = Field(
+        default=False,
+        description="Reload plugins when the active artifact version changes",
+        validation_alias=AliasChoices("AGENTOMATIC_PLUGIN_AUTORELOAD", "plugin_autoreload"),
+    )
+    plugin_autoreload_interval: float = Field(
+        default=5.0,
+        gt=0,
+        description="Seconds between active-artifact checks when plugin auto-reload is enabled",
+        validation_alias=AliasChoices(
+            "AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL", "plugin_autoreload_interval"
+        ),
+    )
     runs_root: Path = Field(
         default=Path(".local/runs"),
         description="Scratch directory for pipeline / task run outputs",

@@ -159,6 +159,11 @@ def create_platform() -> AgentPlatform:
             # Opt-in per-agent invocation history + optional LLM log analysis.
             logs_history=_env_bool("AGENTOMATIC_LOGS_HISTORY", False),
             allow_logsllm_analysis=_env_bool("AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS", False),
+            # Watch versioned artifact promotions and reload ML plugins safely.
+            plugin_autoreload=_env_bool("AGENTOMATIC_PLUGIN_AUTORELOAD", False),
+            plugin_autoreload_interval=float(
+                os.getenv("AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL", "5")
+            ),
         )
     except TypeError as exc:
         if "unexpected keyword argument" not in str(exc):
@@ -247,6 +252,8 @@ def _env_example() -> str:
 # AGENTOMATIC_ENABLE_RATE_LIMIT=0
 # AGENTOMATIC_LOGS_HISTORY=0            # persist invoke/chat/stream history
 # AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=0  # LLM analysis over those logs
+# AGENTOMATIC_PLUGIN_AUTORELOAD=0       # reload plugins when artifact current changes
+# AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL=5
 # AGENTOMATIC_API_KEY=
 # AGENTOMATIC_CONTROL_TOKEN=
 
