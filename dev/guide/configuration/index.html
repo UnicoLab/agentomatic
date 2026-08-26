@@ -2822,48 +2822,64 @@
 </div>
 
 <hr />
-<p>Agentomatic supports a layered configuration system. Settings can be defined via environment variables, <code>.env</code> files, Python code, or a combination. The platform resolves values using a clear priority hierarchy.</p>
+<p>Agentomatic has two configuration surfaces that deliberately do <strong>not</strong> silently
+merge into one another:</p>
+<ul>
+<li>The generated <code>main.py</code> and <code>agentomatic run</code> consume documented
+  <code>AGENTOMATIC_*</code> deployment variables and pass them as explicit
+  <code>AgentPlatform</code> arguments.</li>
+<li><code>PlatformSettings</code> supplies nested provider, embedding, artifact, ingestion,
+  and audit settings to the subsystems that use it. It reads process
+  environment variables and <code>.env</code> files.</li>
+</ul>
+<p>Pass explicit <code>AgentPlatform(...)</code> arguments when configuring an application
+you construct yourself; do not assume that every <code>PlatformSettings</code> field
+changes every platform constructor argument.</p>
 <hr />
 <h2 id="configuration-hierarchy">🔀 Configuration Hierarchy<a class="headerlink" href="#configuration-hierarchy" title="Permanent link">&para;</a></h2>
-<p>Values are resolved in the following order of precedence (highest wins):</p>
+<p>For a <code>PlatformSettings</code> value, process environment variables override <code>.env</code>
+values, which override built-in defaults. Explicit Python constructor arguments
+are passed directly to <code>AgentPlatform</code> and therefore take precedence for that
+specific platform option.</p>
 <pre class="mermaid"><code>flowchart LR
-    A["Environment&lt;br/&gt;Variables"] --&gt; B["Merged&lt;br/&gt;Configuration"]
-    C[".env File"] --&gt; B
-    D["Python Code&lt;br/&gt;(constructor args)"] --&gt; B
-    E["Built-in&lt;br/&gt;Defaults"] --&gt; B
+    A["Explicit Python&lt;br/&gt;AgentPlatform arguments"] --&gt; B["Platform configuration"]
+    C["Process environment"] --&gt; D["PlatformSettings"]
+    E[".env file"] --&gt; D
+    F["Built-in defaults"] --&gt; D
+    D --&gt; G["Settings-backed subsystems"]
 
-    style A fill:#c8e6c9,stroke:#388e3c
-    style C fill:#e1f5fe,stroke:#0288d1
-    style D fill:#fff3e0,stroke:#f57c00
-    style E fill:#f3e5f5,stroke:#7b1fa2</code></pre>
+    style A fill:#fff3e0,stroke:#f57c00
+    style C fill:#c8e6c9,stroke:#388e3c
+    style E fill:#e1f5fe,stroke:#0288d1
+    style F fill:#f3e5f5,stroke:#7b1fa2</code></pre>
 <table>
 <thead>
 <tr>
 <th>Priority</th>
-<th>Source</th>
+<th>Surface</th>
 <th>Example</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>1 (highest)</strong></td>
-<td>Environment variables</td>
-<td><code>export AGENTOMATIC_LOG_LEVEL=DEBUG</code></td>
+<td><strong>1</strong></td>
+<td>Explicit platform arguments</td>
+<td><code>AgentPlatform(log_level="DEBUG")</code></td>
 </tr>
 <tr>
 <td><strong>2</strong></td>
-<td><code>.env</code> file in project root</td>
-<td><code>AGENTOMATIC_LOG_LEVEL=DEBUG</code></td>
+<td>Process environment</td>
+<td><code>export LLM__MODEL=...</code> or <code>export AGENTOMATIC_LOG_LEVEL=DEBUG</code></td>
 </tr>
 <tr>
 <td><strong>3</strong></td>
-<td>Python constructor arguments</td>
-<td><code>AgentPlatform(log_level="DEBUG")</code></td>
+<td><code>.env</code> file in project root</td>
+<td><code>LLM__MODEL=...</code></td>
 </tr>
 <tr>
 <td><strong>4 (lowest)</strong></td>
 <td>Built-in defaults</td>
-<td><code>"INFO"</code></td>
+<td><code>"INFO"</code>, <code>"mistral:7b"</code>, etc.</td>
 </tr>
 </tbody>
 </table>
@@ -2879,34 +2895,50 @@
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="c1"># -- Metadata --</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;My Custom Agent Platform&quot;</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Enterprise Assistant APIs&quot;</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="c1"># -- Networking --</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">api_prefix</span><span class="o">=</span><span class="s2">&quot;/api/v1&quot;</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">package_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">cors_origins</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;https://dashboard.mycompany.com&quot;</span><span class="p">],</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="c1"># -- Observability --</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="c1"># -- Storage --</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://user:pass@localhost/db&quot;</span><span class="p">),</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="c1"># -- Security --</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;sk_live_51hG...&quot;</span><span class="p">,</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="n">rate_limit_requests</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    <span class="n">rate_limit_window</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    <span class="c1"># -- Memory --</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    <span class="n">max_history_messages</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    <span class="n">summarize_after</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    <span class="c1"># -- Studio --</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="n">enable_studio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">plugins_dir</span><span class="o">=</span><span class="s2">&quot;plugins/&quot;</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">endpoints_dir</span><span class="o">=</span><span class="s2">&quot;endpoints/&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">ingestion_dir</span><span class="o">=</span><span class="s2">&quot;ingestion/&quot;</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="c1"># -- Metadata --</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;My Custom Agent Platform&quot;</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Enterprise Assistant APIs&quot;</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="c1"># -- Networking --</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">api_prefix</span><span class="o">=</span><span class="s2">&quot;/api/v1&quot;</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">package_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">cors_origins</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;https://dashboard.mycompany.com&quot;</span><span class="p">],</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="c1"># -- Observability --</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">enable_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="n">enable_feedback</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="c1"># -- Storage --</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://user:pass@localhost/db&quot;</span><span class="p">),</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="c1"># -- Security --</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="n">enable_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    <span class="n">auth_api_key</span><span class="o">=</span><span class="s2">&quot;sk_live_51hG...&quot;</span><span class="p">,</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    <span class="n">enable_rate_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    <span class="n">rate_limit_requests</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    <span class="n">rate_limit_window</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    <span class="n">rate_limit_trust_proxy_headers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># only behind a trusted proxy</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="c1"># -- Memory --</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>    <span class="n">max_history_messages</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    <span class="n">summarize_after</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    <span class="c1"># -- Studio --</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="n">enable_studio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>    <span class="c1"># -- Production security and operations --</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>    <span class="n">enable_jwt_auth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>    <span class="n">enable_zero_trust</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>    <span class="n">require_auth_globally</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>    <span class="n">enable_control_plane</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="n">control_token</span><span class="o">=</span><span class="s2">&quot;ops-secret&quot;</span><span class="p">,</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>    <span class="c1"># -- Tasks, connections, and plugin artifact lifecycle --</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>    <span class="n">enable_tasks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>    <span class="n">task_max_concurrency</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="n">logs_history</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="n">plugin_autoreload</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="n">plugin_autoreload_interval</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="complete-parameter-table">Complete Parameter Table<a class="headerlink" href="#complete-parameter-table" title="Permanent link">&para;</a></h3>
 <table>
@@ -2924,6 +2956,24 @@
 <td><code>str \| Path</code></td>
 <td><code>"agents/"</code></td>
 <td>Filesystem path to scan for agent packages.</td>
+</tr>
+<tr>
+<td><code>plugins_dir</code></td>
+<td><code>str \| Path</code></td>
+<td><code>"plugins/"</code></td>
+<td>Filesystem path to scan for ML plugin packages.</td>
+</tr>
+<tr>
+<td><code>endpoints_dir</code></td>
+<td><code>str \| Path</code></td>
+<td><code>"endpoints/"</code></td>
+<td>Filesystem path to scan for custom endpoint packages.</td>
+</tr>
+<tr>
+<td><code>ingestion_dir</code></td>
+<td><code>str \| Path</code></td>
+<td><code>"ingestion/"</code></td>
+<td>Filesystem path to scan for ingestion packages.</td>
 </tr>
 <tr>
 <td><code>title</code></td>
@@ -3016,6 +3066,12 @@
 <td>Sliding window duration in seconds.</td>
 </tr>
 <tr>
+<td><code>rate_limit_trust_proxy_headers</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Trust <code>X-Forwarded-For</code> only when a trusted proxy overwrites it.</td>
+</tr>
+<tr>
 <td><code>enable_metrics</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
@@ -3037,7 +3093,7 @@
 <td><code>enable_studio</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
-<td>Mount the Studio debug API and UI at <code>/studio/</code>.</td>
+<td>Mount the Studio debug API and UI at <code>/studio/</code> and <code>/studio/ui/</code>.</td>
 </tr>
 <tr>
 <td><code>middleware</code></td>
@@ -3057,11 +3113,115 @@
 <td><code>30</code></td>
 <td>Message threshold before auto-summarization kicks in.</td>
 </tr>
+<tr>
+<td><code>stack</code></td>
+<td><code>str \| StackConfig \| None</code></td>
+<td>auto-detect</td>
+<td>Active named stack or explicit stack configuration.</td>
+</tr>
+<tr>
+<td><code>stacks_dir</code></td>
+<td><code>str \| Path</code></td>
+<td><code>"stacks/"</code></td>
+<td>Directory containing stack YAML files.</td>
+</tr>
+<tr>
+<td><code>enable_jwt_auth</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Enable JWT/OAuth2 bearer-token validation.</td>
+</tr>
+<tr>
+<td><code>jwt_config</code></td>
+<td><code>JWTConfig \| None</code></td>
+<td><code>None</code></td>
+<td>JWT validation configuration; required with <code>enable_jwt_auth=True</code>.</td>
+</tr>
+<tr>
+<td><code>enable_zero_trust</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Enforce per-agent security policies.</td>
+</tr>
+<tr>
+<td><code>require_auth_globally</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Require authenticated claims for every agent request when zero trust is enabled.</td>
+</tr>
+<tr>
+<td><code>enable_control_plane</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Mount the production control-plane API.</td>
+</tr>
+<tr>
+<td><code>control_token</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Optional secret required by mutating control-plane operations.</td>
+</tr>
+<tr>
+<td><code>connections</code></td>
+<td><code>list[Any] \| None</code></td>
+<td><code>None</code></td>
+<td>Platform-wide database, vector, HTTP, or custom connection definitions.</td>
+</tr>
+<tr>
+<td><code>enable_connections_context</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Attach the routed agent's connection manager to <code>request.state.connections</code>.</td>
+</tr>
+<tr>
+<td><code>enable_tasks</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Enable the durable task/execution subsystem.</td>
+</tr>
+<tr>
+<td><code>task_store</code></td>
+<td><code>TaskStore \| None</code></td>
+<td><code>None</code></td>
+<td>Optional durable task-store implementation.</td>
+</tr>
+<tr>
+<td><code>task_max_concurrency</code></td>
+<td><code>int</code></td>
+<td><code>8</code></td>
+<td>Maximum concurrent task workers.</td>
+</tr>
+<tr>
+<td><code>logs_history</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Persist invocation history when a durable store is available.</td>
+</tr>
+<tr>
+<td><code>allow_logsllm_analysis</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Expose opt-in LLM analysis over persisted invocation logs.</td>
+</tr>
+<tr>
+<td><code>plugin_autoreload</code></td>
+<td><code>bool \| None</code></td>
+<td>settings / <code>False</code></td>
+<td>Watch artifact promotions and reload registered ML plugins safely.</td>
+</tr>
+<tr>
+<td><code>plugin_autoreload_interval</code></td>
+<td><code>float \| None</code></td>
+<td>settings / <code>5.0</code></td>
+<td>Seconds between artifact-pointer checks; must be greater than zero.</td>
+</tr>
 </tbody>
 </table>
 <hr />
 <h2 id="environment-variables-reference">🌐 Environment Variables Reference<a class="headerlink" href="#environment-variables-reference" title="Permanent link">&para;</a></h2>
-<p>All platform settings can be overridden using environment variables. There are two systems:</p>
+<p>The generated project and <code>agentomatic run</code> expose deployment configuration
+through direct <code>AGENTOMATIC_*</code> variables. <code>PlatformSettings</code> is a separate,
+nested model used by the subsystems described below.</p>
 <h3 id="direct-agentomatic_-variables">Direct <code>AGENTOMATIC_</code> Variables<a class="headerlink" href="#direct-agentomatic_-variables" title="Permanent link">&para;</a></h3>
 <p>These are the deployment variables consumed by the generated <code>main.py</code> and by
 <code>agentomatic run</code>. For an explicit <code>AgentPlatform(...)</code> constructor, pass the
@@ -3482,29 +3642,26 @@ directory, host, port, and stack values passed to <code>agentomatic run</code>.<
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
 </span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;8000:8000&quot;</span>
 </span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">APP_ENV=production</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOG_LEVEL=WARNING</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LLM__PROVIDER=openai</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LLM__MODEL=gpt-4o</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LLM__OPENAI_API_KEY=${OPENAI_API_KEY}</span>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DB__URL=postgresql+asyncpg://postgres:secret@db:5432/agents</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FEATURES__ENABLE_AUTH=true</span>
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AUTH__API_KEY=${API_KEY}</span>
-</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FEATURES__ENABLE_RATE_LIMIT=true</span>
-</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RATE_LIMIT__REQUESTS=200</span>
-</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
-</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db</span>
-</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>
-</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="w">  </span><span class="nt">db</span><span class="p">:</span>
-</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16-alpine</span>
-</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="w">      </span><span class="nt">POSTGRES_DB</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agents</span>
-</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="w">      </span><span class="nt">POSTGRES_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
-</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pgdata:/var/lib/postgresql/data</span>
-</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>
-</span><span id="__span-13-28"><a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a><span class="nt">volumes</span><span class="p">:</span>
-</span><span id="__span-13-29"><a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a><span class="w">  </span><span class="nt">pgdata</span><span class="p">:</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGENTOMATIC_LOG_LEVEL=WARNING</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGENTOMATIC_ENABLE_METRICS=true</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGENTOMATIC_ENABLE_AUTH=true</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGENTOMATIC_API_KEY=${API_KEY}</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGENTOMATIC_ENABLE_RATE_LIMIT=true</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGENTOMATIC_LOGS_HISTORY=true</span>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DATABASE_URL=postgresql+asyncpg://postgres:secret@db:5432/agents</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db</span>
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">  </span><span class="nt">db</span><span class="p">:</span>
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16-alpine</span>
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="w">      </span><span class="nt">POSTGRES_DB</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agents</span>
+</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="w">      </span><span class="nt">POSTGRES_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pgdata:/var/lib/postgresql/data</span>
+</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>
+</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a><span class="nt">volumes</span><span class="p">:</span>
+</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a><span class="w">  </span><span class="nt">pgdata</span><span class="p">:</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -3513,13 +3670,11 @@ directory, host, port, and stack values passed to <code>agentomatic run</code>.<
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nt">metadata</span><span class="p">:</span>
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agentomatic-config</span>
 </span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="nt">data</span><span class="p">:</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">APP_ENV</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;production&quot;</span>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="nt">LOG_LEVEL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;WARNING&quot;</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span><span class="nt">LLM__PROVIDER</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;vertex&quot;</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">  </span><span class="nt">LLM__VERTEX_PROJECT</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-gcp-project&quot;</span>
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">  </span><span class="nt">DB__URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgresql+asyncpg://user:pass@pg-service:5432/agents&quot;</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">  </span><span class="nt">FEATURES__ENABLE_AUTH</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
-</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">  </span><span class="nt">FEATURES__ENABLE_METRICS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">AGENTOMATIC_LOG_LEVEL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;WARNING&quot;</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="nt">AGENTOMATIC_ENABLE_AUTH</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span><span class="nt">AGENTOMATIC_ENABLE_METRICS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">  </span><span class="nt">AGENTOMATIC_LOGS_HISTORY</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">  </span><span class="nt">DATABASE_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgresql+asyncpg://user:pass@pg-service:5432/agents&quot;</span>
 </span></code></pre></div>
 </div>
 </div>
@@ -3531,7 +3686,9 @@ directory, host, port, and stack values passed to <code>agentomatic run</code>.<
 <p>Check these common causes:</p>
 <ol>
 <li><strong><code>.env</code> file location</strong>: Must be in the project root (same directory as <code>main.py</code>)</li>
-<li><strong>Variable prefix</strong>: Platform variables must start with <code>AGENTOMATIC_</code> (e.g., <code>AGENTOMATIC_LOG_LEVEL</code>)</li>
+<li><strong>Variable shape</strong>: Generated-platform variables start with <code>AGENTOMATIC_</code>
+   (for example, <code>AGENTOMATIC_LOG_LEVEL</code>); <code>PlatformSettings</code> variables use
+   their documented nested form (for example, <code>LLM__MODEL</code>)</li>
 <li><strong>Priority</strong>: Environment variables always override <code>.env</code> file values</li>
 <li><strong>Restart required</strong>: <code>.env</code> changes require a server restart (no hot-reload)</li>
 </ol>
