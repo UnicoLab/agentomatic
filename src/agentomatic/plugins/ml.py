@@ -153,10 +153,14 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         Platform routers, task dispatchers, and pipeline steps use this method
         instead of calling :meth:`predict` directly.  Direct user calls to an
         overridden ``predict`` remain supported for backwards compatibility.
+
+        Readiness is intentionally enforced by the serving boundaries that
+        require it (the REST router and task dispatcher).  Pipeline steps have
+        historically supported lightweight, stateless plugins without a
+        startup ``load_model`` implementation, so ``invoke`` must remain a
+        synchronization primitive rather than changing that contract.
         """
         async with self._operation_lock:
-            if not self.is_loaded:
-                raise RuntimeError(f"Plugin '{self.plugin_name}' is not loaded")
             return await self.predict(inputs)
 
     def info(self, *, include_model_card: bool = False) -> dict[str, Any]:
