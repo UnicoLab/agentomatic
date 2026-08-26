@@ -2797,9 +2797,9 @@ Call reload:</p>
 next predict after reload uses the fresh weights — no process restart.</p>
 <p>Set the root via <code>AGENTOMATIC_ARTIFACT_ROOT</code> (default <code>.local/artifacts</code>).
 Rollback is one call: <code>registry.rollback(prior_version)</code>.</p>
-<p>Optional future flag: <code>AGENTOMATIC_PLUGIN_AUTORELOAD=1</code> (mtime watch of the
-artifact <code>current</code> pointer). Prefer the explicit REST reload for deterministic
-promotion flows.</p>
+<p>Agentomatic does not watch artifact pointers automatically. For deterministic
+promotion, call the authenticated reload endpoint after moving the <code>current</code>
+pointer, or restart the deployment through your normal rollout process.</p>
 <h2 id="framework-agnosticism">Framework Agnosticism<a class="headerlink" href="#framework-agnosticism" title="Permanent link">&para;</a></h2>
 <p>Agentomatic has absolutely zero opinion on what you put inside <code>load_model()</code> and <code>predict()</code>. You can run blocking code like <code>sklearn.predict()</code> or async code like HTTP calls to external APIs. Agentomatic uses FastAPI, which automatically manages thread-pooling for synchronous code.</p>
 

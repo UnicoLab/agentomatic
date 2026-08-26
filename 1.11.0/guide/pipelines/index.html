@@ -4026,10 +4026,45 @@ under <code>/api/v1/</code>.</p>
 </tr>
 <tr>
 <td><code>POST</code></td>
+<td><code>/pipelines/validate-draft</code></td>
+<td>Validate an unsaved JSON/YAML draft</td>
+<td><code>{"pipeline": {…}}</code> or <code>{"yaml": "…"}</code></td>
+<td><code>PipelineDraftValidationResponse</code></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/pipelines/{name}</code></td>
+<td>Validate and save/update a pipeline definition</td>
+<td>Draft body</td>
+<td><code>PipelineSaveResponse</code></td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/pipelines/{name}</code></td>
+<td>Delete a persisted definition</td>
+<td>—</td>
+<td>deletion confirmation</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
 <td><code>/pipelines/{name}/run</code></td>
 <td>Execute a pipeline</td>
 <td><code>{"input": {…}, "metadata": {…}}</code></td>
 <td><code>PipelineRunResponse</code></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/pipelines/{name}/run/async</code></td>
+<td>Submit a tracked pipeline run</td>
+<td><code>{"input": {…}, "metadata": {…}}</code></td>
+<td>task record (<code>202</code>)</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/pipelines/{name}/run/batch</code></td>
+<td>Submit a tracked batch run</td>
+<td><code>{"inputs": [{…}], …}</code></td>
+<td>task record (<code>202</code>)</td>
 </tr>
 <tr>
 <td><code>GET</code></td>
@@ -4054,6 +4089,10 @@ under <code>/api/v1/</code>.</p>
 </tr>
 </tbody>
 </table>
+<p>The save and delete routes require a writable <code>pipelines/</code> mount. A production
+container with a read-only pipeline directory keeps run/inspect endpoints
+available, but authoring requests return an actionable <code>409</code>; use versioned
+Git-managed definitions or provide the dedicated writable authoring mount.</p>
 <h3 id="response-models">Response Models<a class="headerlink" href="#response-models" title="Permanent link">&para;</a></h3>
 <div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="pipelinerunresponse" name="__tabbed_5" type="radio" /><input id="pipelineinfo" name="__tabbed_5" type="radio" /><input id="pipelinevalidationresponse" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="pipelinerunresponse">PipelineRunResponse</label><label for="pipelineinfo">PipelineInfo</label><label for="pipelinevalidationresponse">PipelineValidationResponse</label></div>
 <div class="tabbed-content">

@@ -3905,7 +3905,7 @@ Clients can explicitly override the A/B router by passing a specific <code>promp
 <h2 id="6-llm-failover-fallbacks">🛡️ 6. LLM Failover &amp; Fallbacks<a class="headerlink" href="#6-llm-failover-fallbacks" title="Permanent link">&para;</a></h2>
 <p>LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
 transient network errors. Agentomatic lets you define an <strong>ordered</strong> fallback
-chain of models/providers (requires <strong>agentomatic &gt;= 1.8.0</strong>).</p>
+chain of models/providers.</p>
 <h3 id="configuration_1">Configuration<a class="headerlink" href="#configuration_1" title="Permanent link">&para;</a></h3>
 <p><strong>Python</strong> — pass specs to <code>get_llm()</code> / <code>get_named_llm()</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.providers.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_llm</span>
