@@ -28,7 +28,7 @@ graph LR
 | `openai`       | `ChatOpenAI`         | `langchain-openai`            | ✅        | Stable    |
 | `azure`        | `AzureChatOpenAI`    | `langchain-openai`            | ✅        | Stable    |
 | `vertex`       | `ChatVertexAI`       | `langchain-google-vertexai`   | ✅        | Stable    |
-| `google_genai` | —                    | `langchain-google-genai`      | ✅        | Planned   |
+| `google_genai` | —                    | `langchain-google-genai`      | —         | Not available |
 | `dummy`        | `FakeListChatModel`  | `langchain-core`              | ❌        | Testing   |
 
 !!! note "Google GenAI"
@@ -147,9 +147,7 @@ graph LR
 
 Configure an **ordered** fallback chain so that if the primary model times
 out, disconnects, rate-limits, or returns an empty response, Agentomatic
-retries the next model and logs which one succeeded. Available in
-**agentomatic >= 1.8.0** (install from git / editable checkout until PyPI
-publishes that release).
+retries the next model and logs which one succeeded.
 
 ### Python API
 

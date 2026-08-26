@@ -1,1687 +1,361 @@
-# Prompt Optimization
+# Prompt optimization
 
-Prompt engineering is often a manual, fragile trial-and-error process. Agentomatic solves this by providing a built-in **Prompt Optimization Engine** that acts like `model.fit()` but for your agent prompts.
-
-Inspired by Stanford's [DSPy](https://github.com/stanfordnlp/dspy), the framework allows you to evaluate agent performance over a dataset, automatically generate prompt candidates using a powerful rewriter model, score them using evaluation metrics, and export the best-performing prompt version back into your `prompts.json` file.
-
----
-
-## Seeing the whole loop run
-
-`scripts/keras_showcase.py` runs `compile() → fit() → evaluate() → save() →
-load()` against any OpenAI-compatible endpoint and prints the measured loss
-curve, so you can watch the loop move before wiring it to your own agent:
-
-```bash
-export OMLX_BASE_URL=http://127.0.0.1:8000/v1
-export OMLX_API_KEY=whatever
-python scripts/keras_showcase.py --model omlx/my-local-model
-```
-
-Its agent answers correctly only once the prompt contains a token it has to
-*discover from its own failures*, so an improvement in the curve is
-attributable to the optimizer rather than to model variance.
-
-## 🏗️ The Optimization Flow
-
-The optimization loop coordinates datasets, rewriter LLMs, evaluator LLMs, and scoring metrics to iteratively improve prompt versions:
+Agentomatic evaluates an agent against a labelled dataset, searches for a
+better prompt or runtime configuration, validates the candidate on held-out
+examples, and only then offers to write a new prompt version. It does not
+alter live traffic, route versions, or promote deployments. Treat a generated
+version as a candidate: review it, run your deployment verification, then
+release it through your normal delivery process.
 
 ![Prompt Optimization Flow](../assets/optimization_flow.png)
 
----
+## Choose one entry point
 
-## Running the optimization suites without a cloud key
+There are three supported entry points. They share the same dataset format but
+serve different integration needs. Pick one for a run; they are alternatives,
+not steps to chain together.
 
-The live optimization suites drive a real OpenAI-compatible endpoint. Point
-them at whatever local model you run — oMLX, llama.cpp, vLLM, LM Studio,
-Ollama — and they need no changes:
-
-```bash
-export OMLX_BASE_URL=http://127.0.0.1:8000/v1
-export OMLX_API_KEY=your-key
-export AGENTOMATIC_LIVE_MODEL=omlx/your-model
-
-uv run pytest tests/test_live_omlx_optimize.py \
-              tests/test_live_omlx_keras_optimize.py \
-              -q --override-ini='addopts='
-```
-
-Without such an endpoint these suites **skip entirely**, which leaves the
-`omlx/` provider path, the prompt fitter and the whole Keras-style `fit()`
-loop unexercised — including in CI. For that case the repo ships a stand-in:
-
-```bash
-uv run python scripts/local_slm_server.py --port 8000
-```
-
-`scripts/local_slm_server.py` is a **test double, not a language model**. It
-generates nothing; it follows rules. What makes it a valid optimization target
-is that answer quality genuinely depends on the system prompt — each directive
-a prompt carries makes the response satisfy one more property the metric
-rewards, so an optimizer that really searches and selects will climb, and one
-that does not will not. It also plays the rewriter (reading the briefing's
-failing I/O and expected answers, then folding the missing tokens into a new
-prompt) and the judge (returning the exact schema the metric asked for).
-
-It proves the *machinery* — search, evaluation, selection, early stopping,
-checkpointing, config application. It cannot tell you whether a real model
-writes good prompts. Use your own model and eval set for that.
-
-
-## ⚡ Quick Start — two tiers (same primitives)
-
-Agentomatic exposes **both** a thin one-shot path and a Keras-like staged path.
-They share the same building blocks (`load_data` / `prepare_dataset`,
-`build_default_metrics`, `compile_agent`, `fit_agent`, `evaluate_agent`,
-`generate_fit_report`). `train_and_report` is implemented **on top of** those
-primitives — not a parallel stack.
-
-| Tier | When to use | Entry point |
+| Use case | Supported entry point | What it talks to |
 |---|---|---|
-| **Full abstraction** | Thin project scripts, CLI/env knobs, HolySheet for free | `TrainCliSettings` → `train_and_report` |
-| **Full control** | Swap metrics/loss/optimizer, custom loops, inspect each step | `compile_agent` → `fit_agent` → `evaluate_agent` |
+| Optimize a deployed agent from a terminal | `agentomatic optimize` | The running Agentomatic API (`--host`) |
+| Optimize an in-process agent with full control over metrics and search space | `PromptFitter` | A local agent instance or the API |
+| Keep an existing integration working | `PromptOptimizer` / `--mode prompt_only` | The running Agentomatic API |
 
-Scaffolded agents ship with `agents/<name>/train.py` / `eval.py`
-(`agentomatic init … --template class`): one-shot by default, with a
-**commented staged example** in `train.py`.
+For new work, use the CLI with a fitter mode or use `PromptFitter` directly.
+`PromptOptimizer` remains supported for backwards compatibility, but has a
+smaller search surface.
 
-### Train — one-shot (`train_and_report`)
+## Before you start
 
-```python
-from pathlib import Path
-
-from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
-from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
-from agentomatic.stacks.manager import StackManager
-
-from agents.assistant.agent import AssistantAgent
-
-ROOT = Path(".")  # project root
-HERE = ROOT / "agents" / "assistant"
-
-# --- settings (AGENTOMATIC_* env + optional CLI overrides) ---
-cli = TrainCliSettings.parse()  # or parse(["--augment", "--n-examples", "40"])
-
-# --- environment / stack ---
-stacks = StackManager(ROOT / "stacks")
-stacks.load(cli.stack)
-apply_stack_defaults(stacks)
-
-# --- agent ---
-agent = AssistantAgent(llm=get_llm_for_agent("assistant", stack_manager=stacks))
-
-# --- fit + HolySheet report ---
-result = train_and_report(
-    agent,
-    config=cli.to_train_config(
-        agent_name="assistant",
-        agent_dir=HERE,
-        stacks_dir=ROOT / "stacks",
-        env_path=ROOT / ".env",
-        required_keys=["content", "next_action"],
-        judge_criteria=(
-            "Evaluate pertinence, groundedness, and actionability. "
-            "Score each dimension 0–1 with clear motivation."
-        ),
-        judge_dimensions=["pertinence", "groundedness", "actionability"],
-    ),
-)
-print_train_result(result)          # or result.print_summary()
-print(result.report_path)           # HolySheet HTML under agents/.../reports/
-```
+Install the optimization dependencies and create a dataset with a stable,
+measurable expectation for each request:
 
 ```bash
-# Scaffolded train.py — same knobs via env and/or CLI (see --help)
-AGENTOMATIC_STACK=gemini uv run python agents/assistant/train.py \
-  --augment --n-examples 40 --persist --optimizer rewrite --epochs 2 --trials 12
-# Persist improved prompt + optional DB retrain audit:
-#   ... --apply --apply-as v2_fit --persist-fit-store
-# Env-only example:
-#   AGENTOMATIC_STACK=gemini AGENTOMATIC_EPOCHS=2 AGENTOMATIC_AUGMENT=true \
-#     uv run python agents/assistant/train.py
+pip install "agentomatic[optimize]"
 ```
 
-### Train — staged Keras-like (full control) {#staged-keras-fit}
-
-Own each step; swap any piece (custom metrics, different optimizer, extra
-eval passes). Same internals as `train_and_report`:
-
-```python
-from agentomatic.optimize import (
-    build_default_metrics,
-    compile_agent,
-    evaluate_agent,
-    fit_agent,
-    generate_fit_report,
-    load_data,
-    prepare_dataset,
-)
-
-# 1. Data
-data, written = prepare_dataset(
-    load_data(HERE / "datasets" / "all.jsonl"),
-    augment=True,
-    n_examples=100,
-    persist=True,
-    seed_path=HERE / "datasets" / "all.jsonl",
-    model=rewrite_model,  # stack rewrite LLM
-)
-
-# 2. Metrics / loss
-metrics, loss, fit_metric = build_default_metrics(
-    model=model,
-    required_keys=["content", "next_action"],
-    judge_criteria="Evaluate pertinence, groundedness, actionability.",
-    judge_dimensions=["pertinence", "groundedness", "actionability"],
-)
-
-# 3. Compile
-compiled = compile_agent(
-    agent,
-    dataset=data,
-    metrics=metrics,
-    loss=loss,
-    fit_metric=fit_metric,
-    optimizer="rewrite",
-    task_model=model,
-    rewrite_model=rewrite_model,
-    llm_base_url=entry.base_url,
-    llm_api_key=entry.api_key or "local",
-    agent_name="assistant",
-    max_trials=12,
-    patience=2,
-)
-
-# 4. Fit
-history = fit_agent(compiled, data, epochs=2, trials=12)
-
-# 5. Evaluate + report
-scores = evaluate_agent(compiled, data.test or data.validation).scores
-generate_fit_report(
-    compiled.fit_result,
-    output_path=HERE / "reports" / "train_assistant.html",
-    keras_history=history.history,
-    eval_scores=scores,
-)
+```jsonl
+{"query":"What is the refund period?","expected_answer":"30 days"}
+{"query":"How do I reset my password?","expected_answer":"reset, password"}
 ```
 
-You can also call `agent.compile(...)` / `agent.fit(...)` / `agent.evaluate(...)`
-directly with a hand-built `PromptFitterBridge` — see
-[Local-mode Training](#local-mode-training-compile-fit-evaluate) below.
-Prefer the `compile_agent` / `fit_agent` helpers when you want the same
-defaults as `train_and_report` without the one-shot packaging.
+`query` is required. `expected_answer`, `context` (a list of strings), and
+`metadata` are optional. Use `exact_match` when the expected answer should
+match exactly; use `contains` with comma-separated required phrases when a
+response can vary in wording. For generative quality, use a calibrated judge
+metric and a held-out test dataset.
 
-### Evaluate (score a split)
-
-```python
-from agentomatic.optimize import EvalCliSettings, evaluate_and_report, print_eval_result
-
-cli = EvalCliSettings.parse()  # or parse(["--split", "test", "--prefer-augmented"])
-result = evaluate_and_report(
-    agent,
-    config=cli.to_eval_config(
-        agent_name="assistant",
-        agent_dir=HERE,
-        stacks_dir=ROOT / "stacks",
-        env_path=ROOT / ".env",
-        required_keys=["content", "next_action"],
-        judge_dimensions=["pertinence", "groundedness", "actionability"],
-    ),
-)
-print_eval_result(result, agent_name="assistant")
-```
+Start the target platform before running the API-backed paths:
 
 ```bash
-AGENTOMATIC_STACK=gemini uv run python agents/assistant/eval.py \
-  --split test --prefer-augmented --limit 3
-# uv run python agents/assistant/eval.py --help
+agentomatic run --port 8000
 ```
 
-### Knob reference
+## Recommended: CLI fitter modes
 
-| Knob | Env / CLI | Purpose |
-|---|---|---|
-| `stack` | `AGENTOMATIC_STACK` / `--stack` | Stack YAML to load |
-| `optimizer` | `AGENTOMATIC_OPTIMIZER` / `--optimizer` | Fitter strategy: `rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search`, `apo` |
-| `epochs` / `trials` / `patience` | `AGENTOMATIC_EPOCHS` etc. / `--epochs` `--trials` `--patience` | Outer Keras epochs, inner trial budget (`max_trials`), EarlyStopping on `val_loss` |
-| `augment` / `n_examples` / `persist` | train | LLM-augment seed data, target size, write `all.augmented.jsonl` |
-| `apply` / `apply_as` | train | Persist best prompt to `prompts.json` when improved (guards refuse zero/overfit) |
-| `min_improvement` | `--min-improvement` → `TrainConfig.min_absolute_improvement` | Acceptance threshold for candidates (default `0.001`) |
-| `required_keys` + `judge_*` | script (`to_train_config` / `to_eval_config`) | Structured schema metrics + LLM-as-judge criteria/dimensions |
-| `split` / `prefer_augmented` / `limit` | eval | Which examples to score; reuse augmented dataset |
-| `judge` | `AGENTOMATIC_JUDGE` / `--judge` / `--no-judge` | LLM-as-judge on/off (default on) |
-| HolySheet reports | automatic | Nested `Section`/`Tabs`/`Accordion` dashboards (score curves, prompts, judge rationales); fallback HTML if HolySheet absent |
-| `persist_fit_store` / `fit_store_url` | train | Audit retrain runs via `OptimizationRunStore` → `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` |
-| `logs_history` / `allow_logsllm_analysis` | platform | Persist sync invoke I/O for agents/plugins/pipelines/ingestion/endpoints + optional LLM log analysis (`AGENTOMATIC_LOGS_HISTORY`, `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS`); REST `GET /api/v1/logs?resource=&name=` (+ `/analyze`). Async tasks and per-plugin `/logs` routes are not covered — see [Platform Features](platform-features.md#invocation-log-history-llm-analysis) |
-
-`TrainCliSettings` / `EvalCliSettings` map into `TrainConfig` / `EvalConfig` via
-`.to_train_config(...)` / `.to_eval_config(...)` — agent-specific judge text and
-`required_keys` stay in the flat script, not in argparse.
-
-!!! tip "Nested projects (e.g. SCOOPER `ai_platform/`)"
-    When the agent package lives one level under a monorepo (`.env` beside the
-    parent folder), set `env_path=ROOT.parent / ".env"` — the scaffolded
-    templates default to `ROOT / ".env"` for flat `agentomatic new` projects.
-
-### CLI alternative
+The CLI has two families. `prompt_only` is the legacy default; every other
+mode uses the modern `PromptFitter` path.
 
 ```bash
-agentomatic optimize my_agent \
+# Prompt + configuration rewrite against the running agent.
+agentomatic optimize support_bot \
   --dataset eval.jsonl \
-  --metrics exact_match,contains \
-  --strategy iterative_rewrite \
-  --max-iterations 10 \
+  --val-dataset validation.jsonl \
+  --test-dataset holdout.jsonl \
+  --mode rewrite \
+  --metrics contains \
+  --llm omlx/Qwen3.5-9B-MLX-4bit \
+  --rewrite-llm omlx/Qwen3.5-9B-MLX-4bit \
+  --host http://127.0.0.1:8000 \
+  --max-trials 20 \
   --apply
 ```
 
-### Lower-level `PromptOptimizer` (optional)
+`--apply` writes a prompt version only when the result passes the fitter's
+improvement and generalization guards. Omit it to inspect the report first.
+The command writes reports and trial artifacts under `.optimize/` by default.
 
-```python
-from agentomatic.optimize import PromptOptimizer, Dataset
+### Mode reference
 
-optimizer = PromptOptimizer(
-    agent="my_agent",
-    metrics=["exact_match", "contains"],
-    strategy="iterative_rewrite",
-)
-dataset = Dataset.from_jsonl("eval.jsonl")
-result = await optimizer.optimize(dataset=dataset, max_iterations=10, target_score=0.9)
-print(result.report())
-result.apply()
+| CLI mode | Fitter optimizer | Best for |
+|---|---|---|
+| `rewrite` | `RewriteOptimizer` | Improving system instructions from failure patterns |
+| `gepa_like` | `GEPALikeOptimizer` | Targeted edits once evaluator feedback is useful |
+| `mipro_like` | `MIPROLikeOptimizer` | Exploring prompt and few-shot combinations |
+| `few_shot` | `FewShotBootstrapOptimizer` | Selecting strong demonstrations from labelled data |
+| `param_search` | `ParamSearchOptimizer` | Searching model, RAG, or tool parameter grids |
+| `apo` | `APOOptimizer` | Trace-aware critique and edit search |
+
+`--mode` accepts exactly the values in the first column plus `prompt_only`.
+The fitter API also accepts the aliases `mipro`, `gepa`, and
+`few_shot_bootstrap`; prefer the CLI spellings above in new scripts.
+
+### Parameter-only search
+
+Use a search space to make the allowed changes explicit. This avoids an
+optimization run silently tuning parameters you did not intend to change.
+
+```yaml
+# search-space.yaml
+optimize_system_prompt: false
+optimize_few_shot: false
+optimize_model_params: true
+search_method: tpe
+model_param_space:
+  temperature: [0.0, 0.2, 0.5]
+  top_p: [0.8, 0.95]
+rag_param_space:
+  top_k: [3, 5, 8]
 ```
 
----
-
-## 🧠 Optimization Strategies
-
-Agentomatic supports **6 optimization strategies** suited for different task formats and complexities:
-
-| Strategy Name | CLI / String ID | How It Works | Best Used For |
-|---|---|---|---|
-| **Iterative Rewrite** | `iterative_rewrite` | Evaluates prompts, feeds errors/scores to a powerful rewriter LLM, and refines instructions iteratively. | General instruction-following and system prompt refinement. |
-| **Few-Shot Bootstrap** | `few_shot_bootstrap` | Runs the agent over the dataset, collects high-scoring successful traces, and bootstraps them into the prompt as examples. | Complex logic requiring demonstration of correct formatting/reasoning. |
-| **Chain of Thought** | `chain_of_thought` | Rewrites the prompt to enforce step-by-step reasoning instructions and generates visual scratchpad examples. | Multi-step reasoning and mathematical/logical problems. |
-| **MIPRO** | `mipro` | Bayesian-based prompt optimizer. Jointly optimizes both the instruction strings and few-shot examples using search space trials. | High-complexity pipelines where both instructions and examples matter. |
-| **Bootstrap Random Search** | `bootstrap_randomsearch` | Bootstraps multiple few-shot example sets and runs a random search to find the optimal examples for the prompt. | Large datasets where handpicking examples is impossible. |
-| **Ensemble** | `ensemble` | Evaluates and compiles multiple high-performing prompt variants into a weighted ensemble prompt. | Robust prompt engineering requiring high generalization. |
-
----
-
-## 📊 Evaluation Metrics
-
-Agentomatic supports standard matches, LLM judges, and full **DeepEval** validation suites.
-
-### 1. Text Matching Metrics
-- **Exact Match** (`exact_match`): Verifies if the agent response matches the expected answer exactly.
-- **Contains** (`contains`): Verifies if the agent response contains a set of defined target keywords.
-
-!!! note "Matching metrics read the answer, not the whole reference"
-    An `AgentExample` with a structured `expected_output` is rendered for the
-    optimizer as a *judge-facing reference* — judge guidance, a rubric, an
-    `## Expected answer` section, the structured output as JSON. An LLM judge
-    reads all of it.
-
-    A matching metric compares strings, so it reads only the
-    `## Expected answer` section. Without that it would be comparing your
-    agent's response against markdown headers, and every candidate would score
-    near zero however good it was — `fit()` would report "no improvement"
-    forever. Plain-string expectations are used exactly as written.
-
-### 2. LLM-as-a-Judge Metrics
-- **LLM Judge** (`llm_judge`): Asks an evaluator LLM to grade the response on a scale of 0 to 1 based on custom criteria instructions.
-- **G-Eval** (`g_eval`): Uses the G-Eval framework protocol to evaluate complex criteria (e.g. coherence, readability) with detailed scoring rubrics.
-
-### 3. DeepEval Metrics (`deepeval`)
-Requires `pip install agentomatic[optimize]`. Integrates directly with the Confident AI DeepEval framework:
-- **Answer Relevancy** (`answer_relevancy`): Measures how relevant the agent response is to the user query.
-- **Faithfulness** (`faithfulness`): Evaluates Hallucination by comparing the agent response to retrieved context.
-- **Context Recall** (`context_recall`): Measures whether the RAG retriever fetched all the required context.
-
-### 4. Custom Metrics (Python)
-You can define any custom Python function returning a score between `0.0` (worst) and `1.0` (best):
-
-```python
-from agentomatic.optimize import CustomMetric
-
-def check_word_count(response: str, expected: str, **kwargs) -> float:
-    # Reward responses under 100 words
-    words = len(response.split())
-    return 1.0 if words < 100 else 0.0
-
-metric = CustomMetric(name="short_answers", scorer=check_word_count)
-
-optimizer = PromptOptimizer(
-    agent="my_agent",
-    metrics=[metric],
-    strategy="iterative_rewrite",
-)
+```bash
+agentomatic optimize support_bot \
+  --dataset eval.jsonl \
+  --mode param_search \
+  --search-space search-space.yaml \
+  --search-method tpe \
+  --no-optimize-prompt \
+  --param temperature=0.0,0.2,0.5 \
+  --max-trials 18
 ```
 
----
+`--param` adds or replaces a model parameter grid entry. `--search-method`
+accepts `grid`, `random`, or `tpe`. For `apo`, `--node-match` scopes trace
+critique to matching graph-node or subagent names; `--n-runners` sets fitter
+evaluation concurrency.
 
-## 🗄️ Loading Datasets
+Run `agentomatic optimize --help` for the complete, version-specific CLI
+contract. Do not use undocumented commands such as `agentomatic eval`,
+`agentomatic route`, or `agentomatic promote`: they are not Agentomatic CLI
+commands.
 
-The `Dataset` loader accepts JSONL, CSV, or raw Python dictionaries:
+## Modern Python API: `PromptFitter`
 
-=== "JSONL"
-    ```jsonl
-    {"query": "What is the capital of France?", "expected_answer": "Paris"}
-    {"query": "What is the capital of Spain?", "expected_answer": "Madrid", "context": ["Europe wiki"]}
-    ```
-    ```python
-    dataset = Dataset.from_jsonl("qa.jsonl")
-    ```
-
-=== "CSV"
-    ```csv
-    query,expected_answer
-    What is the capital of France?,Paris
-    What is the capital of Spain?,Madrid
-    ```
-    ```python
-    dataset = Dataset.from_csv("qa.csv")
-    ```
-
-=== "Python"
-    ```python
-    dataset = Dataset.from_list([
-        {"query": "Q1", "expected_answer": "A1"},
-        {"query": "Q2", "expected_answer": "A2", "context": ["context_doc"]},
-    ])
-    ```
-
----
-
-## 🧪 Synthetic Data Generation
-
-If you don't have a dataset, Agentomatic's `DataSynthesizer` can auto-generate high-quality evaluation sets from a textual description or from raw text files (e.g. employee handbooks, text documentation):
+Use `PromptFitter` when your application already owns the agent instance or
+needs custom metrics, callbacks, and search spaces. The example below uses a
+local agent and an oMLX-compatible endpoint for all optimizer model calls.
 
 ```python
-from agentomatic.optimize import DataSynthesizer
-
-synth = DataSynthesizer(model="ollama/llama3:8b")
-
-# Generate 50 test cases covering specific categories
-dataset = await synth.generate(
-    description="Customer support assistant answering questions about orders and returns",
-    n_samples=50,
-    categories=["returns", "shipping", "refunds"],
+from agentomatic.optimize import (
+    Dataset,
+    ExactMatchMetric,
+    PromptFitter,
+    PromptSearchSpace,
 )
 
-# Save to disk
-dataset.to_jsonl("synthetic_eval.jsonl")
-```
+# Import and construct your project's BaseGraphAgent subclass.
+from agents.support_bot.agent import SupportBotAgent
 
-To generate directly from local text files or markdown files:
-
-```python
-from agentomatic.optimize import generate_from_docs
-
-dataset = await generate_from_docs(
-    docs_path="docs/handbook.txt",
-    model="ollama/llama3:8b",
-    n_samples=30,
+dataset = Dataset.from_list(
+    [
+        {"query": "What is the refund period?", "expected_answer": "30 days"},
+        {"query": "How do I reset my password?", "expected_answer": "reset password"},
+        {"query": "Where is my order?", "expected_answer": "tracking"},
+        {"query": "Can I change an address?", "expected_answer": "before shipping"},
+    ]
 )
-```
+trainset, valset = dataset.split(ratio=0.75)
 
----
-
-## 🧠 PromptFitter: learnings, generalization, apply guards
-
-`PromptFitter.fit()` now keeps an auditable **epoch learning trail** and an
-always-on **generalization safety net** so prompt rewrites improve without
-overfitting to the evaluation examples.
-
-### What is recorded each epoch
-
-- Prompt snapshot (system prompt at end of the round)
-- Score + per-dimension scores
-- What worked / what failed (from eval + judge motivation)
-- Next-focus guidance for the following rewrite
-- Optional holdout score and train/holdout gap
-
-Access via `result.prompt_history` (list of dicts) and the Keras-style
-`result.history` score curve. Artefacts are written under
-`.optimize/<agent>/fit_result_*.json` plus append-only
-`retrain_history.jsonl`.
-
-### Generalization safety net
-
-When no explicit `testset` is provided, the fitter auto-splits a holdout
-slice from the validation set. Candidates that beat val but overfit the
-holdout (`fit − holdout > max_generalization_gap`, default `0.15`) are
-**rejected**.
-
-```python
-fitter = PromptFitter(
-    agent="assistant",
-    max_generalization_gap=0.15,
-    holdout_fraction=0.2,
-    sequential=True,       # default: concurrency=1 (local-SLM safe)
-    drain_seconds=1.5,     # cool-down after the async loop
+search_space = PromptSearchSpace(
+    optimize_system_prompt=True,
+    optimize_few_shot=False,
+    optimize_model_params=True,
+    model_param_space={"temperature": [0.0, 0.2]},
 )
-result = await fitter.fit(train, val, metric, testset=test)
-print(result.summary())    # includes holdout, gap, score curve
-```
-
-### apply() refuses zero-improvement
-
-```python
-# Refuses when absolute_improvement <= 0 or generalization gap is too large
-written = result.apply(version="v2_fit", agent_dir="agents/assistant")
-if written is None:
-    print("Kept baseline — no safe improvement")
-
-# Override only when you intentionally want to write anyway
-result.apply(version="v2_fit", agent_dir="agents/assistant", force=True)
-```
-
-Judge metrics (`LocalJudgeMetric`) default to `temperature=0.0` for stable
-scoring and return extensive `motivation` / `what_worked` / `what_failed` /
-`improvement_hints` so rewriters have real signal across epochs.
-
----
-
-## 🛡️ Red Teaming (Adversarial Testing)
-
-Run red-team evaluations to test your agents against adversarial inputs, prompt injections, and toxic prompts:
-
-```python
-from agentomatic.optimize import red_team, RedTeamMetric
-
-# Generate 20 adversarial prompts targeting prompt injection and jailbreaks
-adversarial_dataset = await red_team(
-    agent_name="my_agent",
-    categories=["prompt_injection", "pii_leakage", "toxicity"],
-    n_samples=20,
-)
-
-# Optimize system instructions to resist these vulnerabilities
-optimizer = PromptOptimizer(
-    agent="my_agent",
-    metrics=[RedTeamMetric(vulnerability="prompt_injection")],
-    strategy="iterative_rewrite",
-)
-
-result = await optimizer.optimize(dataset=adversarial_dataset, max_iterations=5)
-result.apply()
-```
-
----
-
-## 🔭 Observability & Callbacks
-
-To give you a perfect understanding of what is happening during a multi-hour optimization run, Agentomatic uses a rich event system (`CallbackManager`) embedded into `PromptFitter` and `PromptOptimizationLoop`.
-
-### 1. Terminal Progress (Rich)
-
-By default, optimization runs use a `RichProgressCallback` if `rich` is installed. It provides:
-- A live progress bar for overall rounds and step-level evaluations.
-- Real-time score trends using a block sparkline (e.g. `📈 ▁▂▃▅▇`).
-- Metrics on candidates evaluated, failures found, and score deltas.
-
-If `rich` is not available, it gracefully degrades to a log-based `LogProgressCallback`.
-
-### 2. TUI Dashboard (Textual)
-
-For maximum observability, you can spin up an interactive terminal dashboard. If you have `textual` installed, pass `dashboard=True` to the `PromptFitter`.
-
-```python
-from agentomatic.optimize import PromptFitter
 
 fitter = PromptFitter(
-    agent="my_agent",
-    dataset=dataset,
-    contract=eval_contract,
-    metrics=my_metrics,
-    dashboard=True  # Opens the Textual TUI
+    agent="support_bot",
+    local_agent=SupportBotAgent(),
+    task_model="omlx/Qwen3.5-9B-MLX-4bit",
+    rewrite_model="omlx/Qwen3.5-9B-MLX-4bit",
+    llm_base_url="http://127.0.0.1:8000/v1",
+    llm_api_key="local",
+    optimizer="rewrite",
+    search_space=search_space,
+    max_trials=12,
 )
 
-result = await fitter.fit()
+result = await fitter.fit(trainset, valset, ExactMatchMetric())
+print(result.summary())
+
+# Writes prompts.json only when the acceptance and generalization checks pass.
+result.apply(version="v2_fit", agent_dir="agents/support_bot")
 ```
 
-The TUI provides:
-- Live metrics and per-dimension scores
-- A candidate evaluation table
-- Event logging pane
-- Real-time performance chart
-
-### 3. Custom Callbacks
-
-You can hook into the event stream directly without subclassing any optimizers. Implement the `OptimizationCallback` protocol and pass your callbacks to the `PromptFitter` or `PromptOptimizationLoop`.
+Use a realistic validation set. If you do not supply `testset` to `fit`, the
+fitter reserves a holdout slice automatically when possible. Pass a separate
+`testset` when you have one:
 
 ```python
-from agentomatic.optimize.events import OptimizationCallback, OptimizationEvent, EventData
-
-class MyNotifier(OptimizationCallback):
-    async def on_event(self, event: OptimizationEvent, data: EventData) -> None:
-        if event == OptimizationEvent.RUN_COMPLETE:
-            send_slack_message(f"Optimization finished. Best score: {data.best_score}")
-
-fitter = PromptFitter(..., callbacks=[MyNotifier()])
+result = await fitter.fit(trainset, valset, ExactMatchMetric(), testset=holdout)
 ```
 
-## 📊 Interactive HTML Reports (HolySheet)
+### Metrics
 
-`train_and_report` and `evaluate_and_report` write interactive HTML dashboards
-via **HolySheet** when installed (`pip install holysheet` / `agentomatic[optimize]`).
-Content is nested under `Section` / `Tabs` / `Accordion` children so cards render
-correctly — empty top-level sections are avoided.
-
-**Fit reports** (`generate_fit_report` / `TrainResult.report_path`) include:
-
-- Score / loss curves and Keras-style epoch history
-- Trial table, early-stop reason, dataset sizes, optimizer
-- Prompt evolution diffs + full baseline/best prompts
-- Judge motivations / what-worked / what-failed
-- Deployment recommendation
-
-**Eval reports** (`generate_eval_report` / `EvaluateResult.report_path`) include:
-
-- Aggregate scores and per-example tables
-- Judge rationale panels (when `OptimizeMetricAdapter.last_result` is available)
-- Split / stack / model metadata
-
-When HolySheet is absent, a built-in static HTML fallback is written instead.
-
-```python
-from agentomatic.optimize import generate_fit_report, generate_eval_report, generate_html_report
-
-generate_fit_report(fit_result, output_path="reports/train_assistant.html")
-generate_eval_report(eval_report, output_path="reports/eval_assistant.html")
-# Lower-level PromptOptimizer loop:
-generate_html_report(result, filepath="reports/my_agent_optimization.html")
-```
-
----
-
-## 🔧 Prompt Fitting (Deployment-First Optimization)
-
-### Overview
-
-Traditional prompt engineering is manual and ad-hoc: you tweak words, run a few tests, and hope
-for the best. **Prompt Fitting** replaces that with a principled, ML-like workflow where every
-change is evaluated against a scored dataset and the result is a *better deployment configuration*
-— not a compiled program.
-
-The core API mirrors scikit-learn:
-
-```python
-fitter = PromptFitter(agent="scope_agent", ...)
-result = await fitter.fit(trainset, valset, metric)
-```
-
-**What the fitter produces:**
-
-- A better system prompt (rewritten, restructured, with stronger guardrails)
-- Optimized model parameters (temperature, top_p, penalties)
-- Curated few-shot examples (bootstrapped from high-scoring traces)
-- Tuned RAG parameters (top_k, rerank strategy)
-- A `DeploymentRecommendation` with rollout strategy and confidence level
-
-> **Key insight:** Your agent is already deployed and serving traffic. Optimization does not
-> produce a new artifact — it produces a *better version* of the existing deployment. Every
-> result includes canary weights, confidence scores, and failure diagnostics so you can ship
-> changes safely.
-
----
-
-### EvalContract — Structural Quality Gate
-
-Before optimizing, define what a valid agent response *must* look like. The `EvalContract`
-enforces structural constraints and can be used as a metric or as judge criteria:
-
-```python
-from agentomatic.optimize import EvalContract
-
-contract = EvalContract(
-    name="scoping_response",
-    input_fields=["query", "context"],
-    output_format="json",
-    required_output_fields=["answer", "confidence", "risks", "next_questions"],
-    constraints=["confidence must be between 0.0 and 1.0"],
-)
-
-# Structural validation — returns a score between 0.0 and 1.0
-score = contract.validate(response_text)
-
-# Detailed validation — field-by-field breakdown
-details = contract.validate_details(response_text)
-# details.missing_fields   → ["next_questions"]
-# details.constraint_violations → ["confidence was 1.5, expected 0.0-1.0"]
-# details.score            → 0.75
-
-# Use as a weighted metric inside CompositeMetric
-metric = contract.as_metric(weight=0.10)
-
-# Use as judge criteria for LLM-based evaluation
-criteria = contract.as_judge_criteria()
-```
-
-The contract acts as a lightweight schema enforcer. When used inside `CompositeMetric`, it
-ensures that optimization never sacrifices structural correctness for content quality.
-
----
-
-### Metrics: CompositeMetric and Friends
-
-Agentomatic ships several metric types that compose into a single scoring function.
-
-#### Metric Types
-
-| Metric | Description |
-|---|---|
-| `LocalJudgeMetric(criteria)` | Asks a local LLM judge to score the response on a named criterion (e.g. "completeness", "business_relevance"). Returns 0.0–1.0. |
-| `DeterministicMetric(fn)` | Wraps a pure Python function `fn(response, expected) → float`. No LLM calls — fast and reproducible. |
-| `LatencyMetric()` | Measures agent response latency in seconds. Normalized to 0.0–1.0 (lower latency = higher score). |
-| `CostMetric()` | Estimates token cost per response. Normalized to 0.0–1.0 (lower cost = higher score). |
-| `WeightedMetric(name, metric, weight)` | Wraps any metric with a scalar weight. **Negative weights** penalize the dimension (useful for cost/latency). |
-
-#### CompositeMetric — Multi-Dimensional Scoring
-
-Combine quality judges with negative-weight cost/latency penalties so the optimizer balances
-accuracy against operational cost:
+Metrics are async and are evaluated for each candidate. The core options are:
 
 ```python
 from agentomatic.optimize import (
     CompositeMetric,
-    WeightedMetric,
-    LocalJudgeMetric,
-    DeterministicMetric,
-    LatencyMetric,
-    CostMetric,
+    ContainsMetric,
+    ExactMatchMetric,
+    LLMJudgeMetric,
 )
 
-metric = CompositeMetric(metrics=[
-    # Quality dimensions — positive weights
-    WeightedMetric("completeness",   LocalJudgeMetric("completeness"),      weight=0.30),
-    WeightedMetric("relevance",      LocalJudgeMetric("business_relevance"),weight=0.25),
-    WeightedMetric("risk_detection", LocalJudgeMetric("risk_detection"),    weight=0.20),
-    WeightedMetric("format",         contract.as_metric(),                  weight=0.10),
-
-    # Operational dimensions — negative weights (penalties)
-    WeightedMetric("latency",        LatencyMetric(),                       weight=-0.10),
-    WeightedMetric("cost",           CostMetric(),                          weight=-0.05),
-])
-```
-
-The composite score is calculated as:
-
-```
-score = Σ (weight_i × metric_i)
-```
-
-Negative weights on `LatencyMetric` and `CostMetric` mean that slower or more expensive
-candidates are penalized, steering the fitter toward cost-effective configurations without
-sacrificing quality.
-
-You can also use `DeterministicMetric` for fast, reproducible checks:
-
-```python
-def check_json_parseable(response: str, expected: str, **kwargs) -> float:
-    try:
-        json.loads(response)
-        return 1.0
-    except json.JSONDecodeError:
-        return 0.0
-
-metric = DeterministicMetric(fn=check_json_parseable)
-```
-
----
-
-### PromptSearchSpace — Full Configuration Surface
-
-The search space defines what the fitter is allowed to change. Every axis can be toggled
-independently:
-
-```python
-from agentomatic.optimize import PromptSearchSpace
-
-space = PromptSearchSpace(
-    # Prompt optimization
-    optimize_system_prompt=True,     # rewrite system instructions
-    optimize_few_shot=True,          # select/bootstrap few-shot examples
-
-    # Model selection
-    optimize_model_choice=True,      # try different models
-    model_choices=["ollama/qwen2.5:7b", "openai/gpt-4.1"],
-    fallback_models=["openai/gpt-4.1-mini"],
-
-    # Model parameters
-    optimize_model_params=True,
-    model_param_space={
-        "temperature": [0.0, 0.1, 0.2, 0.4, 0.7],
-        "top_p": [0.7, 0.9, 1.0],
-    },
-
-    # RAG parameters
-    optimize_rag_params=True,
-    rag_param_space={
-        "top_k": [3, 5, 8, 12],
-        "rerank": [True, False],
-    },
+deterministic = CompositeMetric([ExactMatchMetric(), ContainsMetric()])
+judge = LLMJudgeMetric(
+    criteria="The answer must be accurate, concise, and safe.",
+    model="omlx/Qwen3.5-9B-MLX-4bit",
 )
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `optimize_system_prompt` | `bool` | Allow the fitter to rewrite system instructions |
-| `optimize_few_shot` | `bool` | Allow bootstrapping/selection of few-shot examples |
-| `optimize_model_choice` | `bool` | Try different models from `model_choices` |
-| `model_choices` | `list[str]` | Candidate models to evaluate |
-| `fallback_models` | `list[str]` | Models to fall back to if primary fails |
-| `optimize_model_params` | `bool` | Search over `model_param_space` values |
-| `model_param_space` | `dict` | Grid of parameter values to search |
-| `optimize_rag_params` | `bool` | Tune RAG retrieval settings |
-| `rag_param_space` | `dict` | Grid of RAG parameter values |
-| `search_method` | `str` | Param sampler: `grid`, `random`, or `tpe` |
-| `optimize_nodes` | `list[str]` | Scope prompt updates to named graph nodes |
-| `node_match` | `str \| None` | Regex for selective multi-agent / node traces |
+Start with deterministic metrics where a response contract permits them.
+Judge metrics are useful for open-ended quality, but require a reachable model
+and a rubric that is stable enough to compare candidates fairly.
 
----
+### Result and apply safeguards
 
-### The Fitter Optimizers
+`PromptFitResult` records the baseline and best scores, trial history,
+suggested parameter changes, failure clusters, and any holdout score:
 
-Agentomatic includes six optimizer strategies, each suited to different optimization
-scenarios. Ideas from Microsoft Agent Lightning (textual gradients, beam search,
-versioned resources, selective node traces) are integrated natively — without a
-VERL/GPU RL dependency.
+```python
+print(result.best_prompt)
+print(result.best_params)
+print(result.absolute_improvement)
+print(result.holdout_score)
+print(result.generalization_gap)
+print(result.to_dict())
+```
 
-| Strategy | CLI ID | How It Works | Best For |
-|---|---|---|---|
-| **RewriteOptimizer** | `rewrite` | Analyzes failure clusters, generates a diagnostic summary, and asks the rewriter LLM to produce an improved system prompt. Iterates until improvement stalls. | General prompt improvement; fixing instruction ambiguities and missing guardrails. |
-| **FewShotBootstrapOptimizer** | `few_shot_bootstrap` | Runs the agent on the training set, scores every trace, selects the top examples using Score²-weighted sampling with diversity scoring, and injects them as few-shot demonstrations. | Tasks where showing the right examples matters more than instruction tuning. |
-| **MIPROLikeOptimizer** | `mipro_like` | Generates multiple instruction variants from different perspectives (clarity, brevity, domain expertise), creates few-shot example sets, and performs a cross-product search over all combinations. | Complex pipelines where both instructions and examples interact. |
-| **GEPALikeOptimizer** | `gepa_like` | Uses evaluation feedback to identify specific weaknesses, applies targeted mutations to the relevant prompt sections, and validates each mutation against the failure cases. Most sample-efficient strategy. | Iterative refinement when you have a decent baseline and want targeted improvements. |
-| **APOOptimizer** | `apo` | Agent Lightning–style APO: textual gradient (critique over rollout traces/messages) → apply-edit rewrite → beam of candidates. Critiques appear in HolySheet trial history. | Trace-aware prompt search when tool/step context matters; beam exploration. |
-| **ParamSearchOptimizer** | `param_search` | Structured search over model/RAG/tool params. Supports `search_method`: `grid`, `random`, or lightweight `tpe` (Tree-structured Parzen Estimator) using prior trial scores. | Finding the optimal operating point for model/RAG/tool configuration. |
+`result.apply(...)` refuses a non-improving candidate by default and can reject
+a candidate with an excessive generalization gap. Review the report and use
+`force=True` only when an operator has deliberately accepted that risk.
 
-!!! tip "When to use APO vs GEPA vs rewrite"
-    - **rewrite** — fast full-prompt rewrite from failure I/O (good default).
-    - **gepa_like** — targeted mutations per failure category (efficient once you have judge feedback).
-    - **apo** — critique→edit beam search that reads **message-level traces** (steps/tools/reasoning), closest to Lightning APO.
+## Compatibility API: `PromptOptimizer`
+
+`PromptOptimizer` and CLI `--mode prompt_only` remain available for existing
+API-backed integrations. It supports three legacy strategies only:
+`iterative_rewrite`, `few_shot`, and `chain_of_thought`.
+
+```python
+from agentomatic.optimize import Dataset, PromptOptimizer
+
+optimizer = PromptOptimizer(
+    agent="support_bot",
+    metrics=["contains"],
+    strategy="iterative_rewrite",
+    llm="omlx/Qwen3.5-9B-MLX-4bit",
+    api_base="http://127.0.0.1:8000",
+)
+
+dataset = Dataset.from_jsonl("eval.jsonl")
+result = await optimizer.optimize(
+    dataset=dataset,
+    max_iterations=10,
+    target_score=0.9,
+)
+print(result.report())
+```
+
+Equivalent CLI:
 
 ```bash
-# APO with parallel rollouts and node-scoped traces
-agentomatic optimize my_agent --dataset data.jsonl --mode apo --n-runners 4 \
-  --node-match 'respond|planner'
-
-# Param search with TPE
-agentomatic optimize my_agent --dataset data.jsonl --mode param_search \
-  --search-method tpe --param temperature=0.0,0.3,0.7
+agentomatic optimize support_bot \
+  --dataset eval.jsonl \
+  --mode prompt_only \
+  --strategy iterative_rewrite \
+  --host http://127.0.0.1:8000
 ```
 
-#### Unified algorithm surface
+Do not use old names such as `mipro`, `ensemble`, or
+`bootstrap_randomsearch` with `--strategy`; they are not legacy CLI strategy
+values. Use the fitter modes above instead.
 
-Prefer the Lightning-inspired `OptimizationAlgorithm` ABC when scripting:
+## Advanced extensions
 
-```python
-from agentomatic.optimize import PromptFitter, as_algorithm, ExactMatchMetric
+These are extensions to `PromptFitter`, not additional quick-start paths.
 
-fitter = PromptFitter(agent="hello", optimizer="apo", n_runners=4, local_agent=agent)
-algo = as_algorithm(fitter)  # shares ResourceRegistry + RolloutTraceStore
-result = await algo.run(train_ds, val_ds, metric=ExactMatchMetric())
-# Inspect versioned resources / rollouts:
-# algo.resources.history(), algo.trace_store.list()
-```
+### Callbacks and reports
 
-#### Feedback → fit
-
-Production thumbs / corrections can become a training set:
+Use callbacks when a long-running fit needs an operator-visible stopping or
+checkpoint policy. `PromptFitter` accepts them directly:
 
 ```python
-from agentomatic.optimize import feedback_records_to_dataset, dataset_from_feedback_jsonl
-
-ds = feedback_records_to_dataset(await collector.get_feedback("my_agent"))
-# or: ds = dataset_from_feedback_jsonl("feedback.jsonl")
-```
-
-#### Selective node optimization
-
-Set `PromptSearchSpace.optimize_nodes` and/or `node_match` (regex) to scope
-prompt overrides and APO critique traces to specific LangGraph nodes /
-subagents — analogous to Lightning's `agent_match`.
-
-You can combine strategies by running multiple fit passes:
-
-```python
-# First pass: optimize the prompt
-fitter_prompt = PromptFitter(agent="scope_agent", optimizer="gepa_like", ...)
-result1 = await fitter_prompt.fit(trainset, valset, metric)
-result1.apply(version="v2_prompt")
-
-# Second pass: optimize parameters with the new prompt
-fitter_params = PromptFitter(agent="scope_agent", optimizer="param_search", ...)
-result2 = await fitter_params.fit(trainset, valset, metric)
-result2.apply(version="v2_full")
-```
-
----
-
-### PromptFitter — Full API
-
-The `PromptFitter` is the main entry point for all optimization:
-
-```python
-from agentomatic.optimize import PromptFitter
+from agentomatic.optimize import EarlyStopping, ModelCheckpoint, PromptFitter
 
 fitter = PromptFitter(
-    agent="scope_agent",                    # agent name from agents.json
-    task_model="ollama/qwen2.5:7b",         # model used for agent execution
-    rewrite_model="openai/gpt-4.1",         # model used for prompt rewriting
-    optimizer="gepa_like",                  # optimization strategy
-    search_space=space,                     # PromptSearchSpace config
-    max_trials=30,                          # maximum optimization trials
-    min_absolute_improvement=0.05,          # stop if gain < 5%
-    concurrency=5,                          # parallel evaluation workers
-)
-
-result = await fitter.fit(
-    trainset,                               # training examples (for few-shot)
-    valset,                                 # validation set (for scoring)
-    metric,                                 # CompositeMetric instance
-    testset=testset,                        # optional held-out test set
-)
-```
-
-**Local-mode — no HTTP server required:**
-
-Pass `local_agent` to bypass the HTTP runner and call your agent in-process.
-Also pass `llm_base_url` / `llm_api_key` to route the optimizer's LLM calls to
-a local OpenAI-compatible server (omlx, Ollama, vLLM, LM Studio):
-
-```python
-fitter = PromptFitter(
-    agent="scope_agent",
-    task_model="openai/my-local-model",
-    local_agent=agent_instance,             # bypasses HTTP — calls transform() directly
-    llm_base_url="http://127.0.0.1:8000/v1",  # routes openai/ specs to local server
-    llm_api_key="local-key",               # arbitrary for local servers
-    optimizer="rewrite",                  # full briefing + multi-pass
-    rewrite_passes=None,                  # None = auto (3 SLM / 2 frontier LLM)
-    multipass=True,
-    slm_multipass=True,
-    llm_multipass=True,
-    max_trials=8,
-)
-result = await fitter.fit(trainset, valset, metric)
-print(result.summary())
-print(result.history)   # list[float] — per-round best scores
-result.apply(version="v2_fit")
-```
-
-!!! tip "Multi-pass rewrite (SLM + LLM)"
-    Every rewrite / GEPA / MIPRO call receives a **full briefing**: system
-    prompt, model / RAG / tool params, search space, dataset samples, metrics,
-    history, and per-example input / expected / actual / scores / judge
-    feedback.
-
-    Auto multi-pass (when `rewrite_passes=None` and `multipass=True`):
-
-    | Rewrite model | Default passes | Loop |
-    |---|---|---|
-    | SLM / local (`omlx/`, `ollama/`, `7b`…) | **3** | draft → critique → revise |
-    | Frontier LLM (`openai/`, `anthropic/`…) | **2** | draft → self-check revise |
-
-    Prompt wording and briefing size adapt to the model class. Override with
-    `rewrite_passes=1` (single shot), `rewrite_passes=5` (extra rounds), or
-    disable with `multipass=False` / `llm_multipass=False` / `slm_multipass=False`.
-
-```python
-# Frontier rewrite model — draft + self-check by default
-fitter = PromptFitter(
-    agent="scope_agent",
-    task_model="openai/gpt-4.1-mini",
-    rewrite_model="openai/gpt-4.1",
-    optimizer="rewrite",
-    llm_multipass=True,          # default
-    llm_default_passes=2,        # draft → revise
-)
-
-# Force a deeper LLM critique loop
-fitter = PromptFitter(
-    agent="scope_agent",
-    rewrite_model="anthropic/claude-sonnet-4",
-    optimizer="rewrite",
-    rewrite_passes=3,            # draft → critique → revise
-)
-```
-
-!!! tip "OpenAI cloud vs local OpenAI-compatible"
-    Optimize model specs:
-
-    | Spec | Routes to | Credentials |
-    |---|---|---|
-    | `openai/gpt-4o-mini` | OpenAI cloud (`api.openai.com`) | `OPENAI_API_KEY=sk-…` |
-    | `omlx/Qwen3.5-9B-…` | Local oMLX / OpenAI-compatible | `OMLX_BASE_URL` + `OMLX_API_KEY` |
-    | `openai/local-model` + `llm_base_url=` | Explicit local server | `llm_api_key` / configure |
-
-    A local `OPENAI_BASE_URL=http://127.0.0.1:8000/v1` (common when developing
-    with oMLX) is **ignored** for first-party cloud ids (`gpt-*`, `o1`/`o3`/`o4`)
-    unless you pass an explicit `llm_base_url` / `LLMCaller.configure(...)`.
-    That way `openai/gpt-4o-mini` keeps working even with a local base URL in
-    your shell.
-
-```python
-# Cloud OpenAI rewrite (needs OPENAI_API_KEY=sk-…)
-fitter = PromptFitter(
-    agent="assistant",
-    task_model="openai/gpt-4o-mini",
-    rewrite_model="openai/gpt-4o-mini",
-    optimizer="rewrite",
-    local_agent=agent,
-    # do NOT set llm_base_url — hits api.openai.com
-)
-```
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `agent` | `str` | — | Agent name as defined in `agents.json` |
-| `task_model` | `str` | — | Model used for running the agent during evaluation |
-| `rewrite_model` | `str` | — | Model used by the optimizer for prompt rewriting |
-| `optimizer` | `str` | `"rewrite"` | Strategy: `rewrite`, `few_shot_bootstrap`, `mipro_like`, `gepa_like`, `param_search` |
-| `search_space` | `PromptSearchSpace` | — | Configuration surface to search |
-| `max_trials` | `int` | `20` | Maximum number of candidate evaluations |
-| `min_absolute_improvement` | `float` | `0.02` | Early stop if best improvement is below this threshold |
-| `concurrency` | `int` | `3` | Number of parallel evaluation workers |
-| `local_agent` | `Any \| None` | `None` | Live agent instance — bypasses HTTP runner entirely |
-| `rewrite_passes` | `int \| None` | `None` | Multi-pass refine count (`None` = auto by model class) |
-| `multipass` | `bool` | `True` | Master switch for auto multi-pass refine |
-| `slm_multipass` | `bool` | `True` | Auto multi-pass when rewrite model looks like an SLM |
-| `llm_multipass` | `bool` | `True` | Auto multi-pass for frontier / cloud rewrite LLMs |
-| `slm_default_passes` | `int` | `3` | Passes used when SLM auto-detect fires |
-| `llm_default_passes` | `int` | `2` | Passes used when LLM auto-detect fires |
-| `llm_base_url` | `str \| None` | `None` | Base URL for the optimizer's OpenAI-compatible LLM server |
-| `llm_api_key` | `str \| None` | `None` | API key for the optimizer LLM server |
-
----
-
-### Local-mode Training: `compile → fit → evaluate`
-
-The `PromptFitterBridge` (used via `BaseGraphAgent.compile()` + `fit()`) runs the
-full optimization loop **without a running agentomatic HTTP server**.  All you need
-is a local OpenAI-compatible LLM server (omlx, Ollama, LM Studio, vLLM).
-
-**Architecture:**
-
-```
-your script
-  └─ agent.compile(dataset, metrics, optimizer=PromptFitterBridge(...))
-       └─ agent.fit(dataset)
-            └─ PromptFitterBridge.optimize(agent, dataset, metrics)
-                 └─ PromptFitter.fit(trainset, valset, metric)
-                      ├─ AgentRunner._run_local()   ← calls agent.transform() in-process
-                      └─ LLMCaller._call_openai()   ← routed to http://127.0.0.1:8000/v1
-```
-
-**Key concepts:**
-
-| Class | Role | Import path |
-|---|---|---|
-| `agents.WeightedMetric` | Composite loss — has `.score()` | `agentomatic.agents` |
-| `OptimizeMetricAdapter` | Bridge async `optimize.BaseMetric` → sync `.score()` | `agentomatic.agents` |
-| `MetricLoss` | Wraps any `Metric` as a training loss | `agentomatic.agents` |
-| `PromptFitterBridge` | Drives `PromptFitter` from `fit()` | `agentomatic.agents` |
-| `LocalJudgeMetric` | LLM-as-judge over a local server | `agentomatic.optimize` |
-| `CustomMetric` | Function-based fitter objective | `agentomatic.optimize` |
-| `PromptSearchSpace` | Defines what the fitter can change | `agentomatic.optimize` |
-
-!!! tip "Choose your tier"
-    - **Thin scripts** → `train_and_report` / `TrainCliSettings` (Quick Start).
-    - **Composable steps** → `compile_agent` / `fit_agent` / `evaluate_agent`
-      (same primitives; swap metrics/optimizer freely).
-    - **Maximum wiring control** → hand-build `PromptFitterBridge` as below
-      (still the same fitter engine).
-
-**Complete example — stack-driven, no env-var hacks, no HTTP server:**
-
-```python
-import json, os
-from pathlib import Path
-
-from agentomatic.agents import (
-    AgentDataset, CallableMetric, EarlyStopping, ExactKeyMatchMetric,
-    MetricLoss, OptimizeMetricAdapter, PromptFitterBridge, WeightedMetric,
-)
-from agentomatic.config.settings import load_environment
-from agentomatic.optimize import (
-    CustomMetric, LocalJudgeMetric, PromptSearchSpace, generate_fit_report,
-)
-from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
-from agentomatic.stacks.manager import StackManager
-
-from agents.my_agent.agent import MyAgent   # your BaseGraphAgent subclass
-
-# ── 0. Stack ─────────────────────────────────────────────────────────────────
-load_environment(Path(".env"))
-stacks = StackManager(Path("stacks"))
-stacks.load("local")
-apply_stack_defaults(stacks)
-entry = stacks.get_llm_config("default")
-model = f"{entry.provider}/{entry.model}"  # e.g. "openai/LFM2.5-8B-A1B-MLX-4bit"
-
-# ── 1. Data ───────────────────────────────────────────────────────────────────
-dataset = AgentDataset.from_jsonl("agents/my_agent/datasets/all.jsonl",
-                                   name="my_agent")
-print(f"train={len(dataset.train)} val={len(dataset.validation)}")
-
-# ── 2. Agent ──────────────────────────────────────────────────────────────────
-llm   = get_llm_for_agent("my_agent", role="default", stack_manager=stacks)
-agent = MyAgent(llm=llm)
-
-# ── 3. Metrics ────────────────────────────────────────────────────────────────
-# LLM-as-judge: OptimizeMetricAdapter bridges async .evaluate() → sync .score()
-judge   = LocalJudgeMetric(
-    model=model,
-    criteria="Is the response relevant, grounded, and actionable?",
-    dimensions=["relevance", "groundedness", "actionability"],
-)
-judge_m   = OptimizeMetricAdapter(judge, name="judge")
-key_m     = ExactKeyMatchMetric(["content", "next_action"])
-json_m    = CallableMetric("json_valid",
-                lambda ex, pred: 1.0 if isinstance(pred, dict) and pred else 0.0)
-
-metrics = [judge_m, key_m, json_m]
-
-# agents.WeightedMetric has .score() → compatible with MetricLoss
-loss_metric = WeightedMetric(
-    [("judge", judge_m, 0.40), ("key_match", key_m, 0.35), ("json", json_m, 0.25)],
-    name="composite_loss",
-)
-
-# ── 4. Fitter objective (used by PromptFitter internally) ────────────────────
-def composite_fn(query, response, expected=None, context=None):
-    """Score for the fitter's candidate ranking (query/response strings)."""
-    try:
-        pred = json.loads(response) if response else {}
-    except (json.JSONDecodeError, TypeError):
-        pred = {}
-    key_score = sum(1 for k in ["content", "next_action"] if k in pred) / 2
-    return key_score
-
-# ── 5. Search space ──────────────────────────────────────────────────────────
-space = PromptSearchSpace(
-    optimize_system_prompt=True,
-    optimize_few_shot=True,
-    optimize_model_params=True,
-    model_param_space={
-        "temperature": [0.0, 0.1, 0.2, 0.4],
-        "top_p":       [0.9, 1.0],
-    },
-)
-
-# ── 6. PromptFitterBridge ────────────────────────────────────────────────────
-fitter = PromptFitterBridge(
-    agent_name="my_agent",
-    task_model=model,
-    rewrite_model=model,
-    # local_agent is wired automatically from the live agent in optimize()
-    llm_base_url=entry.base_url,     # routes openai/ specs → local server
-    llm_api_key=entry.api_key or "local",
-    max_trials=8,
-    metric=CustomMetric(fn=composite_fn, name="composite"),
-    base_prompt_version="v1",
-    search_space=space,
+    agent="support_bot",
     optimizer="gepa_like",
-    min_absolute_improvement=0.02,
-    concurrency=2,
-    experiment_dir="reports/.fit",
-    auto_report=True,
-)
-
-# ── 7. compile → fit → evaluate ──────────────────────────────────────────────
-agent.compile(dataset, metrics=metrics, optimizer=fitter,
-              loss=MetricLoss(loss_metric))
-
-history = agent.fit(
-    dataset,
-    epochs=1,
-    validation_data=dataset.validation,
-    callbacks=[EarlyStopping(monitor="val_loss", patience=1, mode="min")],
-    max_trials=8,
-    search_space=space,
-    optimize_mode="gepa_like",
-    optimize_prompt=True,
-    optimize_params=True,
-    verbose=1,
-)
-
-print(f"History: {history.history}")
-print(f"Status:  {getattr(agent, '_last_optimize_status', '')!r}")
-
-report = agent.evaluate(dataset.test or dataset.validation, metrics)
-print(f"Scores:  {report.scores}")
-
-# ── 8. Report + apply ────────────────────────────────────────────────────────
-fit_result = getattr(agent, "_last_fit_result", None)
-if fit_result:
-    print(fit_result.summary())
-    print(f"Score history: {fit_result.history}")   # list[float]
-    generate_fit_report(fit_result, output_path="reports/fit.html")
-    # Persist the best prompt (set to True when satisfied):
-    # fit_result.apply(version="v2_fit", agent_dir="agents/my_agent")
-```
-
-!!! tip "Metric roles explained"
-    - **`agents.WeightedMetric` + `MetricLoss`** — drives the training loss that `fit()` minimises. Must use `agents.WeightedMetric` because it implements `score(example, prediction)`.
-    - **`OptimizeMetricAdapter`** — wraps any `optimize.BaseMetric` (e.g. `LocalJudgeMetric`) so it satisfies the `Metric` protocol expected by `agents.WeightedMetric`.
-    - **`CustomMetric`** — the fitter's internal objective, evaluated as `fn(query_str, response_str, expected_str)`. Separate from the training loss; used by `PromptFitter` to rank candidates.
-
-!!! warning "Do NOT use `optimize.CompositeMetric` directly as a MetricLoss"
-    `optimize.CompositeMetric` is designed for the `PromptFitter` pipeline (it takes string query/response args). For training loss, use `agents.WeightedMetric` wrapping `OptimizeMetricAdapter`-adapted metrics.
-
----
-
-### Prove it: Keras-style loss curves with local omlx
-
-A ready-to-run showcase lives in
-[`examples/keras_optimize_showcase/`](https://github.com/UnicoLab/agentomatic/tree/main/examples/keras_optimize_showcase)
-— a deliberately-bad class-based agent (vague prompt, hot `temperature=0.7`,
-no few-shot), a fake 20-example dataset, and a `train.py` that runs the exact
-Keras workflow from the docs:
-
-```python
-from agentomatic import (
-    BaseGraphAgent,
-    EarlyStopping,
-    EpochDiffCallback,
-    MetricLoss,
-    PromptFitterBridge,
-)
-
-agent = MarkerAgent()                              # bad prompt + bad params
-agent.compile(dataset, metrics=metrics, loss=loss, optimizer=bridge)
-history = agent.fit(
-    dataset,
-    epochs=10,
-    verbose=1,                                     # Keras-like per-epoch log lines
-    validation_data=dataset.validation,            # adds val_* metrics
     callbacks=[
-        CurriculumCallback(...),                   # raise one requirement per epoch
-        EpochDiffCallback(epochs=10),              # print loss + prompt diff + changes
-        EarlyStopping(monitor="val_loss", patience=3),
+        EarlyStopping(monitor="score", patience=3, min_delta=0.01),
+        ModelCheckpoint(save_dir="optimization_results/support_bot"),
     ],
 )
-print(history.best("val_loss", mode="min"))       # (epoch, best_val_loss)
-report = agent.evaluate(dataset.test, metrics)
-agent.save("compiled/v1")
 ```
 
-The agent is fully deterministic, so **every point of loss movement is caused
-by the optimizer changing the prompt / parameters** (the local omlx server is
-only used for rewriting and failure analysis). A curriculum callback raises
-one new quality signal per epoch (four prompt markers, then three temperature
-rungs), so the optimizer must keep discovering new markers — the loss curve
-descends step-by-step and the prompt keeps evolving:
-
-![Keras-style loss per epoch, all five optimizer methods](../assets/showcase/loss_curves.svg)
-
-*Real run (local omlx, `DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx`, 10 epochs, `max_trials=6`):*
-
-| Method | Loss per epoch (base → E1 → E2 → … → E10) | What improved |
-|---|---|---|
-| `rewrite` | `1.000 → 0.857 → 0.857 → 0.571 → 0.429 → …` | prompt markers `banana` → `strawberry` → `blueberry` → `kiwi` |
-| `gepa_like` | `1.000 → 1.000 → 0.857 → 0.714 → 0.571 → …` | prompt mutations from failure feedback |
-| `mipro_like` | `1.000 → 0.857 → 0.857 → 0.571 → 0.429 → 0.286 → 0.143 → 0.000 → …` | markers **and** temperature (`0.7 → 0.02`) |
-| `few_shot_bootstrap` | `1.000 → 0.857 → …` | few-shot demos carrying the marker |
-| `param_search` | `1.000 → 0.857 → 0.714 → 0.571 → …` | temperature rungs (`0.7 → 0.05`, no LLM calls) |
-
-Every method produces a **non-increasing** Keras-style loss that starts at the
-pre-fit baseline (`epoch 0` = 1.000) and improves every epoch until it hits
-the mode's capability ceiling (e.g. `rewrite` cannot tune temperature).
-`mipro_like` converges to `0.000`.
-
-### The prompt evolution
-
-The fitter records a full prompt history — each round's snapshot, accepted
-candidate, and learnings — which the HolySheet report renders as a
-chronological prompt diff (baseline → each improved version):
-
-| Step | Prompt (real run) | Score |
-|---|---|---|
-| Baseline | `You are a vague assistant.` | 0.000 |
-| After E1 | baseline + `## Fit tips` block grounding answers, `must include banana` | 0.143 |
-| After E2 | … + strawberry grounding (LLM rewrite from judge guidance) | 0.143 → 0.429 |
-| After E4 | … + blueberry & kiwi markers → `PARTIAL → OPT` responses | 0.571 |
-
-Per-epoch learnings (`what_worked` / `what_failed` / `next_focus`) are
-recorded into `result.prompt_history` and exposed in the interactive report
-under *Prompt Evolution*.
-
-### Full per-epoch display (loss + prompt diff + changes)
-
-Pass the built-in :class:`EpochDiffCallback` to `agent.fit()` to print, at
-**every epoch**, the Keras-style loss, a unified diff of the prompt (red
-`-` removed / green `+` added lines), the config-change summary
-(temperature, few-shot count, …) and the current best prompt:
+The fitter generates a report by default. For a serializable result from any
+supported path, create a standalone HTML report with:
 
 ```python
-from agentomatic import EpochDiffCallback
+from agentomatic.optimize import generate_html_report
 
-history = agent.fit(
-    dataset,
-    epochs=10,
-    verbose=1,
-    validation_data=dataset.validation,
-    callbacks=[curriculum, EpochDiffCallback(epochs=10), EarlyStopping(...)],
+report_path = generate_html_report(result, output_path="reports/support-fit.html")
+```
+
+### Synthetic seed data
+
+`DataSynthesizer` is a Python API for creating a seed dataset; it is not an
+`agentomatic dataset` CLI command. Always review generated examples and keep a
+separate human-verified validation set.
+
+```python
+from agentomatic.optimize import DataSynthesizer
+
+synthesizer = DataSynthesizer(model="omlx/Qwen3.5-9B-MLX-4bit")
+dataset = await synthesizer.generate(
+    description="A support assistant that explains order status and refunds.",
+    n_samples=40,
+    categories=["orders", "refunds"],
 )
+dataset.to_jsonl("seed-eval.jsonl")
 ```
 
-Real output (one epoch of the showcase):
+### Scaffolded training scripts
 
-```
-──────────────────────────────────────────────────────────────────────
-Epoch 1/10 — report
-  loss: 0.8571   val_loss: 0.8571
-  ── prompt changes (what was modified) ──
-    -You are a vague assistant.
-    +You are a helpful AI assistant.
-    +
-    +## Fit tips (from labelled demos)
-    +- Ground every answer ONLY in the provided snapshot; never invent budgets or stakeholders.
-    +- When relevant, include these anchors naturally: banana.
-  ── config changes ──
-    few_shot_examples: 0 → 3 items
-  ── current prompt ── You are a helpful AI assistant. | ## Fit tips (from labelled demos) | …
-```
+Class-agent project templates may include `train.py` and `eval.py` helpers.
+They use `TrainCliSettings`, `train_and_report`, and the same fitter
+primitives described here; they are project scripts, not global
+`agentomatic train` or `agentomatic eval` commands. Use the generated script's
+`--help` output as its contract, and keep agent-specific metrics and schema
+requirements in that project.
 
-The callback also records every epoch's `{loss, val_loss, improvement,
-prompt_diff, params}` into `callback.per_epoch` (JSON-friendly) — the
-showcase persists it into `summary_<mode>.json`, giving you a machine
-readable proof that the loss descends while the prompt evolves.
+## Local oMLX verification
 
-### Interactive reports (chart + prompt history)
-
-The showcase generates a self-contained HolySheet HTML report per mode with
-KPI cards, loss/score charts, the per-epoch metric table, the prompt
-evolution accordion (unified diffs), parameter changes, failure clusters and
-held-out eval — e.g.
-[`docs/assets/showcase/fit_mipro_like.html`](../assets/showcase/fit_mipro_like.html)
-(full convergence) and
-[`docs/assets/showcase/fit_rewrite.html`](../assets/showcase/fit_rewrite.html)
-(prompt-only). Regenerate anytime:
+The live optimization tests exercise the actual OpenAI-compatible provider
+path. Point them at a real local model rather than demo mode:
 
 ```bash
-OMLX_API_KEY=… OMLX_BASE_URL=http://127.0.0.1:8000/v1 \
-  uv run python examples/keras_optimize_showcase/train.py --mode all \
-  --epochs 10 --max-trials 6 --report-dir docs/assets/showcase
+export OMLX_BASE_URL=http://127.0.0.1:8000/v1
+export OMLX_API_KEY=local
+export AGENTOMATIC_LIVE_MODEL=omlx/Qwen3.5-9B-MLX-4bit
+
+uv run pytest tests/test_live_omlx_optimize.py \
+  tests/test_live_omlx_keras_optimize.py \
+  -q --override-ini='addopts='
 ```
 
-### Data augmentation
-
-Pass `--augment` to grow the seed dataset with LLM-synthesized paraphrases
-(`prepare_dataset(augment=True)` under the hood):
-
-```bash
-uv run python examples/keras_optimize_showcase/train.py --mode rewrite \
-  --epochs 10 --max-trials 6 --augment --n-examples 30
-```
-
-Real run: `20 examples (10 train / 6 val / 4 test) → 30 examples` with 10
-synthesized paraphrases (e.g. *"Who is responsible for the relocation?"*)
-persisted to `dataset.augmented.jsonl`, then fitted with the same
-progressive loss curve.
-
-The same proof is codified as live tests
-(`tests/test_live_omlx_keras_optimize.py`) — every optimizer mode
-(`rewrite`, `gepa_like`, `mipro_like`, `few_shot_bootstrap`, `param_search`)
-must produce a Keras-style `loss` that starts at the pre-fit baseline, never
-increases across epochs, and lands the improvements on the agent
-(`compiled_config` / attributes).
-
----
-
-### The 10-Step Fit Loop
-
-When you call `fitter.fit()`, the following steps execute:
-
-1. **Load baseline config** — Read the current prompt, model params, and RAG settings from `prompts.json` and `agents.json`.
-
-2. **Evaluate baseline on validation set** — Run the agent with the current config on every validation example and score with the composite metric. This establishes the baseline score.
-
-3. **Cluster failures** — Group low-scoring examples into failure clusters based on error patterns (e.g., "missed retrieval context", "malformed JSON output"). Each cluster includes `affected_params` and `expected_metric_gain`.
-
-4. **Generate candidates** — The optimizer generates candidate configurations. For `rewrite`, this means new prompts. For `param_search`, this means parameter grid points. For `few_shot_bootstrap`, this means example subsets.
-
-5. **Score candidates on minibatch** — Each candidate is evaluated on a representative minibatch (subset of validation set) for speed. Candidates are ranked by composite score.
-
-6. **Promote top candidates** — The top-k candidates advance to full validation set evaluation. This two-stage approach reduces cost while maintaining quality.
-
-7. **Compare in absolute improvement space** — The best candidate's score is compared against the baseline. Improvement is measured in absolute terms (e.g., 0.72 → 0.79 = +0.07 improvement).
-
-8. **Produce param suggestions** — Based on failure cluster analysis and candidate performance, the fitter generates actionable parameter suggestions (e.g., "increase `rag.top_k` to 8").
-
-9. **Validate on testset** — If a held-out test set was provided, the best candidate is evaluated on it to check for overfitting. A significant gap between validation and test scores triggers a warning.
-
-10. **Build and return `PromptFitResult`** — The final result object contains the optimized configuration, metric deltas, suggestions, and deployment recommendation.
-
----
-
-### PromptFitResult API
-
-The `PromptFitResult` object returned by `fitter.fit()` provides full access to the
-optimization outcome:
-
-```python
-# Optimized configuration
-result.best_prompt              # str — the optimized system prompt
-result.best_params              # dict — optimized model parameters
-                                # e.g. {"temperature": 0.2, "top_p": 0.9}
-result.best_few_shot_examples   # list[dict] — selected few-shot examples
-
-# Evaluation metrics
-result.metric_deltas            # dict — per-dimension improvement
-                                # e.g. {"completeness": +0.12, "latency": -0.03}
-
-# Per-round history
-result.history                  # list[float] — best score per optimization round
-                                # e.g. [0.61, 0.67, 0.73, 0.79] (Keras-style)
-
-# Actionable output
-result.suggestions              # list[str] — human-readable recommendations
-result.deployment_recommendation # DeploymentRecommendation object
-result.failure_clusters         # list[FailureCluster] — grouped failure patterns
-
-# Serialization
-result.summary()                # str — human-readable summary for terminal output
-result.to_dict()                # dict — full serializable representation
-
-# Apply to project
-result.apply(version="v2_fit")  # writes optimized config to prompts.json
-                                # under the specified version name
-```
-
-Example `summary()` output:
-
-```
-╭─────────────────────────────────────────────╮
-│ PromptFitResult: scope_agent                │
-├─────────────────────────────────────────────┤
-│ Baseline score:  0.61                       │
-│ Best score:      0.79  (+0.18)              │
-│ Trials run:      24 / 30                    │
-│ Strategy:        gepa_like                  │
-├─────────────────────────────────────────────┤
-│ Metric deltas:                              │
-│   completeness:    +0.15                    │
-│   relevance:       +0.08                    │
-│   risk_detection:  +0.22                    │
-│   format:          +0.12                    │
-│   latency:         −0.03  (faster)          │
-│   cost:            +0.01  (cheaper)         │
-├─────────────────────────────────────────────┤
-│ Deployment:  canary @ 40% (confidence: high)│
-╰─────────────────────────────────────────────╯
-```
-
----
-
-### DeploymentRecommendation
-
-Every `PromptFitResult` includes a `DeploymentRecommendation` calculated from the observed
-improvement magnitude, metric variance, and test-set generalization:
-
-```python
-rec = result.deployment_recommendation
-
-# Confidence level based on improvement stability
-print(rec.confidence)              # "high" / "medium" / "low"
-
-# Rollout strategy
-print(rec.rollout.strategy)        # "canary"
-print(rec.rollout.initial_weight)  # 0.40  (40% of traffic)
-print(rec.rollout.ramp_schedule)   # ["40%@0h", "70%@24h", "100%@48h"]
-
-# Human-readable summary
-print(rec.summary())
-# "Recommend canary rollout at 40% initial traffic. Confidence: high.
-#  Ramp to 100% over 48 hours if error rate stays below 2%."
-
-# Machine-readable for CI/CD integration
-config = rec.to_dict()
-# {
-#   "confidence": "high",
-#   "rollout": {
-#     "strategy": "canary",
-#     "initial_weight": 0.40,
-#     "ramp_schedule": ["40%@0h", "70%@24h", "100%@48h"]
-#   },
-#   "abort_conditions": {"error_rate_above": 0.02}
-# }
-```
-
-The confidence level is determined by:
-
-| Confidence | Criteria |
-|---|---|
-| **High** | Improvement ≥ 0.10, low variance across validation folds, test score within 0.02 of validation score |
-| **Medium** | Improvement ≥ 0.05, moderate variance, test score within 0.05 of validation |
-| **Low** | Improvement < 0.05, high variance, or significant test/validation gap |
-
----
-
-### Failure Clusters
-
-During optimization, the fitter clusters validation failures into actionable groups.
-Each cluster identifies the failure pattern, the parameters most likely to resolve it,
-and the expected metric gain if the issue is fixed:
-
-```
-Failure cluster 1:
-  Agent answered without using retrieval context.
-  → Suggested fix: force context-first behavior.
-  → Affected params: rag.top_k, tool_policy.force_retrieval
-  → Expected metric gain: faithfulness +0.18
-
-Failure cluster 2:
-  Agent produced unstructured answers.
-  → Suggested fix: stronger output format block.
-  → Affected params: prompt.output_contract
-  → Expected metric gain: format_compliance +0.12
-
-Failure cluster 3:
-  Agent missed secondary risks in multi-risk queries.
-  → Suggested fix: add explicit "enumerate all risks" instruction.
-  → Affected params: prompt.system_instructions
-  → Expected metric gain: risk_detection +0.09
-```
-
-Access clusters programmatically:
-
-```python
-for cluster in result.failure_clusters:
-    print(f"Pattern: {cluster.description}")
-    print(f"Fix: {cluster.suggested_fix}")
-    print(f"Params: {cluster.affected_params}")
-    print(f"Expected gain: {cluster.expected_metric_gain}")
-```
-
----
-
-### End-to-End CLI Flow
-
-The complete optimization lifecycle from deployment to promotion:
-
-```bash
-# 1. Deploy your agents
-agentomatic run
-
-# 2. Generate a synthetic evaluation dataset from your documentation
-agentomatic dataset synth scope_agent \
-  --from-docs docs/scoping.md \
-  --n 100 \
-  --out scope_eval.jsonl
-
-# 3. Evaluate the current prompt version
-agentomatic eval scope_agent \
-  --dataset scope_eval.jsonl \
-  --prompt-version v1
-
-# 4. Fit a better configuration
-agentomatic optimize scope_agent \
-  --dataset scope_eval.jsonl \
-  --optimize prompt,params,rag,tools \
-  --judge ollama/qwen2.5:7b \
-  --rewriter gpt-4.1 \
-  --max-trials 40 \
-  --apply-as v2_optimized
-
-# 5. Canary release — send 20% of traffic to the new version
-agentomatic route scope_agent --version v2_optimized --weight 20
-
-# 6. Monitor and promote when satisfied
-agentomatic promote scope_agent --version v2_optimized
-```
-
-Each command maps to a stage in the optimization lifecycle:
-
-| Command | Stage | What It Does |
-|---|---|---|
-| `agentomatic run` | Deploy | Starts the agent server with current configuration |
-| `agentomatic dataset synth` | Data | Generates synthetic evaluation data from docs or descriptions |
-| `agentomatic eval` | Evaluate | Scores a prompt version against a dataset with metrics |
-| `agentomatic optimize` | Fit | Runs the optimization loop and produces a new version |
-| `agentomatic route` | Canary | Splits traffic between versions for safe rollout |
-| `agentomatic promote` | Ship | Promotes a version to receive 100% of traffic |
-
----
-
-## ML-style callbacks, presets, and experiment tracking
-
-Agentomatic also exposes a Keras-inspired surface for prompt optimisation
-that plugs directly into :class:`~agentomatic.optimize.fitter.PromptFitter`
-(no adapters required).
-
-### Callbacks
-
-```python
-from agentomatic.optimize.callbacks import (
-    EarlyStopping, ModelCheckpoint, NaNStopping,
-    ScoreThreshold, TemperatureScheduler, default_callbacks,
-)
-from agentomatic.optimize import PromptFitter
-
-fitter = PromptFitter(
-    agent="hello",
-    callbacks=[
-        EarlyStopping(patience=3, min_delta=0.01),
-        ModelCheckpoint(save_dir="checkpoints/hello/"),
-        ScoreThreshold(threshold=0.90),
-        TemperatureScheduler(initial_temperature=0.7),
-        NaNStopping(),
-    ],
-)
-# Or: callbacks=default_callbacks(patience=3, target_score=0.9)
-```
-
-`PromptFitter` polls callback side-effects after every round:
-
-- ``stop_requested`` → early exit (EarlyStopping / ScoreThreshold / NaNStopping)
-- ``current_temperature`` → written into ``best_config.model_params``
-- ``current_prompt`` → restores a checkpointed / rolled-back prompt
-
-### Presets
-
-```python
-from agentomatic.optimize.presets import Presets, to_fitter_kwargs
-from agentomatic.optimize import PromptFitter
-
-preset = Presets.for_local()          # Ollama, 5 rounds
-# Presets.for_quality() / Presets.for_quick() / Presets.for_model(...)
-fitter = PromptFitter(agent="hello", **to_fitter_kwargs(preset))
-cfg = preset.to_config(system_prompt="You are helpful.")
-```
-
-### Experiment tracker
-
-Every `PromptFitter.fit()` run auto-logs to SQLite under
-``{experiment_dir}/experiments.db``. You can also drive it manually:
-
-```python
-from agentomatic.optimize.experiment_tracker import ExperimentTracker
-
-tracker = ExperimentTracker()
-eid = await tracker.start_experiment("hello", strategy="gepa_like", model="ollama/mistral:7b")
-await tracker.log_iteration(eid, iteration=1, score=0.72, prompt="...")
-await tracker.end_experiment(eid, final_score=0.91)
-tracker.display_experiments()  # alias: show_experiments()
-```
-
-### ``agent.fit()`` mixin (prompt path)
-
-```python
-from agentomatic.agents import BaseGraphAgent
-from agentomatic.optimize import OptimizerMixin
-
-class HelloAgent(OptimizerMixin, BaseGraphAgent):  # mixin first for fit(test_cases)
-    agent_name = "hello"
-    ...
-
-result = agent.fit(test_cases, max_iterations=5)  # → FitResult
-print(result.summary())
-
-# Keras History path still works via smart dispatch:
-agent.compile(dataset=ds, metrics=[...])
-history = agent.fit(ds, epochs=2)  # → History
-```
-
-!!! tip "MRO + smart dispatch"
-    Put ``OptimizerMixin`` **before** ``BaseGraphAgent`` so
-    ``agent.fit(test_cases)`` is the discoverable one-liner. Keras-style
-    calls (``AgentDataset``, ``epochs=``, ``optimize_mode=``, …) still
-    delegate to :meth:`BaseGraphAgent.fit`. Prefer ``await
-    agent.optimize_prompts(...)`` only when you are already inside an
-    async context.
-
-### Per-agent ``evals.py`` discovery
-
-```python
-# agents/hello/evals.py
-def get_test_cases(): ...
-THRESHOLDS = {"answer_relevancy": 0.8}
-
-from agentomatic.optimize.evals_discovery import discover_agent_evals
-discovered = discover_agent_evals("agents/")
-```
-
-### Per-agent training CLI
-
-```python
-# agents/hello/train.py
-from agentomatic.optimize.train_cli import create_train_cli
-cli = create_train_cli(agent=HelloAgent(), test_cases_fn=get_test_cases)
-if __name__ == "__main__":
-    cli()  # subcommands: train, evaluate, experiments, generate, settings
-```
-
-### Offline end-to-end coverage
-
-The suite in `tests/test_optimize_langchain_e2e.py` exercises the production
-paths offline (local echo agent + `ExactMatchMetric`, no LLM server):
-
-- `OptimizerMixin.fit(test_cases)` → `FitResult`, callbacks, history
-- `PromptFitter` + tracker / checkpoint / temperature scheduling
-- presets → fitter kwargs
-- `create_train_cli` / `_do_train`
-- LangChain adapter + scaffolded `langchain` agent
-- evals discovery, diversity selection, JSON extract, prompt version control
-
-```bash
-uv run pytest tests/test_optimize_langchain_e2e.py -q --override-ini='addopts='
-```
-
----
-
-### Vocabulary
-
-To maintain consistency across documentation and code, use deployment-first terminology:
-
-| ❌ Avoid | ✅ Use instead | Why |
-|----------|----------------|-----|
-| Program | Agent endpoint | Agents are deployed services, not standalone programs |
-| Compile | Fit / optimize / tune | The output is a configuration, not a binary |
-| Signature | EvalContract | Contracts define structural requirements, not type signatures |
-| Module | Deployment component | Components are parts of a deployed system |
-| Predictor | Agent version | Agents serve versioned configurations, not predictions |
-| Compiled artifact | Optimized config version | The artifact is a JSON config, not compiled code |
+Those tests are intentionally skipped when no reachable model endpoint is
+configured. The standard test suite still verifies deterministic optimizer
+logic, but a production rollout should run the live suite with a real model and
+your own representative evaluation dataset.
+
+## Production checklist
+
+1. Keep a labelled validation set and a separate held-out test set.
+2. Use a deterministic metric or a calibrated judge before trusting a score.
+3. Run without `--apply` first and review the report, prompt diff, and failure
+   clusters.
+4. Verify the saved version in a staging deployment with the same auth,
+   connections, tools, and model configuration as production.
+5. Run the [deployment verifier](verifying-a-deployment.md) before promoting
+   the application through your normal release process.

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ast
+import importlib
 import re
+import shlex
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -14,6 +17,8 @@ REPO = Path(__file__).parents[1]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MARKDOWN_IMAGE = re.compile(r"!\[[^]]*\]\(([^\s)]+)(?:\s+[^)]*)?\)")
 HTML_IMAGE = re.compile(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\']', re.IGNORECASE)
+SHELL_FENCE = re.compile(r"```(?:bash|sh|shell|console)\n(.*?)```", re.DOTALL)
+PYTHON_FENCE = re.compile(r"```python\n(.*?)```", re.DOTALL)
 
 
 def _doc(path: str) -> str:
@@ -161,13 +166,156 @@ def test_local_documentation_images_resolve_from_their_published_pages() -> None
             assert (docs_root / relative_target).is_file(), (page, source)
 
 
-def test_optimization_showcase_closes_its_code_example_before_the_chart() -> None:
-    """Keep the loss curve visible instead of accidentally rendering it as code."""
+def test_optimization_guide_documents_only_supported_cli_paths() -> None:
+    """Prevent removed optimization commands and modes returning to the docs."""
     optimization = _doc("docs/guide/optimization.md")
 
-    assert "```python\nfrom agentomatic import (" in optimization
-    assert 'agent.save("compiled/v1")\n```\n\nThe agent is fully deterministic' in optimization
-    assert "![Keras-style loss per epoch, all five optimizer methods]" in optimization
+    assert "`PromptFitter`" in optimization
+    assert "`PromptOptimizer`" in optimization
+    for mode in ("rewrite", "param_search", "gepa_like", "mipro_like", "few_shot", "apo"):
+        assert f"`{mode}`" in optimization
+    for removed in ("route", "promote", "eval"):
+        assert not re.search(rf"^agentomatic {removed}\b", optimization, re.MULTILINE)
+
+
+def test_readme_does_not_advertise_removed_optimization_commands() -> None:
+    """The README's workflow must use the public CLI, too."""
+    readme = _doc("README.md")
+
+    for removed in ("agentomatic dataset synth", "agentomatic eval", "agentomatic route"):
+        assert removed not in readme
+    assert "agentomatic optimize scope_agent" in readme
+
+
+def test_documented_shell_commands_exist_in_the_current_cli() -> None:
+    """Every fenced ``agentomatic`` command must start with a real command."""
+    public_commands = set(cli.commands)
+    pages = [REPO / "README.md", *(REPO / "docs").rglob("*.md")]
+
+    for page in pages:
+        for block in SHELL_FENCE.findall(page.read_text(encoding="utf-8")):
+            for command in re.findall(r"(?:^|[ \t])agentomatic[ \t]+([a-z][a-z-]*)", block):
+                assert command in public_commands, (page, command)
+
+
+def test_documented_cli_options_exist_in_their_current_command_help() -> None:
+    """Catch stale flags in multiline examples, including CLI subcommands."""
+    help_by_command: dict[tuple[str, ...], str] = {}
+    pages = [REPO / "README.md", *(REPO / "docs").rglob("*.md")]
+
+    for page in pages:
+        for block in SHELL_FENCE.findall(page.read_text(encoding="utf-8")):
+            for line in block.replace("\\\n", " ").splitlines():
+                match = re.search(r"(?:^|[ \t])agentomatic[ \t]+(.+)", line)
+                if not match:
+                    continue
+                try:
+                    tokens = shlex.split(match.group(1), comments=True)
+                except ValueError:
+                    continue
+                if not tokens:
+                    continue
+
+                command = [tokens[0]]
+                group = cli.commands.get(tokens[0])
+                if group is None:
+                    continue
+                if (
+                    hasattr(group, "commands")
+                    and len(tokens) > 1
+                    and not tokens[1].startswith("-")
+                ):
+                    command.append(tokens[1])
+
+                key = tuple(command)
+                help_text = help_by_command.setdefault(
+                    key,
+                    CliRunner().invoke(cli, [*command, "--help"]).output,
+                )
+                for option in re.findall(r"--[a-z][a-z0-9-]*", " ".join(tokens)):
+                    assert option in help_text, (page, command, option)
+
+
+def test_parsable_documented_agentomatic_imports_resolve() -> None:
+    """Public imports in executable Python snippets must remain real exports."""
+    for page in [REPO / "README.md", *(REPO / "docs").rglob("*.md")]:
+        for snippet in PYTHON_FENCE.findall(page.read_text(encoding="utf-8")):
+            try:
+                tree = ast.parse(snippet)
+            except SyntaxError:
+                # Ellipsis-only fragments document a narrow API shape rather
+                # than a standalone program; MkDocs still validates rendering.
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ImportFrom) or not node.module:
+                    continue
+                if not node.module.startswith("agentomatic"):
+                    continue
+                module = importlib.import_module(node.module)
+                for imported in node.names:
+                    if imported.name != "*":
+                        assert hasattr(module, imported.name), (page, node.module, imported.name)
+
+
+def test_optimization_guide_matches_current_cli_contract() -> None:
+    """Keep mode names and important flags tied to Click's public interface."""
+    optimization = _doc("docs/guide/optimization.md")
+    help_text = CliRunner().invoke(cli, ["optimize", "--help"]).output
+
+    for token in (
+        "prompt_only",
+        "rewrite",
+        "param_search",
+        "gepa_like",
+        "mipro_like",
+        "few_shot",
+        "apo",
+        "--search-space",
+        "--search-method",
+        "--node-match",
+        "--n-runners",
+    ):
+        assert token in help_text
+        assert token in optimization
+
+
+def test_production_guides_do_not_advertise_removed_or_unavailable_features() -> None:
+    """Keep versioned production guidance free of retired release-era claims."""
+    plugins = _doc("docs/guide/ml-plugins.md")
+    providers = _doc("docs/guide/llm-providers.md")
+    stacks = _doc("docs/guide/stacks.md")
+    platform_features = _doc("docs/guide/platform-features.md")
+
+    assert "AGENTOMATIC_PLUGIN_AUTORELOAD" not in plugins
+    assert "call the authenticated reload endpoint" in plugins
+    assert "install from git / editable checkout" not in providers
+    assert re.search(
+        r"\| `google_genai` \|\s+—\s+\|[^|]+\|\s+—\s+\|\s+Not available\s+\|",
+        providers,
+    )
+    assert "requires **agentomatic >= 1.8.0**" not in stacks
+    assert "requires **agentomatic >= 1.8.0**" not in platform_features
+
+
+def test_api_and_pipeline_reference_cover_current_authoring_and_reload_routes() -> None:
+    """The operator references must not hide current production route families."""
+    api_reference = _doc("docs/architecture/api-reference.md")
+    pipelines = _doc("docs/guide/pipelines.md")
+
+    for path in (
+        "/api/v1/plugins/reload",
+        "/api/v1/ingestors",
+        "/a2a/tasks/{task_id}/cancel",
+    ):
+        assert path in api_reference
+
+    for path in (
+        "/pipelines/validate-draft",
+        "/pipelines/{name}",
+        "/pipelines/{name}/run/async",
+        "/pipelines/{name}/run/batch",
+    ):
+        assert path in pipelines
 
 
 def test_docs_home_actions_link_to_built_routes_not_markdown_sources() -> None:

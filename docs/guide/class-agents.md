@@ -1204,8 +1204,8 @@ agents/my_agent/
     print_eval_result(ev, agent_name="my_agent")
     ```
 
-    For the staged Keras-like API and hand-wired `PromptFitterBridge`, see
-    [Prompt Optimization](optimization.md#staged-keras-fit).
+    For the current in-process fitter API and explicit search spaces, see
+    [Prompt Optimization](optimization.md#modern-python-api-promptfitter).
 
 ??? example "Generated `dataset.jsonl`"
 

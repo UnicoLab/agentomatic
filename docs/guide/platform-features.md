@@ -296,7 +296,7 @@ To measure the performance and quality of different prompt variants:
 
 LLM APIs can suffer from outages, rate limiting (HTTP 429), empty replies, or
 transient network errors. Agentomatic lets you define an **ordered** fallback
-chain of models/providers (requires **agentomatic >= 1.8.0**).
+chain of models/providers.
 
 ### Configuration
 

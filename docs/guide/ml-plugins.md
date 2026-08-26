@@ -200,9 +200,9 @@ next predict after reload uses the fresh weights — no process restart.
 Set the root via ``AGENTOMATIC_ARTIFACT_ROOT`` (default ``.local/artifacts``).
 Rollback is one call: ``registry.rollback(prior_version)``.
 
-Optional future flag: `AGENTOMATIC_PLUGIN_AUTORELOAD=1` (mtime watch of the
-artifact `current` pointer). Prefer the explicit REST reload for deterministic
-promotion flows.
+Agentomatic does not watch artifact pointers automatically. For deterministic
+promotion, call the authenticated reload endpoint after moving the `current`
+pointer, or restart the deployment through your normal rollout process.
 
 ## Framework Agnosticism
 

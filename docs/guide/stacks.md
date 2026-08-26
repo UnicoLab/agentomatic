@@ -62,7 +62,7 @@ llm:
     api_key: "${OPENAI_API_KEY}"
     # Optional ordered failover (omit entirely for single-model stacks).
     # Triggers (default): timeout | connection | rate_limit | empty_response
-    # Opt-in: any_error. Requires agentomatic >= 1.8.0.
+    # Opt-in: any_error.
     fallbacks:
       - fast
       - provider: ollama

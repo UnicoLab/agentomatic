@@ -22,15 +22,18 @@ These endpoints are global — not scoped to a specific agent.
 | `GET` | `/api/v1/storage/stats` | Storage backend statistics |
 | `GET` | `/metrics` | Prometheus metrics endpoint |
 
-**Resource surfaces** (each with its own list/run endpoints + `/async` and
-`/batch` execution modes):
+**Resource surfaces.** Dynamic resources appear in the live
+[`/openapi.json`](../guide/studio.md#schema-driven-forms-and-live-contracts)
+only after they are discovered. `/{name}` below is a registered resource name;
+the `/async` and `/batch` variants require the task subsystem (enabled by the
+standard platform configuration).
 
 | Method | Path | Description |
 |---|---|---|
 | `POST`/`GET`/`DELETE` | `/api/v1/tasks[/{id}][/events\|/result\|/cancel]` | Task board — submit, poll, stream, cancel, delete |
-| `GET`/`POST` | `/api/v1/plugins[/{name}/predict]` | ML plugins — list, model card, predict |
-| `GET`/`POST` | `/api/v1/pipelines[/{name}/run\|/validate\|/visualize]` | Pipelines — list, run, validate, visualize |
-| `GET`/`POST` | `/api/v1/ingestion[/{name}/run]` | Ingestors — list, info, health, run |
+| `GET`/`POST` | `/api/v1/plugins[/{name}/health\|/model_card\|/predict[/(async\|batch)]\|/reload]` | ML plugins — list, inspect, predict, reload one or all (`POST /api/v1/plugins/reload`) |
+| `GET`/`POST`/`DELETE` | `/api/v1/pipelines/...` | Pipelines — list, validate a draft, save/delete a definition, run sync/async/batch, inspect, visualize; see the [pipeline API table](../guide/pipelines.md#rest-api-reference) |
+| `GET`/`POST` | `/api/v1/ingestors` and `/api/v1/ingestion/{name}/...` | Always-available ingestor registry plus discovered-resource info, health, sync/async/batch run routes |
 | Declared by endpoint | `/api/v1/endpoints[/{name}{path}]` | Custom endpoints — list, call; `GET`/`HEAD` input is query-bound and write-method input is JSON |
 | `GET`/`POST` | `/api/v1/logs[/{id}\|/analyze\|/analysis]` | Invocation logs across resources (`?resource=` + `name=`; when `logs_history` on) |
 | `GET`/`POST` | `/api/v1/control[/...]` | Control plane (when enabled) |
@@ -420,6 +423,18 @@ curl http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6
   "status": "completed",
   "message": "Task tracking requires storage backend"
 }
+```
+
+---
+
+#### `POST /a2a/tasks/{task_id}/cancel`
+
+Request cooperative cancellation of an in-flight A2A task. This endpoint is
+available when the task subsystem is configured; it returns `501` when the
+agent is running without task persistence.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/cancel
 ```
 
 ---

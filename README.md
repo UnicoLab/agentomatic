@@ -757,26 +757,23 @@ Failure cluster 2:
   → Expected metric gain: format_compliance +0.12
 ```
 
-#### Ideal CLI Flow
+#### Optimization workflow
 
 ```bash
 # 1. Run your agents
 agentomatic run
 
-# 2. Generate a synthetic evaluation dataset from your docs
-agentomatic dataset synth scope_agent --from-docs docs/scoping.md --n 100
+# 2. Prepare a labelled JSONL evaluation dataset (query + expected_answer).
+# See docs/guide/optimization.md for the format and metric guidance.
 
-# 3. Evaluate the current version
-agentomatic eval scope_agent --dataset scope_eval.jsonl --metrics scoping_quality
+# 3. Optimize a running agent with the current fitter CLI.
+agentomatic optimize scope_agent \
+  --dataset scope_eval.jsonl \
+  --mode rewrite \
+  --metrics contains \
+  --max-trials 20
 
-# 4. Fit a better configuration
-agentomatic optimize scope_agent --optimize prompt,params,rag,tools
-
-# 5. Canary release — send 20 % traffic to the new version
-agentomatic route scope_agent --version v2_optimized --weight 20
-
-# 6. Promote when satisfied
-agentomatic promote scope_agent --version v2_optimized
+# 4. Review the report, then verify the candidate in staging before release.
 ```
 
 #### Vocabulary

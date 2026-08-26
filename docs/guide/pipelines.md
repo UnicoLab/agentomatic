@@ -754,10 +754,20 @@ All endpoints are mounted under the `/api/v1/` prefix.
 | Method   | Endpoint                            | Description                       | Request Body                          | Response Model               |
 |----------|-------------------------------------|-----------------------------------|---------------------------------------|------------------------------|
 | `GET`    | `/pipelines`                        | List all discovered pipelines     | —                                     | `list[PipelineInfo]`         |
+| `POST`   | `/pipelines/validate-draft`         | Validate an unsaved JSON/YAML draft | `{"pipeline": {…}}` or `{"yaml": "…"}` | `PipelineDraftValidationResponse` |
+| `POST`   | `/pipelines/{name}`                 | Validate and save/update a pipeline definition | Draft body | `PipelineSaveResponse` |
+| `DELETE` | `/pipelines/{name}`                 | Delete a persisted definition     | —                                     | deletion confirmation        |
 | `POST`   | `/pipelines/{name}/run`             | Execute a pipeline                | `{"input": {…}, "metadata": {…}}`     | `PipelineRunResponse`        |
+| `POST`   | `/pipelines/{name}/run/async`       | Submit a tracked pipeline run     | `{"input": {…}, "metadata": {…}}`     | task record (`202`)          |
+| `POST`   | `/pipelines/{name}/run/batch`       | Submit a tracked batch run        | `{"inputs": [{…}], …}`              | task record (`202`)          |
 | `GET`    | `/pipelines/{name}/config`          | Get pipeline configuration        | —                                     | `dict` (full config dump)    |
 | `GET`    | `/pipelines/{name}/validate`        | Pre-flight validation             | —                                     | `PipelineValidationResponse` |
 | `GET`    | `/pipelines/{name}/visualize`       | Mermaid diagram of the pipeline   | —                                     | `{"mermaid": "…"}`           |
+
+The save and delete routes require a writable `pipelines/` mount. A production
+container with a read-only pipeline directory keeps run/inspect endpoints
+available, but authoring requests return an actionable `409`; use versioned
+Git-managed definitions or provide the dedicated writable authoring mount.
 
 ### Response Models
 
