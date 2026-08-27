@@ -20,10 +20,12 @@ from agentomatic.core.router_factory import (
     AgentChatRequest,
     AgentInvokeResponse,
     ApproveSuspendedRequest,
+    CreateThreadRequest,
     FeedbackRequest,
     ForkThreadRequest,
     OptimizeInvokeRequest,
     RejectSuspendedRequest,
+    UpdateThreadRequest,
 )
 from agentomatic.tasks.models import TargetType, TaskProgress, TaskRecord
 
@@ -198,7 +200,25 @@ def test_frontend_guide_tracks_a2a_optimization_and_hitl_request_models() -> Non
         RejectSuspendedRequest,
         ForkThreadRequest,
     ):
-        section = frontend.split(f"interface {model.__name__} {{", 1)[1].split("}", 1)[0]
+        section = re.search(
+            rf"interface {model.__name__} \{{(?P<body>.*?)^\}}",
+            frontend,
+            re.DOTALL | re.MULTILINE,
+        ).group("body")
+        for field in model.model_fields:
+            assert re.search(rf"\b{field}\s*\??:", section), (model.__name__, field)
+
+
+def test_frontend_guide_tracks_every_core_request_interface() -> None:
+    """All models advertised as frontend interfaces must remain field-complete."""
+    frontend = _doc("docs/FRONTEND_API_GUIDE.md")
+
+    for model in (AgentChatRequest, CreateThreadRequest, UpdateThreadRequest):
+        section = re.search(
+            rf"interface {model.__name__} \{{(?P<body>.*?)^\}}",
+            frontend,
+            re.DOTALL | re.MULTILINE,
+        ).group("body")
         for field in model.model_fields:
             assert re.search(rf"\b{field}\s*\??:", section), (model.__name__, field)
 
