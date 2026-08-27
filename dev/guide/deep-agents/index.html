@@ -2880,7 +2880,7 @@
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">create_deep_agent</span><span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;google_genai:gemini-3.5-flash&quot;</span><span class="p">,</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;google_genai:gemini-3.1-pro-preview&quot;</span><span class="p">,</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are an expert research assistant.&quot;</span><span class="p">,</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">internet_search</span><span class="p">],</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
@@ -3053,30 +3053,46 @@
 </ul>
 <hr />
 <h2 id="human-in-the-loop-hitl">Human-in-the-Loop (HITL)<a class="headerlink" href="#human-in-the-loop-hitl" title="Permanent link">&para;</a></h2>
-<p>Deep Agent supports HITL via LangGraph's <code>interrupt</code> mechanism. When the agent hits an interrupt:</p>
+<p>Deep Agent supports HITL via LangGraph's <code>interrupt</code> mechanism. When an
+<code>interrupt_on</code>-configured tool pauses:</p>
 <ol>
 <li>Studio receives a <code>breakpoint_hit</code> event</li>
 <li>The graph pauses and state is persisted via checkpointing</li>
-<li>The Studio UI shows an <strong>"Approve / Reject"</strong> panel</li>
-<li>On approval, Studio calls <code>POST /studio/agents/{name}/threads/{tid}/resume</code></li>
-<li>Execution continues from the interrupt point</li>
+<li>A client can call <code>POST /studio/agents/{name}/threads/{tid}/resume</code> with
+   the value expected by the graph.</li>
+<li>Execution continues from the interrupt point when that resume value is
+   accepted by the graph.</li>
 </ol>
 <h3 id="enabling-hitl">Enabling HITL<a class="headerlink" href="#enabling-hitl" title="Permanent link">&para;</a></h3>
-<p>HITL works automatically when your deep agent has:</p>
+<p>HITL requires both:</p>
 <ul>
 <li>A <strong>checkpointer</strong> configured (required for state persistence)</li>
-<li>Tools that trigger <code>interrupt</code> via deep_agent middleware</li>
+<li>An <code>interrupt_on</code> rule for each sensitive tool (or a tool that calls
+  LangGraph's <code>interrupt()</code> itself)</li>
 </ul>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">langgraph.checkpoint.memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemorySaver</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">create_deep_agent</span><span class="p">(</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;anthropic:claude-sonnet-4-6&quot;</span><span class="p">,</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">sensitive_tool</span><span class="p">],</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">)</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># Compile with checkpointer for HITL</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">compiled</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">checkpointer</span><span class="o">=</span><span class="n">MemorySaver</span><span class="p">())</span>
+<p><code>create_deep_agent()</code> already returns a compiled LangGraph. Pass the
+checkpointer and interrupt policy while creating it; do <strong>not</strong> call
+<code>.compile()</code> on its result:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">deepagents</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_deep_agent</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">langgraph.checkpoint.memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemorySaver</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">create_deep_agent</span><span class="p">(</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;anthropic:claude-sonnet-4-6&quot;</span><span class="p">,</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">sensitive_tool</span><span class="p">],</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">interrupt_on</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;sensitive_tool&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">checkpointer</span><span class="o">=</span><span class="n">MemorySaver</span><span class="p">(),</span>  <span class="c1"># development-only; use durable storage in production</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p">)</span>
 </span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Deep Agent decision payloads</p>
+<p>Agentomatic forwards the <code>value</code> from its Studio resume endpoint as
+<code>Command(resume=value)</code>. For a Deep Agent <code>interrupt_on</code> pause, provide
+the Deep Agents/LangGraph decision payload (typically
+<code>{"decisions": [...]}</code> in the exact action-request order). The generic
+endpoint's <code>action</code> field is only UI metadata; it does not synthesize a
+Deep Agent decision list for you. Keep that policy and payload handling in
+your authenticated production client.</p>
+</div>
 <hr />
 <h2 id="studio-sse-events">Studio SSE Events<a class="headerlink" href="#studio-sse-events" title="Permanent link">&para;</a></h2>
 <p>When running a deep agent through Studio, you'll receive these enhanced events:</p>
