@@ -3720,8 +3720,15 @@
 </span></code></pre></div>
 <p>When this exception is thrown:
 1. Agentomatic intercepts the execution.
-2. The current <code>state_snapshot</code> is stored in the persistent database under <code>SuspendedStateModel</code>.
+2. When a thread store is configured, the current <code>state_snapshot</code> is saved through that store. A SQLAlchemy-backed store persists it in <code>SuspendedStateModel</code>; an in-memory store is lost on restart.
 3. The API immediately returns a <code>202 Accepted</code> status code with the approval details.</p>
+<div class="admonition warning">
+<p class="admonition-title">HITL needs storage to resume</p>
+<p>The approval routes are mounted for every agent, but a suspension cannot be
+listed, approved, or rejected without a configured thread store. Use a
+durable store such as <code>SQLAlchemyStore</code> for production approvals; otherwise
+the original request receives <code>202</code> but no resumable state is retained.</p>
+</div>
 <p><strong>Response payload:</strong>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>

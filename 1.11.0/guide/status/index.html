@@ -2525,23 +2525,28 @@ starting the platform. It polls the JSON endpoint every few seconds and renders:
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    &quot;plugins&quot;:   { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    &quot;endpoints&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2 },
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    &quot;ingestors&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    &quot;pipelines&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 }
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  },
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  &quot;resources&quot;: { &quot;agents&quot;: { &quot;total&quot;: 3, &quot;healthy&quot;: 3, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;...&quot;: { &quot;status&quot;: &quot;healthy&quot; } } } },
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  &quot;tasks&quot;: {
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    &quot;enabled&quot;: true,
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    &quot;total&quot;: 12,
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    &quot;by_status&quot;: { &quot;queued&quot;: 0, &quot;running&quot;: 1, &quot;succeeded&quot;: 10, &quot;failed&quot;: 1, &quot;cancelled&quot;: 0 },
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    &quot;running&quot;: 1,
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    &quot;max_concurrency&quot;: 8,
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    &quot;supported_targets&quot;: [&quot;agent&quot;, &quot;endpoint&quot;, &quot;ingestion&quot;, &quot;pipeline&quot;, &quot;plugin&quot;]
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  },
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>  &quot;storage&quot;: { &quot;status&quot;: &quot;healthy&quot; },
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  &quot;generated_at&quot;: 1718900000.0
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>}
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    &quot;pipelines&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    &quot;connections&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2 }
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  },
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  &quot;resources&quot;: {
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    &quot;agents&quot;: { &quot;total&quot;: 3, &quot;healthy&quot;: 3, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;...&quot;: { &quot;status&quot;: &quot;healthy&quot; } } },
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    &quot;connections&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;fraud/main&quot;: { &quot;status&quot;: &quot;configured&quot; } } }
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  },
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  &quot;tasks&quot;: {
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    &quot;enabled&quot;: true,
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    &quot;total&quot;: 12,
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    &quot;by_status&quot;: { &quot;queued&quot;: 0, &quot;running&quot;: 1, &quot;succeeded&quot;: 10, &quot;failed&quot;: 1, &quot;cancelled&quot;: 0 },
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    &quot;running&quot;: 1,
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    &quot;max_concurrency&quot;: 8,
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    &quot;supported_targets&quot;: [&quot;agent&quot;, &quot;endpoint&quot;, &quot;ingestion&quot;, &quot;pipeline&quot;, &quot;plugin&quot;]
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>  },
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  &quot;storage&quot;: { &quot;status&quot;: &quot;healthy&quot; },
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  &quot;generated_at&quot;: 1718900000.0
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>}
 </span></code></pre></div>
-<p>The top-level <code>status</code> is <code>degraded</code> if any resource is unhealthy or storage is
-unhealthy, otherwise <code>healthy</code> — handy for a single uptime check.</p>
+<p>The top-level <code>status</code> is <code>degraded</code> if any resource (including a configured
+connection) is unhealthy or storage is unhealthy, otherwise <code>healthy</code> — handy
+for a single uptime check.</p>
 <h2 id="related-probes">Related probes<a class="headerlink" href="#related-probes" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>GET /health</code> — aggregate health (agents, plugins, endpoints, ingestors,

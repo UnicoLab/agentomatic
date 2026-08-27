@@ -1240,6 +1240,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#automatic-reload-after-promotion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic reload after promotion
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2496,6 +2507,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#automatic-reload-after-promotion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic reload after promotion
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2797,9 +2819,25 @@ Call reload:</p>
 next predict after reload uses the fresh weights — no process restart.</p>
 <p>Set the root via <code>AGENTOMATIC_ARTIFACT_ROOT</code> (default <code>.local/artifacts</code>).
 Rollback is one call: <code>registry.rollback(prior_version)</code>.</p>
-<p>Agentomatic does not watch artifact pointers automatically. For deterministic
-promotion, call the authenticated reload endpoint after moving the <code>current</code>
-pointer, or restart the deployment through your normal rollout process.</p>
+<h3 id="automatic-reload-after-promotion">Automatic reload after promotion<a class="headerlink" href="#automatic-reload-after-promotion" title="Permanent link">&para;</a></h3>
+<p>For a long-running service that owns its artifact volume, enable the polling
+watcher before deployment:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_PLUGIN_AUTORELOAD</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL</span><span class="o">=</span><span class="m">5</span><span class="w">  </span><span class="c1"># seconds; default 5</span>
+</span></code></pre></div>
+<p>The watcher records the active artifact version at startup, then reloads every
+registered plugin once whenever <code>ArtifactRegistry.promote()</code> changes the
+<code>current</code> version. It serializes platform predictions with the reload, so a
+request cannot observe a partly-loaded model. If a plugin load fails, its prior
+in-memory state and readiness stay active; the broken promoted version is
+logged once and is not retried until a new version is promoted. Use the
+authenticated reload endpoint for an explicit retry after repairing an
+artifact.</p>
+<p>This is per process: in a multi-replica deployment every replica needs the
+same mounted artifact root and the flag enabled, or your deploy controller must
+call <code>POST /api/v1/plugins/reload</code> on each replica. The version pointer is the
+change signal, so publish immutable version directories and promote/rollback
+through <code>ArtifactRegistry</code> rather than editing files within the active bundle.</p>
 <h2 id="framework-agnosticism">Framework Agnosticism<a class="headerlink" href="#framework-agnosticism" title="Permanent link">&para;</a></h2>
 <p>Agentomatic has absolutely zero opinion on what you put inside <code>load_model()</code> and <code>predict()</code>. You can run blocking code like <code>sklearn.predict()</code> or async code like HTTP calls to external APIs. Agentomatic uses FastAPI, which automatically manages thread-pooling for synchronous code.</p>
 

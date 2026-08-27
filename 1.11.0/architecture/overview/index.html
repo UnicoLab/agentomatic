@@ -2361,15 +2361,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#class-agent-architecture-v07" class="md-nav__link">
+  <a href="#class-agent-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Class-Agent Architecture (v0.7)
+        Class-Agent Architecture
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Class-Agent Architecture (v0.7)">
+    <nav class="md-nav" aria-label="Class-Agent Architecture">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2796,15 +2796,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#class-agent-architecture-v07" class="md-nav__link">
+  <a href="#class-agent-architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Class-Agent Architecture (v0.7)
+        Class-Agent Architecture
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Class-Agent Architecture (v0.7)">
+    <nav class="md-nav" aria-label="Class-Agent Architecture">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2983,7 +2983,7 @@
     subgraph "Agentomatic Platform Core"
         AP["AgentPlatform\nCentral orchestrator"]
         REG["AgentRegistry\nIn-memory agent store"]
-        RF["RouterFactory\nAuto-generated REST\n(26 endpoints per agent)"]
+        RF["RouterFactory\nAuto-generated agent REST routes"]
         SR["StudioRouter\nDebug API (/studio/*)"]
         MM["MemoryManager\nConversation history\nSummarization · Windowing"]
         FB["FeedbackCollector\nRatings · Corrections"]
@@ -3080,10 +3080,12 @@
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">store</span><span class="o">=</span><span class="n">SQLAlchemyStore</span><span class="p">(</span><span class="s2">&quot;postgresql+asyncpg://...&quot;</span><span class="p">),</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">enable_studio</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">enable_chainlit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">app</span>  <span class="c1"># FastAPI application</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>  <span class="c1"># FastAPI application</span>
 </span></code></pre></div>
+<p>Mount the optional Chainlit debugging UI with <code>agentomatic run --with-ui</code>
+(after installing <code>agentomatic[ui]</code>); it is not an <code>AgentPlatform</code> constructor
+option.</p>
 <h3 id="agentregistry">AgentRegistry<a class="headerlink" href="#agentregistry" title="Permanent link">&para;</a></h3>
 <p>An in-memory registry holding <code>RegisteredAgent</code> instances. Each agent carries:</p>
 <table>
@@ -3138,7 +3140,7 @@
 </tbody>
 </table>
 <h3 id="routerfactory">RouterFactory<a class="headerlink" href="#routerfactory" title="Permanent link">&para;</a></h3>
-<p>Auto-generates a full FastAPI router per agent with 26 endpoints:</p>
+<p>Auto-generates a full FastAPI router per agent. The core route families are:</p>
 <table>
 <thead>
 <tr>
@@ -3155,8 +3157,8 @@
 </tr>
 <tr>
 <td><strong>A2A Protocol</strong></td>
-<td><code>GET /card</code>, <code>POST /a2a/tasks</code>, <code>GET /a2a/tasks/{id}</code></td>
-<td>Agent-to-agent interop</td>
+<td><code>GET /card</code>, <code>POST /a2a/tasks</code>, <code>GET /a2a/tasks/{id}</code>, <code>POST /a2a/tasks/{id}/cancel</code></td>
+<td>Agent-to-agent interop and cancellation</td>
 </tr>
 <tr>
 <td><strong>Threads</strong></td>
@@ -3192,6 +3194,11 @@
 <td><strong>Optimization</strong></td>
 <td><code>POST /optimize/invoke</code></td>
 <td>Full-context pipeline for DeepEval</td>
+</tr>
+<tr>
+<td><strong>Optional operations</strong></td>
+<td><code>GET /logs...</code>, <code>GET /optimization-runs</code></td>
+<td>Persisted invocation history and optimization-run inspection when enabled</td>
 </tr>
 </tbody>
 </table>
@@ -3355,7 +3362,7 @@
 
     REG --&gt; SCHEMA["Discover custom schemas\n(schemas.py module)"]
 
-    SCHEMA --&gt; ROUTER["RouterFactory creates\n26 endpoints per agent"]
+    SCHEMA --&gt; ROUTER["RouterFactory creates\nagent REST routes"]
 
     ROUTER --&gt; STUDIO["Studio adapter resolved\n(LangGraph/LangChain/Generic)"]
 
@@ -3386,7 +3393,7 @@
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">app</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># uvicorn main:app --reload --port 8000</span>
 </span></code></pre></div>
@@ -3472,7 +3479,7 @@
 </span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
 </span></code></pre></div>
 <hr />
-<h2 id="class-agent-architecture-v07">Class-Agent Architecture (v0.7)<a class="headerlink" href="#class-agent-architecture-v07" title="Permanent link">&para;</a></h2>
+<h2 id="class-agent-architecture">Class-Agent Architecture<a class="headerlink" href="#class-agent-architecture" title="Permanent link">&para;</a></h2>
 <p>The <strong>Class-Owned Graph Agent</strong> system introduces an alternative agent paradigm: define agents as Python classes with an ML-inspired lifecycle, using a built-in graph runtime that requires no LangGraph dependency.</p>
 <h3 id="component-overview">Component Overview<a class="headerlink" href="#component-overview" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>graph TB

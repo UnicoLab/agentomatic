@@ -2618,8 +2618,11 @@
 </div>
 <hr />
 <h2 id="full-install-recommended">Full Install (Recommended)<a class="headerlink" href="#full-install-recommended" title="Permanent link">&para;</a></h2>
-<p>To enable all production features (including prompt optimization, database persistence, OpenTelemetry tracing, and the graphical Chainlit chat playground), install with the <code>all</code> extras flag:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>all<span class="o">]</span>
+<p>To enable the bundled production features (including prompt optimization,
+database persistence, OpenTelemetry tracing, and Studio), install with the
+<code>all</code> extras flag. Chainlit is intentionally separate; add the <code>ui</code> extra when
+you need the graphical chat playground.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[all]&quot;</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Or with uv</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>uv<span class="w"> </span>add<span class="w"> </span>agentomatic<span class="w"> </span>--extra<span class="w"> </span>all
@@ -2638,58 +2641,103 @@
 <tbody>
 <tr>
 <td><code>langgraph</code></td>
-<td><code>pip install agentomatic[langgraph]</code></td>
+<td><code>pip install "agentomatic[langgraph]"</code></td>
 <td>Direct support for LangGraph StateGraphs</td>
 </tr>
 <tr>
+<td><code>langchain</code></td>
+<td><code>pip install "agentomatic[langchain]"</code></td>
+<td>LangChain and community integration helpers</td>
+</tr>
+<tr>
 <td><code>ollama</code></td>
-<td><code>pip install agentomatic[ollama]</code></td>
+<td><code>pip install "agentomatic[ollama]"</code></td>
 <td>Local Ollama LLM provider integrations</td>
 </tr>
 <tr>
 <td><code>openai</code></td>
-<td><code>pip install agentomatic[openai]</code></td>
+<td><code>pip install "agentomatic[openai]"</code></td>
 <td>OpenAI API provider integrations</td>
 </tr>
 <tr>
+<td><code>azure</code></td>
+<td><code>pip install "agentomatic[azure]"</code></td>
+<td>Azure OpenAI provider integration</td>
+</tr>
+<tr>
+<td><code>vertex</code></td>
+<td><code>pip install "agentomatic[vertex]"</code></td>
+<td>Google Vertex AI provider integration</td>
+</tr>
+<tr>
 <td><code>metrics</code></td>
-<td><code>pip install agentomatic[metrics]</code></td>
+<td><code>pip install "agentomatic[metrics]"</code></td>
 <td>Prometheus exporter metrics</td>
 </tr>
 <tr>
 <td><code>db</code></td>
-<td><code>pip install agentomatic[db]</code></td>
+<td><code>pip install "agentomatic[db]"</code></td>
 <td>SQLAlchemy engines + local SQLite support</td>
 </tr>
 <tr>
 <td><code>db-postgres</code></td>
-<td><code>pip install agentomatic[db-postgres]</code></td>
+<td><code>pip install "agentomatic[db-postgres]"</code></td>
 <td>SQLAlchemy async PostgreSQL client driver</td>
 </tr>
 <tr>
 <td><code>cli</code></td>
-<td><code>pip install agentomatic[cli]</code></td>
+<td><code>pip install "agentomatic[cli]"</code></td>
 <td>Rich terminal formatting + interactive select prompt controls</td>
 </tr>
 <tr>
 <td><code>ui</code></td>
-<td><code>pip install agentomatic[ui]</code></td>
+<td><code>pip install "agentomatic[ui]"</code></td>
 <td>Graphical Chainlit chat debug console</td>
 </tr>
 <tr>
 <td><code>studio</code></td>
-<td><code>pip install agentomatic[studio]</code></td>
+<td><code>pip install "agentomatic[studio]"</code></td>
 <td>Agentomatic Studio visual debugger</td>
 </tr>
 <tr>
 <td><code>optimize</code></td>
-<td><code>pip install agentomatic[optimize]</code></td>
+<td><code>pip install "agentomatic[optimize]"</code></td>
 <td>DSPy-style optimizer loop + DeepEval validation</td>
 </tr>
 <tr>
 <td><code>telemetry</code></td>
-<td><code>pip install agentomatic[telemetry]</code></td>
+<td><code>pip install "agentomatic[telemetry]"</code></td>
 <td>OpenTelemetry APM tracing exporters</td>
+</tr>
+<tr>
+<td><code>dotenv</code></td>
+<td><code>pip install "agentomatic[dotenv]"</code></td>
+<td>Explicit <code>.env</code> loading support</td>
+</tr>
+<tr>
+<td><code>security</code></td>
+<td><code>pip install "agentomatic[security]"</code></td>
+<td>JWT, OAuth2, and cryptographic security features</td>
+</tr>
+<tr>
+<td><code>swarm</code></td>
+<td><code>pip install "agentomatic[swarm]"</code></td>
+<td>LangGraph swarm orchestration</td>
+</tr>
+<tr>
+<td><code>vector</code></td>
+<td><code>pip install "agentomatic[vector]"</code></td>
+<td>Local vector/embedding helper dependencies</td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td><code>pip install "agentomatic[docs]"</code></td>
+<td>MkDocs/Mike documentation build toolchain</td>
+</tr>
+<tr>
+<td><code>dev</code></td>
+<td><code>pip install "agentomatic[dev]"</code></td>
+<td>Test, lint, typing, build, and release-development tools</td>
 </tr>
 <tr>
 <td><code>all</code></td>
@@ -2720,7 +2768,7 @@ SDK for the backend you actually use. It also leaves out <code>db-postgres</code
 <div class="admonition note">
 <p class="admonition-title">Combining extras</p>
 <p>You can combine multiple extras in a single install command:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>langgraph,db,metrics<span class="o">]</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[langgraph,db,metrics]&quot;</span>
 </span></code></pre></div></p>
 </div>
 <hr />
@@ -2750,31 +2798,35 @@ SDK for the backend you actually use. It also leaves out <code>db-postgres</code
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>agentomatic<span class="w"> </span>doctor
 </span></code></pre></div>
 <h3 id="expected-diagnostic-output">Expected Diagnostic Output<a class="headerlink" href="#expected-diagnostic-output" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>╭──────────────────── Agentomatic Doctor ────────────────────╮
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>│ ✅ Python         3.12.0                                   │
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>│ ✅ agentomatic    0.1.0                                    │
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>│ ✅ FastAPI        0.115.x                                  │
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│ ✅ click          8.1.x                                    │
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>│ ✅ LangGraph      0.4.x                                   │
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│ ✅ Ollama         connected                                │
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│ ⬚  OpenAI        not installed                             │
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│ ✅ Prometheus     0.21.x                                   │
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>│ ✅ SQLAlchemy     2.0.x                                    │
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>│ ✅ Chainlit       2.0.x                                    │
-</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>│ ✅ DeepEval       2.0.x                                    │
-</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>│ ✅ OpenTelemetry  1.20.x                                   │
-</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>╰────────────────────────────────────────────────────────────╯
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>╭──────────────── 🩺 Environment Health Check ────────────────╮
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>│ Component              │ Status │ Details                    │
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>├────────────────────────┼────────┼────────────────────────────┤
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>│ Python                 │ ✅     │ 3.11+                      │
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│ fastapi                │ ✅     │ installed                  │
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>│ uvicorn                │ ✅     │ installed                  │
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│ pydantic               │ ✅     │ installed                  │
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│ loguru                 │ ✅     │ installed                  │
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│ httpx                  │ ✅     │ installed                  │
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>│ langgraph [langgraph]  │ ✅/❌  │ installed or install hint  │
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>│ sqlalchemy [db]        │ ✅/❌  │ installed or install hint  │
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>│ Agents directory       │ ✅/❌  │ discovered agents / path   │
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>│ Stacks directory       │ ✅/❌  │ discovered stacks / hint   │
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>╰────────────────────────┴────────┴────────────────────────────╯
 </span></code></pre></div>
+<p>Exact package versions and optional-extra rows vary by environment. <code>doctor</code>
+checks <code>langgraph</code>, <code>langchain_core</code>, <code>rich</code>, <code>questionary</code>, <code>chainlit</code>,
+<code>sqlalchemy</code>, <code>prometheus_client</code>, <code>dotenv</code>, JWT/crypto support, and swarm
+support when they are installed; it does not contact an LLM provider.</p>
 <hr />
 <h2 id="troubleshooting">❓ Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <details class="question">
 <summary>Command <code>agentomatic</code> not found after install</summary>
-<p>Make sure you installed the CLI extra: <code>pip install agentomatic[cli]</code> or <code>pip install agentomatic[all]</code>.
+<p>Make sure you installed the CLI extra: <code>pip install "agentomatic[cli]"</code> or <code>pip install "agentomatic[all]"</code>.
 If using a virtual environment, verify it's activated.</p>
 </details>
 <details class="question">
 <summary><code>ModuleNotFoundError: No module named 'langgraph'</code></summary>
-<p>LangGraph is optional. Install it with: <code>pip install agentomatic[langgraph]</code>.
+<p>LangGraph is optional. Install it with: <code>pip install "agentomatic[langgraph]"</code>.
 Class-based agents using <code>BaseGraphAgent</code> do NOT require LangGraph.</p>
 </details>
 <div class="admonition tip">

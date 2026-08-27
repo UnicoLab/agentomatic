@@ -3513,20 +3513,20 @@
 <h2 id="middleware-architecture">🏗️ Middleware Architecture<a class="headerlink" href="#middleware-architecture" title="Permanent link">&para;</a></h2>
 <p>Middleware components are added in <strong>reverse order</strong> — the last middleware added is the first to execute. The diagram below shows the actual execution flow for an incoming request:</p>
 <pre class="mermaid"><code>flowchart LR
-    Client["🌐 Client"] --&gt; CORS["CORS"]
-    CORS --&gt; Logging["📝 Logging"]
-    Logging --&gt; Auth["🔐 Auth"]
-    Auth --&gt; RateLimit["⚡ Rate Limit"]
-    RateLimit --&gt; Metrics["📊 Metrics"]
-    Metrics --&gt; Custom["🔌 Custom"]
-    Custom --&gt; Handler["🤖 Agent&lt;br/&gt;Handler"]
-    Handler --&gt; Custom
-    Custom --&gt; Metrics
-    Metrics --&gt; RateLimit
-    RateLimit --&gt; Auth
-    Auth --&gt; Logging
-    Logging --&gt; CORS
-    CORS --&gt; Client
+    Client["🌐 Client"] --&gt; Custom["🔌 Custom"]
+    Custom --&gt; Metrics["📊 Metrics"]
+    Metrics --&gt; RateLimit["⚡ Rate Limit"]
+    RateLimit --&gt; Auth["🔐 Auth"]
+    Auth --&gt; Logging["📝 Logging"]
+    Logging --&gt; CORS["CORS"]
+    CORS --&gt; Handler["🤖 Agent&lt;br/&gt;Handler"]
+    Handler --&gt; CORS
+    CORS --&gt; Logging
+    Logging --&gt; Auth
+    Auth --&gt; RateLimit
+    RateLimit --&gt; Metrics
+    Metrics --&gt; Custom
+    Custom --&gt; Client
 
     style Auth fill:#ffcdd2
     style RateLimit fill:#fff9c4
@@ -3583,21 +3583,21 @@
 </tr>
 <tr>
 <td>7</td>
-<td><strong>FeedbackCollector</strong></td>
-<td><code>enable_feedback=True</code></td>
-<td>Default on</td>
-</tr>
-<tr>
-<td>8</td>
-<td><strong>OpenTelemetry</strong></td>
-<td><code>enable_telemetry=True</code></td>
-<td>Default on</td>
+<td><strong>Maintenance / connection context</strong></td>
+<td>Control-plane / connections enabled</td>
+<td>Optional request middleware</td>
 </tr>
 </tbody>
 </table>
 <div class="admonition info">
 <p class="admonition-title">Starlette Ordering</p>
-<p>FastAPI/Starlette adds middleware in <strong>reverse order</strong>: the last <code>app.add_middleware()</code> call wraps the outermost layer. This means CORS (added first) is the outermost wrapper, and custom middleware (added last) is closest to the handler.</p>
+<p>FastAPI/Starlette adds middleware in <strong>reverse order</strong>: the last
+<code>app.add_middleware()</code> call wraps the outermost layer. With the common
+enabled stack shown above, custom middleware is outermost and CORS is
+closest to the handler. Zero-trust, JWT, maintenance, and connection
+context middleware are inserted only when their platform features are
+enabled. <code>FeedbackCollector</code> is a collector service rather than request
+middleware; OpenTelemetry instruments the app separately.</p>
 </div>
 <h3 id="full-stack-activation">Full Stack Activation<a class="headerlink" href="#full-stack-activation" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
@@ -3728,15 +3728,20 @@
 <td><code>60</code></td>
 <td>Sliding window duration in seconds</td>
 </tr>
+<tr>
+<td><code>trust_proxy_headers</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Trust <code>X-Forwarded-For</code> only behind a proxy that overwrites it</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Skip paths:</strong> <code>/health</code>, <code>/healthz</code>, <code>/readiness</code></p>
 <h3 id="client-identification">Client Identification<a class="headerlink" href="#client-identification" title="Permanent link">&para;</a></h3>
-<p>The middleware identifies clients using:</p>
-<ol>
-<li><strong><code>X-Forwarded-For</code> header</strong> — first IP in the chain (for proxied requests)</li>
-<li><strong><code>request.client.host</code></strong> — direct connection IP (fallback)</li>
-</ol>
+<p>The middleware uses <code>request.client.host</code> by default. Set
+<code>rate_limit_trust_proxy_headers=True</code> only when a trusted reverse proxy
+overwrites <code>X-Forwarded-For</code>; then its first IP is used. This prevents callers
+that can reach the app directly from rotating that header to evade limits.</p>
 <h3 id="enabling-rate-limiting">Enabling Rate Limiting<a class="headerlink" href="#enabling-rate-limiting" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
@@ -4217,7 +4222,7 @@
 <h3 id="middleware-interaction-with-streaming">Middleware Interaction with Streaming<a class="headerlink" href="#middleware-interaction-with-streaming" title="Permanent link">&para;</a></h3>
 <div class="admonition warning">
 <p class="admonition-title">SSE / Streaming Responses</p>
-<p>The logging and metrics middleware measure time until the <strong>first byte</strong> is sent, not until the full streaming response completes. For streaming endpoints (<code>/chat/stream</code>), the <code>X-Process-Time-Ms</code> header reflects initial response time only.</p>
+<p>The logging and metrics middleware measure time until the <strong>first byte</strong> is sent, not until the full streaming response completes. For streaming invocation endpoints (<code>/invoke/stream</code>), the <code>X-Process-Time-Ms</code> header reflects initial response time only.</p>
 </div>
 <h3 id="disabling-all-middleware">Disabling All Middleware<a class="headerlink" href="#disabling-all-middleware" title="Permanent link">&para;</a></h3>
 <p>For maximum performance in trusted environments:</p>

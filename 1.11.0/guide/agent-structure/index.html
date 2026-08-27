@@ -3147,7 +3147,8 @@
 <p>Agentomatic follows a <strong>convention-over-configuration</strong> model. Each agent lives in a subfolder under your configured agents directory. By dropping files with specific names into this folder, you override default behaviors, customize schemas, configure hyper-parameters, inject custom routers, and define tools.</p>
 <hr />
 <h2 id="choose-your-agent-pattern">🎯 Choose Your Agent Pattern<a class="headerlink" href="#choose-your-agent-pattern" title="Permanent link">&para;</a></h2>
-<p>Agentomatic supports <strong>two patterns</strong> for defining agents. Both are fully auto-discovered and get the same 26 REST endpoints.</p>
+<p>Agentomatic supports <strong>two patterns</strong> for defining agents. Both are fully
+auto-discovered and get the same generated route surface.</p>
 <pre class="mermaid"><code>flowchart TD
     A["How do you want to define your agent?"] --&gt; B["Class-Based Agent\n(Recommended)"]
     A --&gt; C["Functional Agent\n(Legacy)"]
@@ -3792,7 +3793,8 @@
 </span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="n">agent_tools</span> <span class="o">=</span> <span class="p">[</span><span class="n">calculate_salary</span><span class="p">,</span> <span class="n">search_database</span><span class="p">]</span>
 </span></code></pre></div>
 <h3 id="6-apipy-custom-fastapi-router">6. <code>api.py</code> — Custom FastAPI Router<a class="headerlink" href="#6-apipy-custom-fastapi-router" title="Permanent link">&para;</a></h3>
-<p>If <code>api.py</code> exports a <code>router</code>, <strong>Agentomatic drops all 26 auto-generated endpoints</strong> for this agent and mounts your custom router instead.</p>
+<p>If <code>api.py</code> exports a <code>router</code>, <strong>Agentomatic drops the auto-generated routes</strong>
+for this agent and mounts your custom router instead.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># agents/my_agent/api.py</span>
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIRouter</span><span class="p">,</span> <span class="n">File</span><span class="p">,</span> <span class="n">UploadFile</span>
 </span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIResponse</span><span class="p">,</span> <span class="n">handle_api_errors</span>

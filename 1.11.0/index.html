@@ -2657,7 +2657,7 @@
 <ul>
 <li><strong>Ship in minutes</strong> — go from a Python function to a documented, streaming REST API with one command</li>
 <li><strong>Debug visually</strong> — Studio provides graph visualization, time-travel debugging, and live state editing</li>
-<li><strong>Scale with confidence</strong> — built-in auth, rate limiting, metrics, telemetry, and PostgreSQL persistence</li>
+<li><strong>Scale with confidence</strong> — built-in auth, rate limiting, metrics, telemetry, and optional PostgreSQL persistence</li>
 <li><strong>Stay framework-agnostic</strong> — switch between LangGraph, LangChain, Deep Agent, or plain Python without changing your infrastructure</li>
 </ul>
 </div>
@@ -2669,7 +2669,7 @@
 <li>
 <p><span class="twemoji lg middle"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg></span> <strong>Auto-Discovery &amp; REST API</strong></p>
 <hr />
-<p>Drop a folder with <code>agent.py</code> (class-based) or <code>__init__.py</code> + <code>manifest</code> (functional) into <code>agents/</code>. Agentomatic generates <strong>26 REST endpoints</strong> per agent automatically — invoke, stream, chat, health, config, threads, feedback, HITL, A2A, and more.</p>
+<p>Drop a folder with <code>agent.py</code> (class-based) or <code>__init__.py</code> + <code>manifest</code> (functional) into <code>agents/</code>. Agentomatic generates agent REST routes automatically — invoke, stream, chat, health, config, threads, feedback, HITL, A2A, and operational routes when their features are enabled.</p>
 <p><a href="guide/agent-structure/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Agent Structure</a></p>
 </li>
 <li>
@@ -2805,7 +2805,7 @@
 <li>Builds a complete FastAPI application with routes, middleware, storage, and Studio</li>
 <li>Visit <code>http://localhost:8000/docs</code> for your auto-generated OpenAPI specification</li>
 </ol>
-<p>That's it. Every folder inside <code>agents/</code> becomes a full REST API with streaming, persistence, health checks, and documentation — <strong>no router code, no endpoint wiring, no boilerplate</strong>.</p>
+<p>That's it. Every folder inside <code>agents/</code> becomes a full REST API with streaming, health checks, and documentation — <strong>no router code, no endpoint wiring, no boilerplate</strong>. Add a durable storage backend when conversation or task state must survive process restarts.</p>
 <hr />
 <h2 id="platform-architecture"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 2v6h2v3H5c-1.11 0-2 .89-2 2v3H1v6h6v-6H5v-3h6v3H9v6h6v-6h-2v-3h6v3h-2v6h6v-6h-2v-3c0-1.11-.89-2-2-2h-6V8h2V2z"/></svg></span> Platform Architecture<a class="headerlink" href="#platform-architecture" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>graph TB
@@ -2965,7 +2965,7 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="pip-recommended" name="__tabbed_1" type="radio" /><input id="uv" name="__tabbed_1" type="radio" /><input id="poetry" name="__tabbed_1" type="radio" /><input id="minimal" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="pip-recommended">pip (Recommended)</label><label for="uv">uv</label><label for="poetry">poetry</label><label for="minimal">Minimal</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>agentomatic<span class="o">[</span>all<span class="o">]</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[all]&quot;</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
