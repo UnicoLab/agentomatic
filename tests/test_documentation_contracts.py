@@ -15,7 +15,16 @@ from agentomatic._version import __version__
 from agentomatic.cli.commands import cli
 from agentomatic.cli.templates import TEMPLATES
 from agentomatic.core.platform import AgentPlatform
-from agentomatic.core.router_factory import AgentChatRequest, AgentInvokeResponse, FeedbackRequest
+from agentomatic.core.router_factory import (
+    A2ATaskRequest,
+    AgentChatRequest,
+    AgentInvokeResponse,
+    ApproveSuspendedRequest,
+    FeedbackRequest,
+    ForkThreadRequest,
+    OptimizeInvokeRequest,
+    RejectSuspendedRequest,
+)
 from agentomatic.tasks.models import TargetType, TaskProgress, TaskRecord
 
 REPO = Path(__file__).parents[1]
@@ -176,6 +185,22 @@ def test_frontend_guide_tracks_the_feedback_request_model() -> None:
 
     for field in FeedbackRequest.model_fields:
         assert re.search(rf"\b{field}\s*\??:", feedback_section), field
+
+
+def test_frontend_guide_tracks_a2a_optimization_and_hitl_request_models() -> None:
+    """Every frontend-surface request body needs a usable typed shape."""
+    frontend = _doc("docs/FRONTEND_API_GUIDE.md")
+
+    for model in (
+        A2ATaskRequest,
+        OptimizeInvokeRequest,
+        ApproveSuspendedRequest,
+        RejectSuspendedRequest,
+        ForkThreadRequest,
+    ):
+        section = frontend.split(f"interface {model.__name__} {{", 1)[1].split("}", 1)[0]
+        for field in model.model_fields:
+            assert re.search(rf"\b{field}\s*\??:", section), (model.__name__, field)
 
 
 def test_provider_guide_tracks_supported_llm_and_embedding_factories() -> None:

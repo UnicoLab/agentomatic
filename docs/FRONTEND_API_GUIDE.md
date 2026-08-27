@@ -89,6 +89,39 @@ interface FeedbackPayload {
   metadata?: Record<string, any>;
 }
 
+// ── A2A, optimization, and human-in-the-loop ────────────────────
+
+interface A2ATaskRequest {
+  message: Record<string, unknown>;    // supports content, text, or A2A parts
+  metadata?: Record<string, unknown>;
+}
+
+interface OptimizeInvokeRequest {
+  query: string;
+  system_prompt_override?: string | null;
+  user_id?: string;
+  context?: Record<string, unknown>;
+  include_retrieval_context?: boolean;
+  include_steps?: boolean;
+}
+
+interface ApproveSuspendedRequest {
+  approval_id: string;
+  approved?: boolean;
+  context?: Record<string, unknown>;
+}
+
+interface RejectSuspendedRequest {
+  approval_id: string;
+  reason?: string | null;
+}
+
+interface ForkThreadRequest {
+  message_index: number;
+  new_thread_id?: string | null;
+  title?: string | null;
+}
+
 // ── Tasks (async / batch execution) ─────────────────────────────
 
 /** Maps to TaskProgress (tasks/models.py) */
@@ -470,7 +503,7 @@ const messages = await msgsRes.json();
 
 | Method | Path                                    | Description          |
 | ------ | --------------------------------------- | -------------------- |
-| `POST` | `/api/v1/{name}/a2a/tasks`              | Submit an A2A task   |
+| `POST` | `/api/v1/{name}/a2a/tasks`              | Submit an `A2ATaskRequest` |
 | `GET`  | `/api/v1/{name}/a2a/tasks/{task_id}`    | Get A2A task status  |
 
 ---
@@ -479,7 +512,7 @@ const messages = await msgsRes.json();
 
 | Method | Path                                 | Description                              |
 | ------ | ------------------------------------ | ---------------------------------------- |
-| `POST` | `/api/v1/{name}/optimize/invoke`     | Invoke with full optimization context    |
+| `POST` | `/api/v1/{name}/optimize/invoke`     | Invoke with `OptimizeInvokeRequest` and full optimization context |
 
 ---
 
