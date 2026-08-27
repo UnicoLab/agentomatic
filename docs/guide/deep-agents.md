@@ -41,7 +41,7 @@ Edit `agents/my_research_agent/agent.py`:
 
     ```python
     agent = create_deep_agent(
-        model="google_genai:gemini-3.5-flash",
+        model="google_genai:gemini-3.1-pro-preview",
         system_prompt="You are an expert research assistant.",
         tools=[internet_search],
     )
@@ -219,32 +219,48 @@ In Studio's Graph View, you'll see:
 
 ## Human-in-the-Loop (HITL)
 
-Deep Agent supports HITL via LangGraph's `interrupt` mechanism. When the agent hits an interrupt:
+Deep Agent supports HITL via LangGraph's `interrupt` mechanism. When an
+`interrupt_on`-configured tool pauses:
 
 1. Studio receives a `breakpoint_hit` event
 2. The graph pauses and state is persisted via checkpointing
-3. The Studio UI shows an **"Approve / Reject"** panel
-4. On approval, Studio calls `POST /studio/agents/{name}/threads/{tid}/resume`
-5. Execution continues from the interrupt point
+3. A client can call `POST /studio/agents/{name}/threads/{tid}/resume` with
+   the value expected by the graph.
+4. Execution continues from the interrupt point when that resume value is
+   accepted by the graph.
 
 ### Enabling HITL
 
-HITL works automatically when your deep agent has:
+HITL requires both:
 
 - A **checkpointer** configured (required for state persistence)
-- Tools that trigger `interrupt` via deep_agent middleware
+- An `interrupt_on` rule for each sensitive tool (or a tool that calls
+  LangGraph's `interrupt()` itself)
+
+`create_deep_agent()` already returns a compiled LangGraph. Pass the
+checkpointer and interrupt policy while creating it; do **not** call
+`.compile()` on its result:
 
 ```python
+from deepagents import create_deep_agent
 from langgraph.checkpoint.memory import MemorySaver
 
 agent = create_deep_agent(
     model="anthropic:claude-sonnet-4-6",
     tools=[sensitive_tool],
+    interrupt_on={"sensitive_tool": True},
+    checkpointer=MemorySaver(),  # development-only; use durable storage in production
 )
-
-# Compile with checkpointer for HITL
-compiled = agent.compile(checkpointer=MemorySaver())
 ```
+
+!!! warning "Deep Agent decision payloads"
+    Agentomatic forwards the `value` from its Studio resume endpoint as
+    `Command(resume=value)`. For a Deep Agent `interrupt_on` pause, provide
+    the Deep Agents/LangGraph decision payload (typically
+    `{"decisions": [...]}` in the exact action-request order). The generic
+    endpoint's `action` field is only UI metadata; it does not synthesize a
+    Deep Agent decision list for you. Keep that policy and payload handling in
+    your authenticated production client.
 
 ---
 

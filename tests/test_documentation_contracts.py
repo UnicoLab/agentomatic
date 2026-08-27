@@ -324,6 +324,17 @@ def test_delegation_guide_does_not_claim_tool_creation_is_authorization() -> Non
     assert "Pair this with an AgentSecurityPolicy" in delegation
 
 
+def test_deep_agent_guide_uses_the_compiled_graph_and_explicit_hitl_contract() -> None:
+    """Deep Agents are already compiled and require policy + checkpoint wiring."""
+    deep_agents = _doc("docs/guide/deep-agents.md")
+
+    assert "google_genai:gemini-3.1-pro-preview" in deep_agents
+    assert 'interrupt_on={"sensitive_tool": True}' in deep_agents
+    assert "checkpointer=MemorySaver()" in deep_agents
+    assert "agent.compile(checkpointer=MemorySaver())" not in deep_agents
+    assert "does not synthesize a\n    Deep Agent decision list" in deep_agents
+
+
 def test_deployment_guide_matches_root_compose_contract() -> None:
     """Keep the documented local oMLX instructions executable as written."""
     deployment = _doc("docs/guide/deployment.md")
