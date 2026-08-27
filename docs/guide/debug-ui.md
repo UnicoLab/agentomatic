@@ -1,6 +1,9 @@
 # Chat Interface (Chainlit)
 
-Agentomatic includes a built-in ChatGPT-like conversational interface powered by **Chainlit**. It provides an interactive chat playground to test agent responses, compare prompt versions, inspect tool calls, and collect user feedback — without writing any frontend code.
+Agentomatic includes a built-in Chainlit **debug chat**. It lets an operator
+select a deployed agent, send a synchronous invoke request, and inspect the
+returned response, execution-step labels, citations, and suggestions — without
+writing a frontend.
 
 !!! info "Chat UI vs Agentomatic Studio"
     Agentomatic offers **two** debug interfaces for different workflows:
@@ -10,7 +13,7 @@ Agentomatic includes a built-in ChatGPT-like conversational interface powered by
     | **Purpose** | Conversational testing | Visual debugging & inspection |
     | **Launch flag** | `--with-ui` | `--studio` |
     | **URL** | `/chat` | `/studio/ui/` |
-    | **Best for** | Testing agent responses, prompt A/B testing, user feedback | Graph visualization, state inspection, time-travel, breakpoints |
+    | **Best for** | Quick local response checks | Graph visualization, state inspection, time-travel, breakpoints |
     | **Interface** | Chat bubbles (ChatGPT-like) | Node graph + debug panels |
     | **Framework** | Chainlit | React |
 
@@ -30,7 +33,9 @@ pip install "agentomatic[ui]"
 
 === "Embedded Mode (Recommended)"
 
-    Mounts the Chainlit interface directly into your FastAPI application. API requests and chat sessions share the same persistence backend and middleware stack.
+    Mounts the Chainlit interface into the FastAPI application. The debug chat
+    invokes the platform's normal `/invoke` API, so that API request follows
+    the platform middleware.
 
     ```bash
     agentomatic run --with-ui
@@ -71,61 +76,35 @@ pip install "agentomatic[ui]"
     agentomatic run --with-ui --reload
     ```
 
+!!! warning "Local debug surface, not an authenticated operator console"
+    The bundled UI currently sends plain `/invoke` requests and does not
+    forward an API key, JWT, browser identity, or a conversation `thread_id`.
+    It is intended for a local or otherwise trusted debugging setup. For a
+    production frontend, use the documented REST/Studio APIs and your own
+    authentication and session handling.
+
 ---
 
 ## Interface Features
 
 ### :material-robot: Agent Selector
 
-A top-navigation dropdown lists all registered agents discovered by the platform registry. Select an agent to dynamically load its input form, configuration, and documentation.
+A Chainlit settings selector lists agents returned by the platform registry.
+Select an agent to send subsequent messages to that agent's `/invoke` route.
 
-### :material-tag: Prompt Version Selector
+### :material-hammer-wrench: Invocation inspection
 
-Inspect and switch between prompt versions (e.g., `v1`, `v2`, `v1_formal`) on the fly. Chat queries execute against the selected version, enabling manual A/B comparison of prompt behaviors.
-
-```json
-// agents/my_agent/prompts.json
-{
-  "v1": {
-    "system": "You are a concise assistant.",
-    "user_template": "Query: {query}"
-  },
-  "v2": {
-    "system": "You are a creative, detailed assistant.",
-    "user_template": "Please elaborate on: {query}"
-  }
-}
-```
-
-### :material-waves: Token-by-Token Streaming
-
-If your agent supports streaming (via SSE), response completions stream onto the screen in real-time, matching the experience of ChatGPT and similar interfaces.
-
-### :material-hammer-wrench: Tool Call Visualizations
-
-Intermediate agent actions — tool calls, function invocations, retrieval steps — are captured and rendered as clean, expandable panels in the chat flow. Click a panel to inspect the exact input arguments and JSON output returned by the tool.
-
-### :material-brain: Chain-of-Thought & Reasoning
-
-If your agent returns reasoning or step-by-step logs, the UI highlights these in collapsible cards showing the agent's thought process before the final answer.
+Each message creates an expandable Chainlit step containing the `/invoke`
+payload and complete JSON response. If the response contains `steps_taken`,
+the UI displays those agent-supplied execution labels in a second step. It does
+not stream `/invoke/stream`, inspect provider tool calls independently, or
+infer hidden chain-of-thought.
 
 ### :material-book-open-variant: Citations & Sources
 
-Citations returned by RAG pipelines are rendered as clickable badges at the bottom of messages, referencing PDFs, web links, or documentation files.
-
-### :material-thumb-up: User Feedback Collection
-
-Every response includes thumbs-up and thumbs-down icons. Users can submit rating scores and commentary directly from the UI. Feedback is:
-
-- Immediately saved to the platform's database (SQL or Memory)
-- Available via the `/api/v1/{agent}/feedback` endpoint
-- Exportable as training data for prompt optimization
-
-!!! note "Feedback-driven optimization"
-    Feedback collected through the Chat UI can be exported and used as evaluation datasets for the [Prompt Optimization](optimization.md) pipeline:
-    ```bash
-    agentomatic optimize my_agent --dataset feedback_export.jsonl --metrics relevancy
-    ```
+Citations returned by the agent are displayed as an expandable JSON retrieval
+step. The bundled UI does not submit feedback; use the agent feedback API or a
+production client for that workflow.
 
 ---
 
@@ -133,7 +112,9 @@ Every response includes thumbs-up and thumbs-down icons. Users can submit rating
 
 ### Theme & Layout
 
-When running `agentomatic run --with-ui` for the first time, Agentomatic generates a default `.chainlit/config.toml` file. Customize it to match your brand:
+Chainlit controls its own theme and layout files. If your project has a
+`.chainlit/config.toml`, customize it according to your installed Chainlit
+version; Agentomatic does not generate or manage that file.
 
 ```toml
 [theme]
@@ -151,7 +132,9 @@ default_expand_messages = true
 
 ### Custom Welcome Message
 
-Edit the `.chainlit/README.md` file to customize the welcome screen shown when users open a new session:
+The bundled debug chat sends its welcome message from
+`agentomatic.ui.chat`; customize that module or provide a dedicated Chainlit
+application when you need branded copy and behavior.
 
 ```markdown
 # Welcome to My Agent Platform 🚀
@@ -194,8 +177,8 @@ mount(app)  # Chat UI available at /chat
 | Scenario | Use Chat UI | Use Studio |
 |----------|:-----------:|:----------:|
 | Testing agent response quality | ✅ | |
-| Comparing prompt versions side-by-side | ✅ | |
-| Collecting user feedback | ✅ | |
+| Comparing prompt versions side-by-side | | ✅ (use a run payload) |
+| Collecting user feedback | | ✅ (use the agent feedback API) |
 | Demonstrating agents to stakeholders | ✅ | |
 | Debugging graph execution flow | | ✅ |
 | Inspecting intermediate node state | | ✅ |

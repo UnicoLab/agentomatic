@@ -207,10 +207,10 @@ manifest = AgentManifest(
 )
 
 async def node_fn(state: dict) -> dict:
-    # 1. Retrieve the validated fields from the initial state
-    # (By default, fields are mapped to state.get("current_query") or state.get("metadata"))
-    location = state.get("metadata", {}).get("location")
-    units = state.get("metadata", {}).get("units", "celsius")
+    # 1. Retrieve the validated custom fields from the initial state.
+    # Unknown-to-the-default-model fields are preserved at the top level.
+    location = state["location"]
+    units = state.get("units", "celsius")
 
     # 2. Process and fetch data
     # (mocking execution logic here)

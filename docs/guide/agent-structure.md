@@ -13,7 +13,8 @@ Agentomatic follows a **convention-over-configuration** model. Each agent lives 
 
 ## 🎯 Choose Your Agent Pattern
 
-Agentomatic supports **two patterns** for defining agents. Both are fully auto-discovered and get the same 26 REST endpoints.
+Agentomatic supports **two patterns** for defining agents. Both are fully
+auto-discovered and get the same generated route surface.
 
 ```mermaid
 flowchart TD
@@ -542,7 +543,8 @@ agent_tools = [calculate_salary, search_database]
 
 ### 6. `api.py` — Custom FastAPI Router
 
-If `api.py` exports a `router`, **Agentomatic drops all 26 auto-generated endpoints** for this agent and mounts your custom router instead.
+If `api.py` exports a `router`, **Agentomatic drops the auto-generated routes**
+for this agent and mounts your custom router instead.
 
 ```python
 # agents/my_agent/api.py

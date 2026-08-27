@@ -139,9 +139,9 @@ dialogue.
 ```python
 # Client-side: continue a conversation
 response = client.post(
-    "/agents/search_bot/chat",
+    "/api/v1/search_bot/chat",
     json={
-        "message": "Tell me more about that last point.",
+        "content": "Tell me more about that last point.",
         "thread_id": "abc-123",   # ← same thread
     },
 )
@@ -182,7 +182,7 @@ flowchart LR
     C -- yes --> D["Class-Based\nBaseGraphAgent"]
     C -- no --> E{"__init__.py?"}
     E -- yes --> F["Functional\nmanifest + graph_fn"]
-    D --> G["Register\n26 REST Endpoints"]
+    D --> G["Register\nagent route surface"]
     F --> G
 
     style G fill:#e3f2fd,stroke:#1565c0
@@ -211,13 +211,13 @@ See [Agentomatic Studio](../guide/studio.md) for the full guide.
 
 ### :material-api: Endpoint
 
-One of the **26 auto-generated REST API routes** per agent. Every registered
-agent automatically receives endpoints for:
+One of the **auto-generated REST API routes** per agent. Every registered
+agent automatically receives a route surface that includes:
 
 | Category | Example Routes |
 |----------|---------------|
 | **Execution** | `/invoke`, `/stream`, `/batch` |
-| **Chat** | `/chat`, `/chat/stream` |
+| **Chat** | `/chat` |
 | **Threads** | `/threads`, `/threads/{id}/history` |
 | **Introspection** | `/config`, `/schema`, `/graph`, `/health` |
 | **Management** | `/feedback`, `/state`, `/metrics` |
@@ -294,7 +294,7 @@ sequenceDiagram
     participant A as Agent
     participant G as Graph Engine
 
-    C->>F: POST /agents/search_bot/invoke
+    C->>F: POST /api/v1/search_bot/invoke
     F->>M: Auth · Rate Limit · CORS
     M->>R: Route to agent
     R->>A: agent.invoke(payload)
@@ -323,7 +323,8 @@ sequenceDiagram
 ## ⚖️ Two Patterns: Class-Based vs Functional
 
 Agentomatic supports **two ways** to define agents. Both are fully
-auto-discovered and receive the same 26 REST endpoints.
+auto-discovered and receive the same generated route surface (unless a custom
+router replaces it).
 
 ### Choosing a Pattern
 

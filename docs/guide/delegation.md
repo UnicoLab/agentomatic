@@ -163,8 +163,9 @@ from __future__ import annotations
 
 from agentomatic.delegation import AgentDelegator
 
-# Agents this coordinator is allowed to delegate to.
-# The ZeroTrustEnforcer blocks any delegation not in this list.
+# Targets for which this module creates handoff tools.
+# Pair this with an AgentSecurityPolicy when your orchestration code enforces
+# delegation authorization.
 DELEGATION_TARGETS = ["researcher", "writer"]
 
 

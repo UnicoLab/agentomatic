@@ -404,7 +404,7 @@ Interact with the running agent using any HTTP client:
     curl -X POST http://localhost:8000/api/v1/my_chatbot/chat \
       -H "Content-Type: application/json" \
       -d '{
-        "query": "My name is Alice",
+        "content": "My name is Alice",
         "thread_id": "thread_abc123",
         "user_id": "user-1"
       }'
@@ -413,7 +413,7 @@ Interact with the running agent using any HTTP client:
     curl -X POST http://localhost:8000/api/v1/my_chatbot/chat \
       -H "Content-Type: application/json" \
       -d '{
-        "query": "What is my name?",
+        "content": "What is my name?",
         "thread_id": "thread_abc123",
         "user_id": "user-1"
       }'

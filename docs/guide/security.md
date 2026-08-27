@@ -35,8 +35,8 @@ request via an HTTP header or query parameter.
 === "Environment Variables"
 
     ```bash
-    export FEATURES__ENABLE_AUTH=true
-    export AUTH__API_KEY="your-secret-api-key"
+    export AGENTOMATIC_ENABLE_AUTH=1
+    export AGENTOMATIC_API_KEY="your-secret-api-key"
     ```
 
 === "Python"
@@ -287,7 +287,7 @@ client IP**.
 ### Enabling Rate Limiting
 
 ```bash
-export FEATURES__ENABLE_RATE_LIMIT=true
+export AGENTOMATIC_ENABLE_RATE_LIMIT=1
 ```
 
 ```python
@@ -302,11 +302,9 @@ app.add_middleware(
 
 ### Client Identification
 
-The middleware resolves the client IP using:
-
-1. The **`X-Forwarded-For`** header (first entry), when behind a reverse
-   proxy.
-2. Falls back to **`request.client.host`** otherwise.
+The middleware uses `request.client.host` by default. Set
+`rate_limit_trust_proxy_headers=True` only behind a trusted proxy that
+overwrites `X-Forwarded-For`; it then uses the first forwarded address.
 
 ### Response Headers
 
@@ -340,7 +338,7 @@ The middleware is registered with the following defaults:
 
 | Setting | Value |
 |---------|-------|
-| `allow_credentials` | `True` |
+| `allow_credentials` | `False` for the default `['*']` origins; `True` when explicit origins are configured |
 | `allow_methods` | `["*"]` |
 | `allow_headers` | `["*"]` |
 | `expose_headers` | `["X-Studio-Run-Id"]` |
@@ -370,7 +368,7 @@ serialisation.
 ## Environment Variable Security
 
 !!! danger "Keep secrets out of source control"
-    - Store all secrets (`AUTH__API_KEY`, database URIs, LLM provider keys)
+    - Store all secrets (`AGENTOMATIC_API_KEY`, database URIs, LLM provider keys)
       in a **`.env`** file or a secrets manager — never commit them to Git.
     - Ensure **`.env`** is listed in your **`.gitignore`**.
     - Use `env_vars_whitelist` in `AgentSecurityPolicy` to restrict which
@@ -382,11 +380,11 @@ serialisation.
 ## Production Security Checklist
 
 !!! danger "Review before deploying to production"
-    - [x] **API Key Auth** enabled (`FEATURES__ENABLE_AUTH=true`)
+    - [x] **API Key Auth** enabled (`AGENTOMATIC_ENABLE_AUTH=1`)
     - [x] **JWT validation** enabled with a real `jwks_url` — dev-mode
       bypass is disabled
     - [x] **CORS origins** restricted to known domains (no `["*"]`)
-    - [x] **Rate limiting** enabled (`FEATURES__ENABLE_RATE_LIMIT=true`)
+    - [x] **Rate limiting** enabled (`AGENTOMATIC_ENABLE_RATE_LIMIT=1`)
     - [x] **Secrets** stored in `.env` or a vault — never in source code
     - [x] **`allowed_tools`** set per agent — no agent has unrestricted
       tool access
@@ -406,7 +404,7 @@ serialisation.
 ??? question "I get 401 even though I'm sending the API key"
     Make sure the key is in the **`X-API-Key`** header (case-sensitive) or
     the `api_key` query parameter.  Confirm that
-    `FEATURES__ENABLE_AUTH=true` **and** `AUTH__API_KEY` are set in the
+    `AGENTOMATIC_ENABLE_AUTH=1` **and** `AGENTOMATIC_API_KEY` are set in the
     same environment that the server process reads.
 
 ??? question "JWT middleware silently allows all requests"
@@ -417,9 +415,9 @@ serialisation.
     ```
 
 ??? question "Rate limiter counts are wrong behind a load balancer"
-    The middleware reads `X-Forwarded-For` to identify clients.  Ensure
-    your reverse proxy sets this header correctly and that only **trusted
-    proxies** can override it — otherwise clients can spoof their IP.
+    Enable `rate_limit_trust_proxy_headers=True` only when your reverse proxy
+    overwrites `X-Forwarded-For`; otherwise the limiter intentionally uses the
+    direct peer IP so clients cannot spoof their identity.
 
 ---
 

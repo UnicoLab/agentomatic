@@ -78,9 +78,14 @@ interface UpdateThreadRequest {
 // ── Feedback ────────────────────────────────────────────────────
 
 interface FeedbackPayload {
-  thread_id: string;
-  rating: number;                       // e.g. 1–5
-  comment?: string;
+  user_id?: string;                     // default: "anonymous"
+  rating?: number | null;               // 1–5 when supplied
+  comment?: string | null;
+  correction?: string | null;
+  feedback_type?: "thumbs" | "rating" | "correction" | "comment";
+  query?: string;
+  response?: string;
+  thread_id?: string | null;
   metadata?: Record<string, any>;
 }
 

@@ -35,9 +35,13 @@ starting the platform. It polls the JSON endpoint every few seconds and renders:
     "plugins":   { "total": 1, "healthy": 1 },
     "endpoints": { "total": 2, "healthy": 2 },
     "ingestors": { "total": 1, "healthy": 1 },
-    "pipelines": { "total": 1, "healthy": 1 }
+    "pipelines": { "total": 1, "healthy": 1 },
+    "connections": { "total": 2, "healthy": 2 }
   },
-  "resources": { "agents": { "total": 3, "healthy": 3, "degraded": 0, "items": { "...": { "status": "healthy" } } } },
+  "resources": {
+    "agents": { "total": 3, "healthy": 3, "degraded": 0, "items": { "...": { "status": "healthy" } } },
+    "connections": { "total": 2, "healthy": 2, "degraded": 0, "items": { "fraud/main": { "status": "configured" } } }
+  },
   "tasks": {
     "enabled": true,
     "total": 12,
@@ -51,8 +55,9 @@ starting the platform. It polls the JSON endpoint every few seconds and renders:
 }
 ```
 
-The top-level `status` is `degraded` if any resource is unhealthy or storage is
-unhealthy, otherwise `healthy` — handy for a single uptime check.
+The top-level `status` is `degraded` if any resource (including a configured
+connection) is unhealthy or storage is unhealthy, otherwise `healthy` — handy
+for a single uptime check.
 
 ## Related probes
 

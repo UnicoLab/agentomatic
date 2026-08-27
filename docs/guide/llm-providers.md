@@ -26,6 +26,7 @@ graph LR
 |----------------|----------------------|-------------------------------|-----------|-----------|
 | `ollama`       | `ChatOllama`         | `langchain-ollama`            | ✅        | Stable    |
 | `openai`       | `ChatOpenAI`         | `langchain-openai`            | ✅        | Stable    |
+| `openai_compatible` | `ChatOpenAI`    | `langchain-openai`            | ✅        | Stable — a `base_url` is required |
 | `azure`        | `AzureChatOpenAI`    | `langchain-openai`            | ✅        | Stable    |
 | `vertex`       | `ChatVertexAI`       | `langchain-google-vertexai`   | ✅        | Stable    |
 | `google_genai` | —                    | `langchain-google-genai`      | —         | Not available |
@@ -83,6 +84,26 @@ graph LR
     **Model name format:** Ollama model tags — `llama3`, `mistral`,
     `codellama:13b`, `phi3:medium`.
 
+=== "OpenAI-compatible"
+
+    Use this for any OpenAI-API-compatible model service, including oMLX,
+    llama.cpp, vLLM, LM Studio, Groq, Together, or a gateway. Unlike `openai`,
+    this provider requires an explicit `base_url` (or its `api_base` alias).
+
+    ```python
+    from agentomatic.providers import get_llm
+
+    llm = get_llm(
+        provider="openai_compatible",
+        model="Qwen3.5-9B-MLX-4bit",
+        base_url="http://host.docker.internal:8000/v1",
+        api_key="local-service-key",
+        temperature=0.2,
+    )
+    ```
+
+    Install `langchain-openai` via `pip install "agentomatic[openai]"`.
+
 === "Azure OpenAI"
 
     ```bash
@@ -119,7 +140,7 @@ graph LR
 
     llm = get_llm(
         provider="vertex",
-        model_name="gemini-1.5-pro",
+        model="gemini-1.5-pro",
         project="my-gcp-project",
         location="us-central1",       # default
         temperature=0.4,
@@ -136,6 +157,7 @@ graph LR
 | Variable                    | Provider   | Description                         |
 |-----------------------------|------------|-------------------------------------|
 | `OPENAI_API_KEY`            | `openai`   | OpenAI API key                      |
+| service-specific API key     | `openai_compatible` | Pass as `api_key` with the required `base_url` |
 | `AZURE_OPENAI_API_KEY`      | `azure`    | Azure OpenAI resource key           |
 | `AZURE_OPENAI_ENDPOINT`     | `azure`    | Azure resource endpoint URL         |
 | `GOOGLE_CLOUD_PROJECT`      | `vertex`   | GCP project id                      |
@@ -524,10 +546,14 @@ embeddings = get_embeddings(provider="ollama", model="nomic-embed-text")
 vectors = embeddings.embed_documents(["Hello world", "Goodbye world"])
 ```
 
-| Provider Key | Class                        | Notes                        |
-|-------------|------------------------------|------------------------------|
-| `ollama`    | `OllamaEmbeddings`           | Requires running Ollama      |
-| *(other)*   | `DeterministicFakeEmbedding`  | Deterministic dummy vectors  |
+| Provider Key | Class | Notes |
+|-------------|-------|-------|
+| `ollama` | `OllamaEmbeddings` | Requires running Ollama |
+| `openai` | `OpenAIEmbeddings` | Requires `langchain-openai` and an API key/base URL as appropriate |
+| `azure_openai` | `AzureOpenAIEmbeddings` | Azure deployment plus endpoint and API version |
+| `hash` | `HashEmbedder` | Local deterministic hash vectors; default, no network dependency |
+| `dummy` | `DeterministicFakeEmbedding` | Test-only deterministic vectors (falls back to `HashEmbedder` without LangChain) |
+| registered name | Custom builder | Add with `register_embedding_provider(name, builder)` |
 
 Call `reset_embeddings()` to clear the cached instance.
 
@@ -535,23 +561,21 @@ Call `reset_embeddings()` to clear the cached instance.
 
 ## Streaming Support
 
-All LangChain providers support token-level streaming via `astream_events`.
-Agentomatic exposes this through an **SSE (Server-Sent Events)** endpoint:
+Agentomatic exposes framework streaming through an **SSE (Server-Sent Events)**
+endpoint. Use the normal agent invocation request shape; provider selection is
+configured by the agent, stack, or server, not by a request-body `config`
+object:
 
 ```
-POST /invoke/stream
+POST /api/v1/{agent}/invoke/stream
 Content-Type: application/json
 
-{"input": "Explain quantum computing", "config": {"provider": "openai"}}
+{"query": "Explain quantum computing"}
 ```
 
-Enable streaming in your settings:
-
-```python
-# settings.yaml
-platform:
-  enable_streaming: true
-```
+The stream format and event richness depend on the registered agent framework;
+see the [Studio guide](studio.md) and [API reference](../architecture/api-reference.md)
+for the event and endpoint contracts.
 
 !!! note
     The `dummy` provider does **not** support streaming. Use a real

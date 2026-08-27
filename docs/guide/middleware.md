@@ -17,20 +17,20 @@ Middleware components are added in **reverse order** — the last middleware add
 
 ```mermaid
 flowchart LR
-    Client["🌐 Client"] --> CORS["CORS"]
-    CORS --> Logging["📝 Logging"]
-    Logging --> Auth["🔐 Auth"]
-    Auth --> RateLimit["⚡ Rate Limit"]
-    RateLimit --> Metrics["📊 Metrics"]
-    Metrics --> Custom["🔌 Custom"]
-    Custom --> Handler["🤖 Agent<br/>Handler"]
-    Handler --> Custom
-    Custom --> Metrics
-    Metrics --> RateLimit
-    RateLimit --> Auth
-    Auth --> Logging
-    Logging --> CORS
-    CORS --> Client
+    Client["🌐 Client"] --> Custom["🔌 Custom"]
+    Custom --> Metrics["📊 Metrics"]
+    Metrics --> RateLimit["⚡ Rate Limit"]
+    RateLimit --> Auth["🔐 Auth"]
+    Auth --> Logging["📝 Logging"]
+    Logging --> CORS["CORS"]
+    CORS --> Handler["🤖 Agent<br/>Handler"]
+    Handler --> CORS
+    CORS --> Logging
+    Logging --> Auth
+    Auth --> RateLimit
+    RateLimit --> Metrics
+    Metrics --> Custom
+    Custom --> Client
 
     style Auth fill:#ffcdd2
     style RateLimit fill:#fff9c4
@@ -51,11 +51,16 @@ The platform adds middleware in this specific order during `build()`:
 | 4 | **RateLimitMiddleware** | `enable_rate_limit=True` | Default off |
 | 5 | **MetricsMiddleware** | `enable_metrics=True` | Default off |
 | 6 | **Custom middleware** | `middleware=[...]` | User-defined |
-| 7 | **FeedbackCollector** | `enable_feedback=True` | Default on |
-| 8 | **OpenTelemetry** | `enable_telemetry=True` | Default on |
+| 7 | **Maintenance / connection context** | Control-plane / connections enabled | Optional request middleware |
 
 !!! info "Starlette Ordering"
-    FastAPI/Starlette adds middleware in **reverse order**: the last `app.add_middleware()` call wraps the outermost layer. This means CORS (added first) is the outermost wrapper, and custom middleware (added last) is closest to the handler.
+    FastAPI/Starlette adds middleware in **reverse order**: the last
+    `app.add_middleware()` call wraps the outermost layer. With the common
+    enabled stack shown above, custom middleware is outermost and CORS is
+    closest to the handler. Zero-trust, JWT, maintenance, and connection
+    context middleware are inserted only when their platform features are
+    enabled. `FeedbackCollector` is a collector service rather than request
+    middleware; OpenTelemetry instruments the app separately.
 
 ### Full Stack Activation
 
@@ -157,15 +162,16 @@ Protects your backend and LLM models from burst traffic and denial-of-service at
 |-----------|------|---------|-------------|
 | `max_requests` | `int` | `100` | Maximum requests allowed per window |
 | `window_seconds` | `int` | `60` | Sliding window duration in seconds |
+| `trust_proxy_headers` | `bool` | `False` | Trust `X-Forwarded-For` only behind a proxy that overwrites it |
 
 **Skip paths:** `/health`, `/healthz`, `/readiness`
 
 ### Client Identification
 
-The middleware identifies clients using:
-
-1. **`X-Forwarded-For` header** — first IP in the chain (for proxied requests)
-2. **`request.client.host`** — direct connection IP (fallback)
+The middleware uses `request.client.host` by default. Set
+`rate_limit_trust_proxy_headers=True` only when a trusted reverse proxy
+overwrites `X-Forwarded-For`; then its first IP is used. This prevents callers
+that can reach the app directly from rotating that header to evade limits.
 
 ### Enabling Rate Limiting
 
@@ -559,7 +565,7 @@ class IPAllowlistMiddleware(BaseHTTPMiddleware):
 ### Middleware Interaction with Streaming
 
 !!! warning "SSE / Streaming Responses"
-    The logging and metrics middleware measure time until the **first byte** is sent, not until the full streaming response completes. For streaming endpoints (`/chat/stream`), the `X-Process-Time-Ms` header reflects initial response time only.
+    The logging and metrics middleware measure time until the **first byte** is sent, not until the full streaming response completes. For streaming invocation endpoints (`/invoke/stream`), the `X-Process-Time-Ms` header reflects initial response time only.
 
 ### Disabling All Middleware
 

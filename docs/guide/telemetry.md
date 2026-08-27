@@ -13,7 +13,10 @@ Agentomatic provides built-in, production-grade **OpenTelemetry tracing**, **Pro
 
 ## 📡 1. OpenTelemetry Auto-Instrumentation
 
-When enabled, Agentomatic auto-instruments the execution stack. It tracks requests, trace spans, database queries, and downstream API calls (e.g. LLM invocations).
+When enabled and the telemetry extra is installed, Agentomatic instruments its
+FastAPI application and `httpx` clients. This creates standard HTTP server and
+client spans. Add `@traced` to agent nodes and application helpers when you
+need domain spans for LLM calls, retrieval, database work, or business steps.
 
 ```python
 platform = AgentPlatform.from_folder(
@@ -25,14 +28,13 @@ app = platform.build()
 
 ### Trace Spans & Metadata
 
-Agentomatic automatically generates spans for every phase of execution:
+Use explicit spans for domain-specific execution phases:
 
 | Span Name | Attributes | Description |
 |---|---|---|
-| `agentomatic.agent.invoke` | `agent_name`, `user_id`, `thread_id`, `version` | Overall time spent inside the agent execution. |
-| `agentomatic.llm.call` | `provider`, `model`, `prompt_tokens`, `completion_tokens` | Time spent executing LLM completions. |
-| `agentomatic.rag.retrieve` | `query`, `doc_count`, `latency_ms` | Vector database document retrieval span. |
-| `http.request` | `http.method`, `http.status_code`, `http.target` | Client HTTP requests and outgoing requests made via `httpx`. |
+| `support_agent.query_kb` | Application-defined attributes | Example retrieval span created with `@traced`. |
+| Any `@traced("...")` name | Safe function arguments + `duration_ms` | A domain operation you choose to instrument. |
+| Framework HTTP spans | Standard HTTP attributes | Incoming FastAPI and outgoing `httpx` calls, when their instrumentors are installed. |
 
 ### Configuring Exporters
 
@@ -46,7 +48,9 @@ export OTEL_TRACES_SAMPLER="parentbased_traceidratio"
 export OTEL_TRACES_SAMPLER_ARG="0.1"  # Sample 10% of traces in production
 ```
 
-> 💡 *If no OTLP variables are defined, Agentomatic defaults to console logging, dumping trace summaries into standard output for development.*
+> 💡 *If no OTLP endpoint is defined, spans are recorded but are not exported by
+> default. Set `AGENTOMATIC_OTEL_CONSOLE=1` for local console output, or set an
+> OTLP endpoint for a collector.*
 
 ### Adding Custom Spans in Agent Code
 

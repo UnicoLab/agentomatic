@@ -48,7 +48,9 @@ flowchart TB
 
 ### Data Model
 
-Agentomatic's data model consists of **five** core entities:
+The **conversation and execution-state** portion of Agentomatic's data model
+consists of five core entities (invocation logs, analyses, and optimization
+runs are documented separately in the observability and optimization guides):
 
 | Entity | Table | Description |
 |--------|-------|-------------|

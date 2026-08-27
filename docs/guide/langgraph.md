@@ -134,8 +134,9 @@ platform = AgentPlatform.from_folder(
     "agents/",
     store=MemoryStore(),
 )
+app = platform.build()
 
-# Run with: uvicorn main:platform.app --reload
+# Run with: uvicorn main:app --reload
 ```
 
 Your agent now has a full REST API:

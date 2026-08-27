@@ -311,9 +311,9 @@ platform = AgentPlatform.from_folder(
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `str` | Unique task id (`task_...`) |
-| `target_type` | `agent`/`plugin`/`pipeline`/`endpoint` | Resource kind |
+| `target_type` | `agent`/`plugin`/`pipeline`/`endpoint`/`ingestion` | Resource kind |
 | `target` | `str` | Resource name |
-| `mode` | `str` | `sync`/`async`/`batch`/`stream` |
+| `mode` | `str` | `sync`/`async`/`batch` |
 | `status` | `queued`/`running`/`succeeded`/`failed`/`cancelled` | Lifecycle |
 | `progress` | `TaskProgress` | `percent`, `message`, `current`, `total`, `stage` |
 | `input` / `batch` | `Any` | Submitted payload(s) |

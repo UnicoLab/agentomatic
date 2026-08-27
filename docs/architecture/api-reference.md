@@ -160,6 +160,7 @@ curl -X POST http://localhost:8000/api/v1/my_agent/invoke \
 | Field | Type | Description |
 |---|---|---|
 | `response` | `string` | Agent response text |
+| `output` | `any \| null` | Structured `state_to_output()` payload when available |
 | `agent_type` | `string` | Agent slug identifier |
 | `thread_id` | `string \| null` | Thread ID used |
 | `suggestions` | `string[]` | Follow-up suggestions |
@@ -173,6 +174,7 @@ curl -X POST http://localhost:8000/api/v1/my_agent/invoke \
 ```json
 {
   "response": "The capital of France is Paris.",
+  "output": null,
   "agent_type": "my-agent",
   "thread_id": "thread-abc",
   "suggestions": ["Tell me about Paris landmarks"],

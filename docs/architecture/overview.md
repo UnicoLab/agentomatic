@@ -130,10 +130,13 @@ platform = AgentPlatform.from_folder(
     "agents/",
     store=SQLAlchemyStore("postgresql+asyncpg://..."),
     enable_studio=True,
-    enable_chainlit=True,
 )
-app = platform.app  # FastAPI application
+app = platform.build()  # FastAPI application
 ```
+
+Mount the optional Chainlit debugging UI with `agentomatic run --with-ui`
+(after installing `agentomatic[ui]`); it is not an `AgentPlatform` constructor
+option.
 
 ### AgentRegistry
 
@@ -375,7 +378,7 @@ from agentomatic import AgentPlatform
 from agentomatic.storage import MemoryStore
 
 platform = AgentPlatform.from_folder("agents/", store=MemoryStore())
-app = platform.app
+app = platform.build()
 
 # uvicorn main:app --reload --port 8000
 ```

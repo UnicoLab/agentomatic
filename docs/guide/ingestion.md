@@ -36,6 +36,7 @@ exposes:
 |----------|-------------|
 | `POST /api/v1/ingestion/{name}/run` | Run synchronously, return the result |
 | `POST /api/v1/ingestion/{name}/run/async` | Submit as a background **task**, return a pollable id |
+| `POST /api/v1/ingestion/{name}/run/batch` | Fan out multiple inputs as one background task |
 | `GET /api/v1/ingestion/{name}/info` | Ingestor metadata + input schema |
 | `GET /api/v1/ingestion/{name}/health` | Readiness/health |
 | `GET /api/v1/ingestion` | List all ingestors (the resource router is mounted when an ingestor is discovered) |
@@ -202,9 +203,10 @@ emb = get_embeddings("openai", model="text-embedding-3-small")
 vectors = emb.embed_documents(["hello", "world"])
 ```
 
-Providers: `ollama`, `openai`, `hash` (deterministic, dependency-free — great
-for tests/offline), and `dummy`. Instances are cached per `(provider, kwargs)`,
-so requesting the same configuration returns the same object.
+Providers: `ollama`, `openai`, `azure_openai`, `hash` (deterministic,
+dependency-free — great for tests/offline), and `dummy`. Instances are cached
+per `(provider, kwargs)`, so requesting the same configuration returns the
+same object.
 
 ## Programmatic registration
 

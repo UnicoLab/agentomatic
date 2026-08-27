@@ -15,8 +15,8 @@ from agentomatic._version import __version__
 from agentomatic.cli.commands import cli
 from agentomatic.cli.templates import TEMPLATES
 from agentomatic.core.platform import AgentPlatform
-from agentomatic.core.router_factory import AgentInvokeResponse
-from agentomatic.tasks.models import TaskProgress, TaskRecord
+from agentomatic.core.router_factory import AgentChatRequest, AgentInvokeResponse, FeedbackRequest
+from agentomatic.tasks.models import TargetType, TaskProgress, TaskRecord
 
 REPO = Path(__file__).parents[1]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -156,6 +156,147 @@ def test_frontend_guide_tracks_response_and_task_models() -> None:
         0
     )
     assert "`/api/v1/ingestors`" in guide
+
+
+def test_api_reference_tracks_the_standard_invoke_response_model() -> None:
+    """The platform API page must not omit response fields added to the envelope."""
+    api_reference = _doc("docs/architecture/api-reference.md")
+
+    response_section = api_reference.split("**Response Body — `AgentInvokeResponse`:**", 1)[
+        1
+    ].split("**Response Example:**", 1)[0]
+    for field in AgentInvokeResponse.model_fields:
+        assert f"`{field}`" in response_section
+
+
+def test_frontend_guide_tracks_the_feedback_request_model() -> None:
+    """Feedback can be a rating, correction, comment, or thumbs signal."""
+    frontend = _doc("docs/FRONTEND_API_GUIDE.md")
+    feedback_section = frontend.split("interface FeedbackPayload {", 1)[1].split("}", 1)[0]
+
+    for field in FeedbackRequest.model_fields:
+        assert re.search(rf"\b{field}\s*\??:", feedback_section), field
+
+
+def test_provider_guide_tracks_supported_llm_and_embedding_factories() -> None:
+    """Provider documentation must use the exact public factory vocabulary."""
+    providers = _doc("docs/guide/llm-providers.md")
+
+    for provider in ("ollama", "openai", "openai_compatible", "azure", "vertex", "dummy"):
+        assert f"`{provider}`" in providers
+    for provider in ("ollama", "openai", "azure_openai", "hash", "dummy"):
+        assert f"`{provider}`" in providers
+
+    assert 'provider="vertex",\n        model="gemini-1.5-pro"' in providers
+    assert 'model_name="gemini-1.5-pro"' not in providers
+    assert "POST /api/v1/{agent}/invoke/stream" in providers
+    assert '"input": "Explain quantum computing"' not in providers
+
+
+def test_task_guide_tracks_public_task_enums() -> None:
+    """The TaskRecord reference must expose every routable kind and real mode."""
+    task_record_section = _doc("docs/guide/tasks.md").split("### TaskRecord", maxsplit=1)[1]
+
+    for target_type in TargetType:
+        assert f"`{target_type.value}`" in task_record_section
+    for mode in ("sync", "async", "batch"):
+        assert f"`{mode}`" in task_record_section
+    assert "`stream`" not in task_record_section
+
+
+def test_getting_started_uses_the_actual_chat_and_sqlite_contracts() -> None:
+    """Copy-paste onboarding examples must use the chat model and async SQL URL."""
+    concepts = _doc("docs/getting-started/concepts.md")
+    quickstart = _doc("docs/getting-started/quickstart.md")
+    first_agent = _doc("docs/getting-started/first-agent.md")
+
+    assert '"content": "Tell me more about that last point."' in concepts
+    assert "/api/v1/search_bot/chat" in concepts
+    assert '"query": "My name is Alice"' not in quickstart
+    assert '"content": "My name is Alice"' in quickstart
+    assert '"content": "What is my name?"' in quickstart
+    assert "sqlite+aiosqlite:///./data/agents.db" in first_agent
+    assert 'SQLAlchemyStore("sqlite:///./data/agents.db")' not in first_agent
+    assert "content" in AgentChatRequest.model_fields
+
+
+def test_storage_guide_does_not_describe_a_partial_schema_as_complete() -> None:
+    """The five displayed tables intentionally cover state, not every SQL table."""
+    storage = _doc("docs/guide/storage.md")
+
+    assert "conversation and execution-state" in storage
+    assert "invocation logs, analyses, and optimization" in storage
+    assert "data model consists of **five**" not in storage
+
+
+def test_architecture_and_status_docs_track_public_platform_contracts() -> None:
+    """Avoid documenting removed constructor options or omitting status resources."""
+    architecture = _doc("docs/architecture/overview.md")
+    status = _doc("docs/guide/status.md")
+
+    assert "enable_chainlit=True" not in architecture
+    assert "app = platform.build()" in architecture
+    assert '"connections": { "total": 2, "healthy": 2 }' in status
+    assert "including a configured\nconnection" in status
+
+
+def test_schema_and_security_examples_follow_state_and_edge_configuration() -> None:
+    """Keep security commands on the deployment surface and custom schema fields usable."""
+    schemas = _doc("docs/guide/schemas.md")
+    middleware = _doc("docs/guide/middleware.md")
+    security = _doc("docs/guide/security.md")
+
+    assert 'location = state["location"]' in schemas
+    assert 'state.get("metadata", {}).get("location")' not in schemas
+    assert "AGENTOMATIC_ENABLE_AUTH=1" in security
+    assert "FEATURES__ENABLE_AUTH=true" not in security
+    assert "AGENTOMATIC_ENABLE_RATE_LIMIT=1" in security
+    assert "trust_proxy_headers" in middleware
+    assert "custom middleware is outermost" in middleware
+
+
+def test_architecture_and_ingestion_guides_expose_real_routes() -> None:
+    """Prevent removed app/chat aliases and task companions from drifting."""
+    architecture = _doc("docs/architecture/overview.md")
+    concepts = _doc("docs/getting-started/concepts.md")
+    ingestion = _doc("docs/guide/ingestion.md")
+    middleware = _doc("docs/guide/middleware.md")
+
+    assert "platform.app" not in architecture
+    assert "/chat/stream" not in concepts
+    assert "POST /api/v1/ingestion/{name}/run/batch" in ingestion
+    assert "`azure_openai`" in ingestion
+    assert "(`/invoke/stream`)" in middleware
+
+
+def test_langgraph_and_telemetry_guides_match_the_shipped_instrumentation() -> None:
+    """The docs must not promise a removed ASGI attribute or automatic domain spans."""
+    langgraph = _doc("docs/guide/langgraph.md")
+    telemetry = _doc("docs/guide/telemetry.md")
+
+    assert "platform.app" not in langgraph
+    assert "uvicorn main:app --reload" in langgraph
+    assert "Add `@traced`" in telemetry
+    assert "automatically generates spans for every phase" not in telemetry
+    assert "AGENTOMATIC_OTEL_CONSOLE=1" in telemetry
+
+
+def test_chainlit_guide_only_promises_the_bundled_debug_ui_contract() -> None:
+    """The shipped chat target is synchronous, stateless, and not an auth proxy."""
+    debug_ui = _doc("docs/guide/debug-ui.md")
+
+    assert "does not\n    forward an API key" in debug_ui
+    assert "not stream `/invoke/stream`" in debug_ui
+    assert "does not submit feedback" in debug_ui
+    assert "Prompt Version Selector" not in debug_ui
+
+
+def test_delegation_guide_does_not_claim_tool_creation_is_authorization() -> None:
+    """A target list discovers handoffs; authorization is a separate policy check."""
+    delegation = _doc("docs/guide/delegation.md")
+
+    assert "ZeroTrustEnforcer blocks any delegation not in this list" not in delegation
+    assert "Pair this with an AgentSecurityPolicy" in delegation
 
 
 def test_deployment_guide_matches_root_compose_contract() -> None:

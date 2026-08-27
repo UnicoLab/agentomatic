@@ -217,7 +217,7 @@ Enable persistent chat by adding a storage backend:
 from agentomatic import AgentPlatform
 from agentomatic.storage import SQLAlchemyStore
 
-store = SQLAlchemyStore("sqlite:///./data/agents.db")
+store = SQLAlchemyStore("sqlite+aiosqlite:///./data/agents.db")
 
 platform = AgentPlatform.from_folder(
     "agents/",
