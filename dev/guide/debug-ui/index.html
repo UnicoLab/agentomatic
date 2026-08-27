@@ -2005,43 +2005,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#prompt-version-selector" class="md-nav__link">
+  <a href="#invocation-inspection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt Version Selector
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#token-by-token-streaming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Token-by-Token Streaming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tool-call-visualizations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tool Call Visualizations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chain-of-thought-reasoning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Chain-of-Thought &amp; Reasoning
+        Invocation inspection
       
     </span>
   </a>
@@ -2053,17 +2020,6 @@
     <span class="md-ellipsis">
       
         Citations &amp; Sources
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-feedback-collection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User Feedback Collection
       
     </span>
   </a>
@@ -2580,43 +2536,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#prompt-version-selector" class="md-nav__link">
+  <a href="#invocation-inspection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt Version Selector
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#token-by-token-streaming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Token-by-Token Streaming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tool-call-visualizations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tool Call Visualizations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chain-of-thought-reasoning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Chain-of-Thought &amp; Reasoning
+        Invocation inspection
       
     </span>
   </a>
@@ -2628,17 +2551,6 @@
     <span class="md-ellipsis">
       
         Citations &amp; Sources
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#user-feedback-collection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        User Feedback Collection
       
     </span>
   </a>
@@ -2804,7 +2716,10 @@
 
 
 <h1 id="chat-interface-chainlit">Chat Interface (Chainlit)<a class="headerlink" href="#chat-interface-chainlit" title="Permanent link">&para;</a></h1>
-<p>Agentomatic includes a built-in ChatGPT-like conversational interface powered by <strong>Chainlit</strong>. It provides an interactive chat playground to test agent responses, compare prompt versions, inspect tool calls, and collect user feedback — without writing any frontend code.</p>
+<p>Agentomatic includes a built-in Chainlit <strong>debug chat</strong>. It lets an operator
+select a deployed agent, send a synchronous invoke request, and inspect the
+returned response, execution-step labels, citations, and suggestions — without
+writing a frontend.</p>
 <div class="admonition info">
 <p class="admonition-title">Chat UI vs Agentomatic Studio</p>
 <p>Agentomatic offers <strong>two</strong> debug interfaces for different workflows:</p>
@@ -2834,7 +2749,7 @@
 </tr>
 <tr>
 <td><strong>Best for</strong></td>
-<td>Testing agent responses, prompt A/B testing, user feedback</td>
+<td>Quick local response checks</td>
 <td>Graph visualization, state inspection, time-travel, breakpoints</td>
 </tr>
 <tr>
@@ -2860,7 +2775,9 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="embedded-mode-recommended" name="__tabbed_1" type="radio" /><input id="standalone-mode" name="__tabbed_1" type="radio" /><input id="combined-with-studio" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="embedded-mode-recommended">Embedded Mode (Recommended)</label><label for="standalone-mode">Standalone Mode</label><label for="combined-with-studio">Combined with Studio</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>Mounts the Chainlit interface directly into your FastAPI application. API requests and chat sessions share the same persistence backend and middleware stack.</p>
+<p>Mounts the Chainlit interface into the FastAPI application. The debug chat
+invokes the platform's normal <code>/invoke</code> API, so that API request follows
+the platform middleware.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--with-ui
 </span></code></pre></div>
 <ul>
@@ -2898,70 +2815,58 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--with-ui<span class="w"> </span>--reload
 </span></code></pre></div></p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Local debug surface, not an authenticated operator console</p>
+<p>The bundled UI currently sends plain <code>/invoke</code> requests and does not
+forward an API key, JWT, browser identity, or a conversation <code>thread_id</code>.
+It is intended for a local or otherwise trusted debugging setup. For a
+production frontend, use the documented REST/Studio APIs and your own
+authentication and session handling.</p>
+</div>
 <hr />
 <h2 id="interface-features">Interface Features<a class="headerlink" href="#interface-features" title="Permanent link">&para;</a></h2>
 <h3 id="agent-selector"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5"/></svg></span> Agent Selector<a class="headerlink" href="#agent-selector" title="Permanent link">&para;</a></h3>
-<p>A top-navigation dropdown lists all registered agents discovered by the platform registry. Select an agent to dynamically load its input form, configuration, and documentation.</p>
-<h3 id="prompt-version-selector"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.5 7A1.5 1.5 0 0 1 4 5.5 1.5 1.5 0 0 1 5.5 4 1.5 1.5 0 0 1 7 5.5 1.5 1.5 0 0 1 5.5 7m15.91 4.58-9-9C12.05 2.22 11.55 2 11 2H4c-1.11 0-2 .89-2 2v7c0 .55.22 1.05.59 1.41l8.99 9c.37.36.87.59 1.42.59s1.05-.23 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.56-.23-1.06-.59-1.42"/></svg></span> Prompt Version Selector<a class="headerlink" href="#prompt-version-selector" title="Permanent link">&para;</a></h3>
-<p>Inspect and switch between prompt versions (e.g., <code>v1</code>, <code>v2</code>, <code>v1_formal</code>) on the fly. Chat queries execute against the selected version, enabling manual A/B comparison of prompt behaviors.</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// agents/my_agent/prompts.json</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p">{</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">&quot;v1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">&quot;system&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a concise assistant.&quot;</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">&quot;user_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Query: {query}&quot;</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">&quot;v2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="nt">&quot;system&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;You are a creative, detailed assistant.&quot;</span><span class="p">,</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">&quot;user_template&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Please elaborate on: {query}&quot;</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">}</span>
-</span></code></pre></div>
-<h3 id="token-by-token-streaming"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33m0-6h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2V6h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0C17.22 5.53 18.61 6 20 6m0 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33"/></svg></span> Token-by-Token Streaming<a class="headerlink" href="#token-by-token-streaming" title="Permanent link">&para;</a></h3>
-<p>If your agent supports streaming (via SSE), response completions stream onto the screen in real-time, matching the experience of ChatGPT and similar interfaces.</p>
-<h3 id="tool-call-visualizations"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6zm3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47"/></svg></span> Tool Call Visualizations<a class="headerlink" href="#tool-call-visualizations" title="Permanent link">&para;</a></h3>
-<p>Intermediate agent actions — tool calls, function invocations, retrieval steps — are captured and rendered as clean, expandable panels in the chat flow. Click a panel to inspect the exact input arguments and JSON output returned by the tool.</p>
-<h3 id="chain-of-thought-reasoning"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.33 12.91c.09 1.55-.62 3.04-1.89 3.95l.77 1.49c.23.45.26.98.06 1.45-.19.47-.58.84-1.06 1l-.79.25a1.687 1.687 0 0 1-1.86-.55L14.44 18c-.89-.15-1.73-.53-2.44-1.1-.5.15-1 .23-1.5.23-.88 0-1.76-.27-2.5-.79-.53.16-1.07.23-1.62.22-.79.01-1.57-.15-2.3-.45a4.1 4.1 0 0 1-2.43-3.61c-.08-.72.04-1.45.35-2.11-.29-.75-.32-1.57-.07-2.33C2.3 7.11 3 6.32 3.87 5.82c.58-1.69 2.21-2.82 4-2.7 1.6-1.5 4.05-1.66 5.83-.37.42-.11.86-.17 1.3-.17 1.36-.03 2.65.57 3.5 1.64 2.04.53 3.5 2.35 3.58 4.47.05 1.11-.25 2.2-.86 3.13.07.36.11.72.11 1.09m-5-1.41c.57.07 1.02.5 1.02 1.07a1 1 0 0 1-1 1h-.63c-.32.9-.88 1.69-1.62 2.29.25.09.51.14.77.21 5.13-.07 4.53-3.2 4.53-3.25a2.59 2.59 0 0 0-2.69-2.49 1 1 0 0 1-1-1 1 1 0 0 1 1-1c1.23.03 2.41.49 3.33 1.3.05-.29.08-.59.08-.89-.06-1.24-.62-2.32-2.87-2.53-1.25-2.96-4.4-1.32-4.4-.4-.03.23.21.72.25.75a1 1 0 0 1 1 1c0 .55-.45 1-1 1-.53-.02-1.03-.22-1.43-.56-.48.31-1.03.5-1.6.56-.57.05-1.04-.35-1.07-.9a.97.97 0 0 1 .88-1.1c.16-.02.94-.14.94-.77 0-.66.25-1.29.68-1.79-.92-.25-1.91.08-2.91 1.29C6.75 5 6 5.25 5.45 7.2 4.5 7.67 4 8 3.78 9c1.08-.22 2.19-.13 3.22.25.5.19.78.75.59 1.29-.19.52-.77.78-1.29.59-.73-.32-1.55-.34-2.3-.06-.32.27-.32.83-.32 1.27 0 .74.37 1.43 1 1.83.53.27 1.12.41 1.71.4q-.225-.39-.39-.81a1.038 1.038 0 0 1 1.96-.68c.4 1.14 1.42 1.92 2.62 2.05 1.37-.07 2.59-.88 3.19-2.13.23-1.38 1.34-1.5 2.56-1.5m2 7.47-.62-1.3-.71.16 1 1.25zm-4.65-8.61a1 1 0 0 0-.91-1.03c-.71-.04-1.4.2-1.93.67-.57.58-.87 1.38-.84 2.19a1 1 0 0 0 1 1c.57 0 1-.45 1-1 0-.27.07-.54.23-.76.12-.1.27-.15.43-.15.55.03 1.02-.38 1.02-.92"/></svg></span> Chain-of-Thought &amp; Reasoning<a class="headerlink" href="#chain-of-thought-reasoning" title="Permanent link">&para;</a></h3>
-<p>If your agent returns reasoning or step-by-step logs, the UI highlights these in collapsible cards showing the agent's thought process before the final answer.</p>
+<p>A Chainlit settings selector lists agents returned by the platform registry.
+Select an agent to send subsequent messages to that agent's <code>/invoke</code> route.</p>
+<h3 id="invocation-inspection"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6zm3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47"/></svg></span> Invocation inspection<a class="headerlink" href="#invocation-inspection" title="Permanent link">&para;</a></h3>
+<p>Each message creates an expandable Chainlit step containing the <code>/invoke</code>
+payload and complete JSON response. If the response contains <code>steps_taken</code>,
+the UI displays those agent-supplied execution labels in a second step. It does
+not stream <code>/invoke/stream</code>, inspect provider tool calls independently, or
+infer hidden chain-of-thought.</p>
 <h3 id="citations-sources"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 21.5c-1.35-.85-3.8-1.5-5.5-1.5-1.65 0-3.35.3-4.75 1.05-.1.05-.15.05-.25.05-.25 0-.5-.25-.5-.5V6c.6-.45 1.25-.75 2-1 1.11-.35 2.33-.5 3.5-.5 1.95 0 4.05.4 5.5 1.5 1.45-1.1 3.55-1.5 5.5-1.5 1.17 0 2.39.15 3.5.5.75.25 1.4.55 2 1v14.6c0 .25-.25.5-.5.5-.1 0-.15 0-.25-.05-1.4-.75-3.1-1.05-4.75-1.05-1.7 0-4.15.65-5.5 1.5M12 8v11.5c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5V7c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5m1 3.5c1.11-.68 2.6-1 4.5-1 .91 0 1.76.09 2.5.28V9.23c-.87-.15-1.71-.23-2.5-.23q-2.655 0-4.5.84zm4.5.17c-1.71 0-3.21.26-4.5.79v1.69c1.11-.65 2.6-.99 4.5-.99 1.04 0 1.88.08 2.5.24v-1.5c-.87-.16-1.71-.23-2.5-.23m2.5 2.9c-.87-.16-1.71-.24-2.5-.24-1.83 0-3.33.27-4.5.8v1.69c1.11-.66 2.6-.99 4.5-.99 1.04 0 1.88.08 2.5.24z"/></svg></span> Citations &amp; Sources<a class="headerlink" href="#citations-sources" title="Permanent link">&para;</a></h3>
-<p>Citations returned by RAG pipelines are rendered as clickable badges at the bottom of messages, referencing PDFs, web links, or documentation files.</p>
-<h3 id="user-feedback-collection"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23 10a2 2 0 0 0-2-2h-6.32l.96-4.57c.02-.1.03-.21.03-.32 0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.58C7.22 7.95 7 8.45 7 9v10a2 2 0 0 0 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73zM1 21h4V9H1z"/></svg></span> User Feedback Collection<a class="headerlink" href="#user-feedback-collection" title="Permanent link">&para;</a></h3>
-<p>Every response includes thumbs-up and thumbs-down icons. Users can submit rating scores and commentary directly from the UI. Feedback is:</p>
-<ul>
-<li>Immediately saved to the platform's database (SQL or Memory)</li>
-<li>Available via the <code>/api/v1/{agent}/feedback</code> endpoint</li>
-<li>Exportable as training data for prompt optimization</li>
-</ul>
-<div class="admonition note">
-<p class="admonition-title">Feedback-driven optimization</p>
-<p>Feedback collected through the Chat UI can be exported and used as evaluation datasets for the <a href="../optimization/">Prompt Optimization</a> pipeline:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>my_agent<span class="w"> </span>--dataset<span class="w"> </span>feedback_export.jsonl<span class="w"> </span>--metrics<span class="w"> </span>relevancy
-</span></code></pre></div></p>
-</div>
+<p>Citations returned by the agent are displayed as an expandable JSON retrieval
+step. The bundled UI does not submit feedback; use the agent feedback API or a
+production client for that workflow.</p>
 <hr />
 <h2 id="customization">Customization<a class="headerlink" href="#customization" title="Permanent link">&para;</a></h2>
 <h3 id="theme-layout">Theme &amp; Layout<a class="headerlink" href="#theme-layout" title="Permanent link">&para;</a></h3>
-<p>When running <code>agentomatic run --with-ui</code> for the first time, Agentomatic generates a default <code>.chainlit/config.toml</code> file. Customize it to match your brand:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[theme]</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># Custom brand colors</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">primary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#7c3aed&quot;</span><span class="w">          </span><span class="c1"># Deep purple (matches Agentomatic theme)</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#1a202c&quot;</span><span class="w">       </span><span class="c1"># Dark background</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">paper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#2d3748&quot;</span><span class="w">            </span><span class="c1"># Card backgrounds</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">font_family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Inter, sans-serif&quot;</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="k">[UI]</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;My AI Assistant&quot;</span><span class="w">     </span><span class="c1"># Title shown in the header</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="n">show_readme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="w">          </span><span class="c1"># Hide the README panel</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">default_expand_messages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<p>Chainlit controls its own theme and layout files. If your project has a
+<code>.chainlit/config.toml</code>, customize it according to your installed Chainlit
+version; Agentomatic does not generate or manage that file.</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[theme]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># Custom brand colors</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">primary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#7c3aed&quot;</span><span class="w">          </span><span class="c1"># Deep purple (matches Agentomatic theme)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#1a202c&quot;</span><span class="w">       </span><span class="c1"># Dark background</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">paper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;#2d3748&quot;</span><span class="w">            </span><span class="c1"># Card backgrounds</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">font_family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Inter, sans-serif&quot;</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">[UI]</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;My AI Assistant&quot;</span><span class="w">     </span><span class="c1"># Title shown in the header</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">show_readme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="w">          </span><span class="c1"># Hide the README panel</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">default_expand_messages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </span></code></pre></div>
 <h3 id="custom-welcome-message">Custom Welcome Message<a class="headerlink" href="#custom-welcome-message" title="Permanent link">&para;</a></h3>
-<p>Edit the <code>.chainlit/README.md</code> file to customize the welcome screen shown when users open a new session:</p>
-<div class="language-markdown highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gh"># Welcome to My Agent Platform 🚀</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>Select an agent from the dropdown above and start chatting.
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="gs">**Available agents:**</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Support Bot**</span> — Answer customer questions
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Code Assistant**</span> — Help with programming tasks
+<p>The bundled debug chat sends its welcome message from
+<code>agentomatic.ui.chat</code>; customize that module or provide a dedicated Chainlit
+application when you need branded copy and behavior.</p>
+<div class="language-markdown highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="gh"># Welcome to My Agent Platform 🚀</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>Select an agent from the dropdown above and start chatting.
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="gs">**Available agents:**</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Support Bot**</span> — Answer customer questions
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">-</span><span class="w"> </span><span class="gs">**Code Assistant**</span> — Help with programming tasks
 </span></code></pre></div>
 <h3 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h3>
 <table>
@@ -2988,14 +2893,14 @@
 <hr />
 <h2 id="programmatic-integration">Programmatic Integration<a class="headerlink" href="#programmatic-integration" title="Permanent link">&para;</a></h2>
 <p>You can also mount the Chat UI programmatically from Python:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Mount Chainlit UI</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.ui</span><span class="w"> </span><span class="kn">import</span> <span class="n">mount</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">mount</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>  <span class="c1"># Chat UI available at /chat</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span><span class="s2">&quot;agents/&quot;</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># Mount Chainlit UI</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.ui</span><span class="w"> </span><span class="kn">import</span> <span class="n">mount</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">mount</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>  <span class="c1"># Chat UI available at /chat</span>
 </span></code></pre></div>
 <hr />
 <h2 id="when-to-use-chat-ui-vs-studio">When to Use Chat UI vs Studio<a class="headerlink" href="#when-to-use-chat-ui-vs-studio" title="Permanent link">&para;</a></h2>
@@ -3015,13 +2920,13 @@
 </tr>
 <tr>
 <td>Comparing prompt versions side-by-side</td>
-<td style="text-align: center;">✅</td>
 <td style="text-align: center;"></td>
+<td style="text-align: center;">✅ (use a run payload)</td>
 </tr>
 <tr>
 <td>Collecting user feedback</td>
-<td style="text-align: center;">✅</td>
 <td style="text-align: center;"></td>
+<td style="text-align: center;">✅ (use the agent feedback API)</td>
 </tr>
 <tr>
 <td>Demonstrating agents to stakeholders</td>

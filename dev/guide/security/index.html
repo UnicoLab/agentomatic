@@ -2993,8 +2993,8 @@ request via an HTTP header or query parameter.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="environment-variables" name="__tabbed_1" type="radio" /><input id="python" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="environment-variables">Environment Variables</label><label for="python">Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">FEATURES__ENABLE_AUTH</span><span class="o">=</span><span class="nb">true</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AUTH__API_KEY</span><span class="o">=</span><span class="s2">&quot;your-secret-api-key&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_ENABLE_AUTH</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_API_KEY</span><span class="o">=</span><span class="s2">&quot;your-secret-api-key&quot;</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -3352,7 +3352,7 @@ your SIEM for real-time alerting on denied events.</p>
 <p>Agentomatic includes a sliding-window rate limiter that operates <strong>per
 client IP</strong>.</p>
 <h3 id="enabling-rate-limiting">Enabling Rate Limiting<a class="headerlink" href="#enabling-rate-limiting" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">FEATURES__ENABLE_RATE_LIMIT</span><span class="o">=</span><span class="nb">true</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_ENABLE_RATE_LIMIT</span><span class="o">=</span><span class="m">1</span>
 </span></code></pre></div>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.middleware.rate_limit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimitMiddleware</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
@@ -3363,12 +3363,9 @@ client IP</strong>.</p>
 </span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="client-identification">Client Identification<a class="headerlink" href="#client-identification" title="Permanent link">&para;</a></h3>
-<p>The middleware resolves the client IP using:</p>
-<ol>
-<li>The <strong><code>X-Forwarded-For</code></strong> header (first entry), when behind a reverse
-   proxy.</li>
-<li>Falls back to <strong><code>request.client.host</code></strong> otherwise.</li>
-</ol>
+<p>The middleware uses <code>request.client.host</code> by default. Set
+<code>rate_limit_trust_proxy_headers=True</code> only behind a trusted proxy that
+overwrites <code>X-Forwarded-For</code>; it then uses the first forwarded address.</p>
 <h3 id="response-headers">Response Headers<a class="headerlink" href="#response-headers" title="Permanent link">&para;</a></h3>
 <p>Every response includes rate-limit metadata:</p>
 <table>
@@ -3413,7 +3410,7 @@ FastAPI's built-in <code>CORSMiddleware</code>.</p>
 <tbody>
 <tr>
 <td><code>allow_credentials</code></td>
-<td><code>True</code></td>
+<td><code>False</code> for the default <code>['*']</code> origins; <code>True</code> when explicit origins are configured</td>
 </tr>
 <tr>
 <td><code>allow_methods</code></td>
@@ -3455,7 +3452,7 @@ serialisation.</p>
 <div class="admonition danger">
 <p class="admonition-title">Keep secrets out of source control</p>
 <ul>
-<li>Store all secrets (<code>AUTH__API_KEY</code>, database URIs, LLM provider keys)
+<li>Store all secrets (<code>AGENTOMATIC_API_KEY</code>, database URIs, LLM provider keys)
   in a <strong><code>.env</code></strong> file or a secrets manager — never commit them to Git.</li>
 <li>Ensure <strong><code>.env</code></strong> is listed in your <strong><code>.gitignore</code></strong>.</li>
 <li>Use <code>env_vars_whitelist</code> in <code>AgentSecurityPolicy</code> to restrict which
@@ -3468,11 +3465,11 @@ serialisation.</p>
 <div class="admonition danger">
 <p class="admonition-title">Review before deploying to production</p>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>API Key Auth</strong> enabled (<code>FEATURES__ENABLE_AUTH=true</code>)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>API Key Auth</strong> enabled (<code>AGENTOMATIC_ENABLE_AUTH=1</code>)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>JWT validation</strong> enabled with a real <code>jwks_url</code> — dev-mode
   bypass is disabled</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>CORS origins</strong> restricted to known domains (no <code>["*"]</code>)</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>Rate limiting</strong> enabled (<code>FEATURES__ENABLE_RATE_LIMIT=true</code>)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>Rate limiting</strong> enabled (<code>AGENTOMATIC_ENABLE_RATE_LIMIT=1</code>)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>Secrets</strong> stored in <code>.env</code> or a vault — never in source code</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong><code>allowed_tools</code></strong> set per agent — no agent has unrestricted
   tool access</li>
@@ -3492,7 +3489,7 @@ serialisation.</p>
 <summary>I get 401 even though I'm sending the API key</summary>
 <p>Make sure the key is in the <strong><code>X-API-Key</code></strong> header (case-sensitive) or
 the <code>api_key</code> query parameter.  Confirm that
-<code>FEATURES__ENABLE_AUTH=true</code> <strong>and</strong> <code>AUTH__API_KEY</code> are set in the
+<code>AGENTOMATIC_ENABLE_AUTH=1</code> <strong>and</strong> <code>AGENTOMATIC_API_KEY</code> are set in the
 same environment that the server process reads.</p>
 </details>
 <details class="question">
@@ -3504,9 +3501,9 @@ degrades gracefully and logs a warning.  Install the dependency:
 </details>
 <details class="question">
 <summary>Rate limiter counts are wrong behind a load balancer</summary>
-<p>The middleware reads <code>X-Forwarded-For</code> to identify clients.  Ensure
-your reverse proxy sets this header correctly and that only <strong>trusted
-proxies</strong> can override it — otherwise clients can spoof their IP.</p>
+<p>Enable <code>rate_limit_trust_proxy_headers=True</code> only when your reverse proxy
+overwrites <code>X-Forwarded-For</code>; otherwise the limiter intentionally uses the
+direct peer IP so clients cannot spoof their identity.</p>
 </details>
 <hr />
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>

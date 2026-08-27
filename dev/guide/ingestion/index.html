@@ -2647,6 +2647,10 @@ exposes:</p>
 <td>Submit as a background <strong>task</strong>, return a pollable id</td>
 </tr>
 <tr>
+<td><code>POST /api/v1/ingestion/{name}/run/batch</code></td>
+<td>Fan out multiple inputs as one background task</td>
+</tr>
+<tr>
 <td><code>GET /api/v1/ingestion/{name}/info</code></td>
 <td>Ingestor metadata + input schema</td>
 </tr>
@@ -2793,9 +2797,10 @@ existing libraries — you still choose the backend):</p>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">get_embeddings</span><span class="p">(</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;text-embedding-3-small&quot;</span><span class="p">)</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">vectors</span> <span class="o">=</span> <span class="n">emb</span><span class="o">.</span><span class="n">embed_documents</span><span class="p">([</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span> <span class="s2">&quot;world&quot;</span><span class="p">])</span>
 </span></code></pre></div>
-<p>Providers: <code>ollama</code>, <code>openai</code>, <code>hash</code> (deterministic, dependency-free — great
-for tests/offline), and <code>dummy</code>. Instances are cached per <code>(provider, kwargs)</code>,
-so requesting the same configuration returns the same object.</p>
+<p>Providers: <code>ollama</code>, <code>openai</code>, <code>azure_openai</code>, <code>hash</code> (deterministic,
+dependency-free — great for tests/offline), and <code>dummy</code>. Instances are cached
+per <code>(provider, kwargs)</code>, so requesting the same configuration returns the
+same object.</p>
 <h2 id="programmatic-registration">Programmatic registration<a class="headerlink" href="#programmatic-registration" title="Permanent link">&para;</a></h2>
 <p>You can also register an ingestor without a folder:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentPlatform</span>

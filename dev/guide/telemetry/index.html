@@ -2737,7 +2737,10 @@
 <p>Agentomatic provides built-in, production-grade <strong>OpenTelemetry tracing</strong>, <strong>Prometheus metrics</strong>, and <strong>feedback collection</strong> loops. This ensures you can monitor agent behaviors, track latency, audit costs, and capture user corrections to continuously improve your prompts.</p>
 <hr />
 <h2 id="1-opentelemetry-auto-instrumentation">📡 1. OpenTelemetry Auto-Instrumentation<a class="headerlink" href="#1-opentelemetry-auto-instrumentation" title="Permanent link">&para;</a></h2>
-<p>When enabled, Agentomatic auto-instruments the execution stack. It tracks requests, trace spans, database queries, and downstream API calls (e.g. LLM invocations).</p>
+<p>When enabled and the telemetry extra is installed, Agentomatic instruments its
+FastAPI application and <code>httpx</code> clients. This creates standard HTTP server and
+client spans. Add <code>@traced</code> to agent nodes and application helpers when you
+need domain spans for LLM calls, retrieval, database work, or business steps.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">AgentPlatform</span><span class="o">.</span><span class="n">from_folder</span><span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">&quot;agents/&quot;</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">enable_telemetry</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># Enabled by default</span>
@@ -2745,7 +2748,7 @@
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">app</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
 </span></code></pre></div>
 <h3 id="trace-spans-metadata">Trace Spans &amp; Metadata<a class="headerlink" href="#trace-spans-metadata" title="Permanent link">&para;</a></h3>
-<p>Agentomatic automatically generates spans for every phase of execution:</p>
+<p>Use explicit spans for domain-specific execution phases:</p>
 <table>
 <thead>
 <tr>
@@ -2756,24 +2759,19 @@
 </thead>
 <tbody>
 <tr>
-<td><code>agentomatic.agent.invoke</code></td>
-<td><code>agent_name</code>, <code>user_id</code>, <code>thread_id</code>, <code>version</code></td>
-<td>Overall time spent inside the agent execution.</td>
+<td><code>support_agent.query_kb</code></td>
+<td>Application-defined attributes</td>
+<td>Example retrieval span created with <code>@traced</code>.</td>
 </tr>
 <tr>
-<td><code>agentomatic.llm.call</code></td>
-<td><code>provider</code>, <code>model</code>, <code>prompt_tokens</code>, <code>completion_tokens</code></td>
-<td>Time spent executing LLM completions.</td>
+<td>Any <code>@traced("...")</code> name</td>
+<td>Safe function arguments + <code>duration_ms</code></td>
+<td>A domain operation you choose to instrument.</td>
 </tr>
 <tr>
-<td><code>agentomatic.rag.retrieve</code></td>
-<td><code>query</code>, <code>doc_count</code>, <code>latency_ms</code></td>
-<td>Vector database document retrieval span.</td>
-</tr>
-<tr>
-<td><code>http.request</code></td>
-<td><code>http.method</code>, <code>http.status_code</code>, <code>http.target</code></td>
-<td>Client HTTP requests and outgoing requests made via <code>httpx</code>.</td>
+<td>Framework HTTP spans</td>
+<td>Standard HTTP attributes</td>
+<td>Incoming FastAPI and outgoing <code>httpx</code> calls, when their instrumentors are installed.</td>
 </tr>
 </tbody>
 </table>
@@ -2786,7 +2784,9 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_TRACES_SAMPLER_ARG</span><span class="o">=</span><span class="s2">&quot;0.1&quot;</span><span class="w">  </span><span class="c1"># Sample 10% of traces in production</span>
 </span></code></pre></div>
 <blockquote>
-<p>💡 <em>If no OTLP variables are defined, Agentomatic defaults to console logging, dumping trace summaries into standard output for development.</em></p>
+<p>💡 <em>If no OTLP endpoint is defined, spans are recorded but are not exported by
+default. Set <code>AGENTOMATIC_OTEL_CONSOLE=1</code> for local console output, or set an
+OTLP endpoint for a collector.</em></p>
 </blockquote>
 <h3 id="adding-custom-spans-in-agent-code">Adding Custom Spans in Agent Code<a class="headerlink" href="#adding-custom-spans-in-agent-code" title="Permanent link">&para;</a></h3>
 <p>You can instrument custom processing nodes or helper functions in your agent folder (e.g., <code>nodes.py</code> or <code>tools.py</code>) using the <code>@traced</code> decorator:</p>

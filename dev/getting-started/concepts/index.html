@@ -3011,9 +3011,9 @@ You only write one explicitly when using the functional pattern.</p>
 dialogue.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Client-side: continue a conversation</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="s2">&quot;/agents/search_bot/chat&quot;</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="s2">&quot;/api/v1/search_bot/chat&quot;</span><span class="p">,</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">json</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Tell me more about that last point.&quot;</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Tell me more about that last point.&quot;</span><span class="p">,</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="s2">&quot;thread_id&quot;</span><span class="p">:</span> <span class="s2">&quot;abc-123&quot;</span><span class="p">,</span>   <span class="c1"># ← same thread</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="p">},</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">)</span>
@@ -3042,7 +3042,7 @@ startup, imports each agent module, reads its manifest (or introspects the
     C -- yes --&gt; D["Class-Based\nBaseGraphAgent"]
     C -- no --&gt; E{"__init__.py?"}
     E -- yes --&gt; F["Functional\nmanifest + graph_fn"]
-    D --&gt; G["Register\n26 REST Endpoints"]
+    D --&gt; G["Register\nagent route surface"]
     F --&gt; G
 
     style G fill:#e3f2fd,stroke:#1565c0</code></pre>
@@ -3062,8 +3062,8 @@ debugging so you can step through each node's input/output.</p>
 <p>See <a href="../../guide/studio/">Agentomatic Studio</a> for the full guide.</p>
 <hr />
 <h3 id="endpoint"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 7H5a2 2 0 0 0-2 2v8h2v-4h2v4h2V9a2 2 0 0 0-2-2m0 4H5V9h2m7-2h-4v10h2v-4h2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2m0 4h-2V9h2m6 0v6h1v2h-4v-2h1V9h-1V7h4v2Z"/></svg></span> Endpoint<a class="headerlink" href="#endpoint" title="Permanent link">&para;</a></h3>
-<p>One of the <strong>26 auto-generated REST API routes</strong> per agent. Every registered
-agent automatically receives endpoints for:</p>
+<p>One of the <strong>auto-generated REST API routes</strong> per agent. Every registered
+agent automatically receives a route surface that includes:</p>
 <table>
 <thead>
 <tr>
@@ -3078,7 +3078,7 @@ agent automatically receives endpoints for:</p>
 </tr>
 <tr>
 <td><strong>Chat</strong></td>
-<td><code>/chat</code>, <code>/chat/stream</code></td>
+<td><code>/chat</code></td>
 </tr>
 <tr>
 <td><strong>Threads</strong></td>
@@ -3150,7 +3150,7 @@ through the system:</p>
     participant A as Agent
     participant G as Graph Engine
 
-    C-&gt;&gt;F: POST /agents/search_bot/invoke
+    C-&gt;&gt;F: POST /api/v1/search_bot/invoke
     F-&gt;&gt;M: Auth · Rate Limit · CORS
     M-&gt;&gt;R: Route to agent
     R-&gt;&gt;A: agent.invoke(payload)
@@ -3197,7 +3197,8 @@ through the system:</p>
 <hr />
 <h2 id="two-patterns-class-based-vs-functional">⚖️ Two Patterns: Class-Based vs Functional<a class="headerlink" href="#two-patterns-class-based-vs-functional" title="Permanent link">&para;</a></h2>
 <p>Agentomatic supports <strong>two ways</strong> to define agents. Both are fully
-auto-discovered and receive the same 26 REST endpoints.</p>
+auto-discovered and receive the same generated route surface (unless a custom
+router replaces it).</p>
 <h3 id="choosing-a-pattern">Choosing a Pattern<a class="headerlink" href="#choosing-a-pattern" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart TD
     Q["Starting a new agent?"] --&gt; A{"Need typed state,\nML lifecycle, or\nmulti-node graphs?"}
