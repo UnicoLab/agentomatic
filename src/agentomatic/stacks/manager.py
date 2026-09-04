@@ -70,7 +70,11 @@ class LLMStackEntry(BaseModel):
 
     provider: str = Field(
         ...,
-        description="LLM provider: ollama | openai | azure | vertex | google_genai",
+        description=(
+            "LLM provider: ollama | openai | openai_compatible | azure | vertex | "
+            "dummy | any name registered via agentomatic.providers.register_llm_provider "
+            "(e.g. a token-gated internal gateway)"
+        ),
     )
     model: str = Field(..., description="Model identifier")
     temperature: float = Field(0.1, ge=0.0, le=2.0)
@@ -351,7 +355,7 @@ class StackManager:
         env_target = stack.env_file or ".env"
         self.apply_dotenv(env_target)
         for key, value in stack.environment.items():
-            os.environ.setdefault(key, value)
+            os.environ.setdefault(key, self.interpolate_env(value) if isinstance(value, str) else value)
 
         from agentomatic.config.settings import reset_settings
 
@@ -396,6 +400,27 @@ class StackManager:
             elif key == "fallbacks" and isinstance(value, list):
                 data[key] = [self._interpolate_fallback_item(item) for item in value]
         return LLMStackEntry.model_validate(data)
+
+    def get_embedding_config(self) -> EmbeddingStackEntry:
+        """Return the active stack's embedding config, env-interpolated.
+
+        Mirrors :meth:`get_llm_config`: ``provider`` / ``model`` support
+        ``${VAR}`` references so callers always receive concrete values
+        (e.g. ``model: ${SECUREGPT_EMBED_MODEL}``).
+
+        Returns:
+            The :class:`EmbeddingStackEntry` with string fields resolved.
+
+        Raises:
+            ValueError: If no stack is loaded.
+        """
+        if self._active_stack is None:
+            raise ValueError("No stack loaded — call load() first")
+        data = self._active_stack.embedding.model_dump()
+        for key, value in list(data.items()):
+            if isinstance(value, str):
+                data[key] = self.interpolate_env(value)
+        return EmbeddingStackEntry.model_validate(data)
 
     def _interpolate_fallback_item(self, item: Any) -> Any:
         """Interpolate env vars inside a single fallback list item."""

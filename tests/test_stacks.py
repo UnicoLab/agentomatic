@@ -197,6 +197,77 @@ class TestStackManagerLoad:
         assert mgr._active_stack is not None
         assert mgr._active_stack.name == "from-file"
 
+    def test_environment_block_is_env_interpolated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """``environment:`` values with ``${VAR}`` must resolve, not pass through literally."""
+        monkeypatch.setenv("SOURCE_VALUE", "resolved-value")
+        monkeypatch.delenv("TARGET_VAR", raising=False)
+        stack_data = {
+            "name": "env-test",
+            "llm": {"default": {"provider": "openai", "model": "gpt-4o"}},
+            "environment": {"TARGET_VAR": "${SOURCE_VALUE}"},
+        }
+        yaml_file = tmp_path / "env-test.yaml"
+        yaml_file.write_text(yaml.dump(stack_data))
+
+        mgr = StackManager(stacks_dir=tmp_path)
+        mgr.load("env-test")
+
+        assert __import__("os").environ["TARGET_VAR"] == "resolved-value"
+
+    def test_environment_block_does_not_override_existing_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("TARGET_VAR", "already-set")
+        monkeypatch.setenv("SOURCE_VALUE", "resolved-value")
+        stack_data = {
+            "name": "env-test-2",
+            "llm": {"default": {"provider": "openai", "model": "gpt-4o"}},
+            "environment": {"TARGET_VAR": "${SOURCE_VALUE}"},
+        }
+        yaml_file = tmp_path / "env-test-2.yaml"
+        yaml_file.write_text(yaml.dump(stack_data))
+
+        mgr = StackManager(stacks_dir=tmp_path)
+        mgr.load("env-test-2")
+
+        assert __import__("os").environ["TARGET_VAR"] == "already-set"
+
+
+# ---------------------------------------------------------------------------
+# StackManager — get_embedding_config
+# ---------------------------------------------------------------------------
+
+
+class TestGetEmbeddingConfig:
+    """Tests for StackManager.get_embedding_config()."""
+
+    def test_interpolates_provider_and_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("EMBED_MODEL_NAME", "text-embedding-3-large")
+        stack_data = {
+            "name": "embed-test",
+            "llm": {"default": {"provider": "openai", "model": "gpt-4o"}},
+            "embedding": {"provider": "openai", "model": "${EMBED_MODEL_NAME}", "dimension": 3072},
+        }
+        yaml_file = tmp_path / "embed-test.yaml"
+        yaml_file.write_text(yaml.dump(stack_data))
+
+        mgr = StackManager(stacks_dir=tmp_path)
+        mgr.load("embed-test")
+
+        entry = mgr.get_embedding_config()
+        assert entry.model == "text-embedding-3-large"
+        assert entry.provider == "openai"
+        assert entry.dimension == 3072
+
+    def test_no_stack_loaded_raises(self) -> None:
+        mgr = StackManager()
+        with pytest.raises(ValueError, match="No stack loaded"):
+            mgr.get_embedding_config()
+
 
 # ---------------------------------------------------------------------------
 # StackManager — get_llm_config

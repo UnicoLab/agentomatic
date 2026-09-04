@@ -15,6 +15,47 @@ _named_instances: dict[str, Any] = {}
 _failover_count: int = 0
 _llm_lock = threading.Lock()
 
+#: Custom provider builders keyed by lowercase provider name. Populated via
+#: :func:`register_llm_provider` so hosts (or plugins) can add hubs the core
+#: factory doesn't know about (e.g. a token-gated internal gateway) without
+#: forking ``_build_llm``. Checked *before* the built-in providers, so a
+#: registered name may also override a built-in one.
+_LLM_PROVIDERS: dict[str, Any] = {}
+
+
+def register_llm_provider(name: str, builder: Any) -> None:
+    """Register (or override) a custom LLM provider builder.
+
+    Mirrors :func:`agentomatic.providers.embeddings.register_embedding_provider`.
+    Once registered, stack YAML / ``get_llm(provider=name, ...)`` calls build
+    the model through *builder* instead of the built-in provider chain.
+
+    Args:
+        name: Provider identifier (case-insensitive), e.g. ``"securegpt"``.
+        builder: Callable ``(**kwargs) -> llm`` returning any object exposing
+            ``invoke`` / ``ainvoke`` (a LangChain chat model or compatible
+            wrapper). Receives all resolved stack/factory kwargs (``model``,
+            ``api_key``, ``base_url``, ``temperature``, ``extra`` merged in,
+            etc.) — the builder decides which ones it needs.
+
+    Example::
+
+        from agentomatic.providers import register_llm_provider
+
+        def build_securegpt(**kwargs):
+            from myapp.securegpt import SecureGPTChat
+            return SecureGPTChat(**kwargs)
+
+        register_llm_provider("securegpt", build_securegpt)
+        # stacks/*.yaml: llm.default.provider: securegpt
+    """
+    _LLM_PROVIDERS[name.lower()] = builder
+
+
+def registered_llm_providers() -> list[str]:
+    """Return the names of all registered custom LLM providers."""
+    return sorted(_LLM_PROVIDERS)
+
 
 def get_failover_count() -> int:
     """Return the number of LLM failover events recorded."""
@@ -184,8 +225,15 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
       endpoint, plus ``api_version`` and ``deployment_name``.
     * ``vertex`` — Google Vertex AI.
     * ``dummy`` — deterministic fake for tests.
+
+    Any name registered via :func:`register_llm_provider` is tried first,
+    so hosts can add or override providers without touching this function.
     """
     provider = provider.lower()
+
+    custom_builder = _LLM_PROVIDERS.get(provider)
+    if custom_builder is not None:
+        return custom_builder(**kwargs)
 
     if provider == "ollama":
         from langchain_ollama import ChatOllama
@@ -269,7 +317,11 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
         return _build_dummy_llm()
 
     else:
-        raise ValueError(f"Unknown LLM provider: {provider}")
+        raise ValueError(
+            f"Unknown LLM provider: {provider}. Built-in: ollama, azure, openai, "
+            f"openai_compatible, vertex, dummy. Registered: {registered_llm_providers()}. "
+            "Use register_llm_provider(name, builder) to add a custom one."
+        )
 
 
 def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:

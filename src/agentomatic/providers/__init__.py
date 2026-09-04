@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from .auth_token import (
+    OAuth2ClientCredentialsTokenProvider,
+    StaticTokenProvider,
+    TokenProvider,
+)
 from .embeddings import (
     HashEmbedder,
     get_embeddings,
@@ -36,6 +41,8 @@ from .llm import (
     get_structured_llm,
     invoke_with_retry,
     record_failover,
+    register_llm_provider,
+    registered_llm_providers,
     reset_llm,
     set_llm,
 )
@@ -49,14 +56,20 @@ from .message_utils import (
     split_thinking_text,
     strip_thinking_for_json,
 )
+from .retry import DEFAULT_RETRYABLE_EXCEPTIONS, RetryConfig, retry_call
 
 __all__ = [
     "DEFAULT_FALLBACK_ON",
+    "DEFAULT_RETRYABLE_EXCEPTIONS",
     "EmptyLLMResponseError",
     "FallbackLLM",
     "HashEmbedder",
+    "OAuth2ClientCredentialsTokenProvider",
+    "RetryConfig",
     "SplitMessage",
+    "StaticTokenProvider",
     "StructuredOutputFallbackWrapper",
+    "TokenProvider",
     "apply_stack_defaults",
     "astream_with_thinking",
     "attach_thinking_metadata",
@@ -79,10 +92,13 @@ __all__ = [
     "normalize_fallback_on",
     "record_failover",
     "register_embedding_provider",
+    "register_llm_provider",
     "registered_embedding_providers",
+    "registered_llm_providers",
     "repair_json",
     "reset_embeddings",
     "reset_llm",
+    "retry_call",
     "set_llm",
     "should_fallback",
     "split_llm_message",

@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from agentomatic.stacks.manager import (
+    EmbeddingStackEntry,
     LLMFallbackSpec,
     LLMStackEntry,
     StackConfig,
     StackManager,
 )
 
-__all__ = ["LLMFallbackSpec", "LLMStackEntry", "StackConfig", "StackManager"]
+__all__ = [
+    "EmbeddingStackEntry",
+    "LLMFallbackSpec",
+    "LLMStackEntry",
+    "StackConfig",
+    "StackManager",
+]
