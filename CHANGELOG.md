@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v1.12.0 (2026-09-04)
+
+### Bug Fixes
+
+- Preserve pipeline plugin invocation compatibility
+  ([`a865238`](https://github.com/UnicoLab/agentomatic/commit/a865238ef0d89bcfbaa5f881ebd0834a4593482e))
+
+- Restore secure release checks
+  ([`21d3d64`](https://github.com/UnicoLab/agentomatic/commit/21d3d64d0761e308d00489844263f433db1e0942))
+
+### Documentation
+
+- Align guides with current platform contracts
+  ([`e1d40b1`](https://github.com/UnicoLab/agentomatic/commit/e1d40b1a5115bcfd446bff8f255734e5c4b69331))
+
+- Align production guides with current platform
+  ([`feb9e70`](https://github.com/UnicoLab/agentomatic/commit/feb9e708e932bd9f8bb465cf9ecffeef4409e0e4))
+
+- Complete code-aligned documentation audit
+  ([`f8ea416`](https://github.com/UnicoLab/agentomatic/commit/f8ea4163227a364d0f96aef273cb9559c19beb28))
+
+- Complete frontend request contracts
+  ([`cce1194`](https://github.com/UnicoLab/agentomatic/commit/cce1194a2558a3765aef2d60962aebc435dbfb8a))
+
+- Correct deep agent hitl setup
+  ([`ffc3b84`](https://github.com/UnicoLab/agentomatic/commit/ffc3b84abad2c9bb7cb766a78d2cf771889c87a1))
+
+### Features
+
+- Auto-reload plugins after artifact promotion
+  ([`e144116`](https://github.com/UnicoLab/agentomatic/commit/e1441167957669e51d7e030f0d96e29ef2e8654c))
+
+- Harden providers, plugin reload, and release pipeline
+  ([`7668595`](https://github.com/UnicoLab/agentomatic/commit/766859510b04bd8be7c98c410e268c152534a6f6))
+
+- **providers**: Pluggable LLM provider registry, generic OAuth2 token provider, retry/backoff util
+  ([`57d33ac`](https://github.com/UnicoLab/agentomatic/commit/57d33ac0465bc07c39edc3c93d9522a94ef06b36))
+
+### Testing
+
+- Cover every frontend request documentation model
+  ([`bd57877`](https://github.com/UnicoLab/agentomatic/commit/bd578770d93ed4bbaf765507197511b6ae1287eb))
+
+
 ## v1.11.0 (2026-08-26)
 
 ### Features
