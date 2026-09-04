@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/agentomatic-mark.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2798,12 +2798,15 @@ then reload plugins so in-memory weights pick up the new <code>current</code> po
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">load_model</span><span class="p">()</span>
 </span></code></pre></div>
 <p>In-memory plugin weights are <strong>not</strong> refreshed automatically after promote.
-Call reload:</p>
+Call reload. These mutation routes use the platform's API-key/JWT middleware
+when you enable it; do not expose them on an unauthenticated production API:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># All plugins</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/api/v1/plugins/reload
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Single plugin</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/api/v1/plugins/sentiment_analyzer/reload
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-API-Key: </span><span class="nv">$AGENTOMATIC_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>http://127.0.0.1:8000/api/v1/plugins/reload
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Single plugin</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-API-Key: </span><span class="nv">$AGENTOMATIC_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span>http://127.0.0.1:8000/api/v1/plugins/sentiment_analyzer/reload
 </span></code></pre></div>
 <p>Response shape (single plugin):</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
@@ -2830,16 +2833,27 @@ registered plugin once whenever <code>ArtifactRegistry.promote()</code> changes 
 <code>current</code> version. It serializes platform predictions with the reload, so a
 request cannot observe a partly-loaded model. If a plugin load fails, its prior
 in-memory state and readiness stay active; the broken promoted version is
-logged once and is not retried until a new version is promoted. Use the
-authenticated reload endpoint for an explicit retry after repairing an
-artifact.</p>
+logged once and is not retried until a new version is promoted. Promote a new,
+corrected immutable version after a validation failure. Use an authenticated
+manual reload only to retry a transient loading failure against the unchanged
+bundle.</p>
+<p>The rollback guarantee assumes <code>load_model()</code> constructs a replacement model
+and assigns it only after loading and validation succeed. Do not mutate the
+currently serving model object in place. Reload-all is intentionally
+best-effort per plugin: one failed plugin keeps its previous model while other
+plugins may advance, so validate every interdependent model in a bundle before
+promotion.</p>
 <p>This is per process: in a multi-replica deployment every replica needs the
 same mounted artifact root and the flag enabled, or your deploy controller must
 call <code>POST /api/v1/plugins/reload</code> on each replica. The version pointer is the
 change signal, so publish immutable version directories and promote/rollback
 through <code>ArtifactRegistry</code> rather than editing files within the active bundle.</p>
 <h2 id="framework-agnosticism">Framework Agnosticism<a class="headerlink" href="#framework-agnosticism" title="Permanent link">&para;</a></h2>
-<p>Agentomatic has absolutely zero opinion on what you put inside <code>load_model()</code> and <code>predict()</code>. You can run blocking code like <code>sklearn.predict()</code> or async code like HTTP calls to external APIs. Agentomatic uses FastAPI, which automatically manages thread-pooling for synchronous code.</p>
+<p>Agentomatic has no opinion on what model framework you use inside
+<code>load_model()</code> and <code>predict()</code>. Plugin hooks are asynchronous, so CPU-bound or
+blocking calls such as <code>sklearn.predict()</code> must be offloaded explicitly (for
+example with <code>await asyncio.to_thread(model.predict, features)</code>) to avoid
+blocking the server event loop. Native async I/O can be awaited directly.</p>
 
 
 
@@ -2962,7 +2976,7 @@ through <code>ArtifactRegistry</code> rather than editing files within the activ
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.footer", "navigation.path", "search.suggest", "search.highlight", "search.share", "content.tabs.link", "content.code.copy", "content.code.annotate", "content.action.edit", "content.action.view", "content.footnote.tooltips", "content.tooltips", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

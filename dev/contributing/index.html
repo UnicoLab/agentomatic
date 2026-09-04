@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../assets/agentomatic-mark.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2455,6 +2455,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Process
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#license" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2733,6 +2744,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Process
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#license" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2973,6 +2995,28 @@ embed ANSI/line numbers into the subject and break semantic-release. See
 <li>Add a Makefile shortcut if useful</li>
 </ol>
 <hr />
+<h2 id="release-process">Release Process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
+<p>Releases run through the <strong>Release</strong> GitHub Actions workflow; merging to
+<code>main</code> does not itself publish a package.</p>
+<ol>
+<li>Wait for CI on the release-candidate commit to pass.</li>
+<li>Dispatch the Release workflow with <code>DRY_RUN=true</code> and confirm the proposed
+   semantic version.</li>
+<li>Dispatch it with <code>DRY_RUN=false</code>. The workflow re-runs lint, formatting,
+   typing, deterministic tests with coverage, strict docs, dependency audit,
+   and distribution checks before it can create a release.</li>
+<li>Semantic release updates the two version files and inserts generated notes
+   at the <code>&lt;!-- version list --&gt;</code> marker in the root <code>CHANGELOG.md</code>.</li>
+<li>The workflow bundles the released Studio UI, publishes the verified wheel,
+   verifies the GitHub release, and deploys versioned documentation.</li>
+<li>Install the published wheel into staging and run the
+   <a href="../guide/verifying-a-deployment/">deployment verifier</a> before promoting
+   production traffic.</li>
+</ol>
+<p>The repository wrapper in <code>scripts/run_semantic_release.py</code> keeps the release
+tool compatible with the security-patched GitPython pin and aborts if the
+changelog insertion marker is missing.</p>
+<hr />
 <h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
 <p>By contributing, you agree that your contributions will be licensed under the MIT License.</p>
 
@@ -3097,7 +3141,7 @@ embed ANSI/line numbers into the subject and break semantic-release. See
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["announce.dismiss", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.footer", "navigation.path", "search.suggest", "search.highlight", "search.share", "content.tabs.link", "content.code.copy", "content.code.annotate", "content.action.edit", "content.action.view", "content.footnote.tooltips", "content.tooltips", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
