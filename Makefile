@@ -15,17 +15,17 @@ dev: ## Install with ALL dev dependencies
 
 # === Quality ===
 lint: ## Run ruff linter
-	uv run ruff check src/agentomatic/ tests/
+	uv run ruff check src/agentomatic/ tests/ scripts/
 
 audit: ## Fail on known vulnerabilities in the locked dependency set
 	uv run pip-audit --progress-spinner off
 
 format: ## Auto-format code
-	uv run ruff check --fix src/agentomatic/ tests/
-	uv run ruff format src/agentomatic/ tests/
+	uv run ruff check --fix src/agentomatic/ tests/ scripts/
+	uv run ruff format src/agentomatic/ tests/ scripts/
 
 format-check: ## Verify formatting (read-only, for CI)
-	uv run ruff format --check src/agentomatic/ tests/
+	uv run ruff format --check src/agentomatic/ tests/ scripts/
 
 typecheck: ## Run mypy type checking
 	uv run mypy src/agentomatic/ --ignore-missing-imports

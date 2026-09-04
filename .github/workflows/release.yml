@@ -2,8 +2,8 @@
 # Release Workflow — agentomatic
 #
 # Semantic release → Bundle Studio UI → Build + Publish to PyPI → GitHub
-# Release → Deploy docs. The bundle-studio step downloads the latest React
-# UI build from agentomatic-studio releases and places it in
+# Release → Deploy docs. The bundle-studio step downloads the latest published
+# React UI build from agentomatic-studio and places it in
 # src/agentomatic/studio/static/ so `pip install agentomatic[studio]` ships
 # the frontend.
 #
@@ -11,9 +11,6 @@
 # access to the private agentomatic-studio repository.
 # ─────────────────────────────────────────────────────────────────────────────
 name: Release
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 on:
   workflow_dispatch:
@@ -23,23 +20,69 @@ on:
         default: false
         type: boolean
         description: "Run in dry-run mode (no actual release)"
-  # Allow agentomatic-studio to trigger a rebuild after a new UI release
-  repository_dispatch:
-    types: [studio-release]
-
 permissions:
   contents: write
   pages: write
   id-token: write
 
+# Serialize the entire gate + release sequence. Job-only concurrency starts too
+# late: two dispatches could verify the same old SHA and then race to tag it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  # Release independently re-verifies the exact commit it is about to tag.
+  release-gate:
+    name: Release Quality Gate
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'UnicoLab'
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Install complete verification environment
+        run: uv sync --all-extras --group dev --group docs
+
+      - name: Static quality gates
+        run: |
+          make lint
+          make format-check
+          make typecheck
+
+      - name: Deterministic test suite
+        run: >-
+          uv run pytest tests/ -q --cov=agentomatic --cov-report=term
+          -m "not slow and not live" --override-ini="addopts="
+        timeout-minutes: 15
+
+      - name: Documentation and dependency gates
+        run: |
+          make docs-check
+          make audit
+
+      - name: Distribution gate
+        run: |
+          uv build
+          uv run twine check dist/*
+          uv run python scripts/verify_wheel_studio.py dist/*.whl
+
   # ─────────────────────────────────────────────────────────────
   # 1. SEMANTIC RELEASE — Bump version, tag, create GitHub release
   # ─────────────────────────────────────────────────────────────
   semantic-release:
     name: Semantic Release
+    needs: [release-gate]
     runs-on: ubuntu-latest
-    concurrency: release
     if: github.repository_owner == 'UnicoLab'
     outputs:
       new_version: ${{ steps.release.outputs.version }}
@@ -48,24 +91,24 @@ jobs:
     steps:
       - name: Generate App Token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.TECHNICAL_APP_APP_ID }}
           private-key: ${{ secrets.TECHNICAL_APP_PEM }}
           owner: UnicoLab
           repositories: agentomatic,agentomatic-studio
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -109,6 +152,14 @@ jobs:
           mkdir -p .github/recovery
           echo "${{ steps.release.outputs.version }}" > .github/recovery/last_release_version.txt
 
+      - name: Upload recovery metadata
+        if: steps.release.outputs.released == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-recovery-${{ steps.release.outputs.version }}
+          path: .github/recovery/last_release_version.txt
+          retention-days: 30
+
   # ─────────────────────────────────────────────────────────────
   # 2. BUNDLE STUDIO — Download latest Studio UI build from
   #    agentomatic-studio releases and stage for the wheel build.
@@ -122,14 +173,14 @@ jobs:
     steps:
       - name: Generate App Token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.TECHNICAL_APP_APP_ID }}
           private-key: ${{ secrets.TECHNICAL_APP_PEM }}
           owner: UnicoLab
           repositories: agentomatic-studio
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
@@ -176,7 +227,7 @@ jobs:
 
       # Upload as artifact so pypi-publish can access the files
       - name: Upload studio-bundled source
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: source-with-studio
           path: .
@@ -195,16 +246,16 @@ jobs:
     steps:
       # Download the source tree that already has studio files in place
       - name: Download studio-bundled source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: source-with-studio
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Verify studio files are present
         run: |
@@ -246,6 +297,7 @@ jobs:
         with:
           password: ${{ secrets.PYPI_TOKEN }}
           attestations: false
+          skip-existing: true
 
   # ─────────────────────────────────────────────────────────────
   # 4. GITHUB RELEASE — Create GitHub release with assets
@@ -257,7 +309,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: main
@@ -280,17 +332,17 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install docs dependencies
         run: uv sync --group docs

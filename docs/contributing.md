@@ -188,6 +188,31 @@ embed ANSI/line numbers into the subject and break semantic-release. See
 
 ---
 
+## Release Process
+
+Releases run through the **Release** GitHub Actions workflow; merging to
+`main` does not itself publish a package.
+
+1. Wait for CI on the release-candidate commit to pass.
+2. Dispatch the Release workflow with `DRY_RUN=true` and confirm the proposed
+   semantic version.
+3. Dispatch it with `DRY_RUN=false`. The workflow re-runs lint, formatting,
+   typing, deterministic tests with coverage, strict docs, dependency audit,
+   and distribution checks before it can create a release.
+4. Semantic release updates the two version files and inserts generated notes
+   at the `<!-- version list -->` marker in the root `CHANGELOG.md`.
+5. The workflow bundles the released Studio UI, publishes the verified wheel,
+   verifies the GitHub release, and deploys versioned documentation.
+6. Install the published wheel into staging and run the
+   [deployment verifier](guide/verifying-a-deployment.md) before promoting
+   production traffic.
+
+The repository wrapper in `scripts/run_semantic_release.py` keeps the release
+tool compatible with the security-patched GitPython pin and aborts if the
+changelog insertion marker is missing.
+
+---
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.

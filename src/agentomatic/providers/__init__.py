@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from .auth_token import (
+    AsyncTokenProvider,
     OAuth2ClientCredentialsTokenProvider,
     StaticTokenProvider,
     TokenProvider,
+    TokenResponseError,
 )
 from .embeddings import (
     HashEmbedder,
@@ -45,6 +47,7 @@ from .llm import (
     registered_llm_providers,
     reset_llm,
     set_llm,
+    unregister_llm_provider,
 )
 from .message_utils import (
     SplitMessage,
@@ -56,11 +59,12 @@ from .message_utils import (
     split_thinking_text,
     strip_thinking_for_json,
 )
-from .retry import DEFAULT_RETRYABLE_EXCEPTIONS, RetryConfig, retry_call
+from .retry import DEFAULT_RETRYABLE_EXCEPTIONS, RetryConfig, async_retry_call, retry_call
 
 __all__ = [
     "DEFAULT_FALLBACK_ON",
     "DEFAULT_RETRYABLE_EXCEPTIONS",
+    "AsyncTokenProvider",
     "EmptyLLMResponseError",
     "FallbackLLM",
     "HashEmbedder",
@@ -70,8 +74,10 @@ __all__ = [
     "StaticTokenProvider",
     "StructuredOutputFallbackWrapper",
     "TokenProvider",
+    "TokenResponseError",
     "apply_stack_defaults",
     "astream_with_thinking",
+    "async_retry_call",
     "attach_thinking_metadata",
     "extract_json",
     "extract_json_array",
@@ -104,4 +110,5 @@ __all__ = [
     "split_llm_message",
     "split_thinking_text",
     "strip_thinking_for_json",
+    "unregister_llm_provider",
 ]

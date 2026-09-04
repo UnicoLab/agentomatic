@@ -19,27 +19,28 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
+import inspect
+import math
 import random
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 from loguru import logger
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 T = TypeVar("T")
 
 #: Default set of exceptions considered transient/worth retrying.
-DEFAULT_RETRYABLE_EXCEPTIONS: tuple[type[BaseException], ...] = (
+DEFAULT_RETRYABLE_EXCEPTIONS: tuple[type[Exception], ...] = (
     ConnectionError,
     TimeoutError,
     OSError,
 )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RetryConfig:
     """Exponential backoff configuration.
 
@@ -63,20 +64,61 @@ class RetryConfig:
     max_delay: float = 30.0
     multiplier: float = 2.0
     jitter: float = 0.2
-    retryable_exceptions: tuple[type[BaseException], ...] = field(
+    retryable_exceptions: tuple[type[Exception], ...] = field(
         default_factory=lambda: DEFAULT_RETRYABLE_EXCEPTIONS
     )
-    retry_on: Callable[[BaseException], bool] | None = None
+    retry_on: Callable[[Exception], bool] | None = None
+
+    def __post_init__(self) -> None:
+        """Reject invalid policies before the first production request."""
+        if (
+            not isinstance(self.max_attempts, int)
+            or isinstance(self.max_attempts, bool)
+            or self.max_attempts < 1
+        ):
+            raise ValueError("max_attempts must be an integer >= 1")
+        for name, value in (
+            ("base_delay", self.base_delay),
+            ("max_delay", self.max_delay),
+            ("multiplier", self.multiplier),
+            ("jitter", self.jitter),
+        ):
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number")
+        if self.base_delay < 0:
+            raise ValueError("base_delay must be >= 0")
+        if self.max_delay < 0:
+            raise ValueError("max_delay must be >= 0")
+        if self.multiplier < 1:
+            raise ValueError("multiplier must be >= 1")
+        if not 0 <= self.jitter <= 1:
+            raise ValueError("jitter must be between 0 and 1")
+        if not isinstance(self.retryable_exceptions, tuple):
+            raise TypeError("retryable_exceptions must be a tuple of Exception classes")
+        if any(
+            not isinstance(exc_type, type) or not issubclass(exc_type, Exception)
+            for exc_type in self.retryable_exceptions
+        ):
+            raise TypeError("retryable_exceptions must contain only Exception classes")
+        if self.retry_on is not None and not callable(self.retry_on):
+            raise TypeError("retry_on must be callable")
 
     def delay_for(self, attempt: int) -> float:
         """Compute the backoff delay (seconds) before *attempt* (1-indexed retry)."""
-        raw = min(self.base_delay * (self.multiplier ** (attempt - 1)), self.max_delay)
+        if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
+            raise ValueError("attempt must be an integer >= 1")
+        if self.base_delay == 0 or self.max_delay == 0:
+            return 0.0
+        try:
+            raw = min(self.base_delay * (self.multiplier ** (attempt - 1)), self.max_delay)
+        except OverflowError:
+            raw = self.max_delay
         if self.jitter <= 0:
             return raw
         spread = raw * self.jitter
         return max(0.0, raw + random.uniform(-spread, spread))  # noqa: S311 - jitter, not crypto
 
-    def should_retry(self, exc: BaseException) -> bool:
+    def should_retry(self, exc: Exception) -> bool:
         """Decide whether *exc* warrants a retry."""
         if not isinstance(exc, self.retryable_exceptions):
             return False
@@ -89,7 +131,7 @@ def retry_call(
     fn: Callable[[], T],
     *,
     config: RetryConfig | None = None,
-    on_retry: Callable[[int, BaseException, float], None] | None = None,
+    on_retry: Callable[[int, Exception, float], None] | None = None,
 ) -> T:
     """Call ``fn()`` with exponential backoff, retrying on transient errors.
 
@@ -107,13 +149,10 @@ def retry_call(
         immediately if it isn't retryable.
     """
     cfg = config or RetryConfig()
-    last_exc: BaseException | None = None
-
     for attempt in range(1, cfg.max_attempts + 1):
         try:
             return fn()
         except Exception as exc:  # noqa: BLE001 - re-raised below when not retried
-            last_exc = exc
             if attempt >= cfg.max_attempts or not cfg.should_retry(exc):
                 raise
             delay = cfg.delay_for(attempt)
@@ -121,13 +160,60 @@ def retry_call(
                 on_retry(attempt, exc, delay)
             else:
                 logger.debug(
-                    f"retry_call: attempt {attempt}/{cfg.max_attempts} failed "
-                    f"({type(exc).__name__}: {exc}); retrying in {delay:.2f}s"
+                    "retry_call: attempt {}/{} failed ({}); retrying in {:.2f}s",
+                    attempt,
+                    cfg.max_attempts,
+                    type(exc).__name__,
+                    delay,
                 )
             time.sleep(delay)
 
-    # Unreachable in practice (loop always returns or raises), but keeps
-    # type-checkers happy and guards against a zero-attempt misconfiguration.
-    if last_exc is not None:
-        raise last_exc
-    raise RuntimeError("retry_call: max_attempts must be >= 1")
+    raise RuntimeError("retry_call reached an unreachable state")  # pragma: no cover
+
+
+async def async_retry_call(
+    fn: Callable[[], Awaitable[T]],
+    *,
+    config: RetryConfig | None = None,
+    on_retry: Callable[[int, Exception, float], None | Awaitable[None]] | None = None,
+) -> T:
+    """Await ``fn()`` with cancellation-safe exponential backoff.
+
+    ``asyncio.CancelledError`` is deliberately never caught, so task
+    cancellation immediately stops retries and pending sleeps.
+
+    Args:
+        fn: Zero-argument async callable to invoke.
+        config: Retry policy; defaults to :class:`RetryConfig` defaults.
+        on_retry: Optional sync or async hook fired before each sleep.
+
+    Returns:
+        The awaited callable's return value on success.
+
+    Raises:
+        The last exception raised by ``fn`` once attempts are exhausted, or
+        immediately if it is not retryable.
+    """
+    cfg = config or RetryConfig()
+    for attempt in range(1, cfg.max_attempts + 1):
+        try:
+            return await fn()
+        except Exception as exc:  # noqa: BLE001 - re-raised below when not retried
+            if attempt >= cfg.max_attempts or not cfg.should_retry(exc):
+                raise
+            delay = cfg.delay_for(attempt)
+            if on_retry is not None:
+                hook_result = on_retry(attempt, exc, delay)
+                if inspect.isawaitable(hook_result):
+                    await hook_result
+            else:
+                logger.debug(
+                    "async_retry_call: attempt {}/{} failed ({}); retrying in {:.2f}s",
+                    attempt,
+                    cfg.max_attempts,
+                    type(exc).__name__,
+                    delay,
+                )
+            await asyncio.sleep(delay)
+
+    raise RuntimeError("async_retry_call reached an unreachable state")  # pragma: no cover

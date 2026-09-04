@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
@@ -20,10 +21,26 @@ _llm_lock = threading.Lock()
 #: factory doesn't know about (e.g. a token-gated internal gateway) without
 #: forking ``_build_llm``. Checked *before* the built-in providers, so a
 #: registered name may also override a built-in one.
-_LLM_PROVIDERS: dict[str, Any] = {}
+_LLM_PROVIDERS: dict[str, Callable[..., Any]] = {}
+_llm_provider_lock = threading.RLock()
 
 
-def register_llm_provider(name: str, builder: Any) -> None:
+def _llm_provider_key(name: str) -> str:
+    """Normalize and validate a custom provider name."""
+    if not isinstance(name, str):
+        raise TypeError("LLM provider name must be a string")
+    key = name.strip().lower()
+    if not key:
+        raise ValueError("LLM provider name must be a non-empty string")
+    return key
+
+
+def register_llm_provider(
+    name: str,
+    builder: Callable[..., Any],
+    *,
+    overwrite: bool = True,
+) -> None:
     """Register (or override) a custom LLM provider builder.
 
     Mirrors :func:`agentomatic.providers.embeddings.register_embedding_provider`.
@@ -37,6 +54,8 @@ def register_llm_provider(name: str, builder: Any) -> None:
             wrapper). Receives all resolved stack/factory kwargs (``model``,
             ``api_key``, ``base_url``, ``temperature``, ``extra`` merged in,
             etc.) — the builder decides which ones it needs.
+        overwrite: Replace an existing custom builder under the same normalized
+            name. Set to ``False`` to detect accidental duplicate registration.
 
     Example::
 
@@ -49,12 +68,36 @@ def register_llm_provider(name: str, builder: Any) -> None:
         register_llm_provider("securegpt", build_securegpt)
         # stacks/*.yaml: llm.default.provider: securegpt
     """
-    _LLM_PROVIDERS[name.lower()] = builder
+    key = _llm_provider_key(name)
+    if not callable(builder):
+        raise TypeError(f"LLM provider builder for '{key}' must be callable")
+    with _llm_provider_lock:
+        if not overwrite and key in _LLM_PROVIDERS:
+            raise ValueError(f"LLM provider '{key}' is already registered")
+        _LLM_PROVIDERS[key] = builder
+
+
+def unregister_llm_provider(name: str) -> bool:
+    """Remove a custom provider builder.
+
+    Existing cached LLM instances are unaffected; call :func:`reset_llm` when
+    replacing a live provider configuration.
+
+    Args:
+        name: Provider identifier (case-insensitive).
+
+    Returns:
+        ``True`` when a builder was removed, otherwise ``False``.
+    """
+    key = _llm_provider_key(name)
+    with _llm_provider_lock:
+        return _LLM_PROVIDERS.pop(key, None) is not None
 
 
 def registered_llm_providers() -> list[str]:
     """Return the names of all registered custom LLM providers."""
-    return sorted(_LLM_PROVIDERS)
+    with _llm_provider_lock:
+        return sorted(_LLM_PROVIDERS)
 
 
 def get_failover_count() -> int:
@@ -229,9 +272,10 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
     Any name registered via :func:`register_llm_provider` is tried first,
     so hosts can add or override providers without touching this function.
     """
-    provider = provider.lower()
+    provider = _llm_provider_key(provider)
 
-    custom_builder = _LLM_PROVIDERS.get(provider)
+    with _llm_provider_lock:
+        custom_builder = _LLM_PROVIDERS.get(provider)
     if custom_builder is not None:
         return custom_builder(**kwargs)
 

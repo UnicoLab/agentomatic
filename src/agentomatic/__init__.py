@@ -153,7 +153,12 @@ from agentomatic.langchain_adapter import (
     wrap_chain_as_async_node,
     wrap_chain_as_node,
 )
-from agentomatic.providers.embeddings import register_embedding_provider
+from agentomatic.providers import (
+    register_embedding_provider,
+    register_llm_provider,
+    registered_llm_providers,
+    unregister_llm_provider,
+)
 
 # Unified task/execution subsystem (v0.12)
 from agentomatic.tasks import (
@@ -234,6 +239,9 @@ __all__ = [
     "register_vector_store_adapter",
     "register_store_provider",
     "register_embedding_provider",
+    "register_llm_provider",
+    "registered_llm_providers",
+    "unregister_llm_provider",
     # Class-owned graph agents (v0.7)
     "BaseGraphAgent",
     "AgentGraph",

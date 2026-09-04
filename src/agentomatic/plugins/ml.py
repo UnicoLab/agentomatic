@@ -38,11 +38,26 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
     def __init__(self) -> None:
         self._is_loaded = False
         self._loaded_at: str | None = None
+        self._artifact_root: Path | None = None
         # Platform invocation paths and reloads share this lock.  A plugin can
         # contain mutable native-model state, so letting a prediction race a
         # model swap can expose a partially initialised model to production
         # traffic.
         self._operation_lock = asyncio.Lock()
+
+    def _get_operation_lock(self) -> asyncio.Lock:
+        """Return the shared operation lock, creating it for legacy subclasses.
+
+        Older plugins sometimes defined ``__init__`` without calling
+        ``super().__init__()``.  The platform already repairs their readiness
+        state after startup; lazily creating the lock preserves that backwards
+        compatibility now that serving paths synchronize predictions and reloads.
+        """
+        lock = getattr(self, "_operation_lock", None)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._operation_lock = lock
+        return lock
 
     @property
     def is_loaded(self) -> bool:
@@ -114,11 +129,24 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         """Return the active artifact bundle directory, or ``None``.
 
         Convenience for ``load_model`` implementations that read weights from
-        :class:`~agentomatic.artifacts.ArtifactRegistry.current_dir`.
+        :class:`~agentomatic.artifacts.ArtifactRegistry.current_dir`.  A platform
+        configured with an explicit :class:`~agentomatic.config.PlatformSettings`
+        instance injects that instance's ``artifact_root`` before loading plugins.
         """
         from agentomatic.artifacts import ArtifactRegistry
 
-        return ArtifactRegistry().current_dir()
+        return ArtifactRegistry(getattr(self, "_artifact_root", None)).current_dir()
+
+    def set_artifact_root(self, root: str | Path | None) -> None:
+        """Set the artifact registry root used by :meth:`artifact_dir`.
+
+        This is normally called by :class:`~agentomatic.AgentPlatform`; direct
+        plugin users can omit it and keep the environment/settings-based default.
+
+        Args:
+            root: Artifact registry root, or ``None`` to use the default resolver.
+        """
+        self._artifact_root = Path(root) if root is not None else None
 
     async def reload_model(self) -> dict[str, Any]:
         """Reload model weights from the current artifact pointer safely.
@@ -133,7 +161,7 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         Returns:
             Status dict with name, version, loaded flag, loaded_at, model_card.
         """
-        async with self._operation_lock:
+        async with self._get_operation_lock():
             previous_state = self.__dict__.copy()
             try:
                 # A subclass that omits ``super().load_model()`` still gets a
@@ -141,7 +169,10 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
                 self._loaded_at = None
                 await self.load_model()
                 self.mark_loaded()
-            except Exception:
+            except BaseException:
+                # Cancellation is especially important here: a disconnected
+                # manual reload request or lifespan shutdown must not leave a
+                # half-mutated model active in a still-running process.
                 self.__dict__.clear()
                 self.__dict__.update(previous_state)
                 raise
@@ -160,7 +191,7 @@ class BaseMLPlugin(Generic[InputT, OutputT]):
         startup ``load_model`` implementation, so ``invoke`` must remain a
         synchronization primitive rather than changing that contract.
         """
-        async with self._operation_lock:
+        async with self._get_operation_lock():
             return await self.predict(inputs)
 
     def info(self, *, include_model_card: bool = False) -> dict[str, Any]:

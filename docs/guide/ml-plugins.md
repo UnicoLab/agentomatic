@@ -171,14 +171,17 @@ async def load_model(self) -> None:
 ```
 
 In-memory plugin weights are **not** refreshed automatically after promote.
-Call reload:
+Call reload. These mutation routes use the platform's API-key/JWT middleware
+when you enable it; do not expose them on an unauthenticated production API:
 
 ```bash
 # All plugins
-curl -X POST http://127.0.0.1:8000/api/v1/plugins/reload
+curl -X POST -H "X-API-Key: $AGENTOMATIC_API_KEY" \
+  http://127.0.0.1:8000/api/v1/plugins/reload
 
 # Single plugin
-curl -X POST http://127.0.0.1:8000/api/v1/plugins/sentiment_analyzer/reload
+curl -X POST -H "X-API-Key: $AGENTOMATIC_API_KEY" \
+  http://127.0.0.1:8000/api/v1/plugins/sentiment_analyzer/reload
 ```
 
 Response shape (single plugin):
@@ -215,9 +218,17 @@ registered plugin once whenever `ArtifactRegistry.promote()` changes the
 `current` version. It serializes platform predictions with the reload, so a
 request cannot observe a partly-loaded model. If a plugin load fails, its prior
 in-memory state and readiness stay active; the broken promoted version is
-logged once and is not retried until a new version is promoted. Use the
-authenticated reload endpoint for an explicit retry after repairing an
-artifact.
+logged once and is not retried until a new version is promoted. Promote a new,
+corrected immutable version after a validation failure. Use an authenticated
+manual reload only to retry a transient loading failure against the unchanged
+bundle.
+
+The rollback guarantee assumes `load_model()` constructs a replacement model
+and assigns it only after loading and validation succeed. Do not mutate the
+currently serving model object in place. Reload-all is intentionally
+best-effort per plugin: one failed plugin keeps its previous model while other
+plugins may advance, so validate every interdependent model in a bundle before
+promotion.
 
 This is per process: in a multi-replica deployment every replica needs the
 same mounted artifact root and the flag enabled, or your deploy controller must
@@ -227,4 +238,8 @@ through `ArtifactRegistry` rather than editing files within the active bundle.
 
 ## Framework Agnosticism
 
-Agentomatic has absolutely zero opinion on what you put inside `load_model()` and `predict()`. You can run blocking code like `sklearn.predict()` or async code like HTTP calls to external APIs. Agentomatic uses FastAPI, which automatically manages thread-pooling for synchronous code.
+Agentomatic has no opinion on what model framework you use inside
+`load_model()` and `predict()`. Plugin hooks are asynchronous, so CPU-bound or
+blocking calls such as `sklearn.predict()` must be offloaded explicitly (for
+example with `await asyncio.to_thread(model.predict, features)`) to avoid
+blocking the server event loop. Native async I/O can be awaited directly.

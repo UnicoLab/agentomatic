@@ -9,6 +9,46 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Safe plugin artifact auto-reload**: optional polling of the promoted
+  `ArtifactRegistry` version, prediction/reload serialization, failure rollback,
+  cancellation safety, settings-backed artifact roots, and live-route coverage.
+- **Release integrity gates**: release-only scripts are linted, the release
+  workflow re-runs deterministic quality, security, docs, and distribution
+  checks, and semantic release refuses to proceed without its changelog marker.
+- **Code-aligned documentation contracts**: frontend request/response models,
+  CLI flags, provider names, deployment variables, security behavior, and
+  published routes are checked against the implementation.
+- **Hardened provider extension APIs**: thread-safe custom LLM registration and
+  teardown, validated sync/async retry helpers, secure OAuth2 client-credentials
+  token caching, and recursive stack interpolation for custom provider options.
+
+### Fixed
+
+- Pipeline plugin steps keep their historical lightweight-plugin compatibility
+  while sharing the reload synchronization path used by REST and task calls.
+- Release tooling remains compatible with a security-patched GitPython version.
+- The documentation toolchain now requires `mkdocs-material>=9.7.7`, resolving
+  `CVE-2026-73295` found by the release dependency audit.
+- Optimization judges use DeepEval's current `SingleTurnParams` API while
+  retaining compatibility with older supported DeepEval installations.
+- Stack environment blocks now resolve sibling references independent of YAML
+  order and reject cycles instead of exporting partially resolved values.
+- GitHub workflows now use action releases that run natively on Node 24,
+  removing the deprecated Node 20 compatibility override and runner warnings.
+
+## [1.11.0] - 2026-08-26
+
+### Highlights
+
+- Production deployment, auth, error handling, durability, pipeline, Studio,
+  task, and observability hardening landed with an expanded end-to-end verifier.
+- The packaged Studio became self-contained and schema-driven, and the wheel
+  build now verifies that its frontend assets are actually present.
+
+## [1.10.0] - 2026-07-23
+
+### Added
+
 - **ML-style optimize UX** (ported from the Agents inspiration project):
   pluggable callbacks (`EarlyStopping`, `ModelCheckpoint`, `NaNStopping`,
   `TemperatureScheduler`, `PlateauStopping`, `ScoreThreshold`,

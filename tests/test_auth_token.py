@@ -11,6 +11,7 @@ import pytest
 from agentomatic.providers.auth_token import (
     OAuth2ClientCredentialsTokenProvider,
     StaticTokenProvider,
+    TokenResponseError,
 )
 from agentomatic.providers.retry import RetryConfig
 
@@ -21,8 +22,21 @@ def test_static_token_provider_returns_fixed_token():
     assert provider.get_token() == "sk-fixed"
 
 
+@pytest.mark.parametrize("token", ["", "   "])
+def test_static_token_provider_rejects_blank_tokens(token):
+    with pytest.raises(ValueError, match="non-empty"):
+        StaticTokenProvider(token)
+
+
+async def test_static_token_provider_supports_async_callers():
+    provider = StaticTokenProvider("fixed")
+    assert await provider.aget_token() == "fixed"
+
+
 def _response(status_code: int, json_body: dict) -> httpx.Response:
-    return httpx.Response(status_code, json=json_body, request=httpx.Request("POST", "https://x/token"))
+    return httpx.Response(
+        status_code, json=json_body, request=httpx.Request("POST", "https://x/token")
+    )
 
 
 def test_oauth2_fetches_and_caches_token(monkeypatch):
@@ -90,7 +104,7 @@ def test_oauth2_missing_access_token_raises(monkeypatch):
         client_secret="s",
         retry=RetryConfig(max_attempts=1),
     )
-    with pytest.raises(ValueError, match="missing 'access_token'"):
+    with pytest.raises(ValueError, match="missing.*'access_token'"):
         provider.get_token()
 
 
@@ -162,3 +176,154 @@ def test_oauth2_thread_safety_single_fetch(monkeypatch):
     for t in threads:
         t.join()
     assert calls["n"] == 1
+
+
+async def test_oauth2_async_api_uses_the_same_cache(monkeypatch):
+    calls = {"n": 0}
+
+    def fake_post(url, *, data, verify, timeout):
+        calls["n"] += 1
+        return _response(200, {"access_token": "async-token", "expires_in": 3600})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    provider = OAuth2ClientCredentialsTokenProvider(
+        token_url="https://idp.example.com/token",
+        client_id="cid",
+        client_secret="secret",
+    )
+    assert await provider.aget_token() == "async-token"
+    assert provider.get_token() == "async-token"
+    assert calls["n"] == 1
+
+
+def test_oauth2_supports_basic_client_auth_and_custom_token_params(monkeypatch):
+    captured = {}
+
+    def fake_post(url, *, data, verify, timeout, auth):
+        captured.update(data=data, auth=auth)
+        return _response(200, {"access_token": "tok", "expires_in": 3600})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    provider = OAuth2ClientCredentialsTokenProvider(
+        token_url="https://idp.example.com/token",
+        client_id="cid",
+        client_secret="secret",
+        client_auth_method="client_secret_basic",
+        token_params={"audience": "https://api.example.com"},
+    )
+    assert provider.get_token() == "tok"
+    assert captured["data"] == {
+        "grant_type": "client_credentials",
+        "audience": "https://api.example.com",
+    }
+    assert isinstance(captured["auth"], httpx.BasicAuth)
+
+
+@pytest.mark.parametrize("reserved", ["client_id", "client_secret", "grant_type", "scope"])
+def test_oauth2_custom_params_cannot_override_reserved_fields(reserved):
+    with pytest.raises(ValueError, match="cannot override"):
+        OAuth2ClientCredentialsTokenProvider(
+            token_url="https://idp.example.com/token",
+            client_id="cid",
+            client_secret="secret",
+            token_params={reserved: "override"},
+        )
+
+
+def test_oauth2_rejects_insecure_non_loopback_token_url():
+    with pytest.raises(ValueError, match="HTTPS"):
+        OAuth2ClientCredentialsTokenProvider(
+            token_url="http://idp.example.com/token",
+            client_id="cid",
+            client_secret="secret",
+        )
+
+
+def test_oauth2_allows_loopback_http_for_local_development(monkeypatch):
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        lambda *a, **k: _response(200, {"access_token": "local", "expires_in": 60}),
+    )
+    provider = OAuth2ClientCredentialsTokenProvider(
+        token_url="http://127.0.0.1/token",
+        client_id="cid",
+        client_secret="secret",
+    )
+    assert provider.get_token() == "local"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"client_id": ""}, "client_id"),
+        ({"client_secret": ""}, "client_secret"),
+        ({"timeout": 0}, "timeout"),
+        ({"refresh_margin_seconds": -1}, "refresh_margin_seconds"),
+        ({"default_expires_in": float("inf")}, "default_expires_in"),
+        ({"client_auth_method": "private_key_jwt"}, "client_auth_method"),
+    ],
+)
+def test_oauth2_invalid_configuration_fails_fast(kwargs, message):
+    base = {
+        "token_url": "https://idp.example.com/token",
+        "client_id": "cid",
+        "client_secret": "secret",
+    }
+    with pytest.raises(ValueError, match=message):
+        OAuth2ClientCredentialsTokenProvider(**{**base, **kwargs})
+
+
+def test_oauth2_short_lived_token_is_still_cached(monkeypatch):
+    calls = {"n": 0}
+
+    def fake_post(url, *, data, verify, timeout):
+        calls["n"] += 1
+        return _response(200, {"access_token": "short", "expires_in": 10})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    provider = OAuth2ClientCredentialsTokenProvider(
+        token_url="https://idp.example.com/token",
+        client_id="cid",
+        client_secret="secret",
+        refresh_margin_seconds=30,
+    )
+    assert provider.get_token() == "short"
+    assert provider.get_token() == "short"
+    assert calls["n"] == 1
+
+
+@pytest.mark.parametrize("expires_in", [0, -1, "invalid", "inf", None])
+def test_oauth2_rejects_invalid_expiry_without_caching(monkeypatch, expires_in):
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        lambda *a, **k: _response(
+            200,
+            {"access_token": "secret-token", "expires_in": expires_in},
+        ),
+    )
+    provider = OAuth2ClientCredentialsTokenProvider(
+        token_url="https://idp.example.com/token",
+        client_id="cid",
+        client_secret="secret",
+    )
+    with pytest.raises(TokenResponseError, match="expires_in"):
+        provider.get_token()
+
+
+def test_oauth2_invalid_response_errors_never_echo_response_body(monkeypatch):
+    sensitive = "do-not-leak-this-response-value"
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        lambda *a, **k: _response(200, {"error_description": sensitive}),
+    )
+    provider = OAuth2ClientCredentialsTokenProvider(
+        token_url="https://idp.example.com/token",
+        client_id="cid",
+        client_secret="secret",
+    )
+    with pytest.raises(TokenResponseError) as exc_info:
+        provider.get_token()
+    assert sensitive not in str(exc_info.value)

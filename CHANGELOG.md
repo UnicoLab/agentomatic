@@ -1,9 +1,15 @@
 # CHANGELOG
 
+<!-- version list -->
 
-## Unreleased
+## v1.11.0 (2026-08-26)
 
 ### Features
+
+- **Production-ready platform and embedded Studio**: hardened auth and error
+  boundaries, deployable containers, durable storage and task paths, verified
+  pipeline composition, a self-contained schema-driven Studio bundle, and a
+  comprehensive deployment verifier covering all published resource families.
 
 - **Studio schema discovery**: agent input/output schemas now resolve for all
   supported naming conventions (``{Title}Request``/``{Title}Response``,
@@ -14,6 +20,10 @@
   convention) so the UI can badge which contract a run executes against.
 
 ### Bug Fixes
+
+- Fixed release-blocking deployment, distroless startup, provider wiring,
+  pipeline, task, storage, rate-limit, Studio, and API error-handling defects;
+  expanded regression coverage across authenticated and store-backed postures.
 
 - Studio no longer falls back to the generic ``AgentInvokeRequest`` for agents
   that declare ``{Title}Input``/``{Title}Output`` models (e.g. ``alpha``/``beta``),

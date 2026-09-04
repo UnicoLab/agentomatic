@@ -234,6 +234,43 @@ class TestStackManagerLoad:
 
         assert __import__("os").environ["TARGET_VAR"] == "already-set"
 
+    def test_environment_sibling_references_are_declaration_order_independent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STACK_API_URL", raising=False)
+        monkeypatch.delenv("STACK_API_ORIGIN", raising=False)
+        stack_data = {
+            "name": "ordered-env",
+            "environment": {
+                "STACK_API_URL": "${STACK_API_ORIGIN}/v1",
+                "STACK_API_ORIGIN": "https://api.example.com",
+            },
+        }
+        (tmp_path / "ordered-env.yaml").write_text(yaml.dump(stack_data))
+
+        StackManager(stacks_dir=tmp_path).load("ordered-env")
+
+        assert __import__("os").environ["STACK_API_URL"] == "https://api.example.com/v1"
+
+    def test_environment_reference_cycles_fail_fast(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("STACK_CYCLE_A", raising=False)
+        monkeypatch.delenv("STACK_CYCLE_B", raising=False)
+        stack_data = {
+            "name": "cyclic-env",
+            "environment": {
+                "STACK_CYCLE_A": "${STACK_CYCLE_B}",
+                "STACK_CYCLE_B": "${STACK_CYCLE_A}",
+            },
+        }
+        (tmp_path / "cyclic-env.yaml").write_text(yaml.dump(stack_data))
+
+        with pytest.raises(ValueError, match="Cyclic stack environment reference"):
+            StackManager(stacks_dir=tmp_path).load("cyclic-env")
+        assert "STACK_CYCLE_A" not in __import__("os").environ
+        assert "STACK_CYCLE_B" not in __import__("os").environ
+
 
 # ---------------------------------------------------------------------------
 # StackManager — get_embedding_config
@@ -316,6 +353,37 @@ class TestGetLLMConfig:
         with pytest.raises(ValueError, match="No stack loaded"):
             mgr.get_llm_config()
 
+    def test_recursively_interpolates_nested_provider_configuration(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("TENANT", "acme")
+        monkeypatch.setenv("AUDIENCE", "agent-api")
+        stack_data = {
+            "name": "nested-env",
+            "llm": {
+                "default": {
+                    "provider": "custom",
+                    "model": "model",
+                    "extra": {
+                        "oauth": {
+                            "token_url": "https://${TENANT}.example.com/token",
+                            "params": {"audience": "${AUDIENCE}"},
+                        },
+                        "headers": ["X-Tenant=${TENANT}"],
+                    },
+                },
+            },
+        }
+        (tmp_path / "nested-env.yaml").write_text(yaml.dump(stack_data))
+        mgr = StackManager(stacks_dir=tmp_path)
+        mgr.load("nested-env")
+
+        entry = mgr.get_llm_config()
+
+        assert entry.extra["oauth"]["token_url"] == "https://acme.example.com/token"
+        assert entry.extra["oauth"]["params"] == {"audience": "agent-api"}
+        assert entry.extra["headers"] == ["X-Tenant=acme"]
+
 
 # ---------------------------------------------------------------------------
 # StackManager — resolve
@@ -396,6 +464,31 @@ class TestGetAgentLLMConfig:
     def test_returns_none_when_no_stack_loaded(self) -> None:
         mgr = StackManager()
         assert mgr.get_agent_llm_config("any") is None
+
+    def test_agent_override_is_recursively_env_interpolated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PLANNER_MODEL", "planner-v2")
+        monkeypatch.setenv("PLANNER_TENANT", "north")
+        stack_data = {
+            "name": "agent-env",
+            "agent_overrides": {
+                "planner": {
+                    "provider": "custom",
+                    "model": "${PLANNER_MODEL}",
+                    "extra": {"routing": {"tenant": "${PLANNER_TENANT}"}},
+                },
+            },
+        }
+        (tmp_path / "agent-env.yaml").write_text(yaml.dump(stack_data))
+        mgr = StackManager(stacks_dir=tmp_path)
+        mgr.load("agent-env")
+
+        override = mgr.get_agent_llm_config("planner")
+
+        assert override is not None
+        assert override.model == "planner-v2"
+        assert override.extra == {"routing": {"tenant": "north"}}
 
 
 # ---------------------------------------------------------------------------

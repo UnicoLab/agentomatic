@@ -1,8 +1,5 @@
 name: CI
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 on:
   push:
     branches: [main]
@@ -18,7 +15,7 @@ on:
       - "mkdocs.yml"
       - "scripts/**"
       - "README.md"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
   pull_request:
     branches: [main]
     paths:
@@ -33,7 +30,7 @@ on:
       - "mkdocs.yml"
       - "scripts/**"
       - "README.md"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 concurrency:
@@ -51,23 +48,23 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Ruff check
-        run: uv run ruff check src/agentomatic/ tests/
+        run: uv run ruff check src/agentomatic/ tests/ scripts/
 
       - name: Ruff format check
-        run: uv run ruff format --check src/agentomatic/ tests/
+        run: uv run ruff format --check src/agentomatic/ tests/ scripts/
 
   # ─────────────────────────────────────────────────────
   # 2. SECURITY — Audit the complete locked deployment set
@@ -76,14 +73,14 @@ jobs:
     name: Dependency Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install locked dependencies
         run: uv sync --all-extras --group dev --group docs
@@ -102,14 +99,14 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         run: uv sync --all-extras --group dev
@@ -135,7 +132,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-${{ matrix.python-version }}
@@ -151,14 +148,14 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         run: uv sync --all-extras --group dev
@@ -173,14 +170,14 @@ jobs:
     name: Docs Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         run: uv sync --group docs
@@ -199,14 +196,14 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install package
         run: uv sync --all-extras
@@ -240,14 +237,14 @@ jobs:
     needs: [lint, security, test, typecheck, docs, smoke]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Build
         run: uv build
@@ -263,7 +260,7 @@ jobs:
         run: uv run twine check dist/*
 
       - name: Upload dist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/

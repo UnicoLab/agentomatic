@@ -1397,9 +1397,7 @@ class Verifier:
         # The Task Board submits through this generic route.  When an agent
         # publishes required inputs, it must reject an incomplete payload
         # *before* persisting or running a task, just like its /invoke route.
-        agent_schemas = self._req(
-            "GET", f"/studio/agents/{quote(self.agent, safe='')}/schemas"
-        )
+        agent_schemas = self._req("GET", f"/studio/agents/{quote(self.agent, safe='')}/schemas")
         input_schema: Any = None
         if agent_schemas is not None and agent_schemas.status_code == 200:
             try:
@@ -1725,7 +1723,11 @@ class Verifier:
                 "unknown generic agent task",
                 "POST",
                 "/api/v1/tasks",
-                {"target_type": "agent", "target": "definitely_not_an_agent", "input": {"query": "x"}},
+                {
+                    "target_type": "agent",
+                    "target": "definitely_not_an_agent",
+                    "input": {"query": "x"},
+                },
             ),
             ("unknown plugin", "GET", "/api/v1/plugins/nope/model_card", None),
             ("unknown pipeline", "GET", "/api/v1/pipelines/nope/config", None),

@@ -272,19 +272,23 @@ class LLMJudgeMetric(BaseMetric):
         expected: str | None,
         context: list[str] | None,
     ) -> EvalResult:
+        from deepeval import test_case as deepeval_test_case
         from deepeval.metrics import GEval
-        from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+
+        evaluation_params_type = getattr(deepeval_test_case, "SingleTurnParams", None)
+        if evaluation_params_type is None:  # pragma: no cover - older DeepEval compatibility
+            evaluation_params_type = deepeval_test_case.LLMTestCaseParams
 
         metric = GEval(
             name=self.name,
             criteria=self.criteria,
             evaluation_params=[
-                getattr(LLMTestCaseParams, "INPUT"),
-                getattr(LLMTestCaseParams, "ACTUAL_OUTPUT"),
+                evaluation_params_type.INPUT,
+                evaluation_params_type.ACTUAL_OUTPUT,
             ],
             model=self.model,  # type: ignore[arg-type]
         )
-        test_case = LLMTestCase(
+        test_case = deepeval_test_case.LLMTestCase(
             input=query,
             actual_output=response,
             expected_output=expected,

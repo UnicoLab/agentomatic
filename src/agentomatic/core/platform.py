@@ -378,12 +378,15 @@ class AgentPlatform:
         self.cors_origins = cors_origins or ["*"]
         self.log_level = log_level
         self.settings = settings
-        if plugin_autoreload is None or plugin_autoreload_interval is None:
+        if settings is None:
+            from agentomatic.artifacts import default_artifact_root
             from agentomatic.config.settings import get_settings
 
-            plugin_settings = settings or get_settings()
+            plugin_settings = get_settings()
+            plugin_artifact_root = default_artifact_root()
         else:
             plugin_settings = settings
+            plugin_artifact_root = Path(settings.artifact_root)
 
         # Storage — do NOT eagerly install MemoryStore when logs_history is on.
         # That used to preempt lifespan auto-derive from MEMORY connections /
@@ -402,6 +405,7 @@ class AgentPlatform:
             if plugin_autoreload_interval is None
             else plugin_autoreload_interval
         )
+        self._plugin_artifact_root = plugin_artifact_root
         if self._plugin_autoreload_interval <= 0:
             raise ValueError("plugin_autoreload_interval must be greater than zero")
         self._plugin_autoreloader: Any | None = None
@@ -1165,6 +1169,7 @@ class AgentPlatform:
             logger.info("🧠 Loading ML Model Plugins...")
             for name, plugin in platform._plugin_registry.list_plugins().items():
                 try:
+                    plugin.set_artifact_root(platform._plugin_artifact_root)
                     await plugin.load_model()
                     # A subclass that overrides load_model() without calling
                     # super() leaves _is_loaded False, so /predict answers 503
@@ -1182,6 +1187,7 @@ class AgentPlatform:
 
                 platform._plugin_autoreloader = PluginAutoReloader(
                     platform._plugin_registry,
+                    artifact_root=platform._plugin_artifact_root,
                     interval=platform._plugin_autoreload_interval,
                 )
                 await platform._plugin_autoreloader.start()

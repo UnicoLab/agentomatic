@@ -33,6 +33,8 @@ A complete stack configuration is defined under a `StackConfig` structure. This 
 - **features**: Feature flags to toggle components like metrics, streaming, and rate limiting.
 - **auth**: API Key or JWT authentication settings.
 - **agent_overrides**: Per-agent specific overrides.
+- **environment**: Process defaults that may reference external variables or
+  other keys in the same block.
 
 ### Example: `stacks/production.yaml`
 
@@ -49,6 +51,10 @@ features:
 database:
   url: "postgresql+asyncpg://${DB_USER}:${DB_PASS}@${DB_HOST}/agentomatic"
   pool_size: 20
+
+environment:
+  MODEL_GATEWAY_ORIGIN: "https://models.example.com"
+  MODEL_GATEWAY_URL: "${MODEL_GATEWAY_ORIGIN}/v1"  # order-independent
 
 auth:
   method: "jwt"
@@ -93,8 +99,15 @@ Once loaded, you can access properties and pass them to agents or LLM factories 
 # Access a specific LLM configuration profile
 llm_cfg = mgr.get_llm_config("fast")
 
-# Access the database URL (interpolated)
-db_url = stack.database.url
+# Access the embedding profile with provider/model variables resolved
+embedding_cfg = mgr.get_embedding_config()
+
+# Resolve every nested string in the complete stack before direct access
+resolved_stack = mgr.resolve()
+db_url = resolved_stack.database.url
+
+# Agent overrides returned by the manager are resolved recursively too
+coder_cfg = mgr.get_agent_llm_config("coder_agent")
 
 # Check feature flags
 if stack.features.enable_metrics:
@@ -102,3 +115,9 @@ if stack.features.enable_metrics:
 ```
 
 The stack configuration provides a single source of truth for your agent's ecosystem.
+
+Environment references are resolved recursively, including values nested in
+`extra`, fallback definitions, and agent overrides. Existing process variables
+always take precedence over the stack's `environment` defaults. References
+between keys in that block do not depend on YAML declaration order; cyclic
+references fail during `load()` with an actionable error.

@@ -152,6 +152,79 @@ graph LR
 
 ---
 
+## Custom Provider Registry
+
+Register a provider builder when an internal gateway or vendor does not match a
+built-in client. Provider names are trimmed and case-insensitive, registrations
+are thread-safe, and stack profiles can use the registered name directly.
+
+```python
+from agentomatic import register_llm_provider
+from agentomatic.providers import OAuth2ClientCredentialsTokenProvider
+
+tokens = OAuth2ClientCredentialsTokenProvider(
+    token_url="https://identity.example.com/oauth/token",
+    client_id="service-client",
+    client_secret="...",
+    scope="models.invoke",
+    token_params={"audience": "https://models.example.com"},
+)
+
+
+def build_corporate_gateway(**kwargs):
+    return CorporateChatModel(
+        model=kwargs["model"],
+        base_url=kwargs["base_url"],
+        token_provider=tokens,
+    )
+
+
+# overwrite=False detects duplicate plugin registration during startup.
+register_llm_provider("corporate", build_corporate_gateway, overwrite=False)
+```
+
+```yaml
+llm:
+  default:
+    provider: corporate
+    model: enterprise-chat
+    base_url: ${MODEL_GATEWAY_URL}
+```
+
+Use `registered_llm_providers()` for diagnostics and
+`unregister_llm_provider("corporate")` during plugin teardown or tests. Removing
+a builder does not invalidate already-cached models; call `reset_llm()` when a
+live registration is replaced.
+
+### OAuth2 token providers
+
+`OAuth2ClientCredentialsTokenProvider` coalesces concurrent refreshes, retries
+transport errors plus HTTP 429/5xx, validates token response shape and expiry,
+and never includes the identity-provider response body in raised validation
+errors. It supports both OAuth client authentication methods:
+
+```python
+tokens = OAuth2ClientCredentialsTokenProvider(
+    token_url="https://identity.example.com/oauth/token",
+    client_id="service-client",
+    client_secret="...",
+    client_auth_method="client_secret_basic",  # or client_secret_post
+    refresh_margin_seconds=30,
+)
+
+token = tokens.get_token()
+token_in_async_code = await tokens.aget_token()  # does not block the event loop
+tokens.invalidate()                              # force refresh after a 401
+```
+
+Non-loopback token endpoints require HTTPS by default. `http://localhost` and
+loopback IPs remain available for local testing; the explicit
+`allow_insecure_http=True` escape hatch should only be used in a controlled
+development network. `StaticTokenProvider` exposes the same sync and async API
+when the gateway supplies a long-lived bearer token directly.
+
+---
+
 ## Environment Variables
 
 | Variable                    | Provider   | Description                         |
@@ -266,6 +339,28 @@ response = await invoke_with_retry(
 ```
 
 The delay doubles after each attempt: `delay × 2^attempt`.
+
+For custom provider setup, token exchange, and other ordinary callables, use
+the validated generic retry helpers. `RetryConfig` rejects invalid attempt,
+delay, multiplier, jitter, and exception settings at construction time.
+
+```python
+from agentomatic.providers import RetryConfig, async_retry_call, retry_call
+
+policy = RetryConfig(
+    max_attempts=4,
+    base_delay=0.5,
+    max_delay=8,
+    jitter=0.2,
+    retryable_exceptions=(ConnectionError, TimeoutError),
+)
+
+result = retry_call(fetch_sync, config=policy)
+result = await async_retry_call(fetch_async, config=policy)
+```
+
+The async helper uses `asyncio.sleep`, accepts a sync or async `on_retry` hook,
+and propagates task cancellation immediately.
 
 By default `invoke_with_retry` **strips thinking / reasoning** from
 `.content` (Qwen3, DeepSeek-R1, tagged `<think>` blocks, etc.) and stores it

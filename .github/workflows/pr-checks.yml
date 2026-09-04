@@ -1,8 +1,5 @@
 name: PR Checks
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 on:
   pull_request:
     branches: [main]
@@ -22,11 +19,11 @@ jobs:
     name: PR Quality Gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -49,7 +46,7 @@ jobs:
           echo "all=$CHANGED_FILES" >> "$GITHUB_OUTPUT"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         run: uv sync --group dev

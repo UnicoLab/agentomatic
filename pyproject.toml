@@ -60,7 +60,7 @@ swarm = ["langgraph-swarm>=0.1"]
 vector = ["numpy>=1.26"]
 all = ["agentomatic[langgraph,ollama,metrics,db,cli,studio,optimize,telemetry,dotenv,security,swarm,vector]"]
 docs = [
-    "mkdocs-material>=9.5",
+    "mkdocs-material>=9.7.7",
     "mike>=2.1",
     "pymdown-extensions>=10.0",
 ]
@@ -115,10 +115,10 @@ dev = [
     # ``scripts/run_semantic_release.py`` bridges a removed PSR compatibility API.
     "GitPython>=3.1.60,<4",
     "mike>=2.2.0",
-    "mkdocs-material>=9.7.6",
+    "mkdocs-material>=9.7.7",
 ]
 docs = [
-    "mkdocs-material>=9.5",
+    "mkdocs-material>=9.7.7",
     "mike>=2.1",
     "pymdown-extensions>=10.0",
 ]

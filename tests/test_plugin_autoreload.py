@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 import pytest
@@ -33,7 +34,8 @@ class ArtifactBackedPlugin(BaseMLPlugin[_Input, _Output]):
         self.load_count = 0
 
     async def load_model(self) -> None:
-        version = ArtifactRegistry().current_version()
+        artifact_dir = self.artifact_dir()
+        version = artifact_dir.name if artifact_dir is not None else None
         if version == "broken":
             self.model_version = "partially-loaded"
             raise RuntimeError("candidate model is invalid")
@@ -139,3 +141,82 @@ def test_autoreload_environment_settings_are_applied_to_platform(tmp_path, monke
 
     assert platform._plugin_autoreload is True
     assert platform._plugin_autoreload_interval == 2.5
+
+
+def test_platform_settings_artifact_root_drives_plugin_and_watcher(tmp_path) -> None:
+    """An explicit settings object must not split watcher and plugin artifact roots."""
+    artifact_root = tmp_path / "configured-artifacts"
+    artifacts = ArtifactRegistry(artifact_root)
+    _promote(artifacts, "v1")
+    settings = PlatformSettings(
+        _env_file=None,
+        artifact_root=artifact_root,
+        plugin_autoreload=True,
+        plugin_autoreload_interval=0.01,
+    )
+    platform = AgentPlatform(
+        agents_dir=tmp_path / "agents",
+        plugins_dir=tmp_path / "plugins",
+        settings=settings,
+    )
+    plugin = ArtifactBackedPlugin()
+    platform._plugin_registry._plugins[plugin.plugin_name] = plugin  # noqa: SLF001
+
+    with TestClient(platform.build()) as client:
+        assert plugin.artifact_dir() == artifact_root / "v1"
+        assert client.post(
+            "/api/v1/plugins/artifact_backed/predict", json={"value": "before"}
+        ).json() == {"artifact_version": "v1"}
+
+        _promote(artifacts, "v2")
+        deadline = time.monotonic() + 1
+        while time.monotonic() < deadline:
+            response = client.post(
+                "/api/v1/plugins/artifact_backed/predict", json={"value": "after"}
+            )
+            if response.json() == {"artifact_version": "v2"}:
+                break
+            time.sleep(0.02)
+        else:
+            pytest.fail("settings-backed artifact promotion was not observed")
+
+
+@pytest.mark.asyncio
+async def test_cancelled_reload_restores_previous_plugin_state() -> None:
+    """Cancellation must be as transactional as an ordinary loading failure."""
+    plugin = ArtifactBackedPlugin()
+    plugin.model_version = "v1"
+    plugin.load_count = 1
+    plugin.mark_loaded()
+    load_started = asyncio.Event()
+
+    async def partial_load() -> None:
+        plugin.model_version = "partially-loaded"
+        load_started.set()
+        await asyncio.Event().wait()
+
+    plugin.load_model = partial_load  # type: ignore[method-assign]
+    reload_task = asyncio.create_task(plugin.reload_model())
+    await load_started.wait()
+    reload_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await reload_task
+
+    assert plugin.model_version == "v1"
+    assert plugin.load_count == 1
+    assert plugin.is_loaded is True
+
+
+@pytest.mark.asyncio
+async def test_invoke_supports_legacy_plugin_init_without_super() -> None:
+    """The new synchronization wrapper must preserve old plugin subclasses."""
+
+    class LegacyInitPlugin(ArtifactBackedPlugin):
+        def __init__(self) -> None:
+            self.model_version = "legacy"
+
+    plugin = LegacyInitPlugin()
+    result = await plugin.invoke(_Input(value="ok"))
+
+    assert result.artifact_version == "legacy"

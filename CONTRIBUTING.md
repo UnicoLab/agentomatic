@@ -96,12 +96,25 @@ src/agentomatic/
 
 ## Release Process
 
-Releases are automated via [python-semantic-release](https://python-semantic-release.readthedocs.io/):
+Releases are automated via [python-semantic-release](https://python-semantic-release.readthedocs.io/)
+and are dispatched from the **Release** GitHub Actions workflow:
 
-1. Merge PR to `main`
-2. Semantic release analyzes commit messages
-3. If releasable commits found → bumps version, creates tag, publishes to PyPI
-4. Docs are auto-deployed via mike
+1. Merge the release candidate to `main` and wait for every CI job to pass.
+2. Run the Release workflow with `DRY_RUN=true`. Confirm the calculated version
+   and that `CHANGELOG.md` contains `<!-- version list -->`.
+3. Run the same workflow with `DRY_RUN=false`. Semantic release analyzes the
+   conventional commits, updates both version files and `CHANGELOG.md`, then
+   creates and pushes the release commit and tag.
+4. The workflow downloads the released Studio bundle, builds and verifies the
+   wheel, publishes it to PyPI, verifies the GitHub release, and deploys the
+   versioned docs with mike.
+5. Install the published wheel in a clean environment and run the deployment
+   verifier from `docs/guide/verifying-a-deployment.md` against staging before
+   promoting production traffic.
+
+The release wrapper intentionally fails before semantic release when the
+changelog insertion marker is missing; otherwise a release can bump and tag a
+version without recording its changes.
 
 ## License
 

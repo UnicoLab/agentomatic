@@ -11,7 +11,6 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from agentomatic._version import __version__
 from agentomatic.cli.commands import cli
 from agentomatic.cli.templates import TEMPLATES
 from agentomatic.core.platform import AgentPlatform
@@ -116,7 +115,8 @@ def test_install_and_deployment_guides_preserve_real_extra_and_release_contracts
     assert 'pip install "agentomatic[all]"' in installation
     assert "Chainlit is intentionally separate" in installation
     assert 'pip install "agentomatic[all,ui]"' in quickstart
-    assert f"agentomatic[all]=={__version__}" in deployment
+    assert "agentomatic[all]==<released-version>" in deployment
+    assert not re.search(r"agentomatic\[all\]==\d+\.\d+\.\d+", deployment)
 
     import tomllib
 
@@ -236,6 +236,15 @@ def test_provider_guide_tracks_supported_llm_and_embedding_factories() -> None:
     assert 'model_name="gemini-1.5-pro"' not in providers
     assert "POST /api/v1/{agent}/invoke/stream" in providers
     assert '"input": "Explain quantum computing"' not in providers
+    for public_extension in (
+        "register_llm_provider",
+        "registered_llm_providers",
+        "unregister_llm_provider",
+        "OAuth2ClientCredentialsTokenProvider",
+        "StaticTokenProvider",
+        "async_retry_call",
+    ):
+        assert public_extension in providers
 
 
 def test_task_guide_tracks_public_task_enums() -> None:
@@ -577,6 +586,8 @@ def test_production_guides_do_not_advertise_removed_or_unavailable_features() ->
     )
     assert "requires **agentomatic >= 1.8.0**" not in stacks
     assert "requires **agentomatic >= 1.8.0**" not in platform_features
+    assert "do not depend on YAML declaration order" in stacks
+    assert "cyclic\nreferences fail during `load()`" in stacks
 
 
 def test_api_and_pipeline_reference_cover_current_authoring_and_reload_routes() -> None:
@@ -660,6 +671,31 @@ def test_security_audit_is_documented_and_required_by_ci() -> None:
     assert "security:" in ci
     assert "uv run pip-audit --progress-spinner off" in ci
     assert "needs: [lint, security, test, typecheck, docs, smoke]" in ci
+
+
+def test_release_changelog_and_release_scripts_are_guarded() -> None:
+    """Release-only code and generated notes must remain part of the quality gate."""
+    changelog = _doc("CHANGELOG.md")
+    project = _doc("pyproject.toml")
+    ci = _doc(".github/workflows/ci.yml")
+    makefile = _doc("Makefile")
+    wrapper = _doc("scripts/run_semantic_release.py")
+    release = _doc(".github/workflows/release.yml")
+
+    assert "<!-- version list -->" in changelog
+    assert 'changelog_file = "CHANGELOG.md"' in project
+    assert "_validate_changelog_contract" in wrapper
+    assert "ruff check src/agentomatic/ tests/ scripts/" in ci
+    assert "ruff format --check src/agentomatic/ tests/ scripts/" in ci
+    assert "ruff check src/agentomatic/ tests/ scripts/" in makefile
+    assert "release-gate:" in release
+    assert "needs: [release-gate]" in release
+    assert "make audit" in release
+    assert "make docs-check" in release
+    assert "twine check dist/*" in release
+    assert "repository_dispatch:" not in release
+    assert "cancel-in-progress: false" in release
+    assert "skip-existing: true" in release
 
 
 def test_testing_guide_separates_bounded_suite_from_real_model_verification() -> None:

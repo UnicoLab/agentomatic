@@ -354,8 +354,7 @@ class StackManager:
         # Apply dotenv (explicit stack env_file, else project ``.env``)
         env_target = stack.env_file or ".env"
         self.apply_dotenv(env_target)
-        for key, value in stack.environment.items():
-            os.environ.setdefault(key, self.interpolate_env(value) if isinstance(value, str) else value)
+        self._apply_environment(stack.environment)
 
         from agentomatic.config.settings import reset_settings
 
@@ -387,19 +386,7 @@ class StackManager:
                 f"LLM profile '{name}' not found in stack "
                 f"'{self._active_stack.name}'. Available: {available}"
             )
-        entry = self._active_stack.llm[name]
-        data = entry.model_dump()
-        for key, value in list(data.items()):
-            if isinstance(value, str):
-                data[key] = self.interpolate_env(value)
-            elif isinstance(value, dict):
-                data[key] = {
-                    k: self.interpolate_env(v) if isinstance(v, str) else v
-                    for k, v in value.items()
-                }
-            elif key == "fallbacks" and isinstance(value, list):
-                data[key] = [self._interpolate_fallback_item(item) for item in value]
-        return LLMStackEntry.model_validate(data)
+        return self._resolved_llm_entry(self._active_stack.llm[name])
 
     def get_embedding_config(self) -> EmbeddingStackEntry:
         """Return the active stack's embedding config, env-interpolated.
@@ -416,30 +403,8 @@ class StackManager:
         """
         if self._active_stack is None:
             raise ValueError("No stack loaded — call load() first")
-        data = self._active_stack.embedding.model_dump()
-        for key, value in list(data.items()):
-            if isinstance(value, str):
-                data[key] = self.interpolate_env(value)
+        data = self._resolve_recursive(self._active_stack.embedding.model_dump())
         return EmbeddingStackEntry.model_validate(data)
-
-    def _interpolate_fallback_item(self, item: Any) -> Any:
-        """Interpolate env vars inside a single fallback list item."""
-        if isinstance(item, str):
-            return self.interpolate_env(item)
-        if isinstance(item, dict):
-            out: dict[str, Any] = {}
-            for key, value in item.items():
-                if isinstance(value, str):
-                    out[key] = self.interpolate_env(value)
-                elif isinstance(value, dict):
-                    out[key] = {
-                        k: self.interpolate_env(v) if isinstance(v, str) else v
-                        for k, v in value.items()
-                    }
-                else:
-                    out[key] = value
-            return out
-        return item
 
     def resolve_fallbacks(self, entry: LLMStackEntry) -> list[dict[str, Any]]:
         """Resolve an entry's ``fallbacks`` into concrete build kwargs dicts.
@@ -649,7 +614,8 @@ class StackManager:
         """
         if self._active_stack is None:
             return None
-        return self._active_stack.agent_overrides.get(agent_name)
+        entry = self._active_stack.agent_overrides.get(agent_name)
+        return self._resolved_llm_entry(entry) if entry is not None else None
 
     def resolve(self) -> StackConfig:
         """Walk all string fields and interpolate ``${ENV_VAR}`` references.
@@ -668,6 +634,51 @@ class StackManager:
         return StackConfig.model_validate(resolved)
 
     # -- Private helpers ----------------------------------------------------
+
+    def _apply_environment(self, environment: dict[str, str]) -> None:
+        """Apply an environment block with stable sibling-reference resolution.
+
+        Existing process variables keep precedence. References to other keys in
+        the same block are resolved independent of YAML declaration order, and
+        cycles fail fast instead of silently exporting partial values.
+        """
+        resolved: dict[str, str] = {}
+        resolving: list[str] = []
+
+        def resolve_key(key: str) -> str:
+            existing = os.environ.get(key)
+            if existing is not None:
+                return existing
+            if key in resolved:
+                return resolved[key]
+            if key in resolving:
+                cycle = " -> ".join([*resolving, key])
+                raise ValueError(f"Cyclic stack environment reference: {cycle}")
+
+            resolving.append(key)
+
+            def replace(match: re.Match[str]) -> str:
+                referenced = match.group(1)
+                if referenced in environment:
+                    return resolve_key(referenced)
+                return os.environ.get(referenced, "")
+
+            try:
+                value = _ENV_VAR_PATTERN.sub(replace, environment[key])
+                resolved[key] = value
+                return value
+            finally:
+                resolving.pop()
+
+        for key in environment:
+            resolve_key(key)
+        for key, value in resolved.items():
+            os.environ.setdefault(key, value)
+
+    def _resolved_llm_entry(self, entry: LLMStackEntry) -> LLMStackEntry:
+        """Return an LLM entry with all nested string values interpolated."""
+        data = self._resolve_recursive(entry.model_dump())
+        return LLMStackEntry.model_validate(data)
 
     def _resolve_recursive(self, obj: Any) -> Any:
         """Recursively interpolate env vars in a nested data structure."""
