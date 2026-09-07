@@ -208,12 +208,31 @@ Agentomatic multi-agent platform project.
 
 ## Quick start
 
+The `local` stack talks to an OpenAI-compatible small-model server on your
+machine (oMLX by default — llama.cpp / vLLM / LM Studio work identically).
+
 ```bash
+# 1. Start your model server, e.g. oMLX on its default port 8000
+omlx serve --model <your-model>
+
+# 2. Point stacks/local.yaml at that model (edit `model:`), then:
 cp .env.example .env
 agentomatic stack use local
-agentomatic init hello --template basic
-agentomatic run --studio
-# open http://127.0.0.1:8000/studio/ui/  and  /docs
+agentomatic init hello --template chatbot
+
+# 3. Run the platform on a port the model server is not using
+agentomatic run --studio --port 8001
+# open http://127.0.0.1:8001/studio/ui/  and  /docs
+
+# 4. Check the wiring end to end
+agentomatic doctor
+```
+
+Every agent template ships a dummy dataset and a `train.py`, so prompt
+optimization runs against the same local model with no extra setup:
+
+```bash
+python agents/hello/train.py --epochs 1 --trials 2
 ```
 
 ## Agent cards / manifests
@@ -257,7 +276,20 @@ def _env_example() -> str:
 # AGENTOMATIC_API_KEY=
 # AGENTOMATIC_CONTROL_TOKEN=
 
-# --- LLM providers ---
+# --- Local SLM server (the `local` stack talks to this) -----------------
+# oMLX, llama.cpp, vLLM and LM Studio all speak the OpenAI protocol; point
+# OMLX_BASE_URL at whichever one you run. Left unset, the omlx provider uses
+# http://127.0.0.1:8000/v1.
+#
+# NOTE: that is also the platform's own default port — start the platform on
+# another one (`agentomatic run --port 8001`) or move the model server.
+OMLX_BASE_URL=http://127.0.0.1:8000/v1
+OMLX_API_KEY=
+# Model name your server has loaded. Also read by `agentomatic new` /
+# `agentomatic stack init` when baking stacks/local.yaml.
+# AGENTOMATIC_LOCAL_MODEL=Qwen3.5-9B-MLX-4bit
+
+# --- Cloud LLM providers (the `remote` stack) ---
 OPENAI_API_KEY=
 AZURE_OPENAI_API_KEY=
 AZURE_OPENAI_ENDPOINT=

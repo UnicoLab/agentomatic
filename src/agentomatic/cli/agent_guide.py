@@ -52,19 +52,25 @@ pip install agentomatic             # core only
 ## The develop → optimize → deploy loop
 
 ```bash
+# 0. Local model server (the scaffolded `local` stack talks to this).
+#    oMLX by default; llama.cpp / vLLM / LM Studio need only a different
+#    base_url in stacks/local.yaml.
+omlx serve --model <your-model>               # http://127.0.0.1:8000/v1
+
 # 1. Scaffold a project (main.py + agents/ plugins/ endpoints/ stacks/ ...)
 agentomatic new my_platform && cd my_platform
 agentomatic init hello --template basic     # add an agent under agents/
 
 # 2. Develop: run everything locally (Studio at /studio/ui, docs at /docs)
 #    Prefers uvicorn main:app when main.py is present (same as deploy).
-agentomatic run                              # http://127.0.0.1:8000
+#    Port 8001, not 8000 — the model server already holds 8000.
+agentomatic run --port 8001
+agentomatic doctor                           # confirms the LLM endpoint answers
 
-# 3. Optimize — prefer thin train/eval scripts (class agents)
-#    agentomatic init hello --template class
-uv run python agents/hello/train.py --augment --persist --optimizer rewrite
-uv run python agents/hello/eval.py --split test --prefer-augmented
-#    Or CLI: agentomatic optimize hello --dataset data.jsonl
+# 3. Optimize — every class-agent template ships datasets/all.jsonl + train.py
+uv run python agents/hello/train.py --epochs 1 --trials 4
+uv run python agents/hello/eval.py --split test
+#    Or CLI: agentomatic optimize hello --dataset agents/hello/datasets/all.jsonl
 
 # 4. Deploy: generate a container that serves the SAME app via uvicorn
 agentomatic deploy --stack remote --distroless          # full profile
@@ -89,7 +95,7 @@ and platform `logs_history` / `allow_logsllm_analysis`. See the optimization gui
 | `agentomatic deploy [--profile full\\|minimal] [--minimal] [--distroless] [--stack NAME]` | Generate Dockerfile/compose/.env |
 | `agentomatic demo` | Run a self-contained demo platform + Studio |
 | `agentomatic list` / `inspect NAME` / `doctor` | Discover, inspect, diagnose |
-| `agentomatic optimize AGENT --dataset data.jsonl` | Prompt / Keras-style optimization |
+| `agentomatic optimize AGENT --dataset agents/AGENT/datasets/all.jsonl` | Prompt / Keras-style optimization |
 | `agents/*/train.py` / `eval.py` | Thin `train_and_report` / `evaluate_and_report` scripts |
 | `agentomatic test NAME` / `ui` | Interactive console / Chainlit chat UI |
 | `agentomatic stack init\\|list\\|show\\|use\\|export` | Multi-environment stack management |
@@ -193,6 +199,20 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_AGENTS` | Comma-separated allow-list scoping agent discovery |
 | `AGENTOMATIC_ARTIFACT_ROOT` | Versioned plugin/model artifact bundles (default `.local/artifacts`) |
 | `AGENTOMATIC_AUDIT_LOG` | Optional JSONL op-audit path (empty = disabled) |
+| `OMLX_BASE_URL` / `OMLX_API_KEY` | Local SLM endpoint used when the stack's `base_url`/`api_key` are empty (default `http://127.0.0.1:8000/v1`) |
+| `AGENTOMATIC_LOCAL_MODEL` | Model name baked into a generated `stacks/local.yaml` |
+
+## Local-first defaults
+
+`agentomatic new` (and `agentomatic init` in a bare directory) writes a `local`
+stack pointing at an **OpenAI-compatible SLM server on your machine** —
+`provider: omlx`, `base_url: http://127.0.0.1:8000/v1`, no API key — with
+`default` / `fast` / `judge` / `rewrite` profiles and a `hash` embedder, so
+nothing else has to be running. Every class-agent template (`basic`, `full`,
+`chatbot`, `rag`, `coordinator`, `langchain`, `extraction`) also ships
+`datasets/all.jsonl` (dummy seed rows), `train.py`, `eval.py` and a `Makefile`,
+so the fit loop runs the moment the agent exists. Replace the seed rows before
+trusting a score.
 
 ## Batteries included (prefer framework helpers)
 

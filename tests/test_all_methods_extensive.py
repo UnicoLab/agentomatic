@@ -983,7 +983,9 @@ class TestScaffoldScriptsExecute:
                     "--strategy",
                     "prompt_only",
                     "--dataset",
-                    str(agent_dir / "dataset.jsonl"),
+                    # Templates ship the seed data where train.py / eval.py
+                    # resolve it by default.
+                    str(agent_dir / "datasets" / "all.jsonl"),
                 ],
             )
             opt_main()

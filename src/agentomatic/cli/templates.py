@@ -7,6 +7,8 @@ agents; ``TEMPLATES`` is the authoritative public registry.
 
 from __future__ import annotations
 
+import json
+
 
 def _class_agent_get_graph_export(title: str) -> str:
     """Append a ``get_graph()`` export for langgraph.json / Studio tools."""
@@ -375,13 +377,106 @@ def _langgraph_json(*, graph_target: str = "./agent.py:get_graph") -> str:
 
 
 def _env_example(name: str) -> str:
+    """Return the agent-level ``.env.example``.
+
+    The LLM itself comes from the active stack (``stacks/local.yaml`` +
+    ``llm.py``), so this file only carries the local-server endpoint and the
+    agent's own feature flags — nothing that would silently override the stack.
+    """
     upper = name.upper()
-    return f"""# {name} agent configuration\n# Copy to .env and fill in values\n\n# LLM Settings\n{upper}_LLM_PROVIDER=ollama\n{upper}_LLM_MODEL=mistral:7b\n{upper}_TEMPERATURE=0.1\n{upper}_MAX_TOKENS=2048\n\n# Feature Flags\n{upper}_ENABLE_MEMORY=true\n{upper}_ENABLE_STREAMING=true\n"""
+    return f"""# {name} agent configuration
+# Copy to the *project* .env and fill in values.
+#
+# The model is chosen by the active stack, not here:
+#   stacks/local.yaml   → provider/model for local development
+#   agents/{name}/llm.py  → which stack profile each agent role uses
+
+# --- Local SLM server the `local` stack talks to ---
+# oMLX / llama.cpp / vLLM / LM Studio all speak the OpenAI protocol.
+OMLX_BASE_URL=http://127.0.0.1:8000/v1
+OMLX_API_KEY=
+
+# --- Feature Flags ---
+{upper}_ENABLE_MEMORY=true
+{upper}_ENABLE_STREAMING=true
+"""
+
+
+def _training_readme_section(name: str) -> str:
+    """Return the train/eval README section shared by the custom-README templates."""
+    return f"""
+## Train / evaluate
+
+`datasets/all.jsonl` ships with dummy seed rows so the loop runs immediately,
+against whatever model the active stack points at.
+
+```bash
+python agents/{name}/train.py --epochs 1 --trials 4   # fit the prompt
+python agents/{name}/eval.py --split test             # score the result
+```
+
+Replace the seed rows with real examples before trusting a score.
+"""
 
 
 def _readme_md(name: str, template: str) -> str:
+    """Return the agent README, including the train/eval loop when it applies."""
     title = name.replace("_", " ").title()
-    return f"""# {title} Agent\n\nGenerated with `agentomatic init {name} --template {template}`.\n\n## Quick Start\n\n```bash\n# Start the platform\nagentomatic run\n\n# Test the agent\ncurl -X POST http://localhost:8000/api/v1/{name}/invoke \\\n  -H "Content-Type: application/json" \\\n  -d '{{"query": "Hello!"}}'\n```\n\n## Files\n\n| File | Purpose |\n|------|---------|\n| `agent.py` | Agent class definition |\n| `config.py` | Agent-specific configuration |\n| `prompts.json` | Versioned prompt templates |\n| `langgraph.json` | LangGraph Studio config |\n"""
+    training_docs = ""
+    if template in TRAINABLE_TEMPLATES:
+        training_docs = f"""
+## Train / evaluate
+
+`datasets/all.jsonl` ships with dummy seed rows so the loop runs immediately.
+Both scripts read the active stack, so they use the same local model the
+platform serves with.
+
+```bash
+# From the project root
+python agents/{name}/train.py --epochs 1 --trials 4   # fit the prompt
+python agents/{name}/eval.py --split test             # score the result
+make -f agents/{name}/Makefile all                    # both, via the Makefile
+```
+
+Replace the seed rows with real examples before trusting a score — they exist
+to prove the wiring, not to measure quality.
+"""
+
+    file_rows = ["| `agent.py` | Agent class definition |"]
+    if template in ("full", "chatbot", "rag", "coordinator"):
+        file_rows.append("| `config.py` | Agent-specific configuration |")
+    file_rows.append("| `prompts.json` | Versioned prompt templates |")
+    file_rows.append("| `llm.py` | Maps agent roles to stack LLM profiles |")
+    if template in TRAINABLE_TEMPLATES:
+        file_rows.append("| `datasets/all.jsonl` | Seed dataset for train / eval |")
+        file_rows.append("| `train.py` / `eval.py` | Prompt fitting and scoring |")
+    file_rows.append("| `langgraph.json` | LangGraph Studio config |")
+    files_table = "\n".join(file_rows)
+
+    return f"""# {title} Agent
+
+Generated with `agentomatic init {name} --template {template}`.
+
+## Quick start
+
+```bash
+# 1. A local OpenAI-compatible model server must be running (see
+#    stacks/local.yaml). oMLX defaults to port 8000, so give the platform
+#    another one:
+agentomatic run --port 8001
+
+# 2. Call the agent
+curl -X POST http://localhost:8001/api/v1/{name}/invoke \\
+  -H "Content-Type: application/json" \\
+  -d '{{"query": "Hello!"}}'
+```
+{training_docs}
+## Files
+
+| File | Purpose |
+|------|---------|
+{files_table}
+"""
 
 
 # --- Deep Agent template ---
@@ -510,6 +605,7 @@ Routes user queries to the appropriate specialist agent via delegation.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -534,6 +630,27 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
     agent_name = "{name}"
     agent_description = "Coordinator that routes queries to specialist agents"
+    agent_framework = "graph_agent"
+
+    #: Routes this coordinator knows about. Keep in sync with delegation.py.
+    routes = ("billing", "technical", "account", "default")
+
+    def __init__(self, *, llm: Any = None, prompt_manager: Any = None) -> None:
+        super().__init__()
+        self.llm = llm
+        self.prompt_manager = prompt_manager
+
+    def _system_prompt(self) -> str:
+        # The classifier prompt is what ``train.py`` optimizes, so it must go
+        # through resolve_system_prompt rather than being a literal below.
+        return self.resolve_system_prompt(
+            default=(
+                "You are a routing classifier. Read the user request and reply "
+                "with exactly one label from: "
+                + ", ".join(self.routes)
+                + ". Reply with the label only, no explanation."
+            )
+        )
 
     def build_graph(self):
         g = self.new_graph()
@@ -544,17 +661,36 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         g.set_finish_point("route")
         return g.compile()
 
-    def classify(self, state: {title}State) -> {title}State:
-        """Classify the user query to determine routing.
+    def _keyword_route(self, query: str) -> str:
+        """Deterministic fallback used when no LLM is wired in.
 
-        TODO: Replace keyword matching with an LLM classifier.
+        Matches whole words only — a substring test routes "capital" to the
+        technical queue because it contains "api".
         """
-        query = state.request.lower()
-        # Add your routing logic here, e.g.:
-        #     if "invoice" in query:
-        #         state.classification = "billing"
-        #         return state
-        state.classification = "billing" if "invoice" in query else "default"
+        words = set(re.findall(r"[a-z0-9]+", query.lower()))
+        if words & {{"invoice", "charge", "charged", "billing", "refund", "payment"}}:
+            return "billing"
+        if words & {{"error", "500", "latency", "bug", "api", "crash", "timeout"}}:
+            return "technical"
+        if words & {{"password", "account", "login", "export", "cancel"}}:
+            return "account"
+        return "default"
+
+    def classify(self, state: {title}State) -> {title}State:
+        """Pick a route for the request — LLM first, keywords as a fallback."""
+        if self.llm is not None:
+            try:
+                result = self.llm.invoke(
+                    f"{{self._system_prompt()}}\\n\\nRequest: {{state.request}}"
+                )
+                text = (getattr(result, "content", None) or str(result)).strip().lower()
+                match = next((r for r in self.routes if r in text), "")
+                if match:
+                    state.classification = match
+                    return state
+            except Exception:  # noqa: BLE001 - fall back to keyword routing
+                pass
+        state.classification = self._keyword_route(state.request)
         return state
 
     def route(self, state: {title}State) -> {title}State:
@@ -563,7 +699,17 @@ class {title}Agent(BaseGraphAgent[{title}State]):
 
         tools = get_handoff_tools()
         if not tools:
-            state.output = {{"response": "No delegation targets configured"}}
+            # No specialists wired up yet: answer with the routing decision so
+            # the coordinator is useful (and trainable) before delegation.py
+            # names any targets.
+            state.delegated_to = ""
+            state.output = {{
+                "response": (
+                    f"Routing this to the {{state.classification}} specialist. "
+                    "Add targets to delegation.py to hand it over for real."
+                ),
+                "routed_to": state.classification,
+            }}
             return state
 
         # Pick the first tool as default, or match by classification
@@ -1249,9 +1395,9 @@ all: validate eval optimize  ## Full lifecycle: validate → eval → optimize
 # =====================================================================
 
 TEMPLATES: dict[str, str] = {
-    "basic": "Minimal class-based agent (recommended) — 1 file, quick start",
+    "basic": "Minimal class-based agent (recommended) — runnable + trainable",
     "class": "Alias for basic — class-owned BaseGraphAgent",
-    "full": "All files — class agent with config, schemas, tools, dataset, train/eval scripts",
+    "full": "All files — basic plus config, schemas, tools, search space, optimize/predict",
     "coordinator": "Orchestrator — classify & route queries to specialist agents via delegation",
     "pipeline": "Pipeline — multi-step YAML workflow chaining multiple agents",
     "rag": "RAG class-based agent — retrieve → generate pipeline",
@@ -1272,6 +1418,15 @@ TEMPLATES: dict[str, str] = {
         "RunnableConfig with full agentomatic integration"
     ),
 }
+
+
+#: Templates whose ``agent.py`` defines a ``BaseGraphAgent`` subclass, and so
+#: can be fitted by the scaffolded ``train.py`` / ``eval.py``. ``custom``,
+#: ``legacy_dict`` and ``deepagent`` build their graph differently and are
+#: deliberately left out.
+TRAINABLE_TEMPLATES: frozenset[str] = frozenset(
+    {"basic", "class", "full", "chatbot", "rag", "coordinator", "langchain", "extraction"}
+)
 
 
 # --- ML Plugin template ---
@@ -1627,37 +1782,403 @@ clean:
 """
 
 
-def _dataset_jsonl(name: str) -> str:
-    return (
-        f'{{"id": "{name}_001", "split": "train", "input": {{"current_query": '
-        f'"Help me with task planning"}}, "expected_output": {{"response": '
-        f'"Here is a structured plan..."}}, "metadata": {{"domain": "general", '
-        f'"difficulty": "easy"}}}}\n'
-        f'{{"id": "{name}_002", "split": "train", "input": {{"current_query": '
-        f'"Summarize this document"}}, "expected_output": {{"response": '
-        f'"Summary: ..."}}, "metadata": {{"domain": "general", '
-        f'"difficulty": "medium"}}}}\n'
-        f'{{"id": "{name}_003", "split": "train", "input": {{"current_query": '
-        f'"Compare option A vs B"}}, "expected_output": {{"response": '
-        f'"Comparison: A is..."}}, "metadata": {{"domain": "general", '
-        f'"difficulty": "medium"}}}}\n'
-        f'{{"id": "{name}_004", "split": "train", "input": {{"current_query": '
-        f'"Write a brief report"}}, "expected_output": {{"response": '
-        f'"Report: ..."}}, "metadata": {{"domain": "general", '
-        f'"difficulty": "easy"}}}}\n'
-        f'{{"id": "{name}_005", "split": "test", "input": {{"current_query": '
-        f'"Analyze the risks"}}, "expected_output": {{"response": '
-        f'"Risks identified: ..."}}, "metadata": {{"domain": "general", '
-        f'"difficulty": "hard"}}}}\n'
-        f'{{"id": "{name}_006", "split": "test", "input": {{"current_query": '
-        f'"Explain in simple terms"}}, "expected_output": {{"response": '
-        f'"In simple terms: ..."}}, "metadata": {{"domain": "general", '
-        f'"difficulty": "easy"}}}}\n'
-    )
+# --- Seed datasets ---------------------------------------------------------
+
+#: Dummy seed data per template family. Each entry is
+#: ``(split, query, expected_response, difficulty)``. The rows are small and
+#: obviously synthetic on purpose: they exist so ``train.py`` / ``eval.py``
+#: run end-to-end the moment an agent is scaffolded. Replace them with real
+#: examples before drawing conclusions from a score.
+_SEED_ROWS: dict[str, list[tuple[str, str, str, str]]] = {
+    "basic": [
+        (
+            "train",
+            "Help me plan a two-day product launch",
+            "Day 1: finalise the release notes and brief support. Day 2: publish, announce, and monitor error rates.",
+            "easy",
+        ),
+        (
+            "train",
+            "Summarise this quarter's support backlog",
+            "The backlog is 212 tickets, down 8% quarter over quarter; billing questions are the largest category at 41%.",
+            "medium",
+        ),
+        (
+            "train",
+            "Compare a managed database against self-hosting",
+            "Managed costs more per month but removes backup, patching, and failover work; self-hosting is cheaper only if you already have an on-call rota.",
+            "medium",
+        ),
+        (
+            "train",
+            "Draft a status update for a delayed migration",
+            "The migration slipped one week after a schema mismatch in staging. The fix is merged, and the new cutover date is the 14th.",
+            "easy",
+        ),
+        (
+            "validation",
+            "Outline the risks of shipping on a Friday",
+            "Fewer engineers are available to respond, weekend traffic hides regressions, and a rollback competes with on-call load.",
+            "medium",
+        ),
+        (
+            "validation",
+            "Explain rate limiting to a non-engineer",
+            "Rate limiting caps how often one caller may use a service, so a single heavy user cannot slow it down for everyone else.",
+            "easy",
+        ),
+        (
+            "test",
+            "Analyse the risks of a single-region deployment",
+            "A regional outage takes the whole service down, latency is poor for distant users, and some data-residency rules cannot be met.",
+            "hard",
+        ),
+        (
+            "test",
+            "Explain retries with backoff in simple terms",
+            "When a call fails, wait a moment and try again, waiting a little longer each time so a struggling service is not overwhelmed.",
+            "easy",
+        ),
+    ],
+    "chatbot": [
+        (
+            "train",
+            "Hi! What can you help me with?",
+            "Hello! I can answer questions, talk through a problem with you, and keep track of what we have already covered.",
+            "easy",
+        ),
+        (
+            "train",
+            "I'm trying to pick a laptop for data work",
+            "Happy to help. For data work the usual priorities are memory first, then CPU cores — how large are the datasets you work with?",
+            "medium",
+        ),
+        (
+            "train",
+            "16GB or 32GB of RAM?",
+            "If you regularly load datasets above a couple of gigabytes, 32GB pays for itself. For notebooks and dashboards, 16GB is usually enough.",
+            "medium",
+        ),
+        (
+            "train",
+            "Thanks, that helps. Anything else I should check?",
+            "Two things worth checking: the storage size, since datasets pile up, and whether the memory can be upgraded later.",
+            "easy",
+        ),
+        (
+            "validation",
+            "Can we change topic? Tell me about time zones",
+            "Of course. Time zones are offsets from UTC, and the tricky part is daylight saving, which shifts some of them twice a year.",
+            "easy",
+        ),
+        (
+            "validation",
+            "What did I ask you about earlier?",
+            "You asked about choosing a laptop for data work — memory size in particular — and then about time zones.",
+            "medium",
+        ),
+        (
+            "test",
+            "I'm frustrated, nothing is working today",
+            "That sounds draining. Tell me what you tried last and what happened, and we can work back from there together.",
+            "medium",
+        ),
+        (
+            "test",
+            "Goodbye!",
+            "Goodbye! Come back any time if you want to pick this up again.",
+            "easy",
+        ),
+    ],
+    "rag": [
+        (
+            "train",
+            "What is the refund window in the support policy?",
+            "Refunds are accepted within 30 days of purchase, according to the support policy.",
+            "easy",
+        ),
+        (
+            "train",
+            "Which regions does the platform run in?",
+            "The platform runs in eu-west-1 and us-east-1, per the deployment overview.",
+            "easy",
+        ),
+        (
+            "train",
+            "How long are audit logs retained?",
+            "Audit logs are retained for 400 days, as stated in the compliance handbook.",
+            "medium",
+        ),
+        (
+            "train",
+            "Who approves a production database migration?",
+            "A production migration needs approval from the owning team lead and the on-call SRE, per the change policy.",
+            "medium",
+        ),
+        (
+            "validation",
+            "What is the support response target for a Sev-1?",
+            "The Sev-1 response target is 15 minutes, around the clock, according to the support policy.",
+            "medium",
+        ),
+        (
+            "validation",
+            "Does the free tier include SSO?",
+            "No — the pricing page lists SSO as a paid-tier feature.",
+            "easy",
+        ),
+        (
+            "test",
+            "Summarise the backup schedule and cite the source",
+            "Backups run nightly and are kept for 35 days (source: operations runbook).",
+            "hard",
+        ),
+        (
+            "test",
+            "What happens when a document has no matching source?",
+            "When nothing relevant is retrieved, say so plainly rather than answering from memory.",
+            "hard",
+        ),
+    ],
+    "coordinator": [
+        (
+            "train",
+            "My invoice is wrong, I was charged twice",
+            "This is a billing issue: route it to the billing specialist with the duplicate charge details.",
+            "easy",
+        ),
+        (
+            "train",
+            "The API returns 500 on every upload",
+            "This is a technical fault: route it to the engineering specialist with the endpoint and status code.",
+            "easy",
+        ),
+        (
+            "train",
+            "How much does the enterprise plan cost?",
+            "This is a sales question: route it to the sales specialist for current enterprise pricing.",
+            "easy",
+        ),
+        (
+            "train",
+            "I need to export all my data before we cancel",
+            "This spans account management and engineering: route it to the account specialist and attach the export request.",
+            "medium",
+        ),
+        (
+            "validation",
+            "Can you reset the password on my account?",
+            "This is an account request: route it to the account specialist for a verified password reset.",
+            "easy",
+        ),
+        (
+            "validation",
+            "Our latency doubled after the last release",
+            "This is a technical regression: route it to the engineering specialist with the release window.",
+            "medium",
+        ),
+        (
+            "test",
+            "I was charged after cancelling and support never replied",
+            "This spans billing and support escalation: route it to billing first, then flag the unanswered ticket.",
+            "hard",
+        ),
+        (
+            "test",
+            "What is the weather today?",
+            "This is out of scope: answer directly that the platform handles account, billing, and technical topics.",
+            "easy",
+        ),
+    ],
+    "extraction": [
+        (
+            "train",
+            "Extract the parties from: 'This agreement is between Acme Ltd and Globex Inc.'",
+            "Parties: Acme Ltd; Globex Inc.",
+            "easy",
+        ),
+        (
+            "train",
+            "Extract the effective date from: 'Effective as of 1 March 2025.'",
+            "Effective date: 2025-03-01.",
+            "easy",
+        ),
+        (
+            "train",
+            "Extract the payment terms from: 'Invoices are due net 30 from receipt.'",
+            "Payment terms: net 30 days from receipt.",
+            "medium",
+        ),
+        (
+            "train",
+            "Extract the governing law from: 'Governed by the laws of Ireland.'",
+            "Governing law: Ireland.",
+            "easy",
+        ),
+        (
+            "validation",
+            "Extract the notice period from: 'Either party may terminate on 60 days written notice.'",
+            "Notice period: 60 days, written, either party.",
+            "medium",
+        ),
+        (
+            "validation",
+            "Extract the contract value from: 'Total consideration is EUR 120,000 per annum.'",
+            "Contract value: EUR 120,000 per year.",
+            "medium",
+        ),
+        (
+            "test",
+            "Extract every obligation from: 'The supplier shall deliver monthly reports and maintain 99.9% uptime.'",
+            "Obligations: deliver monthly reports; maintain 99.9% uptime.",
+            "hard",
+        ),
+        (
+            "test",
+            "Extract the renewal terms from: 'Renews automatically unless cancelled 30 days prior.'",
+            "Renewal: automatic, unless cancelled at least 30 days before the term ends.",
+            "hard",
+        ),
+    ],
+}
+
+#: Templates that reuse another family's seed rows.
+_SEED_ALIASES: dict[str, str] = {
+    "class": "basic",
+    "full": "basic",
+    "langchain": "basic",
+    "deepagent": "basic",
+    "custom": "basic",
+    "legacy_dict": "basic",
+    "pipeline": "basic",
+    "ingestion": "rag",
+}
 
 
-def _train_py(name: str) -> str:
+def _dataset_jsonl(name: str, template: str = "basic") -> str:
+    """Render a seed ``datasets/all.jsonl`` for an agent.
+
+    The path matters: ``train.py`` / ``eval.py`` resolve their dataset from
+    ``<agent_dir>/datasets/all.jsonl`` by default, so a scaffolded agent is
+    trainable with no arguments and no hand-written data.
+
+    Args:
+        name: Agent name (used to build stable example ids).
+        template: Template family — picks topically matching dummy rows.
+
+    Returns:
+        JSONL text, one ``AgentExample`` per line, split across
+        train / validation / test.
+    """
+    family = _SEED_ALIASES.get(template, template)
+    rows = _SEED_ROWS.get(family, _SEED_ROWS["basic"])
+    lines = []
+    for idx, (split, query, response, difficulty) in enumerate(rows, start=1):
+        lines.append(
+            json.dumps(
+                {
+                    "id": f"{name}_{idx:03d}",
+                    "split": split,
+                    "input": {"current_query": query, "question": query},
+                    "expected_output": {"response": response},
+                    "metadata": {"domain": family, "difficulty": difficulty, "source": "seed"},
+                },
+                ensure_ascii=False,
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _wrap_literal(text: str, indent: str, width: int = 84) -> str:
+    """Render *text* as indented, implicitly-concatenated string literals.
+
+    The judge criteria are long sentences, and a scaffolded project is linted
+    at ruff's default 88-column limit — so they have to be split at render
+    time rather than emitted on one line.
+
+    Args:
+        text: Sentence to wrap.
+        indent: Leading whitespace for every emitted line.
+        width: Maximum total line width including *indent* and quotes.
+
+    Returns:
+        The wrapped literal block, without a trailing newline.
+    """
+    budget = max(width - len(indent) - 2, 20)
+    lines: list[str] = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}" if current else word
+        # +1 leaves room for the trailing space that joins to the next chunk.
+        if current and len(candidate) + 1 > budget:
+            lines.append(current + " ")
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return "\n".join(f'{indent}"{line}"' for line in lines)
+
+
+#: Judge criteria + dimensions used by the scaffolded ``train.py`` / ``eval.py``.
+#: A generic rubric scores every agent the same way; these give each template a
+#: rubric that actually matches what its agent is for, so a fit run has a signal
+#: worth climbing.
+_JUDGE_RUBRICS: dict[str, tuple[str, list[str]]] = {
+    "basic": (
+        "Evaluate whether the response is relevant to the query, accurate, "
+        "well-structured, and actionable. Provide graded 0-1 scores with "
+        "clear motivation.",
+        ["relevance", "accuracy", "structure"],
+    ),
+    "chatbot": (
+        "Evaluate whether the reply answers the latest turn, stays consistent "
+        "with the conversation so far, and keeps a natural, helpful tone. "
+        "Provide graded 0-1 scores with clear motivation.",
+        ["relevance", "coherence", "tone"],
+    ),
+    "rag": (
+        "Evaluate whether the answer is grounded in the retrieved context, "
+        "cites where it came from, and refuses to invent facts the context "
+        "does not support. Provide graded 0-1 scores with clear motivation.",
+        ["groundedness", "relevance", "citation"],
+    ),
+    "coordinator": (
+        "Evaluate whether the request was routed to the right specialist, "
+        "whether the decision is stated unambiguously, and whether "
+        "out-of-scope requests are declined. Provide graded 0-1 scores with "
+        "clear motivation.",
+        ["routing_accuracy", "decisiveness", "scope"],
+    ),
+    "extraction": (
+        "Evaluate whether every requested field was extracted, whether the "
+        "values match the source text exactly, and whether nothing was "
+        "invented. Provide graded 0-1 scores with clear motivation.",
+        ["completeness", "faithfulness", "format"],
+    ),
+}
+
+_JUDGE_ALIASES: dict[str, str] = {"class": "basic", "full": "basic", "langchain": "basic"}
+
+
+def _judge_rubric(template: str) -> tuple[str, list[str]]:
+    """Return ``(criteria, dimensions)`` for a template family.
+
+    Args:
+        template: Template name.
+
+    Returns:
+        The judge criteria string and its dimension names.
+    """
+    family = _JUDGE_ALIASES.get(template, template)
+    return _JUDGE_RUBRICS.get(family, _JUDGE_RUBRICS["basic"])
+
+
+def _train_py(name: str, template: str = "basic") -> str:
     title = name.replace("_", " ").title().replace(" ", "")
+    criteria, dimensions = _judge_rubric(template)
+    criteria_block = _wrap_literal(criteria, " " * 16)
+    dimensions_literal = "[" + ", ".join(f'"{d}"' for d in dimensions) + "]"
     return f'''#!/usr/bin/env python3
 """Fit **{name}** prompts via Agentomatic ``train_and_report``.
 
@@ -1687,6 +2208,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agentomatic.config.settings import load_environment
+from agentomatic.core.lifespan import configure_logging
 from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
@@ -1702,6 +2224,9 @@ console = Console()
 
 def main(argv: list[str] | None = None) -> int:
     """Fit {name} prompts (settings → agent → train_and_report)."""
+    # Library defaults are DEBUG-chatty; keep the fit output readable.
+    configure_logging(os.getenv("AGENTOMATIC_LOG_LEVEL", "INFO"))
+
     # --- settings (AGENTOMATIC_* env + optional CLI overrides) ---
     cli = TrainCliSettings.parse(argv)
 
@@ -1725,11 +2250,9 @@ def main(argv: list[str] | None = None) -> int:
             env_path=ENV_PATH,
             required_keys=["response"],
             judge_criteria=(
-                "Evaluate whether the response is relevant to the query, "
-                "accurate, well-structured, and actionable. Provide graded "
-                "0–1 scores with clear motivation."
+{criteria_block}
             ),
-            judge_dimensions=["relevance", "accuracy", "structure"],
+            judge_dimensions={dimensions_literal},
         ),
     )
     print_train_result(result, console=console)
@@ -1770,8 +2293,11 @@ if __name__ == "__main__":
 '''
 
 
-def _eval_py(name: str) -> str:
+def _eval_py(name: str, template: str = "basic") -> str:
     title = name.replace("_", " ").title().replace(" ", "")
+    criteria, dimensions = _judge_rubric(template)
+    criteria_block = _wrap_literal(criteria, " " * 16)
+    dimensions_literal = "[" + ", ".join(f'"{d}"' for d in dimensions) + "]"
     return f'''#!/usr/bin/env python3
 """Evaluate **{name}** via Agentomatic ``evaluate_and_report``.
 
@@ -1798,6 +2324,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agentomatic.config.settings import load_environment
+from agentomatic.core.lifespan import configure_logging
 from agentomatic.optimize import EvalCliSettings, evaluate_and_report, print_eval_result
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.stacks.manager import StackManager
@@ -1813,6 +2340,9 @@ console = Console()
 
 def main(argv: list[str] | None = None) -> int:
     """Evaluate {name} (settings → agent → evaluate_and_report)."""
+    # Library defaults are DEBUG-chatty; keep the eval output readable.
+    configure_logging(os.getenv("AGENTOMATIC_LOG_LEVEL", "INFO"))
+
     # --- settings (AGENTOMATIC_* env + optional CLI overrides) ---
     cli = EvalCliSettings.parse(argv)
 
@@ -1843,11 +2373,9 @@ def main(argv: list[str] | None = None) -> int:
             env_path=ENV_PATH,
             required_keys=["response"],
             judge_criteria=(
-                "Evaluate whether the response is relevant to the query, "
-                "accurate, well-structured, and actionable. Provide graded "
-                "0–1 scores with clear motivation."
+{criteria_block}
             ),
-            judge_dimensions=["relevance", "accuracy", "structure"],
+            judge_dimensions={dimensions_literal},
         ),
     )
     print_eval_result(result, agent_name=AGENT, console=console)
@@ -1887,7 +2415,7 @@ Usage::
 Equivalent CLI (skips this script entirely)::
 
     agentomatic optimize {name} \\
-        --dataset agents/{name}/dataset.jsonl \\
+        --dataset agents/{name}/datasets/all.jsonl \\
         --mode param_search \\
         --search-space agents/{name}/search_space.yaml
 """
@@ -2040,7 +2568,7 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--dataset", type=str, default=str(DATA_DIR / "dataset.jsonl"),
+        "--dataset", type=str, default=str(DATA_DIR / "datasets" / "all.jsonl"),
         help="Path to training dataset (JSONL)"
     )
     parser.add_argument(
@@ -2226,7 +2754,49 @@ few_shot_selection_strategy: diversity_weighted   # top_k | diversity_weighted |
 """
 
 
-def _makefile(name: str) -> str:
+def _makefile(name: str, template: str = "full") -> str:
+    """Return the agent Makefile.
+
+    Args:
+        name: Agent name.
+        template: Template family. Only ``full`` scaffolds ``optimize.py`` /
+            ``predict.py``, so the leaner templates get a Makefile without
+            targets that would call missing files.
+
+    Returns:
+        Makefile source.
+    """
+    if template != "full":
+        return f"""# Makefile for {name} agent
+#
+# Usage:
+#   make train   — Fit the agent's prompts against datasets/all.jsonl
+#   make eval    — Evaluate on the test split
+#   make all     — train → eval
+#
+# Both read the active stack (see stacks/local.yaml), so a local SLM server
+# is all they need.
+
+.PHONY: train eval eval-all all
+
+AGENT = {name}
+
+train:
+\t@echo "\\n🏋️  Training $(AGENT)..."
+\tpython -m agents.$(AGENT).train
+
+eval:
+\t@echo "\\n📊 Evaluating $(AGENT)..."
+\tpython -m agents.$(AGENT).eval --split test
+
+eval-all:
+\t@echo "\\n📊 Evaluating $(AGENT) on all splits..."
+\tpython -m agents.$(AGENT).eval --split all
+
+all: train eval
+\t@echo "\\n✅ Pipeline complete!"
+"""
+
     return f"""# Makefile for {name} agent — ML lifecycle commands
 #
 # Usage:
@@ -2892,7 +3462,7 @@ Open `agent.py` and replace the body of `extract()` with your real
 extraction logic (LLM prompt, regex chains, structured-output parser,
 etc.).  Each map iteration receives a different `scope` under
 `state.scope`, so a single agent produces N parallel extractions.
-"""
+""" + _training_readme_section(name)
 
 
 # =====================================================================
@@ -3079,7 +3649,28 @@ curl -X POST http://localhost:8000/api/v1/{name}/invoke \\
 - Declare `agent_framework = "langchain"` if you want Studio's
   LangChain adapter (SSE / LCEL graph) instead of the graph-agent one.
 - See `docs/guide/langchain-adapter.md` for the full helper API.
-"""
+""" + _training_readme_section(name)
+
+
+def _training_files(name: str, template: str) -> dict[str, str]:
+    """Return the dataset + fit scripts shared by every class-agent template.
+
+    Args:
+        name: Agent name.
+        template: Template family (selects topically matching seed rows).
+
+    Returns:
+        Relative path → content for the training bundle, or an empty dict for
+        templates that do not scaffold a class agent.
+    """
+    if template not in TRAINABLE_TEMPLATES:
+        return {}
+    return {
+        "datasets/all.jsonl": _dataset_jsonl(name, template),
+        "train.py": _train_py(name, template),
+        "eval.py": _eval_py(name, template),
+        "Makefile": _makefile(name, template),
+    }
 
 
 def get_template_files(template: str, name: str) -> dict[str, str]:
@@ -3111,12 +3702,16 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
         ".env.example": _env_example(name),
         "README.md": _readme_md(name, template),
     }
+    # Dataset + train.py + eval.py + Makefile, so every class agent is
+    # trainable the moment it is scaffolded.
+    training = _training_files(name, template)
 
     if template == "basic":
         return {
             "__init__.py": _agent_manifest_init_py(name, description, keywords),
             "agent.py": _class_agent_py(name, "basic"),
             "llm.py": _llm_py(name),
+            **training,
             **common,
         }
 
@@ -3129,13 +3724,10 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "schemas.py": _schemas_py(name),
             "tools.py": _tools_py(name),
             "api.py": _api_py(name),
-            "dataset.jsonl": _dataset_jsonl(name),
-            "train.py": _train_py(name),
-            "eval.py": _eval_py(name),
             "optimize.py": _optimize_py(name),
             "predict.py": _predict_py(name),
             "search_space.yaml": _search_space_yaml(name),
-            "Makefile": _makefile(name),
+            **training,
             **common,
         }
 
@@ -3149,6 +3741,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "delegation.py": _coordinator_delegation_py(name),
             "security.py": _coordinator_security_py(name),
             "config.py": _config_py(name),
+            **training,
             **common,
         }
 
@@ -3156,7 +3749,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
         return {
             "pipeline.yaml": _pipeline_yaml(name),
             "README.md": _pipeline_readme(name),
-            "dataset.jsonl": _dataset_jsonl(name),
+            "dataset.jsonl": _pipeline_dataset_jsonl(name),
             "eval.py": _pipeline_eval_py(name),
             "optimize.py": _pipeline_optimize_py(name),
             "run.py": _pipeline_run_py(name),
@@ -3170,6 +3763,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "llm.py": _llm_py(name),
             "config.py": _config_py(name),
             "tools.py": _tools_py(name),
+            **training,
             **common,
         }
 
@@ -3179,6 +3773,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "agent.py": _class_agent_py(name, "chatbot"),
             "llm.py": _llm_py(name),
             "config.py": _config_py(name),
+            **training,
             **common,
         }
 
@@ -3254,6 +3849,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "prompts.json": _prompts_json(),
             ".env.example": _env_example(name),
             "README.md": _extraction_readme(name),
+            **training,
         }
 
     elif template == "langchain":
@@ -3265,6 +3861,7 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "langgraph.json": _langgraph_json(),
             ".env.example": _env_example(name),
             "README.md": _langchain_readme(name),
+            **training,
         }
 
     else:

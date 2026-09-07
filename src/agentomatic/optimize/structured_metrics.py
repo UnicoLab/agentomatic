@@ -108,20 +108,37 @@ def structured_composite_score(
       - must_include coverage: 0.25
       - next_action substance + overlap: 0.20
       - must_not_include penalty (subtract up to 0.30)
+
+    A response that is not a JSON object is treated as the primary field's
+    value at half schema credit, so plain-text agents still get a gradient the
+    prompt fitter can rank on.
     """
     keys = required_keys or ["content", "next_action", "response"]
     # Prefer content/next_action when present; else first two keys.
     primary = [k for k in ("content", "next_action", "response") if k in keys] or keys[:2]
 
     data = parse_prediction_json(response)
+    plain_text = False
     if not data:
-        return 0.0
+        # A plain-text answer is not a failure — most agents return prose, and
+        # returning 0.0 here made every candidate score identically, so prompt
+        # fitting could never rank one above another. Score the text as the
+        # single free-text field instead, and dock the schema term so a model
+        # that does honour a JSON contract still ranks above one that does not.
+        text_body = str(response or "").strip()
+        if not text_body:
+            return 0.0
+        data = {primary[0]: text_body} if primary else {"response": text_body}
+        plain_text = True
     exp = parse_expected_spec(expected)
     pred_content = str(data.get("content") or data.get("response") or "")
     pred_next = str(data.get("next_action") or "")
     text = json.dumps(data, ensure_ascii=False)
 
     schema = schema_quality(data, primary)
+    if plain_text:
+        # Half credit: the content is there, the declared structure is not.
+        schema *= 0.5
 
     exp_content = exp.get("content") or exp.get("response")
     content_score = (

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
@@ -10,6 +11,11 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from agentomatic.stacks.manager import StackManager
+
+#: Where a local oMLX / llama.cpp / vLLM style server listens by default.
+#: Kept in sync with ``agentomatic.optimize.llm_caller`` so the serving path
+#: and the optimization path agree on one endpoint.
+DEFAULT_OMLX_BASE_URL = "http://127.0.0.1:8000/v1"
 
 _llm_instance: Any = None
 _named_instances: dict[str, Any] = {}
@@ -264,6 +270,11 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
     * ``openai_compatible`` — any OpenAI-API-compatible endpoint (Groq,
       Together, LM Studio, vLLM, LiteLLM, …) — same as ``openai`` but the
       ``base_url`` is mandatory.
+    * ``omlx`` — a local OpenAI-compatible small-model server (oMLX, and by
+      extension llama.cpp / vLLM / LM Studio). Same wire protocol as
+      ``openai``; the ``base_url`` and ``api_key`` default to
+      ``OMLX_BASE_URL`` / ``OMLX_API_KEY`` so a scaffolded local stack runs
+      with no credentials at all.
     * ``azure`` — Azure OpenAI; accepts ``api_base`` / ``base_url`` as the
       endpoint, plus ``api_version`` and ``deployment_name``.
     * ``vertex`` — Google Vertex AI.
@@ -308,17 +319,27 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
             temperature=kwargs.get("temperature", 0.1),
         )
 
-    elif provider in ("openai", "openai_compatible"):
+    elif provider in ("openai", "openai_compatible", "omlx"):
         from langchain_openai import ChatOpenAI
 
         base_url = kwargs.get("base_url") or kwargs.get("api_base") or None
+        if provider == "omlx":
+            # A local server needs neither a URL nor a key in the stack file:
+            # fall back to the same env vars the optimizer's LLMCaller reads,
+            # then to oMLX's own default port.
+            base_url = base_url or os.getenv("OMLX_BASE_URL") or DEFAULT_OMLX_BASE_URL
         if provider == "openai_compatible" and not base_url:
             raise ValueError(
                 "openai_compatible LLMs require a base_url (or api_base). "
                 "Pass e.g. base_url='https://api.groq.com/openai/v1'."
             )
+        api_key = kwargs.get("api_key", "")
+        if provider == "omlx" and not api_key:
+            # ChatOpenAI refuses to build without *some* key; local servers
+            # ignore its value.
+            api_key = os.getenv("OMLX_API_KEY") or os.getenv("OPENAI_API_KEY") or "omlx"
         ctor_kwargs: dict[str, Any] = {
-            "api_key": kwargs.get("api_key", ""),
+            "api_key": api_key,
             "model": kwargs.get("model", "gpt-4"),
             "temperature": kwargs.get("temperature", 0.1),
         }
@@ -363,7 +384,8 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
     else:
         raise ValueError(
             f"Unknown LLM provider: {provider}. Built-in: ollama, azure, openai, "
-            f"openai_compatible, vertex, dummy. Registered: {registered_llm_providers()}. "
+            f"openai_compatible, omlx, vertex, dummy. "
+            f"Registered: {registered_llm_providers()}. "
             "Use register_llm_provider(name, builder) to add a custom one."
         )
 

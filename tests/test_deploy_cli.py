@@ -20,7 +20,11 @@ from click.testing import CliRunner
 
 from agentomatic.cli import deploy as deploy_mod
 from agentomatic.cli.commands import cli
-from agentomatic.stacks.defaults import get_default_local_stack, get_default_remote_stack
+from agentomatic.stacks.defaults import (
+    DEFAULT_LOCAL_MODEL,
+    get_default_local_stack,
+    get_default_remote_stack,
+)
 
 # =========================================================================
 # render_dockerfile / render_dockerfile_distroless — content assertions
@@ -80,9 +84,7 @@ class TestDockerfileRendering:
                 if line.startswith("RUN uv pip install") and "requirements.txt" in line
             ]
 
-            assert install_lines, (
-                f"{render.__name__} copies requirements.txt but never installs it"
-            )
+            assert install_lines, f"{render.__name__} copies requirements.txt, never installs it"
 
     def test_requirements_are_installed_after_agentomatic(self) -> None:
         """The pinned agentomatic above must win over any looser pin below."""
@@ -383,10 +385,10 @@ class TestEnvExampleRendering:
         stack = get_default_local_stack()
         env = deploy_mod.render_env_example(stack)
         assert "AGENTOMATIC_STACK=local" in env
-        assert "LLM__PROVIDER=ollama" in env
-        assert "LLM__MODEL=mistral:7b" in env
-        assert "LLM__OLLAMA_BASE_URL=http://localhost:11434" in env
-        assert "EMBEDDING__PROVIDER=ollama" in env
+        # The local stack targets a local OpenAI-compatible SLM server.
+        assert "LLM__PROVIDER=omlx" in env
+        assert f"LLM__MODEL={DEFAULT_LOCAL_MODEL}" in env
+        assert "EMBEDDING__PROVIDER=hash" in env
         assert "DB__URL=sqlite+aiosqlite:///data/platform.db" in env
 
     def test_remote_stack_preserves_env_placeholders(self) -> None:
@@ -623,7 +625,7 @@ class TestStackExportCli:
             ],
         )
         assert result.exit_code == 0, result.output
-        assert "LLM__PROVIDER=ollama" in result.output
+        assert "LLM__PROVIDER=omlx" in result.output
         assert "AGENTOMATIC_STACK=local" in result.output
 
     def test_export_to_file(self, tmp_path: Path) -> None:

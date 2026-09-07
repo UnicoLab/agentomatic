@@ -71,8 +71,9 @@ class LLMStackEntry(BaseModel):
     provider: str = Field(
         ...,
         description=(
-            "LLM provider: ollama | openai | openai_compatible | azure | vertex | "
-            "dummy | any name registered via agentomatic.providers.register_llm_provider "
+            "LLM provider: ollama | omlx | openai | openai_compatible | azure | "
+            "vertex | dummy | any name registered via "
+            "agentomatic.providers.register_llm_provider "
             "(e.g. a token-gated internal gateway)"
         ),
     )

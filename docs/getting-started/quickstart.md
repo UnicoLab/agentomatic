@@ -12,13 +12,26 @@ Before you begin, make sure you have the following:
 |-------------|---------|---------------|
 | **Python** | 3.11+ | `python --version` |
 | **pip** or **uv** | Latest | `pip --version` / `uv --version` |
-| **LLM API key** | — | `echo $OPENAI_API_KEY` or local Ollama |
+| **A local model server** | — | `curl http://127.0.0.1:8000/v1/models` |
+| **LLM API key** (optional) | — | `echo $OPENAI_API_KEY` |
 
-!!! tip "Local LLMs with Ollama"
-    You don't need an OpenAI API key to get started. Agentomatic works with [Ollama](https://ollama.com) out of the box:
+!!! tip "No API key needed — the default stack is local"
+    A scaffolded project ships a `local` stack pointing at an OpenAI-compatible
+    small-model server on your own machine. oMLX is the default; llama.cpp,
+    vLLM, LM Studio and Ollama's OpenAI-compatible endpoint all work by
+    changing `base_url` in `stacks/local.yaml`.
+
     ```bash
-    # Install Ollama, then pull a model
-    ollama pull mistral:7b
+    omlx serve --model <your-model>        # defaults to port 8000
+    ```
+
+    Then point `stacks/local.yaml` at the model your server loaded — or export
+    `AGENTOMATIC_LOCAL_MODEL` *before* scaffolding and it is baked in for you.
+
+!!! warning "Port 8000 is taken by your model server"
+    The platform defaults to port 8000 too. Start it somewhere else:
+    ```bash
+    agentomatic run --port 8001
     ```
 
 ---
@@ -96,13 +109,30 @@ This creates a self-contained agent package under `agents/`:
 
 ```text
 agents/my_chatbot/
-├── __init__.py      # AgentManifest card
-├── agent.py         # REQUIRED: BaseGraphAgent subclass
-├── llm.py           # Stack-aware LLM helpers
-├── prompts.json     # Versioned system and user prompt templates
-├── langgraph.json   # LangGraph Studio local settings
-├── .env.example     # Environment variables blueprint
-└── README.md        # Agent documentation
+├── __init__.py         # AgentManifest card
+├── agent.py            # REQUIRED: BaseGraphAgent subclass
+├── llm.py              # Stack-aware LLM helpers
+├── prompts.json        # Versioned system and user prompt templates
+├── datasets/all.jsonl  # Seed dataset (dummy rows — replace with real ones)
+├── train.py            # Fit prompts against that dataset
+├── eval.py             # Score the agent on the test split
+├── Makefile            # make train / make eval
+├── langgraph.json      # LangGraph Studio local settings
+├── .env.example        # Environment variables blueprint
+└── README.md           # Agent documentation
+```
+
+Run in a directory that has no project yet, `init` also writes
+`stacks/local.yaml`, `stacks/remote.yaml` and `.agentomatic-stack`, so the
+agent has an LLM to resolve without `agentomatic new` first.
+
+The dataset and fit scripts ship with every class-agent template (`basic`,
+`full`, `chatbot`, `rag`, `coordinator`, `langchain`, `extraction`), so prompt
+optimization runs the moment the agent exists:
+
+```bash
+python agents/my_chatbot/train.py --epochs 1 --trials 4
+python agents/my_chatbot/eval.py --split test
 ```
 
 !!! note "Available Templates"
