@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.13.0 (2026-09-07)
+
+### Code Style
+
+- Write long asserts so both pinned ruff versions agree
+  ([`3102795`](https://github.com/UnicoLab/agentomatic/commit/310279504611516cefef69b71be52e82c8c0c1f8))
+
+### Continuous Integration
+
+- Install extras in the PR Quality Gate so its test step can collect
+  ([`dc3c5e1`](https://github.com/UnicoLab/agentomatic/commit/dc3c5e1092309ce932d3b3ea29df88333b534273))
+
+### Features
+
+- **cli**: Verify the local model name in `agentomatic doctor`
+  ([`5cd7a30`](https://github.com/UnicoLab/agentomatic/commit/5cd7a304233784347dd3a61ee9094d9438a47165))
+
+- **templates**: Scaffold local-first agents that run and train out of the box
+  ([`3684bdf`](https://github.com/UnicoLab/agentomatic/commit/3684bdfc8c4e653d0e200f860fa304bef3ff85fa))
+
+
 ## v1.12.0 (2026-09-04)
 
 ### Bug Fixes
