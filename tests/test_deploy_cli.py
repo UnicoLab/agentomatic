@@ -84,9 +84,7 @@ class TestDockerfileRendering:
                 if line.startswith("RUN uv pip install") and "requirements.txt" in line
             ]
 
-            assert install_lines, (
-                f"{render.__name__} copies requirements.txt but never installs it"
-            )
+            assert install_lines, f"{render.__name__} copies requirements.txt, never installs it"
 
     def test_requirements_are_installed_after_agentomatic(self) -> None:
         """The pinned agentomatic above must win over any looser pin below."""

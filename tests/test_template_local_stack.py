@@ -133,9 +133,8 @@ class TestTrainingBundle:
         ]
         assert len(rows) >= 6
         splits = {row["split"] for row in rows}
-        assert {"train", "validation", "test"} <= splits, (
-            "EarlyStopping monitors val_loss, so a validation split must exist"
-        )
+        # EarlyStopping monitors val_loss, so a validation split must exist.
+        assert {"train", "validation", "test"} <= splits, f"missing splits: {splits}"
         for row in rows:
             example = AgentExample.from_dict(row)
             assert example.input.get("current_query")
@@ -146,9 +145,8 @@ class TestTrainingBundle:
         if template in TRAINABLE_TEMPLATES or template in ("plugin", "pipeline"):
             return
         files = get_template_files(template, "bot")
-        assert "datasets/all.jsonl" not in files, (
-            f"{template} has no BaseGraphAgent for train.py to fit"
-        )
+        # train.py fits a BaseGraphAgent; these templates do not define one.
+        assert "datasets/all.jsonl" not in files, f"{template} has no BaseGraphAgent"
 
     def test_judge_rubric_matches_the_template(self) -> None:
         assert "grounded" in get_template_files("rag", "bot")["train.py"]
