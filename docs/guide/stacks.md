@@ -36,6 +36,44 @@ A complete stack configuration is defined under a `StackConfig` structure. This 
 - **environment**: Process defaults that may reference external variables or
   other keys in the same block.
 
+### The generated `stacks/local.yaml`
+
+`agentomatic new` (and `agentomatic init` in a bare directory) writes a `local`
+stack that targets an **OpenAI-compatible small-model server on your own
+machine** — no cloud credentials, no API key:
+
+```yaml
+name: local
+llm:
+  default:
+    provider: omlx           # local OpenAI-compatible server
+    model: Qwen3.5-9B-MLX-4bit
+    base_url: http://127.0.0.1:8000/v1
+    temperature: 0.1
+  fast: { ... }              # cheap/auxiliary calls
+  judge: { ... }             # scoring in train.py / eval.py
+  rewrite: { ... }           # prompt rewriting in train.py
+embedding:
+  provider: hash             # deterministic, no second server to run
+  dimension: 256
+```
+
+- The `omlx` provider speaks plain OpenAI protocol, so **llama.cpp, vLLM and
+  LM Studio work too** — only `base_url` changes.
+- Leave `base_url` / `api_key` empty and the provider falls back to
+  `OMLX_BASE_URL` / `OMLX_API_KEY`, then to `http://127.0.0.1:8000/v1`.
+- `model` must match what your server has loaded. Export
+  `AGENTOMATIC_LOCAL_MODEL` before scaffolding to bake the right name in.
+- The four profiles exist because `train.py` looks up `judge` and `rewrite`;
+  a missing profile silently falls back to `default`.
+- Swap `embedding.provider` to `ollama` (`nomic-embed-text`) or `openai` once
+  retrieval quality matters — `hash` is deterministic, not semantic.
+
+!!! warning "Port collision"
+    oMLX and `agentomatic run` both default to port 8000. Run the platform
+    elsewhere: `agentomatic run --port 8001`. `agentomatic doctor` probes the
+    active stack's endpoint and tells you when nothing is listening.
+
 ### Example: `stacks/production.yaml`
 
 ```yaml

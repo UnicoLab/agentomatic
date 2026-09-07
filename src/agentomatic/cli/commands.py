@@ -178,6 +178,116 @@ def cli(ctx: click.Context, version: bool) -> None:
 # =====================================================================
 
 
+def _agent_dataset_path(agent_dir: Path) -> Path | None:
+    """Return the agent's seed dataset, whichever layout it uses.
+
+    Scaffolded agents put theirs at ``datasets/all.jsonl`` — where
+    ``train.py`` / ``eval.py`` resolve it by default — but a flat
+    ``dataset.jsonl`` beside ``agent.py`` is still a valid hand-rolled layout.
+
+    Args:
+        agent_dir: The agent package directory.
+
+    Returns:
+        The first dataset found, or ``None`` when the agent has none.
+    """
+    for candidate in (agent_dir / "datasets" / "all.jsonl", agent_dir / "dataset.jsonl"):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _check_stack_llm_endpoint(stacks_path: Path, stack_name: str) -> tuple[str, bool, str]:
+    """Probe the active stack's default LLM endpoint.
+
+    A local model server that is not running is the most common cause of a
+    scaffolded agent returning errors, and nothing else in ``doctor`` catches
+    it. Only endpoints reachable over HTTP are probed; cloud providers are
+    reported as configured without a network call.
+
+    Args:
+        stacks_path: Directory holding the stack YAML files.
+        stack_name: Name of the active stack.
+
+    Returns:
+        A ``(component, ok, detail)`` row for the doctor table.
+    """
+    label = "LLM endpoint"
+    try:
+        from agentomatic.stacks.manager import StackManager
+
+        manager = StackManager(stacks_path)
+        manager.load(stack_name)
+        entry = manager.get_llm_config("default")
+    except Exception as exc:  # noqa: BLE001 - doctor must never raise
+        return (label, False, f"Could not read stack '{stack_name}': {exc}")
+
+    provider = (entry.provider or "").lower()
+    base_url = entry.base_url or (os.getenv("OMLX_BASE_URL", "") if provider == "omlx" else "")
+    if provider == "omlx" and not base_url:
+        from agentomatic.providers.llm import DEFAULT_OMLX_BASE_URL
+
+        base_url = DEFAULT_OMLX_BASE_URL
+    if provider == "ollama" and not base_url:
+        base_url = "http://localhost:11434"
+
+    if not base_url:
+        return (label, True, f"{provider}/{entry.model} (remote provider — not probed)")
+
+    probe = base_url.rstrip("/") + ("/models" if base_url.rstrip("/").endswith("/v1") else "")
+    try:
+        import httpx
+
+        response = httpx.get(probe, timeout=3.0)
+        reachable = response.status_code < 500
+    except Exception as exc:  # noqa: BLE001 - a failed probe is the finding
+        return (
+            label,
+            False,
+            f"{provider}/{entry.model} at {base_url} is unreachable ({type(exc).__name__}). "
+            "Start your model server, or edit stacks/"
+            f"{stack_name}.yaml.",
+        )
+    if not reachable:
+        return (label, False, f"{base_url} answered HTTP {response.status_code}")
+    return (label, True, f"{provider}/{entry.model} reachable at {base_url}")
+
+
+def _ensure_project_context(parent: Path) -> list[str]:
+    """Create the project files a scaffolded agent needs in order to run.
+
+    ``agentomatic init <agent>`` is often the first command a user types, in a
+    directory that has never seen ``agentomatic new``. Without a stack the
+    agent gets no LLM, and ``train.py`` cannot resolve one either — so the
+    agent scaffolds successfully and then fails at the first invoke. This
+    fills in the missing pieces (stacks, active-stack marker, package init)
+    without touching anything that already exists.
+
+    Args:
+        parent: Directory the agent package was written into (e.g. ``agents``).
+
+    Returns:
+        Relative paths of the files that were created, in write order.
+    """
+    from agentomatic.stacks.defaults import get_default_stack_yaml
+
+    root = parent.parent
+    created: list[str] = []
+    wanted: dict[Path, str] = {
+        root / "stacks" / "local.yaml": get_default_stack_yaml("local"),
+        root / "stacks" / "remote.yaml": get_default_stack_yaml("remote"),
+        root / ".agentomatic-stack": "local\n",
+        parent / "__init__.py": f'"""Agentomatic {parent.name} package."""\n',
+    }
+    for path, content in wanted.items():
+        if path.exists():
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        created.append(str(path))
+    return created
+
+
 # Default top-level directories for non-agent templates (platform discovery paths).
 _TEMPLATE_DEFAULT_DIRS: dict[str, str] = {
     "plugin": "plugins",
@@ -230,7 +340,7 @@ def init(
         agentomatic init docs --template ingestion   # → ingestion/docs/
         agentomatic init scoring --template endpoint # → endpoints/scoring/
     """
-    from .templates import TEMPLATES, get_template_files
+    from .templates import TEMPLATES, TRAINABLE_TEMPLATES, get_template_files
 
     _print_banner()
 
@@ -330,6 +440,12 @@ def init(
     logger.success(f"Created '{name}' with template '{template}'")
     click.echo(f"   📍 Location: {target}")
     click.echo(f"   📦 Written: {written}  ·  Skipped: {skipped}")
+
+    # A bare `agentomatic init <agent>` should leave a runnable workspace, not
+    # an agent with no stack to get its LLM from.
+    bootstrapped = _ensure_project_context(Path(parent))
+    if bootstrapped:
+        click.echo(f"   🧩 Bootstrapped: {', '.join(bootstrapped)}")
     click.echo()
 
     if template == "plugin":
@@ -404,14 +520,23 @@ def init(
             f"  4. [cyan]agentomatic run --studio[/cyan]\n\n"
         )
     else:
+        train_step = (
+            f"  5. [cyan]python {target / 'train.py'} --epochs 1 --trials 4[/cyan]"
+            f" — fit prompts on [yellow]{target / 'datasets' / 'all.jsonl'}[/yellow]\n"
+            if template in TRAINABLE_TEMPLATES
+            else ""
+        )
         steps = (
             f"[bold]Next steps:[/bold]\n\n"
-            f"  1. Edit [yellow]{target / edit_file}[/yellow]\n"
-            f"  2. Review [yellow]{target / '__init__.py'}[/yellow] "
+            f"  1. Start your local model server, then point "
+            f"[yellow]stacks/local.yaml[/yellow] at the model it loaded\n"
+            f"  2. Edit [yellow]{target / edit_file}[/yellow]\n"
+            f"  3. Review [yellow]{target / '__init__.py'}[/yellow] "
             f"(AgentManifest / card) and [yellow]llm.py[/yellow]\n"
-            f"  3. [cyan]agentomatic run --studio[/cyan]\n"
-            f"  4. Open [link=http://localhost:8000/docs]"
-            f"http://localhost:8000/docs[/link]\n\n"
+            f"  4. [cyan]agentomatic run --studio --port 8001[/cyan] "
+            f"(oMLX holds 8000) → [link=http://localhost:8001/docs]"
+            f"http://localhost:8001/docs[/link]\n"
+            f"{train_step}\n"
         )
 
     if HAS_RICH:
@@ -424,7 +549,7 @@ def init(
             .replace("[/yellow]", "")
             .replace("[cyan]", "")
             .replace("[/cyan]", "")
-            .replace("[link=http://localhost:8000/docs]", "")
+            .replace("[link=http://localhost:8001/docs]", "")
             .replace("[/link]", "")
         )
 
@@ -1054,7 +1179,7 @@ def list_agents(agents_dir: str) -> None:
         # ML lifecycle files
         info["has_train"] = (entry / "train.py").exists()
         info["has_eval"] = (entry / "eval.py").exists()
-        info["has_dataset"] = (entry / "dataset.jsonl").exists()
+        info["has_dataset"] = _agent_dataset_path(entry) is not None
         info["has_optimize"] = (entry / "optimize.py").exists()
 
         agents.append(info)
@@ -1371,7 +1496,7 @@ def inspect(name: str, agents_dir: str) -> None:
         # Separator
         cap_table.add_row("[dim]── ML Lifecycle ──[/dim]", "")
         ml_caps = [
-            ("📦 Dataset (dataset.jsonl)", (target / "dataset.jsonl").exists()),
+            ("📦 Dataset (datasets/all.jsonl)", _agent_dataset_path(target) is not None),
             ("🏋️  Train Script (train.py)", (target / "train.py").exists()),
             ("📊 Eval Script (eval.py)", (target / "eval.py").exists()),
             ("🔧 Optimize Script (optimize.py)", (target / "optimize.py").exists()),
@@ -1415,7 +1540,7 @@ def inspect(name: str, agents_dir: str) -> None:
             ("Schemas (schemas.py)", (target / "schemas.py").exists()),
             ("Tools (tools.py)", (target / "tools.py").exists()),
             ("Custom API (api.py)", (target / "api.py").exists()),
-            ("Dataset (dataset.jsonl)", (target / "dataset.jsonl").exists()),
+            ("Dataset (datasets/all.jsonl)", _agent_dataset_path(target) is not None),
             ("Train (train.py)", (target / "train.py").exists()),
             ("Eval (eval.py)", (target / "eval.py").exists()),
             ("Optimize (optimize.py)", (target / "optimize.py").exists()),
@@ -1500,6 +1625,7 @@ def doctor(agents_dir: str) -> None:
 
     # Active stack
     active_file = Path(".agentomatic-stack")
+    active_name = ""
     if active_file.exists():
         active_name = active_file.read_text().strip()
         checks.append(("Active stack", True, active_name))
@@ -1507,6 +1633,10 @@ def doctor(agents_dir: str) -> None:
         checks.append(
             ("Active stack", False, "No active stack — run: agentomatic stack use <name>")
         )
+
+    # LLM endpoint — the single most common reason a scaffolded agent 500s.
+    if stacks_path.exists() and active_name:
+        checks.append(_check_stack_llm_endpoint(stacks_path, active_name))
 
     if HAS_RICH:
         table = Table(title="🩺 Environment Health Check", show_lines=True)

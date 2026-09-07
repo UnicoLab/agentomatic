@@ -223,7 +223,10 @@ class TestScaffolding:
         target = tmp_dir / "hello"
         target.mkdir()
         for rel_path, content in files.items():
-            (target / rel_path).write_text(content)
+            # Templates ship nested paths (datasets/all.jsonl), same as the CLI.
+            path = target / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
 
         assert (target / "__init__.py").exists()
         assert (target / "agent.py").exists()

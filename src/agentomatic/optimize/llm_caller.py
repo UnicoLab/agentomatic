@@ -252,6 +252,10 @@ class LLMCaller:
                     explicit_base=explicit_base,
                 )
             if provider == "omlx":
+                # An explicit base (per-call or ``LLMCaller.configure``, which
+                # is how a stack's ``base_url`` reaches here) wins over the
+                # OMLX_BASE_URL env default — otherwise a stack pointing at a
+                # non-default port is silently ignored.
                 return await _call_openai(
                     model_name,
                     prompt,
@@ -260,8 +264,15 @@ class LLMCaller:
                     max_tokens=max_tokens,
                     json_mode=json_mode,
                     timeout=timeout,
-                    base_url=os.getenv("OMLX_BASE_URL", _DEFAULT_OMLX_BASE_URL),
-                    api_key=os.getenv("OMLX_API_KEY") or os.getenv("OPENAI_API_KEY") or "omlx",
+                    base_url=(
+                        eff_base_url or os.getenv("OMLX_BASE_URL") or _DEFAULT_OMLX_BASE_URL
+                    ),
+                    api_key=(
+                        eff_api_key
+                        or os.getenv("OMLX_API_KEY")
+                        or os.getenv("OPENAI_API_KEY")
+                        or "omlx"
+                    ),
                     disable_thinking=True,
                     explicit_base=True,
                 )

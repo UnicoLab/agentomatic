@@ -13,6 +13,7 @@ import yaml
 
 from agentomatic.stacks.defaults import (
     BUILTIN_STACKS,
+    DEFAULT_LOCAL_MODEL,
     get_default_local_stack,
     get_default_remote_stack,
     get_default_stack_yaml,
@@ -503,7 +504,11 @@ class TestDefaultStacks:
         stack = get_default_local_stack()
         assert stack.name == "local"
         assert "default" in stack.llm
-        assert stack.llm["default"].provider == "ollama"
+        # Local development targets a local OpenAI-compatible SLM server.
+        assert stack.llm["default"].provider == "omlx"
+        assert stack.llm["default"].model == DEFAULT_LOCAL_MODEL
+        # train.py resolves these roles; missing profiles silently fall back.
+        assert {"default", "fast", "judge", "rewrite"} <= set(stack.llm)
         assert stack.features.enable_auth is False
         assert stack.auth.method == "api_key"
 
@@ -545,4 +550,4 @@ class TestDefaultStacks:
         data = yaml.safe_load(yaml_str)
         stack = StackConfig.model_validate(data)
         assert stack.name == "local"
-        assert stack.llm["default"].provider == "ollama"
+        assert stack.llm["default"].provider == "omlx"

@@ -323,8 +323,50 @@ def resolve_reports_dir(agent_dir: Path, agent_name: str) -> Path:
         return fallback
 
 
+#: Stack provider name → the prefix ``LLMCaller.parse_model_spec`` understands.
+#: The serving layer knows more providers than the optimization layer, and an
+#: unmapped name used to fall through to Ollama silently — so a local
+#: ``openai_compatible`` stack quietly trained against a server that was not
+#: running. The stack's ``base_url`` / ``api_key`` still reach the caller via
+#: ``LLMCaller.configure``, so an OpenAI-compatible endpoint only needs the
+#: ``openai`` prefix here.
+_STACK_TO_OPTIMIZER_PROVIDER: dict[str, str] = {
+    "ollama": "ollama",
+    "omlx": "omlx",
+    "openai": "openai",
+    "openai_compatible": "openai",
+    "azure": "openai",
+    "gemini": "gemini",
+    "litellm": "litellm",
+}
+
+
 def _model_spec(entry: Any) -> str:
-    return f"{entry.provider}/{entry.model}"
+    """Render a stack LLM entry as an optimizer ``provider/model`` spec.
+
+    Args:
+        entry: Stack ``LLMStackEntry`` (or anything with ``provider``/``model``).
+
+    Returns:
+        A spec string the optimizer's ``LLMCaller`` can route, e.g.
+        ``"omlx/Qwen3-4B-Instruct-MLX-4bit"``.
+    """
+    provider = str(getattr(entry, "provider", "") or "").strip().lower()
+    mapped = _STACK_TO_OPTIMIZER_PROVIDER.get(provider)
+    if mapped is None:
+        # A custom/registered provider: treat it as OpenAI-compatible when the
+        # stack gave us an endpoint to talk to, and say so rather than letting
+        # the call default to a local Ollama that probably is not there.
+        mapped = "openai" if getattr(entry, "base_url", "") else provider or "ollama"
+        logger.warning(
+            "Stack LLM provider '{}' has no optimizer equivalent; routing "
+            "train/eval calls as '{}'. Set an OpenAI-compatible base_url on the "
+            "profile, or use one of: {}.",
+            provider,
+            mapped,
+            ", ".join(sorted(_STACK_TO_OPTIMIZER_PROVIDER)),
+        )
+    return f"{mapped}/{entry.model}"
 
 
 def _datapoint_to_example(dp: Any, *, idx: int, split: str = "train") -> Any:
