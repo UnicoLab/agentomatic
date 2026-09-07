@@ -1,0 +1,357 @@
+{
+  "mode": "gepa_like",
+  "model": "omlx/DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx",
+  "history": {
+    "params": {
+      "epochs": 10,
+      "optimizer": "PromptFitterBridge",
+      "metrics": [
+        "banana",
+        "strawberry",
+        "blueberry",
+        "kiwi",
+        "temp_ok",
+        "r1",
+        "r2",
+        "r3",
+        "quality",
+        "exact_key_match"
+      ],
+      "loss": "quality_loss",
+      "train_size": 10,
+      "val_size": 6,
+      "optimize": {
+        "search_space": {
+          "optimize_system_prompt": true,
+          "optimize_user_template": false,
+          "optimize_few_shot": false,
+          "optimize_model_params": false,
+          "optimize_rag_params": false,
+          "optimize_tool_params": false,
+          "optimize_model_choice": false,
+          "model_param_space": {
+            "temperature": [
+              0.0,
+              0.1,
+              0.2,
+              0.4,
+              0.7
+            ],
+            "top_p": [
+              0.7,
+              0.9,
+              1.0
+            ],
+            "max_tokens": [
+              800,
+              1200,
+              2000
+            ]
+          },
+          "rag_param_space": {},
+          "tool_param_space": {},
+          "model_choices": [],
+          "fallback_models": [],
+          "routing_weight_space": {},
+          "max_few_shot_examples": 5,
+          "few_shot_selection_strategy": "diversity_weighted",
+          "search_method": "random",
+          "optimize_nodes": [],
+          "node_match": null
+        },
+        "optimizer": "gepa_like",
+        "max_trials": 6
+      }
+    },
+    "epoch": [
+      -1,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "history": {
+      "banana": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "strawberry": [
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "blueberry": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "kiwi": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temp_ok": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "r1": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "r2": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "r3": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "quality": [
+        0.0,
+        0.0,
+        0.14285714285714282,
+        0.28571428571428564,
+        0.4285714285714285,
+        0.4285714285714285,
+        0.4285714285714285,
+        0.4285714285714285,
+        0.4285714285714285
+      ],
+      "exact_key_match": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "loss": [
+        1.0,
+        1.0,
+        0.8571428571428574,
+        0.7142857142857143,
+        0.5714285714285713,
+        0.5714285714285713,
+        0.5714285714285713,
+        0.5714285714285713,
+        0.5714285714285713
+      ],
+      "val_banana": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "val_strawberry": [
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "val_blueberry": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "val_kiwi": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "val_temp_ok": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "val_r1": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "val_r2": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "val_r3": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "val_quality": [
+        0.0,
+        0.0,
+        0.14285714285714282,
+        0.28571428571428564,
+        0.42857142857142855,
+        0.42857142857142855,
+        0.42857142857142855,
+        0.42857142857142855,
+        0.42857142857142855
+      ],
+      "val_exact_key_match": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "val_loss": [
+        1.0,
+        1.0,
+        0.8571428571428573,
+        0.7142857142857143,
+        0.5714285714285713,
+        0.5714285714285713,
+        0.5714285714285713,
+        0.5714285714285713,
+        0.5714285714285713
+      ]
+    }
+  },
+  "compiled_config": {
+    "system_prompt": "You are a helpful AI assistant that ensures responses include the marker tokens 'strawberry', 'blueberry', and 'kiwi' to meet the expectations of the judge guidance.",
+    "few_shot_examples": "[]"
+  },
+  "prompt_evolution": [
+    {
+      "round_idx": 0,
+      "score": 0.4296,
+      "accepted": false,
+      "what_worked": [],
+      "what_failed": [
+        "q='When is the next release candidate?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the 'r1' marker (temperature must be <= 0.5",
+        "q='Who approved the scope change?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the 'r1' marker (temperature must be <= 0.5",
+        "q='List the next steps for the delivery plan.' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the 'r1' marker (temperature must be <= 0.5",
+        "q='What follow-up is needed after the demo?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the 'r1' marker (temperature must be <= 0.5",
+        "q='What happened at the steering committee?' expected≈\"## Judge guidance\\nThe ideal answer also includes the marker tokens 'strawberry', 'blueberry' and 'ki\" score=0.43 | response is missing the required marker token 'banana' (expected output contains 'OPT, banana'); response is missing the 'r1' marker (temperature must be <= 0.5"
+      ],
+      "next_focus": [
+        "Address lowest-scoring failure modes without hardcoding those exact queries."
+      ],
+      "prompt": "You are a helpful AI assistant that ensures responses include the marker tokens 'strawberry', 'blueberry', and 'kiwi' to meet the expectations of the judge guidance."
+    }
+  ],
+  "test_scores": {
+    "banana": 0.0,
+    "strawberry": 1.0,
+    "blueberry": 1.0,
+    "kiwi": 1.0,
+    "temp_ok": 0.0,
+    "r1": 0.0,
+    "r2": 0.0,
+    "r3": 0.0,
+    "quality": 0.4286,
+    "exact_key_match": 1.0
+  }
+}
