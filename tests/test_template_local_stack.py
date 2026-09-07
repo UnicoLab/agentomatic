@@ -223,3 +223,72 @@ class TestPlainTextFitMetric:
         from agentomatic.optimize.structured_metrics import structured_composite_score
 
         assert structured_composite_score("q", "   ", "{}", required_keys=["response"]) == 0.0
+
+
+class TestDoctorLlmEndpointProbe:
+    """`agentomatic doctor` must name the two ways a local model fails."""
+
+    def _stacks(self, tmp_path: Path, model: str) -> Path:
+        stacks = tmp_path / "stacks"
+        stacks.mkdir()
+        (stacks / "local.yaml").write_text(
+            "name: local\n"
+            "llm:\n"
+            "  default:\n"
+            "    provider: omlx\n"
+            f"    model: {model}\n"
+            "    base_url: http://127.0.0.1:8/v1\n"
+        )
+        return stacks
+
+    def test_unreachable_server_is_reported(self, tmp_path: Path) -> None:
+        from agentomatic.cli.commands import _check_stack_llm_endpoint
+
+        label, ok, detail = _check_stack_llm_endpoint(self._stacks(tmp_path, "m"), "local")
+        assert label == "LLM endpoint"
+        assert ok is False
+        assert "unreachable" in detail
+
+    def test_model_mismatch_is_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import httpx
+
+        from agentomatic.cli.commands import _check_stack_llm_endpoint
+
+        served = {"data": [{"id": "stub-slm-1b-instruct"}]}
+        monkeypatch.setattr(
+            httpx,
+            "get",
+            lambda *a, **k: httpx.Response(200, json=served),
+        )
+        _, ok, detail = _check_stack_llm_endpoint(self._stacks(tmp_path, "not-loaded"), "local")
+        # Reachable is not enough: an unknown model 404s on the first invoke.
+        assert ok is False
+        assert "stub-slm-1b-instruct" in detail
+        assert "not-loaded" in detail
+
+    def test_matching_model_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import httpx
+
+        from agentomatic.cli.commands import _check_stack_llm_endpoint
+
+        monkeypatch.setattr(
+            httpx,
+            "get",
+            lambda *a, **k: httpx.Response(200, json={"data": [{"id": "loaded"}]}),
+        )
+        _, ok, detail = _check_stack_llm_endpoint(self._stacks(tmp_path, "loaded"), "local")
+        assert ok is True
+        assert "reachable" in detail
+
+    def test_non_openai_shaped_body_is_not_treated_as_a_mismatch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import httpx
+
+        from agentomatic.cli.commands import _check_stack_llm_endpoint
+
+        monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(200, text="pong"))
+        _, ok, _ = _check_stack_llm_endpoint(self._stacks(tmp_path, "anything"), "local")
+        assert ok is True, "an unknown response shape says nothing about the model"

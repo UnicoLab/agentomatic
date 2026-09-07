@@ -250,7 +250,40 @@ def _check_stack_llm_endpoint(stacks_path: Path, stack_name: str) -> tuple[str, 
         )
     if not reachable:
         return (label, False, f"{base_url} answered HTTP {response.status_code}")
+
+    served = _served_model_ids(response)
+    if served and entry.model not in served:
+        # Reaching the server is not the same as being able to call it: an
+        # OpenAI-compatible server rejects an unknown model at request time,
+        # which surfaces as a 404 on the first invoke rather than here.
+        return (
+            label,
+            False,
+            f"{base_url} is up but serves {', '.join(sorted(served)[:3])} — "
+            f"the stack asks for '{entry.model}'. Fix `model:` in "
+            f"stacks/{stack_name}.yaml.",
+        )
     return (label, True, f"{provider}/{entry.model} reachable at {base_url}")
+
+
+def _served_model_ids(response: Any) -> set[str]:
+    """Extract model ids from an OpenAI-compatible ``/v1/models`` response.
+
+    Args:
+        response: The ``httpx`` response returned by the probe.
+
+    Returns:
+        The advertised model ids, or an empty set when the endpoint does not
+        speak that shape (in which case the caller must not draw conclusions).
+    """
+    try:
+        payload = response.json()
+    except Exception:  # noqa: BLE001 - a non-JSON body just means "unknown"
+        return set()
+    entries = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return set()
+    return {str(item["id"]) for item in entries if isinstance(item, dict) and item.get("id")}
 
 
 def _ensure_project_context(parent: Path) -> list[str]:
