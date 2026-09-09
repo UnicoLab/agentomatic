@@ -14,12 +14,27 @@ repos:
       - id: debug-statements
       - id: check-merge-conflict
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+  # Ruff runs from the project's own lockfile rather than a separately
+  # pinned hook environment. The two used to drift: the hook pinned v0.8.6
+  # while the dev dependency resolved to 0.15, and they disagreed on 34 lint
+  # findings and 9 files' formatting. Every PR that touched one of those
+  # files failed the gate on code it had not written. Sourcing ruff from
+  # `uv run` — as the mypy hook below already does — makes that impossible:
+  # there is one ruff, the one in uv.lock.
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
       - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
 
   - repo: local
     hooks:
