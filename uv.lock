@@ -212,7 +212,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "questionary", marker = "extra == 'cli'", specifier = ">=2.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'db'", specifier = ">=2.0" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'db-postgres'", specifier = ">=2.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=6.0" },
@@ -235,7 +235,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-mock", specifier = ">=3.14" },
     { name = "python-semantic-release", specifier = ">=10.0,<11" },
-    { name = "ruff", specifier = ">=0.8" },
+    { name = "ruff", specifier = ">=0.15" },
     { name = "twine", specifier = ">=6.0" },
 ]
 docs = [

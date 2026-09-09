@@ -10,7 +10,9 @@ the card that advertises it.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -244,3 +246,99 @@ class TestStreamDoesNotHammerTheStore:
         # One lookup to 404-check, one for the snapshot, at most one for the
         # terminal payload — never one per frame.
         assert len(calls) <= 3, f"{len(calls)} store reads for {frames} frames"
+
+
+class TestA2ATasksAreScopedToTheirAgent:
+    """The per-agent A2A routes are namespaced by agent but used to accept any
+    task id. Zero-trust derives its policy from that agent segment, so one
+    agent's route could read — and cancel — work the policy engine had denied
+    the caller on the owning agent.
+
+    The shared task board at ``/api/v1/tasks/{id}`` is deliberately untouched:
+    it is cross-agent by design.
+    """
+
+    @pytest.fixture
+    def two_agents(self) -> Any:
+        async def secret(state: dict[str, Any]) -> dict[str, Any]:
+            return {"response": "CONFIDENTIAL-PAYROLL"}
+
+        async def slow(state: dict[str, Any]) -> dict[str, Any]:
+            await asyncio.sleep(5)
+            return {"response": "done"}
+
+        platform = AgentPlatform(
+            agents_dir="/tmp/agentomatic_a2a_scope_test",
+            title="A2A Scope",
+            version="0.0.1",
+            enable_tasks=True,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="payroll", slug="p", description="p"), node_fn=secret
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="slowpoke", slug="s", description="s"), node_fn=slow
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="faq", slug="f", description="f"), node_fn=_echo_fn
+        )
+        with TestClient(platform.build()) as test_client:
+            yield test_client
+
+    def _submit(self, client: Any, agent: str) -> str:
+        return str(
+            client.post(f"{BASE}/{agent}/a2a/tasks", json={"message": {"content": "x"}}).json()[
+                "task_id"
+            ]
+        )
+
+    def test_another_agent_cannot_read_the_task(self, two_agents: Any) -> None:
+        task_id = self._submit(two_agents, "payroll")
+
+        leaked = two_agents.get(f"{BASE}/faq/a2a/tasks/{task_id}")
+
+        assert leaked.status_code == 404
+        assert "CONFIDENTIAL-PAYROLL" not in leaked.text
+
+    def test_another_agent_cannot_stream_the_task(self, two_agents: Any) -> None:
+        task_id = self._submit(two_agents, "payroll")
+
+        leaked = two_agents.get(f"{BASE}/faq/a2a/tasks/{task_id}/events")
+
+        assert leaked.status_code == 404
+        assert "CONFIDENTIAL-PAYROLL" not in leaked.text
+
+    def test_another_agent_cannot_cancel_a_running_task(self, two_agents: Any) -> None:
+        """The write is the sharper end of this: without the check any agent
+        could stop any task."""
+        task_id = self._submit(two_agents, "slowpoke")
+        time.sleep(0.3)  # let it reach running
+
+        assert two_agents.post(f"{BASE}/faq/a2a/tasks/{task_id}/cancel").status_code == 404
+
+    def test_the_owning_agent_still_reads_and_streams(self, two_agents: Any) -> None:
+        task_id = self._submit(two_agents, "payroll")
+
+        assert two_agents.get(f"{BASE}/payroll/a2a/tasks/{task_id}").status_code == 200
+        assert two_agents.get(f"{BASE}/payroll/a2a/tasks/{task_id}/events").status_code == 200
+
+    def test_the_owning_agent_can_still_cancel(self, two_agents: Any) -> None:
+        task_id = self._submit(two_agents, "slowpoke")
+        time.sleep(0.3)
+
+        assert two_agents.post(f"{BASE}/slowpoke/a2a/tasks/{task_id}/cancel").status_code == 200
+
+    def test_a_foreign_task_looks_exactly_like_a_missing_one(self, two_agents: Any) -> None:
+        """A distinct status would confirm the id exists."""
+        task_id = self._submit(two_agents, "payroll")
+
+        foreign = two_agents.get(f"{BASE}/faq/a2a/tasks/{task_id}")
+        missing = two_agents.get(f"{BASE}/faq/a2a/tasks/task_deadbeefdeadbeef")
+
+        assert foreign.status_code == missing.status_code == 404
+
+    def test_the_shared_task_board_is_unchanged(self, two_agents: Any) -> None:
+        """This fix is deliberately local to the per-agent A2A routes."""
+        task_id = self._submit(two_agents, "payroll")
+
+        assert two_agents.get(f"{BASE}/tasks/{task_id}").status_code == 200
