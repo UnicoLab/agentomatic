@@ -241,6 +241,11 @@ Re-send the frames a previous `/invoke/stream` already produced, using the
 returns only the frames after that point; `404` once the stream is no longer
 retained.
 
+A retained stream is scoped to the agent that produced it **and** the
+principal it was produced for. Replaying another agent's stream — or another
+caller's — returns `404`, the same answer as an id that does not exist, so the
+response never confirms that someone else's stream is there.
+
 ```bash
 curl -N "http://localhost:8000/api/v1/my_agent/invoke/stream/stream_a1b2c3d4?since=2"
 ```

@@ -67,6 +67,7 @@ def create_streaming_response(
     media_type: str = "text/event-stream",
     *,
     stream_id: str | None = None,
+    owner: str = "",
 ) -> StreamingResponse:
     """Create an SSE streaming response.
 
@@ -76,10 +77,15 @@ def create_streaming_response(
         media_type: Response media type.
         stream_id: Retain the stream's frames under this identity and number
             them, so a client that drops mid-response can collect what it
-            missed. Get one from
-            :func:`~agentomatic.streaming.new_stream_id`; the value is echoed
-            back in ``X-Stream-Id``. Omit it to stream without retention, as
-            before.
+            missed. It **must** be a fresh
+            :func:`~agentomatic.streaming.new_stream_id` — never a
+            caller-supplied value such as a path parameter, which would let
+            one caller name another's stream. The value is echoed back in
+            ``X-Stream-Id``. Omit it to stream without retention, as before.
+        owner: Ownership tag required to read these frames back. Retention is
+            process-wide, so without a tag scoping the stream to its endpoint
+            and principal, anything that can reach a replay route could read
+            it by id alone.
 
     Returns:
         The streaming response.
@@ -93,7 +99,7 @@ def create_streaming_response(
     if stream_id:
         from agentomatic.streaming import numbered_stream
 
-        body = numbered_stream(generator, stream_id=stream_id)
+        body = numbered_stream(generator, stream_id=stream_id, owner=owner)
         headers["X-Stream-Id"] = stream_id
 
     return StreamingResponse(body, media_type=media_type, headers=headers)

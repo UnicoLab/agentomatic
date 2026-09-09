@@ -513,3 +513,90 @@ class TestReplayOccupancyIsObservable:
         assert not hasattr(NullTaskEventLog, "stats")
         stats = asyncio.run(manager.stats())
         assert "event_log" not in stats
+
+
+class TestReplayIsScopedToItsOwner:
+    """The replay buffer is process-wide, and zero-trust derives its policy
+    from the agent segment of the path. Without an ownership check, a caller
+    permitted on one agent could read another agent's retained response by
+    naming its stream id on their own agent's route — bypassing exactly the
+    boundary the platform enforces per agent."""
+
+    @pytest.fixture
+    def two_agents(self) -> Any:
+        async def secret(state: dict[str, Any]) -> dict[str, Any]:
+            return {"response": "TOP-SECRET-SALARY-DATA"}
+
+        platform = AgentPlatform(
+            agents_dir="/tmp/agentomatic_stream_owner_test",
+            title="Two Agents",
+            version="0.0.1",
+            enable_studio=True,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="secret_agent", slug="s", description="s"),
+            node_fn=secret,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="open_agent", slug="o", description="o"),
+            node_fn=_echo_fn,
+        )
+        with TestClient(platform.build()) as test_client:
+            yield test_client
+
+    def test_another_agents_route_cannot_replay_the_stream(self, two_agents: Any) -> None:
+        produced = two_agents.post(f"{BASE}/secret_agent/invoke/stream", json={"query": "salary?"})
+        stream_id = produced.headers["X-Stream-Id"]
+        assert "TOP-SECRET-SALARY-DATA" in produced.text
+
+        leaked = two_agents.get(f"{BASE}/open_agent/invoke/stream/{stream_id}")
+
+        assert leaked.status_code == 404
+        assert "TOP-SECRET-SALARY-DATA" not in leaked.text
+
+    def test_the_owning_agent_can_still_replay(self, two_agents: Any) -> None:
+        stream_id = two_agents.post(
+            f"{BASE}/secret_agent/invoke/stream", json={"query": "salary?"}
+        ).headers["X-Stream-Id"]
+
+        replayed = two_agents.get(f"{BASE}/secret_agent/invoke/stream/{stream_id}")
+
+        assert replayed.status_code == 200
+        assert "TOP-SECRET-SALARY-DATA" in replayed.text
+
+    def test_a_studio_run_id_is_not_valid_on_an_agent_route(self, two_agents: Any) -> None:
+        """Studio run ids are enumerable, so they must live in their own
+        namespace rather than being accepted as agent stream ids."""
+        run_id = two_agents.post(
+            "/studio/agents/open_agent/runs/stream", json={"input": {"query": "hi"}}
+        ).headers["X-Studio-Run-Id"]
+
+        assert two_agents.get(f"{BASE}/open_agent/invoke/stream/{run_id}").status_code == 404
+
+    def test_a_missing_stream_and_a_forbidden_one_look_the_same(self, two_agents: Any) -> None:
+        """Answering differently would confirm that an id exists."""
+        stream_id = two_agents.post(
+            f"{BASE}/secret_agent/invoke/stream", json={"query": "hi"}
+        ).headers["X-Stream-Id"]
+
+        forbidden = two_agents.get(f"{BASE}/open_agent/invoke/stream/{stream_id}")
+        missing = two_agents.get(f"{BASE}/open_agent/invoke/stream/stream_deadbeefdeadbeef")
+
+        assert forbidden.status_code == missing.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_buffer_refuses_reads_under_a_different_owner(self) -> None:
+        buffer = StreamReplayBuffer()
+        await buffer.record("s", "frame", owner="agent:a:alice")
+
+        assert await buffer.replay("s", owner="agent:a:alice")
+        assert await buffer.replay("s", owner="agent:b:alice") == []
+        assert await buffer.replay("s", owner="agent:a:bob") == []
+        assert not await buffer.knows("s", owner="agent:b:alice")
+
+    def test_negative_resume_points_are_rejected(self, client: Any) -> None:
+        stream_id = client.post(f"{BASE}/echo/invoke/stream", json={"query": "hi"}).headers[
+            "X-Stream-Id"
+        ]
+
+        assert client.get(f"{BASE}/echo/invoke/stream/{stream_id}?since=-5").status_code == 422

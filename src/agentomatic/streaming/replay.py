@@ -76,6 +76,7 @@ async def numbered_stream(
     source: Any,
     *,
     stream_id: str,
+    owner: str = "",
     buffer: StreamReplayBuffer | None = None,
 ) -> Any:
     """Record and number frames from a generator that already emits SSE text.
@@ -89,6 +90,7 @@ async def numbered_stream(
     Args:
         source: Async iterator of SSE-encoded strings.
         stream_id: Identity the frames are retained under.
+        owner: Ownership tag required to read the frames back.
         buffer: Replay buffer to use (default: the process-wide one).
 
     Yields:
@@ -100,7 +102,7 @@ async def numbered_stream(
         if payload is None:
             yield chunk
             continue
-        sequence = await store.record(stream_id, payload)
+        sequence = await store.record(stream_id, payload, owner=owner)
         yield sse_frame(payload, event_id=sequence)
 
 
@@ -177,17 +179,23 @@ class StreamReplayBuffer:
         # without its size leaving the running total, and the byte accounting
         # would drift upwards until nothing could be retained at all.
         self._streams: OrderedDict[str, deque[StreamFrame]] = OrderedDict()
+        self._owners: dict[str, str] = {}
         self._bytes: dict[str, int] = {}
         self._total_bytes = 0
         self._sequences: dict[str, int] = {}
         self._lock = asyncio.Lock()
 
-    async def record(self, stream_id: str, data: str) -> int:
+    async def record(self, stream_id: str, data: str, *, owner: str = "") -> int:
         """Append one frame and return the sequence assigned to it.
 
         Args:
             stream_id: Stream the frame belongs to.
             data: The frame body as sent to the client.
+            owner: Opaque tag identifying who may read this stream back —
+                the agent that produced it, and the principal it was produced
+                for. Reads with a different tag are refused. The buffer is
+                process-wide, so without this a lookup by id alone would cross
+                every authorization boundary the platform enforces per agent.
 
         Returns:
             The frame's sequence number.
@@ -196,6 +204,7 @@ class StreamReplayBuffer:
         async with self._lock:
             sequence = self._sequences.get(stream_id, 0) + 1
             self._sequences[stream_id] = sequence
+            self._owners.setdefault(stream_id, owner)
             frame.sequence = sequence
 
             bucket = self._streams.setdefault(stream_id, deque())
@@ -267,18 +276,25 @@ class StreamReplayBuffer:
         self._streams.pop(stream_id, None)
         self._total_bytes -= self._bytes.pop(stream_id, 0)
         self._sequences.pop(stream_id, None)
+        self._owners.pop(stream_id, None)
 
-    async def replay(self, stream_id: str, *, after: int = 0) -> list[StreamFrame]:
+    async def replay(
+        self, stream_id: str, *, after: int = 0, owner: str | None = None
+    ) -> list[StreamFrame]:
         """Return retained frames with sequence greater than ``after``.
 
         Args:
             stream_id: Stream to read.
             after: Exclusive lower bound on sequence.
+            owner: When given, return nothing unless the stream was recorded
+                under this exact tag.
 
         Returns:
             The matching frames, oldest first.
         """
         async with self._lock:
+            if owner is not None and self._owners.get(stream_id) != owner:
+                return []
             bucket = self._streams.get(stream_id)
             if not bucket:
                 return []
@@ -297,16 +313,22 @@ class StreamReplayBuffer:
             bucket = self._streams.get(stream_id)
             return bucket[0].sequence if bucket else 0
 
-    async def knows(self, stream_id: str) -> bool:
-        """Report whether any frames are retained for a stream.
+    async def knows(self, stream_id: str, *, owner: str | None = None) -> bool:
+        """Report whether a stream is retained and readable by ``owner``.
+
+        A stream owned by someone else reports False rather than raising, so
+        callers answer "not found" and do not confirm that the id exists.
 
         Args:
             stream_id: Stream to check.
+            owner: When given, require this exact ownership tag.
 
         Returns:
-            True when the stream has retained frames.
+            True when the stream has retained frames the caller may read.
         """
         async with self._lock:
+            if owner is not None and self._owners.get(stream_id) != owner:
+                return False
             return bool(self._streams.get(stream_id))
 
     async def drop(self, stream_id: str) -> None:

@@ -356,6 +356,7 @@ def create_studio_router(
                     adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
                 ),
                 stream_id=run.id,
+                owner=f"studio:{name}",
             ),
             media_type="text/event-stream",
             headers={
@@ -539,7 +540,7 @@ def create_studio_router(
         # collide with another thread's retained frames by choosing its name.
         resume_stream_id = new_stream_id()
         return StreamingResponse(
-            numbered_stream(_stream(), stream_id=resume_stream_id),
+            numbered_stream(_stream(), stream_id=resume_stream_id, owner=f"studio:{name}"),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",

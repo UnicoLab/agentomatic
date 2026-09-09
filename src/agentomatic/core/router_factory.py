@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any, cast
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
@@ -736,9 +736,37 @@ def create_default_router(
                 detail=client_safe_detail(exc, context="Agent invocation failed"),
             ) from exc
 
-    async def invoke_stream(request: Any) -> StreamingResponse:
+    def _stream_owner(http_request: Request | None) -> str:
+        """Return the ownership tag for a stream on this agent.
+
+        The replay buffer is process-wide, so a lookup by id alone would read
+        across every boundary the platform enforces per agent: zero-trust
+        derives its policy from the agent segment of the path, so a caller
+        allowed on one agent could otherwise fetch another agent's retained
+        response by naming its stream id on their own agent's route.
+
+        The tag pins a stream to the agent that produced it *and* to the
+        principal it was produced for, so neither a different agent's route
+        nor a different caller can read it back.
+
+        Args:
+            http_request: The incoming request, when one is available.
+
+        Returns:
+            An opaque ownership tag.
+        """
+        principal = "anon"
+        if http_request is not None:
+            state = http_request.scope.get("state") or {}
+            principal = str(
+                getattr(http_request.state, "user_id", None) or state.get("user_id") or "anon"
+            )
+        return f"agent:{agent_name}:{principal}"
+
+    async def invoke_stream(request: Any, http_request: Request) -> StreamingResponse:
         """Invoke agent with SSE streaming."""
         agent = _get_agent()
+        stream_owner = _stream_owner(http_request)
         state = _build_initial_state(request)
         thread_id = state.get("thread_id", "")
         query = state.get("current_query", "")
@@ -782,7 +810,7 @@ def create_default_router(
             body = (
                 payload if isinstance(payload, str) else json.dumps(payload, default=json_default)
             )
-            sequence = await replay_buffer.record(stream_id, body)
+            sequence = await replay_buffer.record(stream_id, body, owner=stream_owner)
             return sse_frame(body, event_id=sequence)
 
         async def event_stream():
@@ -923,7 +951,7 @@ def create_default_router(
     async def replay_invoke_stream(
         stream_id: str,
         request: Request,
-        since: int = 0,
+        since: int = Query(default=0, ge=0),
     ) -> StreamingResponse:
         """Re-send the frames a previous ``/invoke/stream`` already produced.
 
@@ -941,14 +969,18 @@ def create_default_router(
         from agentomatic.tasks.event_log import parse_last_event_id
 
         buffer = get_replay_buffer()
-        if not await buffer.knows(stream_id):
+        owner = _stream_owner(request)
+        # A stream belonging to another agent or another caller reports "not
+        # found" rather than "forbidden": answering differently would confirm
+        # that the id exists.
+        if not await buffer.knows(stream_id, owner=owner):
             raise HTTPException(
                 404,
                 f"Stream '{stream_id}' is unknown or its frames are no longer retained.",
             )
 
         resume_from = since or parse_last_event_id(request.headers.get("last-event-id"))
-        frames = await buffer.replay(stream_id, after=resume_from)
+        frames = await buffer.replay(stream_id, after=resume_from, owner=owner)
         earliest = await buffer.earliest_sequence(stream_id)
         truncated = bool(resume_from and earliest and earliest > resume_from + 1)
 
@@ -1384,7 +1416,7 @@ def create_default_router(
         }
 
     @router.get("/a2a/tasks/{task_id}/events")
-    async def stream_a2a_task(task_id: str, request: Request, since: int = 0):
+    async def stream_a2a_task(task_id: str, request: Request, since: int = Query(default=0, ge=0)):
         """Subscribe (or re-subscribe) to an A2A task's progress over SSE.
 
         This is the A2A analogue of the platform's task stream: same
