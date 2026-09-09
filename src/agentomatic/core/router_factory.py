@@ -1423,10 +1423,16 @@ def create_default_router(
                             "resumed_after": resume_from,
                         }
                     )
+                # ``_a2a_event_view`` consults the record only for a
+                # terminal event's payload, so read it once rather than once
+                # per replayed event — that was a store round-trip per frame.
+                replay_record = (
+                    await task_manager.get(task_id)
+                    if any(evt.status.is_terminal for evt in resumption.replay)
+                    else None
+                )
                 for evt in resumption.replay:
-                    yield _frame(
-                        _a2a_event_view(evt, await task_manager.get(task_id)), evt.sequence
-                    )
+                    yield _frame(_a2a_event_view(evt, replay_record), evt.sequence)
 
                 current = await task_manager.get(task_id)
                 if current is not None and (resume_from <= 0 or resumption.truncated):
@@ -1444,9 +1450,11 @@ def create_default_router(
                     if evt.sequence and evt.sequence <= cursor:
                         continue
                     cursor = evt.sequence or cursor
-                    yield _frame(
-                        _a2a_event_view(evt, await task_manager.get(task_id)), evt.sequence
+                    # Only a terminal event needs the record's result.
+                    live_record = (
+                        await task_manager.get(task_id) if evt.status.is_terminal else None
                     )
+                    yield _frame(_a2a_event_view(evt, live_record), evt.sequence)
                     if evt.status.is_terminal:
                         yield "data: [DONE]\n\n"
                         return

@@ -23,6 +23,7 @@ from agentomatic import AgentPlatform
 from agentomatic.core.manifest import AgentManifest
 from agentomatic.streaming import (
     StreamReplayBuffer,
+    buffer_from_env,
     get_replay_buffer,
     new_stream_id,
     set_replay_buffer,
@@ -299,3 +300,185 @@ class TestStudioStreamsAreNumbered:
         retained = asyncio.run(get_replay_buffer().replay(run_id))
         assert retained, "studio frames were not retained under the run id"
         assert [frame.sequence for frame in retained] == _ids(response.text)
+
+
+class TestNewRoutesRequireAuth:
+    """Auth is middleware with a skip-list, so a new route is protected by
+    default — but only until someone adds a path to that list. A replay route
+    that stops requiring a key hands out other callers' responses."""
+
+    @pytest.fixture
+    def secured(self) -> Any:
+        platform = AgentPlatform(
+            agents_dir="/tmp/agentomatic_stream_auth_test",
+            title="Secured",
+            version="0.0.1",
+            enable_auth=True,
+            auth_api_key="secret",
+            enable_tasks=True,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="echo", slug="fn-echo", description="Echo"),
+            node_fn=_echo_fn,
+        )
+        with TestClient(platform.build()) as test_client:
+            yield test_client
+
+    def test_stream_replay_requires_a_key(self, secured: Any) -> None:
+        header = {"X-API-Key": "secret"}
+        stream_id = secured.post(
+            f"{BASE}/echo/invoke/stream", json={"query": "hi"}, headers=header
+        ).headers["X-Stream-Id"]
+
+        assert secured.get(f"{BASE}/echo/invoke/stream/{stream_id}").status_code == 401
+        assert (
+            secured.get(f"{BASE}/echo/invoke/stream/{stream_id}", headers=header).status_code
+            == 200
+        )
+
+    def test_a2a_event_stream_requires_a_key(self, secured: Any) -> None:
+        header = {"X-API-Key": "secret"}
+        task_id = secured.post(
+            f"{BASE}/echo/a2a/tasks",
+            json={"message": {"content": "hi"}},
+            headers=header,
+        ).json()["task_id"]
+
+        assert secured.get(f"{BASE}/echo/a2a/tasks/{task_id}/events").status_code == 401
+        assert (
+            secured.get(f"{BASE}/echo/a2a/tasks/{task_id}/events", headers=header).status_code
+            == 200
+        )
+
+    def test_task_event_stream_requires_a_key(self, secured: Any) -> None:
+        header = {"X-API-Key": "secret"}
+        task_id = secured.post(
+            f"{BASE}/echo/a2a/tasks",
+            json={"message": {"content": "hi"}},
+            headers=header,
+        ).json()["task_id"]
+
+        assert secured.get(f"{BASE}/tasks/{task_id}/events").status_code == 401
+
+    def test_stream_ids_are_not_guessable(self) -> None:
+        """The id is the only thing standing between a caller and a retained
+        response, so it must carry real entropy."""
+        ids = {new_stream_id() for _ in range(500)}
+        assert len(ids) == 500
+        # uuid4 hex[:16] — 64 bits.
+        assert all(len(sid.removeprefix("stream_")) == 16 for sid in ids)
+
+
+class TestMemoryIsBoundedByBytes:
+    """Count limits are not memory limits. 512 frames across 256 streams is a
+    few hundred megabytes of perfectly ordinary traffic, and one long
+    generated answer per frame pushes it past a container's limit."""
+
+    @pytest.mark.asyncio
+    async def test_total_bytes_stay_under_budget(self) -> None:
+        buffer = StreamReplayBuffer(max_bytes_total=200_000)
+        big = "x" * 10_000
+        for stream in range(40):
+            for _ in range(20):
+                await buffer.record(f"s{stream}", big)
+
+        stats = await buffer.stats()
+        assert stats["bytes"] <= 200_000, "byte budget exceeded"
+
+    @pytest.mark.asyncio
+    async def test_per_stream_bytes_stay_under_budget(self) -> None:
+        buffer = StreamReplayBuffer(max_bytes_per_stream=50_000)
+        for _ in range(200):
+            await buffer.record("s", "y" * 5_000)
+
+        stats = await buffer.stats()
+        assert stats["bytes"] <= 50_000
+
+    @pytest.mark.asyncio
+    async def test_newest_frame_survives_even_when_oversized(self) -> None:
+        """A frame bigger than the whole budget must still be replayable —
+        dropping it would silently lose the answer it carries."""
+        buffer = StreamReplayBuffer(max_bytes_per_stream=100, max_bytes_total=100)
+        await buffer.record("s", "z" * 50_000)
+
+        retained = await buffer.replay("s")
+        assert len(retained) == 1
+        assert retained[0].data == "z" * 50_000
+
+    @pytest.mark.asyncio
+    async def test_eviction_keeps_the_accounting_honest(self) -> None:
+        """If evicted bytes were not subtracted, the total would drift up
+        until the buffer refused to retain anything at all."""
+        buffer = StreamReplayBuffer(max_frames_per_stream=5)
+        for _ in range(500):
+            await buffer.record("s", "a" * 1_000)
+
+        stats = await buffer.stats()
+        retained = await buffer.replay("s")
+        assert stats["frames"] == len(retained) == 5
+        assert stats["bytes"] == sum(frame.size for frame in retained)
+
+    @pytest.mark.asyncio
+    async def test_dropping_a_stream_reclaims_its_bytes(self) -> None:
+        buffer = StreamReplayBuffer()
+        await buffer.record("a", "x" * 1_000)
+        await buffer.record("b", "x" * 1_000)
+        before = (await buffer.stats())["bytes"]
+
+        await buffer.drop("a")
+        after = (await buffer.stats())["bytes"]
+
+        assert after < before
+        assert after == sum(frame.size for frame in await buffer.replay("b"))
+
+    @pytest.mark.asyncio
+    async def test_sequences_stay_gapless_through_eviction(self) -> None:
+        """Eviction trims history; it must never renumber what survives."""
+        buffer = StreamReplayBuffer(max_frames_per_stream=4)
+        for _ in range(20):
+            await buffer.record("s", "f")
+
+        sequences = [frame.sequence for frame in await buffer.replay("s")]
+        assert sequences == [17, 18, 19, 20]
+
+
+class TestStreamReplayEnvConfiguration:
+    def test_defaults_when_nothing_is_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for var in (
+            "AGENTOMATIC_STREAM_REPLAY",
+            "AGENTOMATIC_STREAM_FRAMES",
+            "AGENTOMATIC_STREAM_COUNT",
+            "AGENTOMATIC_STREAM_MAX_MB",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        assert isinstance(buffer_from_env(), StreamReplayBuffer)
+
+    @pytest.mark.asyncio
+    async def test_replay_can_be_turned_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AGENTOMATIC_STREAM_REPLAY", "0")
+        buffer = buffer_from_env()
+        for _ in range(20):
+            await buffer.record("s", "frame")
+        # Streaming still works; only the history is gone.
+        assert len(await buffer.replay("s")) <= 1
+
+    @pytest.mark.asyncio
+    async def test_frame_limit_is_read_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AGENTOMATIC_STREAM_FRAMES", "3")
+        buffer = buffer_from_env()
+        for _ in range(10):
+            await buffer.record("s", "frame")
+        assert len(await buffer.replay("s")) == 3
+
+    @pytest.mark.asyncio
+    async def test_a_bad_value_falls_back_to_the_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A typo in a container's env must not stop the platform booting."""
+        monkeypatch.setenv("AGENTOMATIC_STREAM_FRAMES", "lots")
+        buffer = buffer_from_env()
+        for _ in range(10):
+            await buffer.record("s", "frame")
+        assert len(await buffer.replay("s")) == 10

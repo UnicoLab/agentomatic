@@ -215,3 +215,32 @@ class TestDiscoveryMatchesTheAgentCard:
 
         assert "a2a_events" not in discovery["endpoints"]
         assert discovery["capabilities"]["resumableStreams"] is False
+
+
+class TestStreamDoesNotHammerTheStore:
+    """Rendering an A2A frame needs the task record only for the terminal
+    payload. Reading it per event turned a replay into one store round-trip
+    per frame — invisible with the in-memory store, N queries with SQL."""
+
+    def test_replay_reads_the_record_at_most_once(self, client: Any, monkeypatch) -> None:
+        task_id = _submit(client)
+        # Let the task finish so there is a real history to replay.
+        client.get(f"{BASE}/echo/a2a/tasks/{task_id}/events")
+
+        from agentomatic.tasks.manager import TaskManager
+
+        original = TaskManager.get
+        calls: list[str] = []
+
+        async def counting_get(self, tid: str):
+            calls.append(tid)
+            return await original(self, tid)
+
+        monkeypatch.setattr(TaskManager, "get", counting_get)
+        body = client.get(f"{BASE}/echo/a2a/tasks/{task_id}/events").text
+
+        frames = len(_frames(body))
+        assert frames >= 1
+        # One lookup to 404-check, one for the snapshot, at most one for the
+        # terminal payload — never one per frame.
+        assert len(calls) <= 3, f"{len(calls)} store reads for {frames} frames"

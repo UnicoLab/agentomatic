@@ -23,6 +23,8 @@ from agentomatic.tasks.event_log import (
     NullTaskEventLog,
     available_event_log_providers,
     create_event_log,
+    estimate_event_size,
+    event_log_from_env,
     parse_last_event_id,
     register_event_log_provider,
     resolve_resumption,
@@ -421,3 +423,107 @@ class TestEveryTargetTypeResumes:
 
         # Nothing ever subscribed, yet the history is there to replay.
         assert asyncio.run(manager.event_log.replay(submitted["id"]))
+
+
+class TestEventLogMemoryIsBounded:
+    """A progress event can carry a pipeline checkpoint's ``sub_result``, so
+    capping the number of events is not the same as capping memory."""
+
+    @pytest.mark.asyncio
+    async def test_total_bytes_stay_under_budget(self) -> None:
+        log = InMemoryTaskEventLog(max_bytes_total=200_000)
+        payload = {"blob": "x" * 10_000}
+        for task in range(40):
+            for seq in range(1, 21):
+                await log.append(
+                    TaskEvent(
+                        task_id=f"t{task}",
+                        sequence=seq,
+                        event="progress",
+                        status=TaskStatus.RUNNING,
+                        data=payload,
+                    )
+                )
+
+        assert (await log.stats())["bytes"] <= 200_000
+
+    @pytest.mark.asyncio
+    async def test_eviction_keeps_the_accounting_honest(self) -> None:
+        log = InMemoryTaskEventLog(max_events_per_task=5)
+        for seq in range(1, 201):
+            await log.append(_event("t", seq))
+
+        stats = await log.stats()
+        assert stats["events"] == 5
+        assert stats["bytes"] == sum(estimate_event_size(evt) for evt in await log.replay("t"))
+
+    @pytest.mark.asyncio
+    async def test_dropping_a_task_reclaims_its_bytes(self) -> None:
+        log = InMemoryTaskEventLog()
+        await log.append(_event("a", 1))
+        await log.append(_event("b", 1))
+        before = (await log.stats())["bytes"]
+
+        await log.drop("a")
+
+        assert (await log.stats())["bytes"] < before
+
+    @pytest.mark.asyncio
+    async def test_sequences_stay_gapless_through_eviction(self) -> None:
+        log = InMemoryTaskEventLog(max_events_per_task=4)
+        for seq in range(1, 21):
+            await log.append(_event("t", seq))
+
+        assert [e.sequence for e in await log.replay("t")] == [17, 18, 19, 20]
+
+    @pytest.mark.asyncio
+    async def test_empty_data_costs_only_the_fixed_overhead(self) -> None:
+        """The common case must not pay for JSON serialisation."""
+        assert estimate_event_size(_event("t", 1)) == 512
+
+    @pytest.mark.asyncio
+    async def test_unserialisable_data_does_not_raise(self) -> None:
+        event = _event("t", 1)
+        event.data = {"obj": object()}
+        assert estimate_event_size(event) >= 512
+
+
+class TestEnvironmentConfiguration:
+    """Retention is an operational concern: an operator sizing a container has
+    to be able to cap or disable it without editing Python."""
+
+    def test_defaults_when_nothing_is_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for var in (
+            "AGENTOMATIC_TASK_EVENT_LOG",
+            "AGENTOMATIC_TASK_EVENTS_PER_TASK",
+            "AGENTOMATIC_TASK_EVENT_TASKS",
+            "AGENTOMATIC_TASK_EVENT_MAX_MB",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        assert isinstance(event_log_from_env(), InMemoryTaskEventLog)
+
+    def test_replay_can_be_turned_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AGENTOMATIC_TASK_EVENT_LOG", "none")
+        assert isinstance(event_log_from_env(), NullTaskEventLog)
+
+    @pytest.mark.asyncio
+    async def test_limits_are_read_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AGENTOMATIC_TASK_EVENT_LOG", "memory")
+        monkeypatch.setenv("AGENTOMATIC_TASK_EVENTS_PER_TASK", "3")
+        log = event_log_from_env()
+        for seq in range(1, 11):
+            await log.append(_event("t", seq))
+        assert [e.sequence for e in await log.replay("t")] == [8, 9, 10]
+
+    def test_a_bad_value_falls_back_instead_of_crashing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A typo in a container's env must not stop the platform booting."""
+        monkeypatch.setenv("AGENTOMATIC_TASK_EVENTS_PER_TASK", "not-a-number")
+        assert isinstance(event_log_from_env(), InMemoryTaskEventLog)
+
+    def test_an_unknown_provider_falls_back(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AGENTOMATIC_TASK_EVENT_LOG", "redis-typo")
+        assert isinstance(event_log_from_env(), InMemoryTaskEventLog)

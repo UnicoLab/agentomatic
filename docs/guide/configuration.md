@@ -193,6 +193,10 @@ directory, host, port, and stack values passed to `agentomatic run`.
 | `AGENTOMATIC_PLUGIN_AUTORELOAD` | `plugin_autoreload` | `false` | Watch the promoted artifact version and reload plugins safely |
 | `AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL` | `plugin_autoreload_interval` | `5` | Seconds between artifact-pointer checks |
 | `AGENTOMATIC_RUNS_ROOT` | `runs_root` | `.local/runs` | Scratch directory for pipeline/task outputs |
+| `AGENTOMATIC_TASK_EVENT_LOG` | task-event replay backend | `memory` | `none` disables replay; any registered provider name also works |
+| `AGENTOMATIC_TASK_EVENTS_PER_TASK` / `AGENTOMATIC_TASK_EVENT_TASKS` / `AGENTOMATIC_TASK_EVENT_MAX_MB` | task-event retention | `512` / `1024` / `32` | Caps how much history `/tasks/{id}/events` can replay. The MB ceiling is what protects a container's memory limit |
+| `AGENTOMATIC_STREAM_REPLAY` | `/invoke/stream` frame retention | `true` | `0` streams without retaining anything |
+| `AGENTOMATIC_STREAM_FRAMES` / `AGENTOMATIC_STREAM_COUNT` / `AGENTOMATIC_STREAM_MAX_MB` | stream retention | `512` / `256` / `64` | Caps what `GET /invoke/stream/{id}` can replay |
 | `AGENTOMATIC_AUDIT_LOG` | `audit_log` | `""` (disabled) | JSONL op-audit sink path (non-PII metadata only) |
 | `AGENTOMATIC_AUDIT_HASH_KEY` | — | API key or process-local key | HMAC key for audit correlation references |
 | `AGENTOMATIC_CHUNK_SIZE_TOKENS` | `chunk_size_tokens` | `1200` | Default ingestion chunk size |
@@ -487,7 +491,7 @@ platform.run(
 
 ??? question "My environment variables aren't being loaded"
     Check these common causes:
-    
+
     1. **`.env` file location**: Must be in the project root (same directory as `main.py`)
     2. **Variable shape**: Generated-platform variables start with `AGENTOMATIC_`
        (for example, `AGENTOMATIC_LOG_LEVEL`); `PlatformSettings` variables use
@@ -497,7 +501,7 @@ platform.run(
 
 ??? question "CORS errors from my frontend"
     Pass your frontend's origin to `cors_origins`:
-    
+
     ```python
     platform = AgentPlatform.from_folder(
         "agents/",

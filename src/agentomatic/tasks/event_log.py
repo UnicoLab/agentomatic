@@ -16,10 +16,14 @@ interface, not a vendor client.
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from abc import ABC, abstractmethod
 from collections import OrderedDict, deque
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+
+from loguru import logger
 
 if TYPE_CHECKING:
     from agentomatic.tasks.models import TaskEvent
@@ -29,6 +33,97 @@ DEFAULT_MAX_EVENTS_PER_TASK = 512
 
 #: Tasks retained in the log before the least recently used are discarded.
 DEFAULT_MAX_TASKS = 1024
+
+#: Bytes retained across all tasks. Most events are small, but a progress
+#: payload can carry a pipeline checkpoint's ``sub_result``, so a count-only
+#: bound is not a memory bound.
+DEFAULT_MAX_BYTES_TOTAL = 32 * 1024 * 1024
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read a positive integer from the environment.
+
+    Args:
+        name: Environment variable to read.
+        default: Value used when unset, unparseable, or not positive.
+
+    Returns:
+        The configured value, or ``default``.
+    """
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        logger.warning(f"{name}={raw!r} is not an integer — using {default}")
+        return default
+    if value <= 0:
+        logger.warning(f"{name}={value} must be positive — using {default}")
+        return default
+    return value
+
+
+def event_log_from_env() -> TaskEventLog:
+    """Build the task event log a deployment's environment asks for.
+
+    The platform is env-driven everywhere else, so retention has to be
+    tunable without editing Python — an operator sizing a container needs to
+    cap it, and someone who wants no replay at all needs to say so.
+
+    Reads ``AGENTOMATIC_TASK_EVENT_LOG`` (a provider name; ``none``/``off``
+    selects the null log), plus ``AGENTOMATIC_TASK_EVENTS_PER_TASK``,
+    ``AGENTOMATIC_TASK_EVENT_TASKS`` and ``AGENTOMATIC_TASK_EVENT_MAX_MB``.
+
+    Returns:
+        The configured :class:`TaskEventLog`.
+    """
+    provider = (os.getenv("AGENTOMATIC_TASK_EVENT_LOG") or "memory").strip().lower()
+    if provider in {"none", "off", "disabled", "null"}:
+        return NullTaskEventLog()
+
+    options: dict[str, Any] = {}
+    if provider == "memory":
+        options = {
+            "max_events_per_task": _env_int(
+                "AGENTOMATIC_TASK_EVENTS_PER_TASK", DEFAULT_MAX_EVENTS_PER_TASK
+            ),
+            "max_tasks": _env_int("AGENTOMATIC_TASK_EVENT_TASKS", DEFAULT_MAX_TASKS),
+            "max_bytes_total": _env_int(
+                "AGENTOMATIC_TASK_EVENT_MAX_MB", DEFAULT_MAX_BYTES_TOTAL // (1024 * 1024)
+            )
+            * 1024
+            * 1024,
+        }
+    try:
+        return create_event_log(provider, **options)
+    except ValueError as exc:
+        # An unknown provider must not take the platform down; replay is a
+        # convenience, and the default still works.
+        logger.warning(f"{exc} Falling back to the in-memory event log.")
+        return InMemoryTaskEventLog()
+
+
+def estimate_event_size(event: TaskEvent) -> int:
+    """Approximate an event's in-memory footprint in bytes.
+
+    Cheap in the common case: most events carry no ``data``, so this is a
+    constant. When ``data`` is present it is measured, because that is the
+    field that can carry a large payload.
+
+    Args:
+        event: Event to size.
+
+    Returns:
+        An estimated byte count, never less than the fixed overhead.
+    """
+    overhead = 512
+    if not event.data:
+        return overhead
+    try:
+        return overhead + len(json.dumps(event.data, default=str))
+    except (TypeError, ValueError):  # pragma: no cover - exotic payloads
+        return overhead
 
 
 class TaskEventLog(ABC):
@@ -94,13 +189,16 @@ class TaskEventLog(ABC):
 class InMemoryTaskEventLog(TaskEventLog):
     """Bounded in-process event history.
 
-    Retention is capped twice over — per task and across tasks — so a
-    long-running platform cannot accumulate history without limit. Eviction is
+    Retention is capped three ways — events per task, tasks, and total bytes.
+    The byte ceiling is the one that protects a container's memory limit: a
+    progress event can carry a pipeline checkpoint's ``sub_result``, so
+    counting events alone bounds nothing in particular. Eviction is
     least-recently-appended.
 
     Args:
         max_events_per_task: Events retained per task.
         max_tasks: Number of tasks retained.
+        max_bytes_total: Estimated bytes retained across all tasks.
     """
 
     def __init__(
@@ -108,23 +206,86 @@ class InMemoryTaskEventLog(TaskEventLog):
         *,
         max_events_per_task: int = DEFAULT_MAX_EVENTS_PER_TASK,
         max_tasks: int = DEFAULT_MAX_TASKS,
+        max_bytes_total: int = DEFAULT_MAX_BYTES_TOTAL,
     ) -> None:
         self._max_events_per_task = max(1, max_events_per_task)
         self._max_tasks = max(1, max_tasks)
+        self._max_bytes_total = max(1, max_bytes_total)
+        # No ``maxlen``: an implicit drop would evict an event without its
+        # size leaving the running total, and the accounting would drift up
+        # until nothing could be retained at all.
         self._events: OrderedDict[str, deque[TaskEvent]] = OrderedDict()
+        self._sizes: dict[str, int] = {}
+        self._total_bytes = 0
         self._lock = asyncio.Lock()
 
     async def append(self, event: TaskEvent) -> None:
         """Record one event, evicting the oldest history when full."""
+        size = estimate_event_size(event)
         async with self._lock:
-            bucket = self._events.get(event.task_id)
-            if bucket is None:
-                bucket = deque(maxlen=self._max_events_per_task)
-                self._events[event.task_id] = bucket
+            task_id = event.task_id
+            bucket = self._events.setdefault(task_id, deque())
             bucket.append(event)
-            self._events.move_to_end(event.task_id)
-            while len(self._events) > self._max_tasks:
-                self._events.popitem(last=False)
+            self._sizes[task_id] = self._sizes.get(task_id, 0) + size
+            self._total_bytes += size
+            self._events.move_to_end(task_id)
+
+            while len(bucket) > 1 and len(bucket) > self._max_events_per_task:
+                self._drop_oldest(task_id)
+            self._trim_total(keep=task_id)
+
+    def _drop_oldest(self, task_id: str) -> None:
+        """Remove a task's oldest event, keeping the byte totals honest.
+
+        ``estimate_event_size`` is deterministic, so what is subtracted here
+        is exactly what was added when the event was appended.
+        """
+        dropped = estimate_event_size(self._events[task_id].popleft())
+        self._sizes[task_id] = self._sizes.get(task_id, 0) - dropped
+        self._total_bytes -= dropped
+
+    def _trim_bytes(self, task_id: str, limit: int) -> None:
+        """Drop a task's oldest events until it fits ``limit`` bytes.
+
+        The newest event always survives: a single oversized one should still
+        be replayable rather than silently dropped.
+
+        Args:
+            task_id: Task to trim.
+            limit: Byte ceiling.
+        """
+        bucket = self._events.get(task_id)
+        if bucket is None:
+            return
+        while len(bucket) > 1 and self._sizes.get(task_id, 0) > limit:
+            self._drop_oldest(task_id)
+
+    def _trim_total(self, *, keep: str) -> None:
+        """Evict least-recently-used tasks until the whole log fits.
+
+        Args:
+            keep: Task that must survive — it is the one just written to.
+        """
+        while len(self._events) > 1 and (
+            len(self._events) > self._max_tasks or self._total_bytes > self._max_bytes_total
+        ):
+            oldest = next(iter(self._events))
+            if oldest == keep:
+                # ``keep`` was just moved to the end, so reaching it means
+                # every other task's history is already gone.
+                break
+            self._forget(oldest)
+
+        # Nothing left to evict but still over budget: the surviving task
+        # holds the bytes, so trim its history rather than quietly ignoring
+        # the ceiling.
+        if self._total_bytes > self._max_bytes_total:
+            self._trim_bytes(keep, self._max_bytes_total)
+
+    def _forget(self, task_id: str) -> None:
+        """Remove one task's history and its byte accounting."""
+        self._events.pop(task_id, None)
+        self._total_bytes = max(0, self._total_bytes - self._sizes.pop(task_id, 0))
 
     async def replay(self, task_id: str, *, after: int = 0) -> list[TaskEvent]:
         """Return retained events for a task with sequence greater than ``after``."""
@@ -138,22 +299,31 @@ class InMemoryTaskEventLog(TaskEventLog):
         """Return the lowest sequence still retained, or 0 when empty."""
         async with self._lock:
             bucket = self._events.get(task_id)
-            if not bucket:
-                return 0
-            return bucket[0].sequence
+            return bucket[0].sequence if bucket else 0
 
     async def latest_sequence(self, task_id: str) -> int:
         """Return the highest recorded sequence, or 0 when empty."""
         async with self._lock:
             bucket = self._events.get(task_id)
-            if not bucket:
-                return 0
-            return bucket[-1].sequence
+            return bucket[-1].sequence if bucket else 0
 
     async def drop(self, task_id: str) -> None:
         """Discard a task's retained history."""
         async with self._lock:
-            self._events.pop(task_id, None)
+            self._forget(task_id)
+
+    async def stats(self) -> dict[str, int]:
+        """Return current occupancy, for tests and operational visibility.
+
+        Returns:
+            Task count, retained event count and total estimated bytes.
+        """
+        async with self._lock:
+            return {
+                "tasks": len(self._events),
+                "events": sum(len(bucket) for bucket in self._events.values()),
+                "bytes": self._total_bytes,
+            }
 
 
 class NullTaskEventLog(TaskEventLog):

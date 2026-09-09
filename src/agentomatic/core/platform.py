@@ -975,12 +975,16 @@ class AgentPlatform:
             make_plugin_dispatcher,
             make_plugin_input_validator,
         )
+        from agentomatic.tasks.event_log import event_log_from_env
         from agentomatic.tasks.manager import TaskManager
         from agentomatic.tasks.models import TargetType
 
         manager = TaskManager(
             store=self._task_store,
             max_concurrency=self._task_max_concurrency,
+            # Retention is an operational concern — sized from the
+            # environment, like every other platform switch.
+            event_log=event_log_from_env(),
         )
         manager.register_dispatcher(TargetType.AGENT, make_agent_dispatcher(self._registry))
         manager.register_input_validator(
