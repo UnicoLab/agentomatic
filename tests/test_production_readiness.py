@@ -85,9 +85,11 @@ def test_slug_alias_routes_work_but_are_not_documented_twice(dual_mounted_platfo
     spec = app.openapi()
 
     assert "/api/v1/hello/invoke" in spec["paths"], "canonical route must be documented"
-    assert "/api/v1/agent-hello/invoke" not in spec["paths"], (
-        "the slug alias must not be documented — it doubles the advertised surface"
-    )
+    # Kept on its own line: ruff 0.8.6 (pinned in .pre-commit-config.yaml) and
+    # newer ruff wrap an assert message in opposite directions, so an inline
+    # message here reformats differently depending on which version runs.
+    alias_note = "the slug alias must not be documented — it doubles the advertised surface"
+    assert "/api/v1/agent-hello/invoke" not in spec["paths"], alias_note
 
     with TestClient(app) as client:
         # ...but it must still route, so Studio's slug-based calls keep working.
@@ -320,6 +322,11 @@ def test_all_extra_contents_match_what_the_docs_claim() -> None:
 
     documented = {
         "langgraph",
+        # ``langchain`` + ``openai`` carry langchain-openai, which the default
+        # scaffolded ``stacks/local.yaml`` needs: its ``omlx`` provider speaks
+        # to a local OpenAI-*compatible* server.
+        "langchain",
+        "openai",
         "ollama",
         "metrics",
         "db",
@@ -337,9 +344,11 @@ def test_all_extra_contents_match_what_the_docs_claim() -> None:
         f"(added={included - documented}, removed={documented - included})"
     )
 
-    # These are deliberately excluded — vendor SDKs (provider-agnostic
+    # These are deliberately excluded — hosted vendor SDKs (provider-agnostic
     # principle), an alternative DB driver, and the heavy Chainlit UI.
-    for deliberately_excluded in ("openai", "azure", "vertex", "db-postgres", "ui"):
+    # ``openai`` is *not* on this list: the default local stack's ``omlx``
+    # provider needs langchain-openai to reach an OpenAI-compatible server.
+    for deliberately_excluded in ("azure", "vertex", "db-postgres", "ui"):
         assert deliberately_excluded in extras, f"{deliberately_excluded} extra vanished"
         assert deliberately_excluded not in included
 

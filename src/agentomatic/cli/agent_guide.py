@@ -191,6 +191,10 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_LOGS_HISTORY` | Persist per-agent invoke/chat/stream history (default off) |
 | `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` | Enable LLM analysis over those logs (default off) |
 | `AGENTOMATIC_INGESTION_ROOT` | Confine ingestion source/output paths to this dir (default: cwd) |
+| `AGENTOMATIC_TASK_EVENT_LOG` | Task-event replay backend: `memory` (default), `none` to disable, or a registered provider |
+| `AGENTOMATIC_TASK_EVENTS_PER_TASK` / `AGENTOMATIC_TASK_EVENT_TASKS` / `AGENTOMATIC_TASK_EVENT_MAX_MB` | Task-event replay retention (default 512 / 1024 / 32 MB) |
+| `AGENTOMATIC_STREAM_REPLAY` | Retain `/invoke/stream` frames for replay (default on; `0` disables) |
+| `AGENTOMATIC_STREAM_FRAMES` / `AGENTOMATIC_STREAM_COUNT` / `AGENTOMATIC_STREAM_MAX_MB` | Stream replay retention (default 512 / 256 / 64 MB) |
 | `AGENTOMATIC_DEBUG_ERRORS` | Return raw exception text in API errors (default off — dev only) |
 | `AGENTOMATIC_OTEL_CONSOLE` | Print OpenTelemetry spans to stdout (default off) |
 | `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS` | Honour X-Forwarded-For for rate-limit keys (default off) |

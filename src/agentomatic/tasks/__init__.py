@@ -35,6 +35,14 @@ from .dispatchers import (
     make_plugin_dispatcher,
     make_plugin_input_validator,
 )
+from .event_log import (
+    InMemoryTaskEventLog,
+    NullTaskEventLog,
+    TaskEventLog,
+    available_event_log_providers,
+    create_event_log,
+    register_event_log_provider,
+)
 from .manager import TaskInputValidationError, TaskManager
 from .models import (
     TargetType,
@@ -61,12 +69,15 @@ if TYPE_CHECKING:
 
 __all__ = [
     "BatchSubmitRequest",
+    "InMemoryTaskEventLog",
     "InMemoryTaskStore",
+    "NullTaskEventLog",
     "SQLAlchemyTaskStore",
     "TargetNotFoundError",
     "TargetType",
     "TaskContext",
     "TaskEvent",
+    "TaskEventLog",
     "TaskManager",
     "TaskInputValidationError",
     "TaskProgress",
@@ -76,7 +87,9 @@ __all__ = [
     "TaskStore",
     "TaskSubmitRequest",
     "attach_execution_modes",
+    "available_event_log_providers",
     "bind_task_context",
+    "create_event_log",
     "create_task_router",
     "get_task_context",
     "install_task_progress_bridge",
@@ -88,6 +101,7 @@ __all__ = [
     "make_ingestion_input_validator",
     "make_pipeline_dispatcher",
     "make_pipeline_input_validator",
+    "register_event_log_provider",
     "make_plugin_dispatcher",
     "make_plugin_input_validator",
     "report_stage",

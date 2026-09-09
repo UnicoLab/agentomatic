@@ -72,7 +72,7 @@ is enabled by default (`enable_tasks=True`).
 | `GET` | `/tasks` | List / filter tasks |
 | `GET` | `/tasks/{id}` | Poll status + progress |
 | `GET` | `/tasks/{id}/result` | Fetch the result (`409` if still pending) |
-| `GET` | `/tasks/{id}/events` | Live SSE progress stream |
+| `GET` | `/tasks/{id}/events` | Resumable SSE progress stream |
 | `POST` | `/tasks/{id}/cancel` | Request cancellation |
 | `DELETE` | `/tasks/{id}` | Delete a terminal record |
 
@@ -202,9 +202,74 @@ const es = new EventSource("/api/v1/tasks/task_a1b2c3d4e5f6a7b8/events");
 es.onmessage = (e) => {
   if (e.data === "[DONE]") { es.close(); return; }
   const evt = JSON.parse(e.data);
-  console.log(evt.status, evt.progress?.percent, evt.progress?.message);
+  console.log(evt.sequence, evt.status, evt.progress?.percent);
 };
 ```
+
+#### Resuming a dropped stream
+
+Every frame carries an SSE `id:` holding the event's `sequence` — a
+per-task counter that starts at 1 and never skips. That is what makes a
+dropped connection recoverable rather than merely survivable.
+
+A browser `EventSource` needs no extra code: it reconnects on its own and
+sends the last id it saw back in `Last-Event-ID`, and the server replays
+only what was missed. Other clients pass the same value explicitly:
+
+```bash
+# Resume after event 7 — events 8 onwards, then live updates.
+curl -N "http://localhost:8000/api/v1/tasks/task_a1b2c3d4e5f6a7b8/events?since=7"
+curl -N -H "Last-Event-ID: 7" \
+  http://localhost:8000/api/v1/tasks/task_a1b2c3d4e5f6a7b8/events
+```
+
+A client reconnecting *without* a cursor is treated as new: it receives the
+task's current snapshot (itself carrying an `id:`, so it can resume from
+there) rather than the whole history.
+
+!!! warning "Replay is bounded, and says so"
+
+    The event log keeps the last 512 events of each of the last 1024 tasks by
+    default. If you resume from a point that has already been evicted, the
+    stream sends a `{"event": "truncated"}` frame followed by the current
+    snapshot — it never serves a partial history as if it were complete.
+
+    Tune it, or turn replay off, when constructing the manager:
+
+    ```python
+    from agentomatic.tasks import InMemoryTaskEventLog, TaskManager
+
+    manager = TaskManager(
+        event_log=InMemoryTaskEventLog(max_events_per_task=2048, max_tasks=256)
+    )
+    ```
+
+!!! note "One process, by default"
+
+    The built-in event log lives in the worker that ran the task. Task
+    *records* are shared through the store, so a client reconnecting to
+    another worker still gets the correct snapshot and terminal result — but
+    the missed intermediate events are not replayable from there.
+
+    For replay across workers or replicas, register a shared log. Agentomatic
+    ships the interface, not a vendor client:
+
+    ```python
+    from agentomatic.tasks import TaskEventLog, register_event_log_provider
+
+    class RedisEventLog(TaskEventLog):
+        async def append(self, event): ...
+        async def replay(self, task_id, *, after=0): ...
+        async def earliest_sequence(self, task_id): ...
+        async def latest_sequence(self, task_id): ...
+        async def drop(self, task_id): ...
+
+    register_event_log_provider("redis", lambda **cfg: RedisEventLog(**cfg))
+    ```
+
+This applies to **every** task target — agents, pipelines, plugins,
+endpoints and ingestion all run through the same manager, so a pipeline's
+per-step progress resumes exactly like an agent's.
 
 ### Fetching the result
 

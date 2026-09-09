@@ -42,17 +42,70 @@ _LOCAL_STACK_HEADER = f"""\
 """
 
 
-def default_local_model() -> str:
+def probe_local_models(base_url: str | None = None, *, timeout: float = 1.5) -> list[str]:
+    """List the models an OpenAI-compatible server currently has loaded.
+
+    Every scaffolded project used to hard-code :data:`DEFAULT_LOCAL_MODEL`, so
+    a local server holding anything else answered the first invoke with HTTP
+    400 (unknown model) — the generated stack was wrong the moment it was
+    written. Asking the server what it actually serves removes that mismatch.
+
+    The probe is best-effort and never raises: no server, a slow one, or a
+    non-OpenAI endpoint all yield an empty list.
+
+    Args:
+        base_url: Server base URL (default: :func:`default_local_base_url`).
+        timeout: Per-request timeout in seconds.
+
+    Returns:
+        Model identifiers, in the order the server reported them.
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    url = (base_url or default_local_base_url()).rstrip("/") + "/models"
+    try:
+        # A localhost model server must not be reached through a proxy, and
+        # an ambient HTTP_PROXY would otherwise swallow the request.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(url, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError):
+        return []
+
+    entries = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return []
+    models: list[str] = []
+    for entry in entries:
+        identifier = entry.get("id") if isinstance(entry, dict) else None
+        if isinstance(identifier, str) and identifier.strip():
+            models.append(identifier.strip())
+    return models
+
+
+def default_local_model(*, probe: bool = True) -> str:
     """Return the model name to bake into a generated local stack.
 
-    Reads ``AGENTOMATIC_LOCAL_MODEL`` then ``OMLX_MODEL`` so a machine that
-    already has a model loaded scaffolds projects pointing straight at it.
+    Resolution order: ``AGENTOMATIC_LOCAL_MODEL``, ``OMLX_MODEL``, whatever a
+    running local server reports, then :data:`DEFAULT_LOCAL_MODEL`.
+
+    Args:
+        probe: Ask a running local server when no env var is set.
 
     Returns:
         A model identifier, e.g. ``"Qwen3.5-9B-MLX-4bit"``.
     """
     model = os.getenv("AGENTOMATIC_LOCAL_MODEL") or os.getenv("OMLX_MODEL") or ""
-    return model.strip().removeprefix("omlx/") or DEFAULT_LOCAL_MODEL
+    resolved = model.strip().removeprefix("omlx/")
+    if resolved:
+        return resolved
+    if probe:
+        detected = probe_local_models()
+        if detected:
+            return detected[0]
+    return DEFAULT_LOCAL_MODEL
 
 
 def default_local_base_url() -> str:

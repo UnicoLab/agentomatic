@@ -975,12 +975,16 @@ class AgentPlatform:
             make_plugin_dispatcher,
             make_plugin_input_validator,
         )
+        from agentomatic.tasks.event_log import event_log_from_env
         from agentomatic.tasks.manager import TaskManager
         from agentomatic.tasks.models import TargetType
 
         manager = TaskManager(
             store=self._task_store,
             max_concurrency=self._task_max_concurrency,
+            # Retention is an operational concern — sized from the
+            # environment, like every other platform switch.
+            event_log=event_log_from_env(),
         )
         manager.register_dispatcher(TargetType.AGENT, make_agent_dispatcher(self._registry))
         manager.register_input_validator(
@@ -1810,23 +1814,29 @@ class AgentPlatform:
         # A2A discovery
         @app.get("/.well-known/agent.json", tags=["Platform"])
         async def a2a_discovery() -> dict[str, Any]:
-            """Return A2A agent cards for all registered agents."""
-            cards: dict[str, Any] = {}
-            for name, agent in self._registry.all().items():
-                m = agent.manifest
-                cards[name] = {
-                    "name": m.slug,
-                    "description": m.description,
-                    "version": m.version,
-                    "endpoints": {
-                        "invoke": f"{self.api_prefix}/{name}/invoke",
-                        "chat": f"{self.api_prefix}/{name}/chat",
-                    },
-                }
+            """Return A2A agent cards for all registered agents.
+
+            This is the canonical A2A discovery document, so it renders the
+            same card as ``GET {api_prefix}/{agent}/card``. It used to emit a
+            reduced one — no capabilities, and only ``invoke`` and ``chat`` —
+            which left a conforming client knowing less about an agent than
+            one that guessed the per-agent URL.
+            """
+            from agentomatic.core.agent_card import build_agent_card
+
+            supports_tasks = self._task_manager is not None
             return {
                 "platform": self.title,
                 "version": self.version,
-                "agents": cards,
+                "agents": {
+                    name: build_agent_card(
+                        agent.manifest,
+                        name,
+                        self.api_prefix,
+                        supports_tasks=supports_tasks,
+                    )
+                    for name, agent in self._registry.all().items()
+                },
             }
 
         # Agents list

@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
 from collections.abc import Callable
 from typing import Any, cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
+from agentomatic.core.agent_card import build_agent_card
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
 from agentomatic.core.errors import client_safe_detail, client_safe_message
 from agentomatic.langchain_adapter import dict_to_messages, json_default, to_jsonable
+from agentomatic.streaming import get_replay_buffer, new_stream_id, sse_frame
 
 # ---------------------------------------------------------------------------
 # Request / Response Models
@@ -162,7 +165,7 @@ def coerce_agent_invoke_payload(
         return raw_response, output, context
 
     # Explicit structured response value.
-    if isinstance(raw_response, (dict, list)):
+    if isinstance(raw_response, dict | list):
         jsonable_response = to_jsonable(raw_response)
         return _json_dumps(jsonable_response), jsonable_response, context
 
@@ -733,9 +736,37 @@ def create_default_router(
                 detail=client_safe_detail(exc, context="Agent invocation failed"),
             ) from exc
 
-    async def invoke_stream(request: Any) -> StreamingResponse:
+    def _stream_owner(http_request: Request | None) -> str:
+        """Return the ownership tag for a stream on this agent.
+
+        The replay buffer is process-wide, so a lookup by id alone would read
+        across every boundary the platform enforces per agent: zero-trust
+        derives its policy from the agent segment of the path, so a caller
+        allowed on one agent could otherwise fetch another agent's retained
+        response by naming its stream id on their own agent's route.
+
+        The tag pins a stream to the agent that produced it *and* to the
+        principal it was produced for, so neither a different agent's route
+        nor a different caller can read it back.
+
+        Args:
+            http_request: The incoming request, when one is available.
+
+        Returns:
+            An opaque ownership tag.
+        """
+        principal = "anon"
+        if http_request is not None:
+            state = http_request.scope.get("state") or {}
+            principal = str(
+                getattr(http_request.state, "user_id", None) or state.get("user_id") or "anon"
+            )
+        return f"agent:{agent_name}:{principal}"
+
+    async def invoke_stream(request: Any, http_request: Request) -> StreamingResponse:
         """Invoke agent with SSE streaming."""
         agent = _get_agent()
+        stream_owner = _stream_owner(http_request)
         state = _build_initial_state(request)
         thread_id = state.get("thread_id", "")
         query = state.get("current_query", "")
@@ -767,6 +798,20 @@ def create_default_router(
         )
 
         stream_t0 = time.perf_counter()
+        stream_id = new_stream_id()
+        replay_buffer = get_replay_buffer()
+
+        async def emit(payload: Any) -> str:
+            """Record one frame and render it with its sequence as the SSE id.
+
+            Recording is what lets a client that drops mid-answer recover the
+            part that was already produced, rather than losing the exchange.
+            """
+            body = (
+                payload if isinstance(payload, str) else json.dumps(payload, default=json_default)
+            )
+            sequence = await replay_buffer.record(stream_id, body, owner=stream_owner)
+            return sse_frame(body, event_id=sequence)
 
         async def event_stream():
             """Yield SSE frames from graph or node execution."""
@@ -785,30 +830,30 @@ def create_default_router(
                         state_obj = class_agent.input_to_state(input_data)
                         graph = class_agent.graph
                         async for event in graph.astream(state_obj):
-                            yield f"data: {json.dumps(event, default=json_default)}\n\n"
+                            yield await emit(event)
                         result = class_agent.state_to_output(state_obj)
                         if hasattr(class_agent, "_graph") and class_agent._graph is not None:
                             class_agent._traces.append(class_agent._graph.last_trace)
                     finally:
                         class_agent._end_request_prompt()
-                    yield f"data: {json.dumps(result, default=json_default)}\n\n"
+                    yield await emit(result)
                     collected_response = result.get("response", "")
                     collected_output = result
                 elif agent.graph_fn:
                     graph = agent.graph_fn()
                     async for event in graph.astream(state):
-                        yield f"data: {json.dumps(event, default=json_default)}\n\n"
+                        yield await emit(event)
                         # Collect response for persistence
                         if isinstance(event, dict) and "response" in event:
                             collected_response = event["response"]
                             collected_output = event
                 elif agent.node_fn:
                     result = await agent.node_fn(state)
-                    yield f"data: {json.dumps(result, default=json_default)}\n\n"
+                    yield await emit(result)
                     if isinstance(result, dict):
                         collected_response = result.get("response", "")
                         collected_output = result
-                yield "data: [DONE]\n\n"
+                yield await emit("[DONE]")
 
                 # Persist the turn after streaming completes
                 if memory_mgr and thread_id and query and collected_response:
@@ -849,7 +894,14 @@ def create_default_router(
                         status="suspended",
                         error=exc.message,
                     )
-                yield f"data: {json.dumps({'status': 'suspended', 'approval_id': exc.approval_id, 'node_name': exc.node_name, 'message': exc.message})}\n\n"
+                yield await emit(
+                    {
+                        "status": "suspended",
+                        "approval_id": exc.approval_id,
+                        "node_name": exc.node_name,
+                        "message": exc.message,
+                    }
+                )
             except Exception as exc:
                 if log_recorder is not None:
                     await log_recorder.record(
@@ -863,12 +915,18 @@ def create_default_router(
                         error=str(exc),
                     )
                 safe = client_safe_detail(exc, context="Agent streaming failed")
-                yield f"data: {json.dumps(safe)}\n\n"
+                yield await emit(safe)
 
         return StreamingResponse(
             event_stream(),
             media_type="text/event-stream",
-            headers={"X-Agent": agent_name, "Cache-Control": "no-cache"},
+            headers={
+                "X-Agent": agent_name,
+                "Cache-Control": "no-cache",
+                # A client that drops mid-answer needs this to ask for the
+                # frames it missed.
+                "X-Stream-Id": stream_id,
+            },
         )
 
     # Apply annotations dynamically
@@ -888,6 +946,66 @@ def create_default_router(
         methods=["POST"],
         summary="Invoke agent with SSE streaming",
     )
+
+    @router.get("/invoke/stream/{stream_id}", summary="Replay a streamed response")
+    async def replay_invoke_stream(
+        stream_id: str,
+        request: Request,
+        since: int = Query(default=0, ge=0),
+    ) -> StreamingResponse:
+        """Re-send the frames a previous ``/invoke/stream`` already produced.
+
+        A dropped SSE connection used to lose the whole partial answer: the
+        frames were written straight to the socket and kept nowhere. They are
+        now retained under the ``X-Stream-Id`` the original response carried,
+        so a client can come back and collect what it missed.
+
+        This replays what was *produced*; it does not restart the run, because
+        the run is bound to the request that was cancelled. For a stream that
+        keeps working across a disconnect, submit the work as a task
+        (``/invoke/async``) and follow ``/api/v1/tasks/{id}/events``, which is
+        resumable end to end.
+        """
+        from agentomatic.tasks.event_log import parse_last_event_id
+
+        buffer = get_replay_buffer()
+        owner = _stream_owner(request)
+        # A stream belonging to another agent or another caller reports "not
+        # found" rather than "forbidden": answering differently would confirm
+        # that the id exists.
+        if not await buffer.knows(stream_id, owner=owner):
+            raise HTTPException(
+                404,
+                f"Stream '{stream_id}' is unknown or its frames are no longer retained.",
+            )
+
+        resume_from = since or parse_last_event_id(request.headers.get("last-event-id"))
+        frames = await buffer.replay(stream_id, after=resume_from, owner=owner)
+        earliest = await buffer.earliest_sequence(stream_id)
+        truncated = bool(resume_from and earliest and earliest > resume_from + 1)
+
+        async def replay_stream() -> Any:
+            if truncated:
+                yield sse_frame(
+                    {
+                        "event": "truncated",
+                        "stream_id": stream_id,
+                        "resumed_after": resume_from,
+                        "detail": "Earlier frames are no longer retained.",
+                    }
+                )
+            for frame in frames:
+                yield sse_frame(frame.data, event_id=frame.sequence)
+
+        return StreamingResponse(
+            replay_stream(),
+            media_type="text/event-stream",
+            headers={
+                "X-Agent": agent_name,
+                "Cache-Control": "no-cache",
+                "X-Stream-Id": stream_id,
+            },
+        )
 
     # ── POST /invoke/async + /invoke/batch (via the task system) ──
     if task_manager is not None:
@@ -1153,26 +1271,12 @@ def create_default_router(
     async def get_card() -> dict[str, Any]:
         """A2A Agent Card."""
         agent = _get_agent()
-        m = agent.manifest
-        return {
-            "name": m.slug,
-            "description": m.description,
-            "version": m.version,
-            "framework": m.framework,
-            "capabilities": {
-                "streaming": True,
-                "chat": True,
-                "invoke": True,
-                "a2a": True,
-            },
-            "endpoints": {
-                "invoke": f"{api_prefix}/{agent_name}/invoke",
-                "chat": f"{api_prefix}/{agent_name}/chat",
-                "stream": f"{api_prefix}/{agent_name}/invoke/stream",
-                "health": f"{api_prefix}/{agent_name}/health",
-            },
-            "metadata": m.metadata,
-        }
+        return build_agent_card(
+            agent.manifest,
+            agent_name,
+            api_prefix,
+            supports_tasks=task_manager is not None,
+        )
 
     # ── A2A task lifecycle ────────────────────────────────────────
     # Maps the unified TaskStatus to canonical A2A task states.
@@ -1200,6 +1304,34 @@ def create_default_router(
             view["raw"] = result
         if record.error:
             view["error"] = record.error
+        return view
+
+    def _a2a_event_view(evt: Any, record: Any) -> dict[str, Any]:
+        """Render one recorded event as an A2A-shaped task object.
+
+        A replayed event describes the state *at that point*, so its status and
+        progress come from the event rather than from the task's current
+        snapshot — otherwise every historical frame would claim the task's
+        latest state. The record is consulted only for the terminal payload.
+
+        Args:
+            evt: The recorded :class:`~agentomatic.tasks.models.TaskEvent`.
+            record: The task record, used for the result on a terminal event.
+
+        Returns:
+            An A2A task object for one point in the task's history.
+        """
+        view: dict[str, Any] = {
+            "task_id": evt.task_id,
+            "sequence": evt.sequence,
+            "status": _A2A_STATE.get(evt.status.value, evt.status.value),
+            "progress": evt.progress.model_dump() if evt.progress else None,
+        }
+        if evt.status.is_terminal and record is not None:
+            terminal = _a2a_view(record)
+            for key in ("result", "artifacts", "raw", "error"):
+                if key in terminal:
+                    view[key] = terminal[key]
         return view
 
     @router.post("/a2a/tasks")
@@ -1282,6 +1414,90 @@ def create_default_router(
             "status": "completed",
             "message": "Task tracking requires a task manager",
         }
+
+    @router.get("/a2a/tasks/{task_id}/events")
+    async def stream_a2a_task(task_id: str, request: Request, since: int = Query(default=0, ge=0)):
+        """Subscribe (or re-subscribe) to an A2A task's progress over SSE.
+
+        This is the A2A analogue of the platform's task stream: same
+        resumption contract — every frame carries its sequence as the SSE
+        ``id:``, and a reconnect replays the gap named by ``Last-Event-ID`` or
+        ``?since=`` — but the frames are A2A task objects rather than raw task
+        records, so an A2A client sees the states it expects.
+        """
+        from agentomatic.tasks.event_log import parse_last_event_id
+
+        if task_manager is None:
+            raise HTTPException(501, "A2A task streaming requires a task manager")
+        record = await task_manager.get(task_id)
+        if record is None:
+            raise HTTPException(404, f"Task '{task_id}' not found")
+
+        resume_from = since or parse_last_event_id(request.headers.get("last-event-id"))
+
+        def _frame(payload: dict[str, Any], seq: int | None = None) -> str:
+            body = f"data: {json.dumps(payload, default=str)}\n\n"
+            return f"id: {seq}\n{body}" if seq else body
+
+        async def event_stream() -> Any:
+            queue = await task_manager.subscribe(task_id)
+            try:
+                resumption = await task_manager.resume(task_id, after=resume_from)
+                cursor = resumption.cursor
+                if resume_from <= 0:
+                    cursor = await task_manager.event_log.latest_sequence(task_id)
+
+                if resumption.truncated:
+                    yield _frame(
+                        {
+                            "task_id": task_id,
+                            "event": "truncated",
+                            "resumed_after": resume_from,
+                        }
+                    )
+                # ``_a2a_event_view`` consults the record only for a
+                # terminal event's payload, so read it once rather than once
+                # per replayed event — that was a store round-trip per frame.
+                replay_record = (
+                    await task_manager.get(task_id)
+                    if any(evt.status.is_terminal for evt in resumption.replay)
+                    else None
+                )
+                for evt in resumption.replay:
+                    yield _frame(_a2a_event_view(evt, replay_record), evt.sequence)
+
+                current = await task_manager.get(task_id)
+                if current is not None and (resume_from <= 0 or resumption.truncated):
+                    yield _frame(_a2a_view(current), cursor)
+                if current is not None and current.status.is_terminal:
+                    yield "data: [DONE]\n\n"
+                    return
+
+                while True:
+                    try:
+                        evt = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    except TimeoutError:
+                        yield ": keep-alive\n\n"
+                        continue
+                    if evt.sequence and evt.sequence <= cursor:
+                        continue
+                    cursor = evt.sequence or cursor
+                    # Only a terminal event needs the record's result.
+                    live_record = (
+                        await task_manager.get(task_id) if evt.status.is_terminal else None
+                    )
+                    yield _frame(_a2a_event_view(evt, live_record), evt.sequence)
+                    if evt.status.is_terminal:
+                        yield "data: [DONE]\n\n"
+                        return
+            finally:
+                task_manager.unsubscribe(task_id, queue)
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @router.post("/a2a/tasks/{task_id}/cancel")
     async def cancel_a2a_task(task_id: str) -> dict[str, Any]:

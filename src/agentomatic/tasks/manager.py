@@ -28,6 +28,12 @@ from loguru import logger
 from agentomatic.core.errors import client_safe_message
 
 from .context import TaskContext
+from .event_log import (
+    InMemoryTaskEventLog,
+    StreamResumption,
+    TaskEventLog,
+    resolve_resumption,
+)
 from .models import (
     TargetType,
     TaskEvent,
@@ -65,8 +71,10 @@ class TaskManager:
         *,
         max_concurrency: int = 8,
         default_batch_concurrency: int = 4,
+        event_log: TaskEventLog | None = None,
     ) -> None:
         self.store = store or InMemoryTaskStore()
+        self.event_log: TaskEventLog = event_log or InMemoryTaskEventLog()
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._max_concurrency = max_concurrency
         self._default_batch_concurrency = default_batch_concurrency
@@ -75,6 +83,7 @@ class TaskManager:
         self._running: dict[str, asyncio.Task[Any]] = {}
         self._cancel_requested: set[str] = set()
         self._subscribers: dict[str, list[asyncio.Queue[TaskEvent]]] = {}
+        self._sequences: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     # Registration & lifecycle
@@ -240,13 +249,23 @@ class TaskManager:
         the number currently executing, and the configured concurrency.
         """
         by_status = {status.value: await self.store.count(status=status) for status in TaskStatus}
-        return {
+        stats: dict[str, Any] = {
             "total": await self.store.count(),
             "by_status": by_status,
             "running": len(self._running),
             "max_concurrency": self._max_concurrency,
             "supported_targets": self.supported_targets,
         }
+        # The event log holds memory, so its occupancy belongs on the status
+        # dashboard. ``stats`` is not part of the TaskEventLog contract — a
+        # registered custom backend need not implement it.
+        occupancy = getattr(self.event_log, "stats", None)
+        if callable(occupancy):
+            try:
+                stats["event_log"] = await occupancy()
+            except Exception as exc:  # noqa: BLE001 - status must never fail
+                stats["event_log"] = {"error": str(exc)}
+        return stats
 
     # ------------------------------------------------------------------
     # Cancellation
@@ -284,6 +303,27 @@ class TaskManager:
             subs.remove(queue)
         if subs is not None and not subs:
             self._subscribers.pop(task_id, None)
+
+    async def resume(self, task_id: str, *, after: int) -> StreamResumption:
+        """Work out what a client reconnecting at ``after`` still needs.
+
+        Args:
+            task_id: Task being resumed.
+            after: Last sequence the client processed (0 for a new client).
+
+        Returns:
+            The events it missed, and whether the history was truncated.
+        """
+        return await resolve_resumption(self.event_log, task_id, after=after)
+
+    async def forget_events(self, task_id: str) -> None:
+        """Discard a task's retained event history.
+
+        Args:
+            task_id: Task whose history to drop.
+        """
+        self._sequences.pop(task_id, None)
+        await self.event_log.drop(task_id)
 
     # ------------------------------------------------------------------
     # Internal execution
@@ -489,22 +529,37 @@ class TaskManager:
     async def _emit(
         self, record: TaskRecord, event: str, *, data: dict[str, Any] | None = None
     ) -> None:
-        """Broadcast an event to all subscribers of a task."""
-        subs = self._subscribers.get(record.id)
-        if not subs:
-            return
+        """Record an event and broadcast it to the task's live subscribers.
+
+        Recording happens whether or not anyone is currently listening. The
+        previous behaviour — build the event only when a subscriber existed —
+        made a dropped connection unrecoverable: the events emitted while the
+        client was away were never created, let alone retained.
+        """
+        self._sequences[record.id] = self._sequences.get(record.id, 0) + 1
         evt = TaskEvent(
             task_id=record.id,
+            sequence=self._sequences[record.id],
             event=event,
             status=record.status,
             progress=record.progress,
             data=data or {},
         )
-        for queue in list(subs):
+        try:
+            await self.event_log.append(evt)
+        except Exception as exc:  # noqa: BLE001 - the log must never break a task
+            logger.warning(f"Task event log rejected an event for {record.id}: {exc}")
+
+        for queue in list(self._subscribers.get(record.id, ())):
             try:
                 queue.put_nowait(evt)
             except asyncio.QueueFull:  # pragma: no cover - slow consumer
+                # The subscriber can still recover: it reconnects with its last
+                # sequence and replays the gap from the event log.
                 logger.debug(f"Dropping task event for slow subscriber on {record.id}")
+
+        if record.status.is_terminal:
+            self._sequences.pop(record.id, None)
 
     async def _fire_webhook(self, record: TaskRecord) -> None:
         """POST the final record to ``callback_url`` (best-effort)."""

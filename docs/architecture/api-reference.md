@@ -213,10 +213,13 @@ curl -X POST http://localhost:8000/api/v1/my_agent/invoke/stream \
 **SSE Response:**
 
 ```
+id: 1
 data: {"response": "", "steps_taken": ["retrieve"]}
 
+id: 2
 data: {"response": "Quantum computing uses...", "steps_taken": ["retrieve", "generate"]}
 
+id: 3
 data: [DONE]
 ```
 
@@ -226,7 +229,45 @@ data: [DONE]
 |---|---|
 | `Content-Type` | `text/event-stream` |
 | `X-Agent` | Agent name |
+| `X-Stream-Id` | Identity to replay this stream with |
 | `Cache-Control` | `no-cache` |
+
+---
+
+#### `GET /invoke/stream/{stream_id}`
+
+Re-send the frames a previous `/invoke/stream` already produced, using the
+`X-Stream-Id` that response carried. Accepts `?since=` or `Last-Event-ID` and
+returns only the frames after that point; `404` once the stream is no longer
+retained.
+
+A retained stream is scoped to the agent that produced it **and** the
+principal it was produced for. Replaying another agent's stream — or another
+caller's — returns `404`, the same answer as an id that does not exist, so the
+response never confirms that someone else's stream is there.
+
+```bash
+curl -N "http://localhost:8000/api/v1/my_agent/invoke/stream/stream_a1b2c3d4?since=2"
+```
+
+!!! warning "Replay is not resumption"
+
+    This returns what was already **produced**. It does not restart the run:
+    the agent execution is bound to the request that was cancelled, so a
+    client that disconnects mid-answer loses the *generation*, and replay
+    recovers only the part that had been emitted.
+
+    For a stream that keeps working across a dropped connection, submit the
+    work as a task and follow the task's events — that path is resumable end
+    to end:
+
+    ```bash
+    TASK=$(curl -sX POST http://localhost:8000/api/v1/my_agent/invoke/async \
+      -H 'Content-Type: application/json' -d '{"query": "..."}' | jq -r .id)
+    curl -N "http://localhost:8000/api/v1/tasks/$TASK/events"
+    ```
+
+    See [Tasks & Execution Modes](../guide/tasks.md#resuming-a-dropped-stream).
 
 ---
 
@@ -360,17 +401,39 @@ curl http://localhost:8000/api/v1/my_agent/card
     "streaming": true,
     "chat": true,
     "invoke": true,
-    "a2a": true
+    "a2a": true,
+    "stateTransitionHistory": true,
+    "pushNotifications": true,
+    "resumableStreams": true
   },
   "endpoints": {
     "invoke": "/api/v1/my_agent/invoke",
     "chat": "/api/v1/my_agent/chat",
     "stream": "/api/v1/my_agent/invoke/stream",
-    "health": "/api/v1/my_agent/health"
+    "stream_replay": "/api/v1/my_agent/invoke/stream/{stream_id}",
+    "health": "/api/v1/my_agent/health",
+    "card": "/api/v1/my_agent/card",
+    "a2a_tasks": "/api/v1/my_agent/a2a/tasks",
+    "a2a_events": "/api/v1/my_agent/a2a/tasks/{task_id}/events"
   },
   "metadata": {}
 }
 ```
+
+`stateTransitionHistory`, `pushNotifications` and `resumableStreams` all
+depend on the task subsystem. When it is disabled they report `false` and the
+`a2a_*` endpoints are omitted — the card describes what this deployment
+actually serves, so a client is never sent down a path that answers `501`.
+
+!!! note "Discovery returns the same card"
+
+    `GET /.well-known/agent.json` — the canonical A2A discovery document —
+    renders each agent through the same builder, so its cards are identical to
+    this one, wrapped in a platform envelope:
+
+    ```json
+    {"platform": "My Platform", "version": "1.0.0", "agents": {"my_agent": { ... }}}
+    ```
 
 ---
 
@@ -426,6 +489,39 @@ curl http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6
   "message": "Task tracking requires storage backend"
 }
 ```
+
+---
+
+#### `GET /a2a/tasks/{task_id}/events`
+
+Subscribe — or **re-subscribe** — to an A2A task's progress over
+Server-Sent Events. Frames are A2A task objects (`submitted`, `working`,
+`completed`, `failed`, `canceled`), and the stream ends with `data: [DONE]`.
+Returns `501` without the task subsystem, `404` for an unknown task.
+
+Every frame carries an SSE `id:` holding the event's monotonic `sequence`, so
+a client that loses the connection resumes precisely instead of restarting:
+
+```bash
+# Subscribe
+curl -N http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/events
+
+# Re-subscribe after event 4 — replays 5 onwards, then goes live
+curl -N -H "Last-Event-ID: 4" \
+  http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/events
+curl -N "http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/events?since=4"
+```
+
+```json
+{"task_id": "task_a1b2c3d4e5f6", "sequence": 5, "status": "working",
+ "progress": {"percent": 60.0, "message": "step 3"}}
+```
+
+A reconnect whose resume point has already been evicted receives a
+`{"event": "truncated"}` frame followed by the current task object, so a
+client is never handed a partial history as if it were complete. See
+[Tasks & Execution Modes](../guide/tasks.md#resuming-a-dropped-stream) for
+retention limits and the multi-worker caveat.
 
 ---
 

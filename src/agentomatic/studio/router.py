@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from agentomatic.core.errors import client_safe_detail
 from agentomatic.core.schemas import SchemaValidator, load_schema_models
+from agentomatic.streaming import new_stream_id, numbered_stream
 from agentomatic.studio.adapters import resolve_adapter
 from agentomatic.studio.models import (
     StudioAgentInfo,
@@ -350,8 +351,12 @@ def create_studio_router(
         state = _build_studio_state(request, thread_id)
 
         return StreamingResponse(
-            tracker.execute_with_adapter(
-                adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+            numbered_stream(
+                tracker.execute_with_adapter(
+                    adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+                ),
+                stream_id=run.id,
+                owner=f"studio:{name}",
             ),
             media_type="text/event-stream",
             headers={
@@ -528,10 +533,20 @@ def create_studio_router(
                 )
                 yield f"data: {error_data}\n\n"
 
+        # Key the retained frames on a fresh per-request id, never on
+        # ``thread_id``: that is a client-supplied path parameter, so reusing
+        # it would continue a previous resume's numbering (serving the wrong
+        # frames to a client reconnecting with Last-Event-ID) and let a caller
+        # collide with another thread's retained frames by choosing its name.
+        resume_stream_id = new_stream_id()
         return StreamingResponse(
-            _stream(),
+            numbered_stream(_stream(), stream_id=resume_stream_id, owner=f"studio:{name}"),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "X-Stream-Id": resume_stream_id,
+            },
         )
 
     @router.get(

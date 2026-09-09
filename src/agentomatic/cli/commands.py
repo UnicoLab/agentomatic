@@ -286,25 +286,166 @@ def _served_model_ids(response: Any) -> set[str]:
     return {str(item["id"]) for item in entries if isinstance(item, dict) and item.get("id")}
 
 
-def _ensure_project_context(parent: Path) -> list[str]:
+def _is_project_root(path: Path) -> bool:
+    """Report whether ``path`` looks like an Agentomatic project root.
+
+    Markers are deliberately specific. A lone ``stacks/`` or ``main.py`` says
+    almost nothing — plenty of unrelated projects have both — and treating
+    either as a marker would let a scaffold escape into an ancestor directory
+    that merely resembles a project.
+
+    Args:
+        path: Directory to test.
+
+    Returns:
+        True when the directory carries an Agentomatic project marker.
+    """
+    # Written by ``agentomatic new`` and by the init bootstrap alike, so every
+    # real project has one.
+    if (path / ".agentomatic-stack").is_file():
+        return True
+    if not (path / "agents").is_dir():
+        return False
+    stacks = path / "stacks"
+    if stacks.is_dir() and any(stacks.glob("*.yaml")):
+        return True
+    return (path / "main.py").is_file()
+
+
+def _is_walk_boundary(path: Path) -> bool:
+    """Report whether the upward search must stop *after* inspecting ``path``.
+
+    A repository root or the user's home directory is as far as a scaffold
+    should ever reach; beyond that any match is a coincidence.
+
+    Args:
+        path: Directory just inspected.
+
+    Returns:
+        True when the walk should not continue past ``path``.
+    """
+    if (path / ".git").exists():
+        return True
+    try:
+        return path == Path.home().resolve()
+    except (OSError, RuntimeError):
+        return False
+
+
+def find_project_root(start: Path | None = None, *, ceiling: int = 6) -> Path | None:
+    """Walk up from ``start`` looking for the enclosing Agentomatic project.
+
+    ``agentomatic init`` used to resolve ``agents/`` against the current
+    working directory, so running it from a subdirectory of a project silently
+    built a *second*, parallel project instead of adding an agent to the real
+    one — leaving the project's own ``agents/`` empty while the CLI reported
+    success.
+
+    Args:
+        start: Directory to start from (default: the current directory).
+        ceiling: Maximum number of directories to inspect while walking up.
+
+    Returns:
+        The project root, or None when ``start`` is not inside a project.
+    """
+    current = (start or Path.cwd()).resolve()
+    for _ in range(ceiling):
+        if _is_project_root(current):
+            return current
+        if _is_walk_boundary(current) or current.parent == current:
+            break
+        current = current.parent
+    return None
+
+
+def find_child_projects(start: Path | None = None) -> list[Path]:
+    """List Agentomatic projects in the immediate subdirectories of ``start``.
+
+    Covers the most common mistake by far: ``agentomatic new my_platform``
+    followed by ``agentomatic init hello`` *without* the ``cd`` in between.
+
+    Args:
+        start: Directory whose children are scanned (default: cwd).
+
+    Returns:
+        Child project roots, sorted by name.
+    """
+    base = (start or Path.cwd()).resolve()
+    try:
+        return [p for p in sorted(base.iterdir()) if p.is_dir() and _is_project_root(p)]
+    except OSError:
+        return []
+
+
+def find_child_project(start: Path | None = None) -> Path | None:
+    """Find a lone Agentomatic project in an immediate subdirectory.
+
+    Args:
+        start: Directory whose children are scanned (default: cwd).
+
+    Returns:
+        The sole child project root, or None when there is not exactly one.
+    """
+    children = find_child_projects(start)
+    return children[0] if len(children) == 1 else None
+
+
+def _display_path(path: Path) -> str:
+    """Render ``path`` relative to the current directory when that is shorter.
+
+    Absolute paths are what make a mis-targeted scaffold obvious, but they are
+    noisy for the common in-project case.
+
+    Args:
+        path: Path to render.
+
+    Returns:
+        A path string for display.
+    """
+    resolved = path.resolve()
+    try:
+        relative = resolved.relative_to(Path.cwd().resolve())
+    except ValueError:
+        return str(resolved)
+    return str(relative) if str(relative) != "." else str(resolved)
+
+
+def _ensure_project_context(
+    parent: Path,
+    *,
+    root: Path | None = None,
+    project_name: str = "agentomatic-app",
+) -> list[str]:
     """Create the project files a scaffolded agent needs in order to run.
 
     ``agentomatic init <agent>`` is often the first command a user types, in a
     directory that has never seen ``agentomatic new``. Without a stack the
     agent gets no LLM, and ``train.py`` cannot resolve one either — so the
     agent scaffolds successfully and then fails at the first invoke. This
-    fills in the missing pieces (stacks, active-stack marker, package init)
-    without touching anything that already exists.
+    fills in the missing pieces (stacks, active-stack marker, package init and
+    the platform ``main.py``) without touching anything that already exists.
+
+    Deliberately narrow: it does not create ``plugins/``, ``endpoints/``,
+    ``ingestion/`` or ``pipelines/``. Those are discovered lazily and only
+    clutter a directory the user did not ask to have restructured — use
+    ``agentomatic new`` for the full project layout.
 
     Args:
         parent: Directory the agent package was written into (e.g. ``agents``).
+        root: Project root to bootstrap. Defaults to ``parent.parent``, which
+            is only correct when ``parent`` is the project's own ``agents/``:
+            with an explicit ``--dir`` it would scatter ``stacks/``,
+            ``main.py`` and ``.agentomatic-stack`` into whatever happens to
+            contain that directory — a home directory, in the worst case.
+        project_name: Name baked into the generated ``main.py`` title.
 
     Returns:
-        Relative paths of the files that were created, in write order.
+        Paths of the files that were created, in write order.
     """
+    from agentomatic.cli.project import get_project_files
     from agentomatic.stacks.defaults import get_default_stack_yaml
 
-    root = parent.parent
+    root = root if root is not None else parent.parent
     created: list[str] = []
     wanted: dict[Path, str] = {
         root / "stacks" / "local.yaml": get_default_stack_yaml("local"),
@@ -312,13 +453,120 @@ def _ensure_project_context(parent: Path) -> list[str]:
         root / ".agentomatic-stack": "local\n",
         parent / "__init__.py": f'"""Agentomatic {parent.name} package."""\n',
     }
+
+    # ``agentomatic run`` prefers ``main:app`` and ``agentomatic deploy``
+    # renders ``uvicorn main:app`` unconditionally, so a project without one
+    # deploys to a container that cannot boot.
+    main_py = root / "main.py"
+    if not main_py.exists():
+        wanted[main_py] = get_project_files(project_name)["main.py"]
+
     for path, content in wanted.items():
         if path.exists():
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
-        created.append(str(path))
+        created.append(_display_path(path))
     return created
+
+
+_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+
+
+def _validate_agent_name(name: str) -> str | None:
+    """Validate an agent/component name.
+
+    A name with a path separator in it used to scaffold into a surprising
+    place; one starting with a digit produced a package Python cannot import.
+
+    Args:
+        name: Candidate name.
+
+    Returns:
+        An error message, or None when the name is usable.
+    """
+    if not name or not name.strip():
+        return "NAME cannot be empty"
+    if "/" in name or "\\" in name or name in {".", ".."}:
+        return f"NAME cannot contain path separators: {name!r} (use --dir for the location)"
+    if not _NAME_RE.match(name):
+        return (
+            f"Invalid NAME {name!r} — use letters, digits, '_' and '-', "
+            "starting with a letter or underscore"
+        )
+    return None
+
+
+def _prompt_agent_name() -> str | None:
+    """Ask for an agent name interactively.
+
+    Returns:
+        The entered name, or None when there is no TTY or the user cancels.
+    """
+    if not sys.stdin.isatty():
+        return None
+    try:
+        answer = click.prompt(
+            click.style("Agent name", fg="cyan", bold=True),
+            default="my_agent",
+            show_default=True,
+            type=str,
+        )
+    except (click.Abort, EOFError):
+        return None
+    return str(answer).strip() or None
+
+
+def _resolve_project_root(*, here: bool = False) -> tuple[Path, str]:
+    """Decide which project directory a scaffold should be written into.
+
+    Resolution order:
+
+    1. ``--here`` — the current directory, no questions asked.
+    2. The nearest enclosing project root, walking up from the current
+       directory (so ``init`` works from anywhere inside a project).
+    3. A lone Agentomatic project in an immediate subdirectory — the
+       ``agentomatic new x`` / forgot-to-``cd`` case.
+    4. The current directory, which then gets bootstrapped into a project.
+
+    Args:
+        here: Skip detection and use the current directory.
+
+    Returns:
+        A ``(root, note)`` pair; ``note`` is a line to echo, or "".
+    """
+    cwd = Path.cwd()
+    if here:
+        return cwd, ""
+
+    enclosing = find_project_root(cwd)
+    if enclosing is not None:
+        if enclosing == cwd.resolve():
+            return enclosing, ""
+        return enclosing, click.style(
+            f"   📦 Project root: {_display_path(enclosing)} (detected from {cwd.name}/)",
+            fg="cyan",
+        )
+
+    children = find_child_projects(cwd)
+    if len(children) == 1:
+        return children[0], click.style(
+            f"   📦 Project root: {_display_path(children[0])} — detected in a subdirectory.\n"
+            f"      Pass --here to scaffold into {cwd.name}/ instead.",
+            fg="yellow",
+        )
+    if children:
+        # Guessing between them would put the agent somewhere the user has no
+        # reason to look, which is the failure this detection exists to stop.
+        names = ", ".join(p.name for p in children[:4])
+        return cwd, click.style(
+            f"   ⚠️  Several projects here ({names}) — scaffolding into "
+            f"{_display_path(cwd)} itself.\n"
+            f"      cd into the one you meant, or pass --dir.",
+            fg="yellow",
+        )
+
+    return cwd, ""
 
 
 # Default top-level directories for non-agent templates (platform discovery paths).
@@ -356,12 +604,18 @@ _TEMPLATE_DEFAULT_DIRS: dict[str, str] = {
     is_flag=True,
     help="Scaffold a full Agentomatic project (main.py, stacks, dirs)",
 )
+@click.option(
+    "--here",
+    is_flag=True,
+    help="Scaffold into the current directory, skipping project-root detection",
+)
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
 def init(
     name: str | None,
     target_dir: str | None,
     template: str | None,
     as_project: bool,
+    here: bool,
     force: bool,
 ) -> None:
     """Create a new agent/project from a template.
@@ -403,8 +657,17 @@ def init(
         click.echo("  agentomatic run --studio")
         return
 
+    # A bare ``agentomatic init`` is the first command most people type. Hard
+    # exiting on a missing NAME turned that into a dead end, so ask for it.
     if not name:
-        _print_error("NAME is required (or use --project NAME)")
+        name = _prompt_agent_name()
+        if not name:
+            _print_error("NAME is required. Try: agentomatic init my_agent --template basic")
+            sys.exit(1)
+
+    invalid = _validate_agent_name(name)
+    if invalid:
+        _print_error(invalid)
         sys.exit(1)
 
     # Template selection
@@ -430,11 +693,29 @@ def init(
         sys.exit(1)
 
     # Resolve target directory: ingestion→ingestion/, plugins→plugins/, etc.
-    if target_dir is None:
-        parent = _TEMPLATE_DEFAULT_DIRS.get(template, "agents")
+    #
+    # These used to resolve against the *current* directory, so running
+    # ``agentomatic init`` from a subdirectory of a project — or from the
+    # parent it was just created in — silently built a second, parallel
+    # project and left the real ``agents/`` empty while reporting success.
+    subdir = _TEMPLATE_DEFAULT_DIRS.get(template, "agents")
+    if target_dir is not None:
+        # An explicit --dir places the package, and must never decide where
+        # the project itself lives: bootstrapping relative to it scattered
+        # stacks/, main.py and .agentomatic-stack into whatever contained it.
+        # With a custom layout there is nothing to bootstrap unless the
+        # directory sits inside a project we can actually identify.
+        parent_path = Path(target_dir)
+        project_root = find_project_root(parent_path) or find_project_root()
+        root_note = ""
     else:
-        parent = target_dir
-    target = Path(parent) / name
+        project_root, root_note = _resolve_project_root(here=here)
+        parent_path = project_root / subdir
+    parent = str(parent_path)
+    target = parent_path / name
+
+    if root_note:
+        click.echo(root_note)
 
     files = get_template_files(template, name)
 
@@ -469,16 +750,43 @@ def init(
         file_path.write_text(content)
         written += 1
 
+    # Report what is actually on disk, not what we believe we wrote — a
+    # scaffold that claims success while the directory is empty is the single
+    # most confusing failure this command can produce.
+    on_disk = sorted(q for q in target.rglob("*") if q.is_file())
     click.echo()
+    if not on_disk:
+        _print_error(
+            f"Template '{template}' produced no files in {target.resolve()} — "
+            "this is a bug, please report it."
+        )
+        sys.exit(1)
+
     logger.success(f"Created '{name}' with template '{template}'")
-    click.echo(f"   📍 Location: {target}")
-    click.echo(f"   📦 Written: {written}  ·  Skipped: {skipped}")
+    click.echo(f"   📍 Location: {target.resolve()}")
+    click.echo(f"   📦 Written: {written}  ·  Skipped: {skipped}  ·  On disk: {len(on_disk)}")
 
     # A bare `agentomatic init <agent>` should leave a runnable workspace, not
     # an agent with no stack to get its LLM from.
-    bootstrapped = _ensure_project_context(Path(parent))
-    if bootstrapped:
-        click.echo(f"   🧩 Bootstrapped: {', '.join(bootstrapped)}")
+    if project_root is not None:
+        bootstrapped = _ensure_project_context(Path(parent), root=project_root, project_name=name)
+        if bootstrapped:
+            click.echo(f"   🧩 Bootstrapped: {', '.join(bootstrapped)}")
+
+    # ``uv init`` (and cookiecutters) leave a main.py of their own. It is not
+    # ours to overwrite, but ``deploy`` renders ``uvicorn main:app`` against
+    # whatever is there, so an unrelated main.py deploys to a dead container.
+    if (
+        project_root is not None
+        and (project_root / "main.py").is_file()
+        and not _has_project_main_app(project_root)
+    ):
+        _print_warning(
+            f"{_display_path(project_root / 'main.py')} exists but does not define an "
+            "Agentomatic `app`. `agentomatic run` falls back to folder discovery; "
+            "`agentomatic deploy` needs `main:app` — see the scaffold in "
+            "`agentomatic new`."
+        )
     click.echo()
 
     if template == "plugin":
@@ -604,15 +912,30 @@ def add() -> None:
 
 @add.command("connection")
 @click.argument("agent_name")
-@click.option("--dir", "-d", "agents_dir", default="agents", help="Agents directory")
+@click.option(
+    "--dir",
+    "-d",
+    "agents_dir",
+    default=None,
+    help="Agents directory (default: the enclosing project's agents/)",
+)
 @click.option("--force", "-f", is_flag=True, help="Overwrite connections.py if present")
-def add_connection(agent_name: str, agents_dir: str, force: bool) -> None:
+def add_connection(agent_name: str, agents_dir: str | None, force: bool) -> None:
     """Add ``connections.py`` to an existing agent package."""
     from .templates import _connections_env_example, _connections_py, _connections_readme
 
-    target = Path(agents_dir) / agent_name
+    # ``agents`` used to be resolved against the current directory, so this
+    # failed outright from any subdirectory of the project it was aimed at.
+    if agents_dir is not None:
+        base = Path(agents_dir)
+    else:
+        base = (find_project_root() or Path.cwd()) / "agents"
+    target = base / agent_name
     if not target.exists():
-        _print_error(f"Agent directory not found: {target}")
+        _print_error(
+            f"Agent directory not found: {_display_path(target)}\n"
+            f"   Create it first: agentomatic init {agent_name} --template basic"
+        )
         sys.exit(1)
 
     files = {
@@ -653,11 +976,11 @@ def add_connection(agent_name: str, agents_dir: str, force: bool) -> None:
     "--dir",
     "-d",
     "ingestion_dir",
-    default="ingestion",
-    help="Ingestion directory (default: ingestion)",
+    default=None,
+    help="Ingestion directory (default: the enclosing project's ingestion/)",
 )
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
-def add_ingestion(name: str, ingestion_dir: str, force: bool) -> None:
+def add_ingestion(name: str, ingestion_dir: str | None, force: bool) -> None:
     """Scaffold an ingestor under ``ingestion/<name>/`` (never into agents/)."""
     ctx = click.get_current_context()
     ctx.invoke(
