@@ -1471,6 +1471,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="JSON shape">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#replay-occupancy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replay occupancy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2376,6 +2393,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="JSON shape">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#replay-occupancy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replay occupancy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2538,12 +2572,26 @@ starting the platform. It polls the JSON endpoint every few seconds and renders:
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    &quot;by_status&quot;: { &quot;queued&quot;: 0, &quot;running&quot;: 1, &quot;succeeded&quot;: 10, &quot;failed&quot;: 1, &quot;cancelled&quot;: 0 },
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    &quot;running&quot;: 1,
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    &quot;max_concurrency&quot;: 8,
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    &quot;supported_targets&quot;: [&quot;agent&quot;, &quot;endpoint&quot;, &quot;ingestion&quot;, &quot;pipeline&quot;, &quot;plugin&quot;]
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>  },
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  &quot;storage&quot;: { &quot;status&quot;: &quot;healthy&quot; },
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  &quot;generated_at&quot;: 1718900000.0
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>}
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    &quot;supported_targets&quot;: [&quot;agent&quot;, &quot;endpoint&quot;, &quot;ingestion&quot;, &quot;pipeline&quot;, &quot;plugin&quot;],
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    &quot;event_log&quot;: { &quot;tasks&quot;: 4, &quot;events&quot;: 61, &quot;bytes&quot;: 31232 }
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  },
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  &quot;streams&quot;: { &quot;streams&quot;: 2, &quot;frames&quot;: 9, &quot;bytes&quot;: 12408 },
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>  &quot;storage&quot;: { &quot;status&quot;: &quot;healthy&quot; },
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  &quot;generated_at&quot;: 1718900000.0
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>}
 </span></code></pre></div>
+<h3 id="replay-occupancy">Replay occupancy<a class="headerlink" href="#replay-occupancy" title="Permanent link">&para;</a></h3>
+<p><code>tasks.event_log</code> and <code>streams</code> report what the replay buffers currently
+hold — the history that makes
+<a href="../tasks/#resuming-a-dropped-stream">dropped streams resumable</a>. They hold
+memory, so <code>bytes</code> is the number to watch when sizing a container: if it sits
+at the configured ceiling, raise it or lower retention with
+<code>AGENTOMATIC_TASK_EVENT_MAX_MB</code> / <code>AGENTOMATIC_STREAM_MAX_MB</code>, or turn replay
+off entirely (<code>AGENTOMATIC_TASK_EVENT_LOG=none</code>,
+<code>AGENTOMATIC_STREAM_REPLAY=0</code>). See
+<a href="../configuration/">Configuration</a>.</p>
+<p><code>event_log</code> is absent when a registered custom backend does not report
+occupancy — <code>stats</code> is not part of the <code>TaskEventLog</code> contract.</p>
 <p>The top-level <code>status</code> is <code>degraded</code> if any resource (including a configured
 connection) is unhealthy or storage is unhealthy, otherwise <code>healthy</code> — handy
 for a single uptime check.</p>

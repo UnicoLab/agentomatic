@@ -2748,15 +2748,22 @@ you need the graphical chat playground.</p>
 </table>
 <div class="admonition warning">
 <p class="admonition-title">What <code>all</code> does <em>not</em> include</p>
-<p><code>all</code> covers <code>langgraph</code>, <code>ollama</code>, <code>metrics</code>, <code>db</code>, <code>cli</code>, <code>studio</code>,
-<code>optimize</code>, <code>telemetry</code>, <code>dotenv</code>, <code>security</code>, <code>swarm</code> and <code>vector</code>.</p>
-<p>It deliberately leaves out the vendor LLM drivers — <code>openai</code>, <code>azure</code>,
-<code>vertex</code> — which follow the provider-agnostic principle: you install the
-SDK for the backend you actually use. It also leaves out <code>db-postgres</code>
-(an alternative to <code>db</code>) and <code>ui</code> (Chainlit), which is a heavy dependency.</p>
+<p><code>all</code> covers <code>langgraph</code>, <code>langchain</code>, <code>openai</code>, <code>ollama</code>, <code>metrics</code>,
+<code>db</code>, <code>cli</code>, <code>studio</code>, <code>optimize</code>, <code>telemetry</code>, <code>dotenv</code>, <code>security</code>,
+<code>swarm</code> and <code>vector</code>.</p>
+<p><code>openai</code> is in that list for the <strong>local-first</strong> path, not for OpenAI:
+the <code>omlx</code> provider in a freshly scaffolded <code>stacks/local.yaml</code> talks to
+your own OpenAI-<em>compatible</em> server (oMLX, llama.cpp, vLLM, LM Studio)
+through <code>langchain-openai</code>. Without it, <code>agentomatic[all]</code> scaffolds a
+project whose every LLM call fails with <em>"client library is not
+installed"</em>.</p>
+<p>It still leaves out the hosted vendor drivers <code>azure</code> and <code>vertex</code>, which
+follow the provider-agnostic principle: you install the SDK for the
+backend you actually use. It also leaves out <code>db-postgres</code> (an
+alternative to <code>db</code>) and <code>ui</code> (Chainlit), which is a heavy dependency.</p>
 <p>So <code>agentomatic ui</code> needs <code>pip install "agentomatic[ui]"</code> even after an
 <code>all</code> install. Add what you need alongside it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[all,openai,ui]&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[all,ui]&quot;</span>
 </span></code></pre></div>
 </div>
 <div class="admonition tip">

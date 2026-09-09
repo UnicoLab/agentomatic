@@ -3328,6 +3328,30 @@ directory, host, port, and stack values passed to <code>agentomatic run</code>.<
 <td>Scratch directory for pipeline/task outputs</td>
 </tr>
 <tr>
+<td><code>AGENTOMATIC_TASK_EVENT_LOG</code></td>
+<td>task-event replay backend</td>
+<td><code>memory</code></td>
+<td><code>none</code> disables replay; any registered provider name also works</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_TASK_EVENTS_PER_TASK</code> / <code>AGENTOMATIC_TASK_EVENT_TASKS</code> / <code>AGENTOMATIC_TASK_EVENT_MAX_MB</code></td>
+<td>task-event retention</td>
+<td><code>512</code> / <code>1024</code> / <code>32</code></td>
+<td>Caps how much history <code>/tasks/{id}/events</code> can replay. The MB ceiling is what protects a container's memory limit</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_STREAM_REPLAY</code></td>
+<td><code>/invoke/stream</code> frame retention</td>
+<td><code>true</code></td>
+<td><code>0</code> streams without retaining anything</td>
+</tr>
+<tr>
+<td><code>AGENTOMATIC_STREAM_FRAMES</code> / <code>AGENTOMATIC_STREAM_COUNT</code> / <code>AGENTOMATIC_STREAM_MAX_MB</code></td>
+<td>stream retention</td>
+<td><code>512</code> / <code>256</code> / <code>64</code></td>
+<td>Caps what <code>GET /invoke/stream/{id}</code> can replay</td>
+</tr>
+<tr>
 <td><code>AGENTOMATIC_AUDIT_LOG</code></td>
 <td><code>audit_log</code></td>
 <td><code>""</code> (disabled)</td>
