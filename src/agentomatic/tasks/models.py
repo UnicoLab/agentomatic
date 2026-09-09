@@ -91,9 +91,21 @@ class TaskProgress(BaseModel):
 
 
 class TaskEvent(BaseModel):
-    """A single progress/status event emitted during task execution."""
+    """A single progress/status event emitted during task execution.
+
+    ``sequence`` is what makes a dropped stream recoverable: it numbers the
+    events of one task from 1 upwards with no gaps, so a client that
+    reconnects can say how far it got and be sent only what it missed. It is
+    the value published as the SSE ``id:`` field, which browsers echo back in
+    ``Last-Event-ID`` automatically.
+    """
 
     task_id: str
+    sequence: int = Field(
+        default=0,
+        ge=0,
+        description="Monotonic per-task event number, starting at 1 (0 = unassigned).",
+    )
     event: str = Field(
         description="Event name: queued|started|progress|succeeded|failed|cancelled."
     )

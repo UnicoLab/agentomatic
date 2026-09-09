@@ -429,6 +429,39 @@ curl http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6
 
 ---
 
+#### `GET /a2a/tasks/{task_id}/events`
+
+Subscribe — or **re-subscribe** — to an A2A task's progress over
+Server-Sent Events. Frames are A2A task objects (`submitted`, `working`,
+`completed`, `failed`, `canceled`), and the stream ends with `data: [DONE]`.
+Returns `501` without the task subsystem, `404` for an unknown task.
+
+Every frame carries an SSE `id:` holding the event's monotonic `sequence`, so
+a client that loses the connection resumes precisely instead of restarting:
+
+```bash
+# Subscribe
+curl -N http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/events
+
+# Re-subscribe after event 4 — replays 5 onwards, then goes live
+curl -N -H "Last-Event-ID: 4" \
+  http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/events
+curl -N "http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6/events?since=4"
+```
+
+```json
+{"task_id": "task_a1b2c3d4e5f6", "sequence": 5, "status": "working",
+ "progress": {"percent": 60.0, "message": "step 3"}}
+```
+
+A reconnect whose resume point has already been evicted receives a
+`{"event": "truncated"}` frame followed by the current task object, so a
+client is never handed a partial history as if it were complete. See
+[Tasks & Execution Modes](../guide/tasks.md#resuming-a-dropped-stream) for
+retention limits and the multi-worker caveat.
+
+---
+
 #### `POST /a2a/tasks/{task_id}/cancel`
 
 Request cooperative cancellation of an in-flight A2A task. This endpoint is

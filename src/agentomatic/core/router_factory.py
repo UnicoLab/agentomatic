@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
 from collections.abc import Callable
 from typing import Any, cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
@@ -1159,17 +1160,32 @@ def create_default_router(
             "description": m.description,
             "version": m.version,
             "framework": m.framework,
+            # Reported from what this deployment actually wired up. A card
+            # that claims a capability unconditionally sends A2A clients down
+            # code paths that then 501, which is worse than admitting the gap.
             "capabilities": {
                 "streaming": True,
                 "chat": True,
                 "invoke": True,
                 "a2a": True,
+                # Resumable task streams and push both need the task manager.
+                "stateTransitionHistory": task_manager is not None,
+                "pushNotifications": task_manager is not None,
+                "resumableStreams": task_manager is not None,
             },
             "endpoints": {
                 "invoke": f"{api_prefix}/{agent_name}/invoke",
                 "chat": f"{api_prefix}/{agent_name}/chat",
                 "stream": f"{api_prefix}/{agent_name}/invoke/stream",
                 "health": f"{api_prefix}/{agent_name}/health",
+                **(
+                    {
+                        "a2a_tasks": f"{api_prefix}/{agent_name}/a2a/tasks",
+                        "a2a_events": (f"{api_prefix}/{agent_name}/a2a/tasks/{{task_id}}/events"),
+                    }
+                    if task_manager is not None
+                    else {}
+                ),
             },
             "metadata": m.metadata,
         }
@@ -1200,6 +1216,34 @@ def create_default_router(
             view["raw"] = result
         if record.error:
             view["error"] = record.error
+        return view
+
+    def _a2a_event_view(evt: Any, record: Any) -> dict[str, Any]:
+        """Render one recorded event as an A2A-shaped task object.
+
+        A replayed event describes the state *at that point*, so its status and
+        progress come from the event rather than from the task's current
+        snapshot — otherwise every historical frame would claim the task's
+        latest state. The record is consulted only for the terminal payload.
+
+        Args:
+            evt: The recorded :class:`~agentomatic.tasks.models.TaskEvent`.
+            record: The task record, used for the result on a terminal event.
+
+        Returns:
+            An A2A task object for one point in the task's history.
+        """
+        view: dict[str, Any] = {
+            "task_id": evt.task_id,
+            "sequence": evt.sequence,
+            "status": _A2A_STATE.get(evt.status.value, evt.status.value),
+            "progress": evt.progress.model_dump() if evt.progress else None,
+        }
+        if evt.status.is_terminal and record is not None:
+            terminal = _a2a_view(record)
+            for key in ("result", "artifacts", "raw", "error"):
+                if key in terminal:
+                    view[key] = terminal[key]
         return view
 
     @router.post("/a2a/tasks")
@@ -1282,6 +1326,82 @@ def create_default_router(
             "status": "completed",
             "message": "Task tracking requires a task manager",
         }
+
+    @router.get("/a2a/tasks/{task_id}/events")
+    async def stream_a2a_task(task_id: str, request: Request, since: int = 0):
+        """Subscribe (or re-subscribe) to an A2A task's progress over SSE.
+
+        This is the A2A analogue of the platform's task stream: same
+        resumption contract — every frame carries its sequence as the SSE
+        ``id:``, and a reconnect replays the gap named by ``Last-Event-ID`` or
+        ``?since=`` — but the frames are A2A task objects rather than raw task
+        records, so an A2A client sees the states it expects.
+        """
+        from agentomatic.tasks.event_log import parse_last_event_id
+
+        if task_manager is None:
+            raise HTTPException(501, "A2A task streaming requires a task manager")
+        record = await task_manager.get(task_id)
+        if record is None:
+            raise HTTPException(404, f"Task '{task_id}' not found")
+
+        resume_from = since or parse_last_event_id(request.headers.get("last-event-id"))
+
+        def _frame(payload: dict[str, Any], seq: int | None = None) -> str:
+            body = f"data: {json.dumps(payload, default=str)}\n\n"
+            return f"id: {seq}\n{body}" if seq else body
+
+        async def event_stream() -> Any:
+            queue = await task_manager.subscribe(task_id)
+            try:
+                resumption = await task_manager.resume(task_id, after=resume_from)
+                cursor = resumption.cursor
+                if resume_from <= 0:
+                    cursor = await task_manager.event_log.latest_sequence(task_id)
+
+                if resumption.truncated:
+                    yield _frame(
+                        {
+                            "task_id": task_id,
+                            "event": "truncated",
+                            "resumed_after": resume_from,
+                        }
+                    )
+                for evt in resumption.replay:
+                    yield _frame(
+                        _a2a_event_view(evt, await task_manager.get(task_id)), evt.sequence
+                    )
+
+                current = await task_manager.get(task_id)
+                if current is not None and (resume_from <= 0 or resumption.truncated):
+                    yield _frame(_a2a_view(current), cursor)
+                if current is not None and current.status.is_terminal:
+                    yield "data: [DONE]\n\n"
+                    return
+
+                while True:
+                    try:
+                        evt = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    except TimeoutError:
+                        yield ": keep-alive\n\n"
+                        continue
+                    if evt.sequence and evt.sequence <= cursor:
+                        continue
+                    cursor = evt.sequence or cursor
+                    yield _frame(
+                        _a2a_event_view(evt, await task_manager.get(task_id)), evt.sequence
+                    )
+                    if evt.status.is_terminal:
+                        yield "data: [DONE]\n\n"
+                        return
+            finally:
+                task_manager.unsubscribe(task_id, queue)
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @router.post("/a2a/tasks/{task_id}/cancel")
     async def cancel_a2a_task(task_id: str) -> dict[str, Any]:
