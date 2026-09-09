@@ -65,17 +65,47 @@ Commands:
 Scaffold a new agent directory from one of the pre-built templates.
 
 ```text
-Usage: agentomatic init [OPTIONS] NAME
+Usage: agentomatic init [OPTIONS] [NAME]
 
 Arguments:
-  NAME  Agent name (snake_case)  [required]
+  NAME  Agent name (snake_case)  [prompted for if omitted]
 
 Options:
   -t, --template [basic|class|full|coordinator|pipeline|rag|chatbot|deepagent|custom|legacy_dict|plugin|endpoint|connection|ingestion|extraction|langchain]
                           Template to use (interactive picker if omitted)
-  -d, --dir TEXT          Agents parent directory  [default: agents]
+  -d, --dir TEXT          Parent directory for the package (default: the
+                          enclosing project's agents/, or the template's own
+                          directory — plugins/, endpoints/, ingestion/,
+                          pipelines/)
+      --here              Scaffold into the current directory, skipping
+                          project-root detection
   -f, --force             Overwrite existing agent directory
 ```
+
+#### Where the code lands
+
+`init` writes into the **enclosing project**, not blindly into the current
+directory. It walks up from where you are (stopping at a repository root or
+your home directory) looking for a project marker — `.agentomatic-stack`, or
+an `agents/` directory alongside `stacks/` or a platform `main.py`.
+
+```bash
+cd my_platform/notebooks
+agentomatic init helper --template basic
+#   📦 Project root: /path/to/my_platform (detected from notebooks/)
+#   📍 Location: /path/to/my_platform/agents/helper
+```
+
+If you run it in the directory you *just created a project in* — the
+`agentomatic new my_platform` then forgot-to-`cd` case — the lone project in a
+subdirectory is used, and the choice is printed. Pass `--here` to scaffold into
+the current directory instead, or `--dir` to choose the location outright.
+
+When no project is found, the current directory is bootstrapped into one:
+`stacks/local.yaml`, `stacks/remote.yaml`, `.agentomatic-stack`,
+`agents/__init__.py` and a platform `main.py` (an existing `main.py` is never
+overwritten). Nothing else is created — no empty `plugins/`, `endpoints/`,
+`ingestion/` or `pipelines/`; use `agentomatic new` for the full layout.
 
 #### Templates
 
@@ -101,6 +131,9 @@ Options:
 #### Examples
 
 ```bash
+# Fully interactive — prompts for the name, then the template
+agentomatic init
+
 # Interactive template selection (requires questionary)
 agentomatic init support_agent
 

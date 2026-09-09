@@ -320,6 +320,11 @@ def test_all_extra_contents_match_what_the_docs_claim() -> None:
 
     documented = {
         "langgraph",
+        # ``langchain`` + ``openai`` carry langchain-openai, which the default
+        # scaffolded ``stacks/local.yaml`` needs: its ``omlx`` provider speaks
+        # to a local OpenAI-*compatible* server.
+        "langchain",
+        "openai",
         "ollama",
         "metrics",
         "db",
@@ -337,9 +342,11 @@ def test_all_extra_contents_match_what_the_docs_claim() -> None:
         f"(added={included - documented}, removed={documented - included})"
     )
 
-    # These are deliberately excluded — vendor SDKs (provider-agnostic
+    # These are deliberately excluded — hosted vendor SDKs (provider-agnostic
     # principle), an alternative DB driver, and the heavy Chainlit UI.
-    for deliberately_excluded in ("openai", "azure", "vertex", "db-postgres", "ui"):
+    # ``openai`` is *not* on this list: the default local stack's ``omlx``
+    # provider needs langchain-openai to reach an OpenAI-compatible server.
+    for deliberately_excluded in ("azure", "vertex", "db-postgres", "ui"):
         assert deliberately_excluded in extras, f"{deliberately_excluded} extra vanished"
         assert deliberately_excluded not in included
 

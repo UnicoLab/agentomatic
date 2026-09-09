@@ -84,19 +84,27 @@ If you prefer a lightweight install, you can select only the modules and depende
 
 !!! warning "What `all` does *not* include"
 
-    `all` covers `langgraph`, `ollama`, `metrics`, `db`, `cli`, `studio`,
-    `optimize`, `telemetry`, `dotenv`, `security`, `swarm` and `vector`.
+    `all` covers `langgraph`, `langchain`, `openai`, `ollama`, `metrics`,
+    `db`, `cli`, `studio`, `optimize`, `telemetry`, `dotenv`, `security`,
+    `swarm` and `vector`.
 
-    It deliberately leaves out the vendor LLM drivers — `openai`, `azure`,
-    `vertex` — which follow the provider-agnostic principle: you install the
-    SDK for the backend you actually use. It also leaves out `db-postgres`
-    (an alternative to `db`) and `ui` (Chainlit), which is a heavy dependency.
+    `openai` is in that list for the **local-first** path, not for OpenAI:
+    the `omlx` provider in a freshly scaffolded `stacks/local.yaml` talks to
+    your own OpenAI-*compatible* server (oMLX, llama.cpp, vLLM, LM Studio)
+    through `langchain-openai`. Without it, `agentomatic[all]` scaffolds a
+    project whose every LLM call fails with *"client library is not
+    installed"*.
+
+    It still leaves out the hosted vendor drivers `azure` and `vertex`, which
+    follow the provider-agnostic principle: you install the SDK for the
+    backend you actually use. It also leaves out `db-postgres` (an
+    alternative to `db`) and `ui` (Chainlit), which is a heavy dependency.
 
     So `agentomatic ui` needs `pip install "agentomatic[ui]"` even after an
     `all` install. Add what you need alongside it:
 
     ```bash
-    pip install "agentomatic[all,openai,ui]"
+    pip install "agentomatic[all,ui]"
     ```
 
 !!! tip "Quote the extras in zsh/bash"

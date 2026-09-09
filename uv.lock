@@ -10,7 +10,7 @@ resolution-markers = [
 
 [[package]]
 name = "agentomatic"
-version = "1.12.0"
+version = "1.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -31,8 +31,11 @@ all = [
     { name = "cryptography" },
     { name = "deepeval" },
     { name = "holysheet" },
+    { name = "langchain" },
+    { name = "langchain-community" },
     { name = "langchain-core" },
     { name = "langchain-ollama" },
+    { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "langgraph-swarm" },
     { name = "numpy" },
@@ -159,7 +162,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentomatic", extras = ["langgraph", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry", "dotenv", "security", "swarm", "vector"], marker = "extra == 'all'" },
+    { name = "agentomatic", extras = ["langgraph", "langchain", "openai", "ollama", "metrics", "db", "cli", "studio", "optimize", "telemetry", "dotenv", "security", "swarm", "vector"], marker = "extra == 'all'" },
     { name = "aiosqlite", marker = "extra == 'db'", specifier = ">=0.20" },
     { name = "asyncpg", marker = "extra == 'db-postgres'", specifier = ">=0.30" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0" },
