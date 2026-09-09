@@ -396,17 +396,39 @@ curl http://localhost:8000/api/v1/my_agent/card
     "streaming": true,
     "chat": true,
     "invoke": true,
-    "a2a": true
+    "a2a": true,
+    "stateTransitionHistory": true,
+    "pushNotifications": true,
+    "resumableStreams": true
   },
   "endpoints": {
     "invoke": "/api/v1/my_agent/invoke",
     "chat": "/api/v1/my_agent/chat",
     "stream": "/api/v1/my_agent/invoke/stream",
-    "health": "/api/v1/my_agent/health"
+    "stream_replay": "/api/v1/my_agent/invoke/stream/{stream_id}",
+    "health": "/api/v1/my_agent/health",
+    "card": "/api/v1/my_agent/card",
+    "a2a_tasks": "/api/v1/my_agent/a2a/tasks",
+    "a2a_events": "/api/v1/my_agent/a2a/tasks/{task_id}/events"
   },
   "metadata": {}
 }
 ```
+
+`stateTransitionHistory`, `pushNotifications` and `resumableStreams` all
+depend on the task subsystem. When it is disabled they report `false` and the
+`a2a_*` endpoints are omitted — the card describes what this deployment
+actually serves, so a client is never sent down a path that answers `501`.
+
+!!! note "Discovery returns the same card"
+
+    `GET /.well-known/agent.json` — the canonical A2A discovery document —
+    renders each agent through the same builder, so its cards are identical to
+    this one, wrapped in a platform envelope:
+
+    ```json
+    {"platform": "My Platform", "version": "1.0.0", "agents": {"my_agent": { ... }}}
+    ```
 
 ---
 

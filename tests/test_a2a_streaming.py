@@ -168,3 +168,50 @@ class TestAgentCardCapabilities:
         assert card["capabilities"]["stateTransitionHistory"] is False
         assert card["capabilities"]["pushNotifications"] is False
         assert "a2a_events" not in card["endpoints"]
+
+
+class TestDiscoveryMatchesTheAgentCard:
+    """``/.well-known/agent.json`` is the canonical A2A discovery document.
+
+    It used to emit a reduced card — no capabilities, only ``invoke`` and
+    ``chat`` — so a conforming client learned *less* about an agent than one
+    that guessed the per-agent URL and could not discover streaming at all.
+    """
+
+    def test_discovery_card_matches_the_per_agent_card(self, client: Any) -> None:
+        per_agent = client.get(f"{BASE}/echo/card").json()
+        discovery = client.get("/.well-known/agent.json").json()["agents"]["echo"]
+        assert discovery == per_agent
+
+    def test_discovery_advertises_capabilities(self, client: Any) -> None:
+        discovery = client.get("/.well-known/agent.json").json()["agents"]["echo"]
+        assert discovery["capabilities"]["resumableStreams"] is True
+
+    def test_discovery_advertises_the_streaming_endpoints(self, client: Any) -> None:
+        endpoints = client.get("/.well-known/agent.json").json()["agents"]["echo"]["endpoints"]
+        assert "a2a_events" in endpoints
+        assert "stream_replay" in endpoints
+
+    def test_discovery_keeps_its_platform_envelope(self, client: Any) -> None:
+        """Unifying the card must not change the document around it."""
+        body = client.get("/.well-known/agent.json").json()
+        assert body["platform"] == "A2A Stream Test"
+        assert "version" in body
+        assert "echo" in body["agents"]
+
+    def test_discovery_omits_task_endpoints_without_a_task_manager(self) -> None:
+        platform = AgentPlatform(
+            agents_dir="/tmp/agentomatic_a2a_discovery_notasks",
+            title="No Tasks",
+            version="0.0.1",
+            enable_tasks=False,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="echo", slug="fn-echo", description="Echo"),
+            node_fn=_echo_fn,
+        )
+        with TestClient(platform.build()) as test_client:
+            discovery = test_client.get("/.well-known/agent.json").json()["agents"]["echo"]
+
+        assert "a2a_events" not in discovery["endpoints"]
+        assert discovery["capabilities"]["resumableStreams"] is False

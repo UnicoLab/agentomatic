@@ -65,14 +65,35 @@ def create_streaming_response(
     generator: Any,
     agent_name: str = "",
     media_type: str = "text/event-stream",
+    *,
+    stream_id: str | None = None,
 ) -> StreamingResponse:
-    """Create an SSE streaming response."""
-    return StreamingResponse(
-        generator,
-        media_type=media_type,
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Agent": agent_name,
-        },
-    )
+    """Create an SSE streaming response.
+
+    Args:
+        generator: Async iterator yielding SSE-encoded strings.
+        agent_name: Reported in the ``X-Agent`` header.
+        media_type: Response media type.
+        stream_id: Retain the stream's frames under this identity and number
+            them, so a client that drops mid-response can collect what it
+            missed. Get one from
+            :func:`~agentomatic.streaming.new_stream_id`; the value is echoed
+            back in ``X-Stream-Id``. Omit it to stream without retention, as
+            before.
+
+    Returns:
+        The streaming response.
+    """
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Agent": agent_name,
+    }
+    body = generator
+    if stream_id:
+        from agentomatic.streaming import numbered_stream
+
+        body = numbered_stream(generator, stream_id=stream_id)
+        headers["X-Stream-Id"] = stream_id
+
+    return StreamingResponse(body, media_type=media_type, headers=headers)

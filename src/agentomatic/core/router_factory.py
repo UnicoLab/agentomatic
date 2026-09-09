@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
+from agentomatic.core.agent_card import build_agent_card
 from agentomatic.core.agent_invoke import build_invoke_state, invoke_registered_agent
 from agentomatic.core.errors import client_safe_detail, client_safe_message
 from agentomatic.langchain_adapter import dict_to_messages, json_default, to_jsonable
@@ -1238,41 +1239,12 @@ def create_default_router(
     async def get_card() -> dict[str, Any]:
         """A2A Agent Card."""
         agent = _get_agent()
-        m = agent.manifest
-        return {
-            "name": m.slug,
-            "description": m.description,
-            "version": m.version,
-            "framework": m.framework,
-            # Reported from what this deployment actually wired up. A card
-            # that claims a capability unconditionally sends A2A clients down
-            # code paths that then 501, which is worse than admitting the gap.
-            "capabilities": {
-                "streaming": True,
-                "chat": True,
-                "invoke": True,
-                "a2a": True,
-                # Resumable task streams and push both need the task manager.
-                "stateTransitionHistory": task_manager is not None,
-                "pushNotifications": task_manager is not None,
-                "resumableStreams": task_manager is not None,
-            },
-            "endpoints": {
-                "invoke": f"{api_prefix}/{agent_name}/invoke",
-                "chat": f"{api_prefix}/{agent_name}/chat",
-                "stream": f"{api_prefix}/{agent_name}/invoke/stream",
-                "health": f"{api_prefix}/{agent_name}/health",
-                **(
-                    {
-                        "a2a_tasks": f"{api_prefix}/{agent_name}/a2a/tasks",
-                        "a2a_events": (f"{api_prefix}/{agent_name}/a2a/tasks/{{task_id}}/events"),
-                    }
-                    if task_manager is not None
-                    else {}
-                ),
-            },
-            "metadata": m.metadata,
-        }
+        return build_agent_card(
+            agent.manifest,
+            agent_name,
+            api_prefix,
+            supports_tasks=task_manager is not None,
+        )
 
     # ── A2A task lifecycle ────────────────────────────────────────
     # Maps the unified TaskStatus to canonical A2A task states.

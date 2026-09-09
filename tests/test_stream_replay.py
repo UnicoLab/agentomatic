@@ -208,3 +208,56 @@ class TestSseEncoding:
 
     def test_default_buffer_is_shared(self) -> None:
         assert get_replay_buffer() is get_replay_buffer()
+
+
+class TestPublicStreamingHelper:
+    """``create_streaming_response`` is exported for user-built endpoints, so
+    it should be able to opt into the same numbering and retention."""
+
+    @pytest.mark.asyncio
+    async def test_without_a_stream_id_nothing_is_retained(self) -> None:
+        from agentomatic.protocols import create_streaming_response
+
+        async def frames():
+            yield "data: one\n\n"
+
+        response = create_streaming_response(frames(), agent_name="a")
+        assert "X-Stream-Id" not in response.headers
+        body = "".join([chunk async for chunk in response.body_iterator])
+        assert "id:" not in body
+
+    @pytest.mark.asyncio
+    async def test_a_stream_id_numbers_and_retains(self) -> None:
+        from agentomatic.protocols import create_streaming_response
+
+        async def frames():
+            yield "data: one\n\n"
+            yield "data: two\n\n"
+
+        stream_id = new_stream_id()
+        response = create_streaming_response(frames(), agent_name="a", stream_id=stream_id)
+        assert response.headers["X-Stream-Id"] == stream_id
+
+        body = "".join([chunk async for chunk in response.body_iterator])
+        assert "id: 1" in body
+        assert "id: 2" in body
+
+        retained = await get_replay_buffer().replay(stream_id)
+        assert [frame.data for frame in retained] == ["one", "two"]
+
+    @pytest.mark.asyncio
+    async def test_non_data_chunks_pass_through_unnumbered(self) -> None:
+        """Keep-alive comments must not be numbered or retained as frames."""
+        from agentomatic.protocols import create_streaming_response
+
+        async def frames():
+            yield ": keep-alive\n\n"
+            yield "data: real\n\n"
+
+        stream_id = new_stream_id()
+        response = create_streaming_response(frames(), stream_id=stream_id)
+        body = "".join([chunk async for chunk in response.body_iterator])
+
+        assert ": keep-alive" in body
+        retained = await get_replay_buffer().replay(stream_id)
+        assert [frame.data for frame in retained] == ["real"]
