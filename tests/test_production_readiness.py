@@ -85,9 +85,11 @@ def test_slug_alias_routes_work_but_are_not_documented_twice(dual_mounted_platfo
     spec = app.openapi()
 
     assert "/api/v1/hello/invoke" in spec["paths"], "canonical route must be documented"
-    assert "/api/v1/agent-hello/invoke" not in spec["paths"], (
-        "the slug alias must not be documented — it doubles the advertised surface"
-    )
+    # Kept on its own line: ruff 0.8.6 (pinned in .pre-commit-config.yaml) and
+    # newer ruff wrap an assert message in opposite directions, so an inline
+    # message here reformats differently depending on which version runs.
+    alias_note = "the slug alias must not be documented — it doubles the advertised surface"
+    assert "/api/v1/agent-hello/invoke" not in spec["paths"], alias_note
 
     with TestClient(app) as client:
         # ...but it must still route, so Studio's slug-based calls keep working.
