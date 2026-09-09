@@ -3670,6 +3670,10 @@ than silently running the agent on an empty query.</p>
 <hr />
 <h4 id="get-a2ataskstask_id"><code>GET /a2a/tasks/{task_id}</code><a class="headerlink" href="#get-a2ataskstask_id" title="Permanent link">&para;</a></h4>
 <p>Get A2A task status.</p>
+<p>These per-agent A2A routes — status, <code>events</code> and <code>cancel</code> — only accept tasks
+submitted to <em>this</em> agent. A task belonging to another agent answers <code>404</code>, the
+same as an id that does not exist. The shared task board at
+<code>/api/v1/tasks/{id}</code> is cross-agent by design and is unaffected.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>curl<span class="w"> </span>http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6
 </span></code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="p">{</span>
