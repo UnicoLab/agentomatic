@@ -48,12 +48,29 @@ starting the platform. It polls the JSON endpoint every few seconds and renders:
     "by_status": { "queued": 0, "running": 1, "succeeded": 10, "failed": 1, "cancelled": 0 },
     "running": 1,
     "max_concurrency": 8,
-    "supported_targets": ["agent", "endpoint", "ingestion", "pipeline", "plugin"]
+    "supported_targets": ["agent", "endpoint", "ingestion", "pipeline", "plugin"],
+    "event_log": { "tasks": 4, "events": 61, "bytes": 31232 }
   },
+  "streams": { "streams": 2, "frames": 9, "bytes": 12408 },
   "storage": { "status": "healthy" },
   "generated_at": 1718900000.0
 }
 ```
+
+### Replay occupancy
+
+`tasks.event_log` and `streams` report what the replay buffers currently
+hold — the history that makes
+[dropped streams resumable](tasks.md#resuming-a-dropped-stream). They hold
+memory, so `bytes` is the number to watch when sizing a container: if it sits
+at the configured ceiling, raise it or lower retention with
+`AGENTOMATIC_TASK_EVENT_MAX_MB` / `AGENTOMATIC_STREAM_MAX_MB`, or turn replay
+off entirely (`AGENTOMATIC_TASK_EVENT_LOG=none`,
+`AGENTOMATIC_STREAM_REPLAY=0`). See
+[Configuration](configuration.md).
+
+`event_log` is absent when a registered custom backend does not report
+occupancy — `stats` is not part of the `TaskEventLog` contract.
 
 The top-level `status` is `degraded` if any resource (including a configured
 connection) is unhealthy or storage is unhealthy, otherwise `healthy` — handy

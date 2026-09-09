@@ -482,3 +482,34 @@ class TestStreamReplayEnvConfiguration:
         for _ in range(10):
             await buffer.record("s", "frame")
         assert len(await buffer.replay("s")) == 10
+
+
+class TestReplayOccupancyIsObservable:
+    """The buffers hold memory. If an operator cannot see how much, they
+    cannot tell whether the retention limits are sized right for the box."""
+
+    def test_status_reports_stream_occupancy(self, client: Any) -> None:
+        client.post(f"{BASE}/echo/invoke/stream", json={"query": "hi"})
+        streams = client.get(f"{BASE}/status").json()["streams"]
+
+        assert streams["streams"] >= 1
+        assert streams["frames"] >= 1
+        assert streams["bytes"] > 0
+
+    def test_status_reports_event_log_occupancy(self, client: Any) -> None:
+        client.post(f"{BASE}/echo/a2a/tasks", json={"message": {"content": "hi"}})
+        tasks = client.get(f"{BASE}/status").json()["tasks"]
+
+        assert tasks["enabled"] is True
+        assert tasks["event_log"]["events"] >= 1
+
+    def test_status_survives_a_log_without_stats(self) -> None:
+        """``stats`` is not part of the TaskEventLog contract, so a registered
+        custom backend that omits it must not break the dashboard."""
+        from agentomatic.tasks.event_log import NullTaskEventLog
+        from agentomatic.tasks.manager import TaskManager
+
+        manager = TaskManager(event_log=NullTaskEventLog())
+        assert not hasattr(NullTaskEventLog, "stats")
+        stats = asyncio.run(manager.stats())
+        assert "event_log" not in stats

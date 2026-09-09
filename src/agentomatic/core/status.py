@@ -95,6 +95,16 @@ async def build_status_payload(platform: AgentPlatform) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             tasks = {"enabled": True, "error": str(exc)}
 
+    # Stream replay buffer — retained response frames hold memory, so its
+    # occupancy belongs beside the task counts rather than being invisible.
+    streams: dict[str, Any]
+    try:
+        from agentomatic.streaming import get_replay_buffer
+
+        streams = await get_replay_buffer().stats()
+    except Exception as exc:  # noqa: BLE001 - status must never fail
+        streams = {"error": str(exc)}
+
     # Connections (platform + per-agent scopes)
     connections: dict[str, Any] = {}
     try:
@@ -153,6 +163,7 @@ async def build_status_payload(platform: AgentPlatform) -> dict[str, Any]:
         },
         "resources": sections,
         "tasks": tasks,
+        "streams": streams,
         "storage": storage,
         "generated_at": time.time(),
     }

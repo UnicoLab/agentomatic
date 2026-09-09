@@ -249,13 +249,23 @@ class TaskManager:
         the number currently executing, and the configured concurrency.
         """
         by_status = {status.value: await self.store.count(status=status) for status in TaskStatus}
-        return {
+        stats: dict[str, Any] = {
             "total": await self.store.count(),
             "by_status": by_status,
             "running": len(self._running),
             "max_concurrency": self._max_concurrency,
             "supported_targets": self.supported_targets,
         }
+        # The event log holds memory, so its occupancy belongs on the status
+        # dashboard. ``stats`` is not part of the TaskEventLog contract — a
+        # registered custom backend need not implement it.
+        occupancy = getattr(self.event_log, "stats", None)
+        if callable(occupancy):
+            try:
+                stats["event_log"] = await occupancy()
+            except Exception as exc:  # noqa: BLE001 - status must never fail
+                stats["event_log"] = {"error": str(exc)}
+        return stats
 
     # ------------------------------------------------------------------
     # Cancellation
