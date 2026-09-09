@@ -213,10 +213,13 @@ curl -X POST http://localhost:8000/api/v1/my_agent/invoke/stream \
 **SSE Response:**
 
 ```
+id: 1
 data: {"response": "", "steps_taken": ["retrieve"]}
 
+id: 2
 data: {"response": "Quantum computing uses...", "steps_taken": ["retrieve", "generate"]}
 
+id: 3
 data: [DONE]
 ```
 
@@ -226,7 +229,40 @@ data: [DONE]
 |---|---|
 | `Content-Type` | `text/event-stream` |
 | `X-Agent` | Agent name |
+| `X-Stream-Id` | Identity to replay this stream with |
 | `Cache-Control` | `no-cache` |
+
+---
+
+#### `GET /invoke/stream/{stream_id}`
+
+Re-send the frames a previous `/invoke/stream` already produced, using the
+`X-Stream-Id` that response carried. Accepts `?since=` or `Last-Event-ID` and
+returns only the frames after that point; `404` once the stream is no longer
+retained.
+
+```bash
+curl -N "http://localhost:8000/api/v1/my_agent/invoke/stream/stream_a1b2c3d4?since=2"
+```
+
+!!! warning "Replay is not resumption"
+
+    This returns what was already **produced**. It does not restart the run:
+    the agent execution is bound to the request that was cancelled, so a
+    client that disconnects mid-answer loses the *generation*, and replay
+    recovers only the part that had been emitted.
+
+    For a stream that keeps working across a dropped connection, submit the
+    work as a task and follow the task's events — that path is resumable end
+    to end:
+
+    ```bash
+    TASK=$(curl -sX POST http://localhost:8000/api/v1/my_agent/invoke/async \
+      -H 'Content-Type: application/json' -d '{"query": "..."}' | jq -r .id)
+    curl -N "http://localhost:8000/api/v1/tasks/$TASK/events"
+    ```
+
+    See [Tasks & Execution Modes](../guide/tasks.md#resuming-a-dropped-stream).
 
 ---
 

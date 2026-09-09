@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from agentomatic.core.errors import client_safe_detail
 from agentomatic.core.schemas import SchemaValidator, load_schema_models
+from agentomatic.streaming import numbered_stream
 from agentomatic.studio.adapters import resolve_adapter
 from agentomatic.studio.models import (
     StudioAgentInfo,
@@ -350,8 +351,11 @@ def create_studio_router(
         state = _build_studio_state(request, thread_id)
 
         return StreamingResponse(
-            tracker.execute_with_adapter(
-                adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+            numbered_stream(
+                tracker.execute_with_adapter(
+                    adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+                ),
+                stream_id=run.id,
             ),
             media_type="text/event-stream",
             headers={
@@ -529,9 +533,13 @@ def create_studio_router(
                 yield f"data: {error_data}\n\n"
 
         return StreamingResponse(
-            _stream(),
+            numbered_stream(_stream(), stream_id=thread_id),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "X-Stream-Id": thread_id,
+            },
         )
 
     @router.get(
