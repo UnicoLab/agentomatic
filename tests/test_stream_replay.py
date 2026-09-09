@@ -261,3 +261,41 @@ class TestPublicStreamingHelper:
         assert ": keep-alive" in body
         retained = await get_replay_buffer().replay(stream_id)
         assert [frame.data for frame in retained] == ["real"]
+
+
+class TestStudioStreamsAreNumbered:
+    """Studio builds its frames inside ``run_tracker``, so the numbering is
+    applied by wrapping the generator at the router. Worth asserting directly:
+    a refactor that stops wrapping would silently drop the ids."""
+
+    @pytest.fixture
+    def studio_client(self) -> Any:
+        platform = AgentPlatform(
+            agents_dir="/tmp/agentomatic_studio_numbering_test",
+            title="Studio Numbering",
+            version="0.0.1",
+            enable_studio=True,
+        )
+        platform.register_agent(
+            manifest=AgentManifest(name="echo", slug="fn-echo", description="Echo"),
+            node_fn=_echo_fn,
+        )
+        with TestClient(platform.build()) as test_client:
+            yield test_client
+
+    def test_run_stream_frames_carry_ids(self, studio_client: Any) -> None:
+        response = studio_client.post(
+            "/studio/agents/echo/runs/stream", json={"input": {"query": "hi"}}
+        )
+        assert response.status_code == 200
+        sequences = _ids(response.text)
+        assert sequences == list(range(1, len(sequences) + 1))
+
+    def test_run_stream_frames_are_retained(self, studio_client: Any) -> None:
+        response = studio_client.post(
+            "/studio/agents/echo/runs/stream", json={"input": {"query": "hi"}}
+        )
+        run_id = response.headers["X-Studio-Run-Id"]
+        retained = asyncio.run(get_replay_buffer().replay(run_id))
+        assert retained, "studio frames were not retained under the run id"
+        assert [frame.sequence for frame in retained] == _ids(response.text)
