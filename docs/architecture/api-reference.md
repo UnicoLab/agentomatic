@@ -478,6 +478,11 @@ curl -X POST http://localhost:8000/api/v1/my_agent/a2a/tasks \
 
 Get A2A task status.
 
+These per-agent A2A routes — status, `events` and `cancel` — only accept tasks
+submitted to *this* agent. A task belonging to another agent answers `404`, the
+same as an id that does not exist. The shared task board at
+`/api/v1/tasks/{id}` is cross-agent by design and is unaffected.
+
 ```bash
 curl http://localhost:8000/api/v1/my_agent/a2a/tasks/task_a1b2c3d4e5f6
 ```

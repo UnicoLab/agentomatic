@@ -1306,6 +1306,33 @@ def create_default_router(
             view["error"] = record.error
         return view
 
+    async def _owned_a2a_task(task_id: str) -> Any:
+        """Fetch a task, insisting it belongs to *this* agent.
+
+        These routes are namespaced per agent but used to accept any task id,
+        so one agent's route would read — and cancel — another agent's task.
+        Zero-trust derives its policy from the agent segment of the path, so
+        that let a caller reach work the policy engine had denied them.
+
+        A task owned by another agent answers 404, exactly as a nonexistent
+        one does: a distinct status would confirm the id exists.
+
+        Args:
+            task_id: Task being addressed.
+
+        Returns:
+            The task record.
+
+        Raises:
+            HTTPException: 404 when the task is missing or owned elsewhere.
+        """
+        if task_manager is None:
+            raise HTTPException(501, "A2A task tracking requires a task manager")
+        record = await task_manager.get(task_id)
+        if record is None or record.target != agent_name:
+            raise HTTPException(404, f"Task '{task_id}' not found")
+        return record
+
     def _a2a_event_view(evt: Any, record: Any) -> dict[str, Any]:
         """Render one recorded event as an A2A-shaped task object.
 
@@ -1404,16 +1431,13 @@ def create_default_router(
     @router.get("/a2a/tasks/{task_id}")
     async def get_a2a_task(task_id: str) -> dict[str, Any]:
         """Get A2A task status."""
-        if task_manager is not None:
-            record = await task_manager.get(task_id)
-            if record is None:
-                raise HTTPException(404, f"Task '{task_id}' not found")
-            return _a2a_view(record)
-        return {
-            "task_id": task_id,
-            "status": "completed",
-            "message": "Task tracking requires a task manager",
-        }
+        if task_manager is None:
+            return {
+                "task_id": task_id,
+                "status": "completed",
+                "message": "Task tracking requires a task manager",
+            }
+        return _a2a_view(await _owned_a2a_task(task_id))
 
     @router.get("/a2a/tasks/{task_id}/events")
     async def stream_a2a_task(task_id: str, request: Request, since: int = Query(default=0, ge=0)):
@@ -1429,9 +1453,7 @@ def create_default_router(
 
         if task_manager is None:
             raise HTTPException(501, "A2A task streaming requires a task manager")
-        record = await task_manager.get(task_id)
-        if record is None:
-            raise HTTPException(404, f"Task '{task_id}' not found")
+        await _owned_a2a_task(task_id)
 
         resume_from = since or parse_last_event_id(request.headers.get("last-event-id"))
 
@@ -1504,6 +1526,9 @@ def create_default_router(
         """Cancel an in-flight A2A task."""
         if task_manager is None:
             raise HTTPException(501, "Task cancellation requires a task manager")
+        # Cancelling is a write, so the ownership check matters more here than
+        # on the read routes: without it any agent could stop any task.
+        await _owned_a2a_task(task_id)
         cancelled = await task_manager.cancel(task_id)
         if not cancelled:
             raise HTTPException(409, f"Task '{task_id}' not found or already terminal")
