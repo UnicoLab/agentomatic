@@ -78,6 +78,7 @@ runs are documented separately in the observability and optimization guides):
 | **PostgreSQL** | — | ✅ `asyncpg` |
 | **SQLite** | — | ✅ `aiosqlite` |
 | **MySQL** | — | ✅ `asyncmy` |
+| **SQL Server / Azure SQL** | — | ✅ `aioodbc` |
 | **Best for** | Development, testing | Production |
 
 ---
@@ -175,7 +176,20 @@ Production-ready async storage supporting any SQLAlchemy-compatible database. Fe
     )
     ```
 
-    **Required package:** `pip install asyncmy`
+    **Required package:** `pip install "agentomatic[db-mysql]"`
+
+=== "SQL Server / Azure SQL"
+
+    ```python
+    from agentomatic.storage import SQLAlchemyStore
+
+    store = SQLAlchemyStore(
+        "mssql+aioodbc://user:password@server.database.windows.net:1433/agentomatic"
+        "?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no"
+    )
+    ```
+
+    **Required package:** `pip install "agentomatic[db-mssql]"` plus Microsoft ODBC Driver 18
 
 ### Database Table Schema
 

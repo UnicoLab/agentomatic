@@ -1,7 +1,8 @@
 """SQLAlchemy-based persistent storage with connection pooling.
 
-Production-ready backend supporting PostgreSQL, SQLite, MySQL, and any
-SQLAlchemy-compatible database.  Uses async engines and session pooling.
+Production-ready backend supporting PostgreSQL, SQLite, MySQL/MariaDB, SQL
+Server/Azure SQL, and other SQLAlchemy-compatible databases. Uses async
+engines and session pooling.
 
 Usage::
 
@@ -12,6 +13,12 @@ Usage::
 
     # SQLite (development)
     store = SQLAlchemyStore("sqlite+aiosqlite:///data/platform.db")
+
+    # Azure SQL / SQL Server
+    store = SQLAlchemyStore(
+        "mssql+aioodbc://user:pass@server:1433/db"
+        "?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes"
+    )
 
     await store.initialize()
 
@@ -25,7 +32,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import delete, event, func, select
+from sqlalchemy import delete, event, func, select, update
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -82,7 +89,8 @@ class SQLAlchemyStore(BaseStore):
     Supports:
     - PostgreSQL (``asyncpg``)
     - SQLite (``aiosqlite``)
-    - MySQL (``asyncmy``)
+    - MySQL / MariaDB (``aiomysql``)
+    - SQL Server / Azure SQL (``aioodbc``)
     - Any SQLAlchemy async driver
 
     Args:
@@ -263,6 +271,14 @@ class SQLAlchemyStore(BaseStore):
             result = await session.execute(select(ThreadModel).where(ThreadModel.id == thread_id))
             thread = result.scalar_one_or_none()
             if thread:
+                # SQL Server rejects a self-referencing ON DELETE SET NULL FK
+                # alongside this schema's other cascades (multiple cascade
+                # paths). Detach direct descendants explicitly instead.
+                await session.execute(
+                    update(ThreadModel)
+                    .where(ThreadModel.parent_thread_id == thread_id)
+                    .values(parent_thread_id=None)
+                )
                 # CheckpointModel has no FK to ThreadModel (see models.py), so
                 # it isn't covered by the ondelete="CASCADE" on Feedback/
                 # SuspendedState — clean it up explicitly or it's orphaned.

@@ -69,6 +69,8 @@ If you prefer a lightweight install, you can select only the modules and depende
 | `metrics` | `pip install "agentomatic[metrics]"` | Prometheus exporter metrics |
 | `db` | `pip install "agentomatic[db]"` | SQLAlchemy engines + local SQLite support |
 | `db-postgres` | `pip install "agentomatic[db-postgres]"` | SQLAlchemy async PostgreSQL client driver |
+| `db-mysql` | `pip install "agentomatic[db-mysql]"` | SQLAlchemy async MySQL / MariaDB driver |
+| `db-mssql` | `pip install "agentomatic[db-mssql]"` | SQLAlchemy async SQL Server / Azure SQL driver |
 | `cli` | `pip install "agentomatic[cli]"` | Rich terminal formatting + interactive select prompt controls |
 | `ui` | `pip install "agentomatic[ui]"` | Graphical Chainlit chat debug console |
 | `studio` | `pip install "agentomatic[studio]"` | Agentomatic Studio visual debugger |

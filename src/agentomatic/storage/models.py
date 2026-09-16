@@ -69,7 +69,7 @@ class ThreadModel(Base):
     )
     message_count: Mapped[int] = mapped_column(Integer, default=0)
     parent_thread_id: Mapped[str | None] = mapped_column(
-        String(64), ForeignKey("threads.id", ondelete="SET NULL"), nullable=True, index=True
+        String(64), ForeignKey("threads.id"), nullable=True, index=True
     )
     fork_message_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
