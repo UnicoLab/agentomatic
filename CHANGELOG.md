@@ -2,6 +2,55 @@
 
 <!-- version list -->
 
+## v1.14.0 (2026-09-16)
+
+### Bug Fixes
+
+- **a2a**: Render one agent card for discovery and the per-agent endpoint
+  ([`7fc8d66`](https://github.com/UnicoLab/agentomatic/commit/7fc8d66dfc731e0e0f35af88e95c8b1fe5e3d215))
+
+- **cli**: Scaffold into the real project instead of the current directory
+  ([`302e754`](https://github.com/UnicoLab/agentomatic/commit/302e7547db4f43945685ada6722735a9e92de233))
+
+- **security**: Scope retained stream replay to its agent and principal
+  ([`de013da`](https://github.com/UnicoLab/agentomatic/commit/de013daa8dfe0c3da90a7330090b52b7d9f06614))
+
+- **security**: Scope the per-agent A2A task routes to their owning agent
+  ([`ba50f55`](https://github.com/UnicoLab/agentomatic/commit/ba50f55e34dc498bc7b085620b3a32eee8f9164b))
+
+- **storage**: Support Azure SQL and portable database drivers
+  ([`e265adb`](https://github.com/UnicoLab/agentomatic/commit/e265adbaf90468433833aa7a0cd827e062e40329))
+
+- **streaming**: Bound replay memory, key Studio resumes safely, size config
+  ([`cb264d8`](https://github.com/UnicoLab/agentomatic/commit/cb264d83861732ac7e1c0c648f4df25874fd1a12))
+
+### Build System
+
+- **lint**: Run ruff from the project's lockfile instead of a pinned hook
+  ([`6739f07`](https://github.com/UnicoLab/agentomatic/commit/6739f07ab6b5f58c835125c04b2119028173ee0a))
+
+### Code Style
+
+- **tests**: Format an assert stably across both pinned ruff versions
+  ([`02b1ef9`](https://github.com/UnicoLab/agentomatic/commit/02b1ef9be16844b73ad1d38291588329208b9c6d))
+
+### Features
+
+- **status**: Report replay buffer occupancy on the status dashboard
+  ([`c4a8054`](https://github.com/UnicoLab/agentomatic/commit/c4a805438f7826525c37da29fc93bce8ac417f2b))
+
+- **streaming**: Number and retain frames on every SSE surface
+  ([`75af79c`](https://github.com/UnicoLab/agentomatic/commit/75af79c039a9b4fe9b30b2577aee7656d6eafae2))
+
+- **tasks**: Make task progress streams resumable after a dropped connection
+  ([`cc1f746`](https://github.com/UnicoLab/agentomatic/commit/cc1f746511d0e787b3ac580527520e531c4b1aa9))
+
+### Testing
+
+- **streaming**: Assert Studio's frames stay numbered and retained
+  ([`d576e6e`](https://github.com/UnicoLab/agentomatic/commit/d576e6e320bb3f68cb8090c2bf29c57066ec5bbd))
+
+
 ## v1.13.0 (2026-09-07)
 
 ### Code Style
