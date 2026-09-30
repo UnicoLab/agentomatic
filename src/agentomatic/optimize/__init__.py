@@ -202,7 +202,9 @@ from agentomatic.optimize.metrics import (
     LLMJudgeMetric,
     MetricResult,
     RedTeamMetric,
+    ScoreMetricAdapter,
     WeightedMetric,
+    as_optimize_metric,
     resolve_metrics,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
@@ -401,6 +403,8 @@ __all__ = [
     "BaseMetric",
     "ContainsMetric",
     "CustomMetric",
+    "ScoreMetricAdapter",
+    "as_optimize_metric",
     "DeepEvalMetric",
     "ExactMatchMetric",
     "GEvalMetric",

@@ -748,7 +748,9 @@ class TestBug5OptimizeMetricAdapter:
 
     # -- error handling -------------------------------------------------------
 
-    def test_score_returns_neutral_on_exception(self):
+    def test_score_is_zero_and_counted_on_exception(self):
+        """A failed judge must not invent a mid-scale score (it hid outages)."""
+
         class FailMetric:
             name = "fail"
 
@@ -758,9 +760,10 @@ class TestBug5OptimizeMetricAdapter:
         adapter = OptimizeMetricAdapter(FailMetric())
         ex = self._make_example()
         result = adapter.score(ex, {"response": "r"})
-        assert result == pytest.approx(0.5)  # neutral, not 0.0 crash
+        assert result == 0.0  # no crash, and no fabricated 0.5
+        assert adapter.failures == 1
 
-    def test_score_returns_neutral_on_sync_exception(self):
+    def test_score_is_zero_and_counted_on_sync_exception(self):
         class SyncFail:
             name = "sync_fail"
 
@@ -770,7 +773,8 @@ class TestBug5OptimizeMetricAdapter:
         adapter = OptimizeMetricAdapter(SyncFail())
         ex = self._make_example()
         result = adapter.score(ex, {"response": "r"})
-        assert result == pytest.approx(0.5)
+        assert result == 0.0
+        assert adapter.failures == 1
 
     # -- integration with training stack -------------------------------------
 

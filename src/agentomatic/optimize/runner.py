@@ -175,6 +175,9 @@ class AgentRunner:
                 query=query,
                 response=response,
                 duration_ms=duration,
+                # The full structured output, for metrics that score fields
+                # other than the response text (see ScoreMetricAdapter).
+                metadata={"output": raw} if isinstance(raw, dict) else {},
             )
         except Exception as exc:
             duration = (time.perf_counter() - t0) * 1000
@@ -349,6 +352,10 @@ class AgentRunner:
                 result.expected = point.get("expected_answer") or point.get("expected")
                 if not result.context:
                     result.context = point.get("context", [])
+                if isinstance(meta, dict) and meta:
+                    # Dataset metadata (rubric hints, required facts, split…)
+                    # for example-aware metrics.
+                    result.metadata = {**result.metadata, "example": dict(meta)}
                 return result
 
         return list(await asyncio.gather(*[_run_one(p) for p in points]))

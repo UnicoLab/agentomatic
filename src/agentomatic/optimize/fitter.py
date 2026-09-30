@@ -632,6 +632,11 @@ class PromptFitter:
             tracker = None
             tracker_exp_id = None
 
+        # Any metric protocol is accepted: class-agent ``score()`` metrics and
+        # ``OptimizeMetricAdapter`` are bridged to the async ``evaluate()``.
+        from agentomatic.optimize.metrics import as_optimize_metric
+
+        metric = as_optimize_metric(metric)
         metric = self._augment_metric_with_local_judges(metric)
 
         # ── Generalization safety net: always reserve a holdout ──────
@@ -1806,13 +1811,15 @@ class PromptFitter:
                 continue
 
             try:
-                # TODO: check if thise should be calling metric.score or metric evaluate ? and check entire metrics code for inifications
-                eval_result: EvalResult = await metric.evaluate(
-                    query=rr.query,
-                    response=rr.response,
-                    expected=rr.expected,
-                    context=rr.context or rr.retrieval_context,
-                )
+                from agentomatic.optimize.metrics import scoring_run
+
+                with scoring_run(rr):
+                    eval_result: EvalResult = await metric.evaluate(
+                        query=rr.query,
+                        response=rr.response,
+                        expected=rr.expected,
+                        context=rr.context or rr.retrieval_context,
+                    )
                 # Honest eval: skip fabricated / failed judge scores from the
                 # average so a broken LLM-as-judge cannot invent mid-scale loss.
                 if (eval_result.metadata or {}).get("evaluation_failed"):

@@ -424,8 +424,11 @@ class Loss:
 class MetricLoss(Loss):
     """Turn a 0..1 (higher-better) metric into a loss (``1 - score``)."""
 
-    def __init__(self, metric: Metric, name: str | None = None) -> None:
-        self.metric = metric
+    def __init__(self, metric: Metric | Any, name: str | None = None) -> None:
+        from .metrics import as_agent_metric
+
+        # Optimize metrics (e.g. ``LocalJudgeMetric``) are wrapped automatically.
+        self.metric = as_agent_metric(metric)
         self.name = name or f"{getattr(metric, 'name', 'metric')}_loss"
 
     def compute(self, example: AgentExample, prediction: dict[str, Any]) -> float:
@@ -452,14 +455,14 @@ def resolve_loss(obj: Any) -> Loss | None:
     """Coerce ``obj`` into a :class:`Loss`.
 
     Accepts ``None`` (→ ``None``), an existing ``Loss``, a metric-like object
-    with ``.score`` (→ :class:`MetricLoss`), or a plain callable
-    (→ :class:`CallableLoss`).
+    with ``.score`` or an optimize metric with async ``.evaluate``
+    (→ :class:`MetricLoss`), or a plain callable (→ :class:`CallableLoss`).
     """
     if obj is None:
         return None
     if isinstance(obj, Loss):
         return obj
-    if hasattr(obj, "score"):
+    if hasattr(obj, "score") or callable(getattr(obj, "evaluate", None)):
         return MetricLoss(obj)
     if callable(obj):
         return CallableLoss(

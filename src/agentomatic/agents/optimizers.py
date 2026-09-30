@@ -190,8 +190,11 @@ class PromptFitterBridge:
         agent_name: Name for the fitter to use.
         task_model: Model for running tasks.
         rewrite_model: Model for prompt rewriting.
-        metric: An ``optimize.BaseMetric`` used as the fit objective. Defaults
-            to ``ExactMatchMetric`` when omitted.
+        metric: The fit objective PromptFitter selects candidates with. Any
+            metric works: an ``optimize.BaseMetric`` (``LocalJudgeMetric``,
+            ``CompositeMetric``, …), an ``OptimizeMetricAdapter`` (unwrapped),
+            or a class-agent metric with ``score(example, prediction)``
+            (wrapped). Defaults to ``ExactMatchMetric`` when omitted.
         max_trials: Maximum optimization trials.
         fitter: Pre-built fitter instance (mainly for testing / advanced use);
             when given, construction kwargs are ignored.
@@ -258,7 +261,14 @@ class PromptFitterBridge:
         self.task_model = task_model
         self.rewrite_model = rewrite_model
         self.optimizer = optimizer
-        self.metric = metric
+        # Coerce now so an unusable metric fails at construction with a clear
+        # message instead of mid-fit (where it was logged and skipped). An
+        # injected ``fitter`` owns its metric contract, so it gets it verbatim.
+        from agentomatic.optimize.metrics import as_optimize_metric
+
+        self.metric = (
+            as_optimize_metric(metric) if metric is not None and fitter is None else metric
+        )
         self.max_trials = max_trials
         self.fitter = fitter
         self.local_agent = local_agent
@@ -300,13 +310,20 @@ class PromptFitterBridge:
         if not len(opt_dataset):
             return _skip("empty dataset")
 
-        trainset, valset = self._split(opt_dataset)
+        trainset, valset, testset = self._split_three(opt_dataset)
         metric = self._resolve_metric()
         if metric is None:
             return _skip("no usable metric")
+        logger.info(
+            "PromptFitterBridge: train={} (proposals) · validation={} (selection) · "
+            "test={} (held out — generalization gate only)",
+            len(trainset),
+            len(valset),
+            len(testset) if testset is not None else "auto-reserved from validation",
+        )
 
         try:
-            result = self._run_async(fitter.fit(trainset, valset, metric))
+            result = self._run_async(fitter.fit(trainset, valset, metric, testset=testset))
         except RuntimeError as exc:
             return _skip(f"cannot run fitter here ({exc})")
         except Exception as exc:  # noqa: BLE001
@@ -441,8 +458,55 @@ class PromptFitterBridge:
             return None
 
     @staticmethod
+    def _split_three(opt_dataset: Any) -> tuple[Any, Any, Any | None]:
+        """Split into ``(train, validation, test)`` without leaking ``test``.
+
+        * ``train`` — failure analysis and few-shot demonstrations.
+        * ``validation`` — the only data candidates are scored/selected on.
+        * ``test`` — handed to the fitter as its held-out ``testset``: it is
+          never used for selection, only for the generalization gate that
+          rejects an overfit candidate (and for the reported holdout score).
+
+        The ``test`` split used to be folded into the validation pool, so the
+        "held-out" score was measured on data the winner had been picked on.
+
+        Without a ``validation`` split, validation is carved (20%) from
+        ``train``. Without a ``test`` split, ``None`` is returned and the
+        fitter reserves its own holdout slice from validation.
+        """
+        from agentomatic.optimize.dataset import Dataset
+
+        points = list(getattr(opt_dataset, "points", []) or [])
+
+        def _split_of(point: Any) -> str:
+            return str((getattr(point, "metadata", None) or {}).get("split", "train"))
+
+        train = [p for p in points if _split_of(p) == "train"]
+        val = [p for p in points if _split_of(p) in ("validation", "val")]
+        test = [p for p in points if _split_of(p) == "test"]
+        testset = Dataset(points=test) if test else None
+        if train and not val and len(train) >= 2:
+            cut = max(1, int(round(len(train) * 0.8)))
+            cut = min(cut, len(train) - 1)
+            train, val = train[:cut], train[cut:]
+        if train and val:
+            return Dataset(points=train), Dataset(points=val), testset
+        if val and not train:
+            return Dataset(points=val), Dataset(points=val), testset
+        if test and not train and not val:
+            # Only a test split was labelled: nothing else to learn from.
+            train_ds, val_ds = PromptFitterBridge._split(Dataset(points=test))
+            return train_ds, val_ds, None
+        train_ds, val_ds = PromptFitterBridge._split(opt_dataset)
+        return train_ds, val_ds, None
+
+    @staticmethod
     def _split(opt_dataset: Any) -> tuple[Any, Any]:
-        """Prefer ``metadata.split`` labels; else fall back to an 80/20 cut."""
+        """Prefer ``metadata.split`` labels; else fall back to an 80/20 cut.
+
+        Two-way split kept for callers that do not hold out a test set;
+        :meth:`optimize` uses :meth:`_split_three`.
+        """
         from agentomatic.optimize.dataset import Dataset
 
         points = list(getattr(opt_dataset, "points", []) or [])

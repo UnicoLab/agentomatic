@@ -21,7 +21,9 @@ import difflib
 import os
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
@@ -820,7 +822,9 @@ def resolve_metrics(
         - ``"red_team"`` — adversarial scoring
 
     Args:
-        metrics: List of metric names (str) or BaseMetric instances.
+        metrics: List of metric names (str) or metric instances — a
+            ``BaseMetric``, an ``OptimizeMetricAdapter`` or a class-agent
+            ``score(example, prediction)`` metric.
         model: LLM model for evaluation (used by DeepEval/LLM metrics).
 
     Returns:
@@ -828,13 +832,12 @@ def resolve_metrics(
     """
     resolved: list[BaseMetric] = []
     for m in metrics:
-        if isinstance(m, BaseMetric):
-            resolved.append(m)
-        else:
-            m_any: Any = m
-            if not isinstance(m_any, str):
-                raise TypeError(f"Expected str or BaseMetric, got {type(m)}")
+        m_any: Any = m
+        if isinstance(m_any, str):
             resolved.append(_resolve_single(m_any, model))
+        else:
+            # Instances of either metric protocol (see ``as_optimize_metric``).
+            resolved.append(as_optimize_metric(m_any))
     return resolved
 
 
@@ -936,6 +939,11 @@ class WeightedMetric:
     name: str
     metric: BaseMetric
     weight: float = 1.0
+
+    def __post_init__(self) -> None:
+        # Accept class-agent ``score()`` metrics and ``OptimizeMetricAdapter``
+        # too: CompositeMetric awaits ``metric.evaluate`` on every component.
+        self.metric = as_optimize_metric(self.metric)
 
 
 class CompositeMetric(BaseMetric):
@@ -1389,3 +1397,182 @@ class CostMetric(BaseMetric):
                         pass
         # Rough estimate: ~4 chars per token
         return max(1, len(response) // 4)
+
+
+# =====================================================================
+# Protocol bridge: agents.Metric (sync ``score``) ⇄ optimize.BaseMetric
+# =====================================================================
+
+#: The run being scored by ``PromptFitter`` (set around each ``evaluate``
+#: call). Lets example-aware metrics reach the dataset metadata and the
+#: agent's structured output, which the string-based ``evaluate`` signature
+#: cannot carry. ``None`` outside a fitter scoring pass.
+_SCORING_RUN: ContextVar[Any] = ContextVar("agentomatic_scoring_run", default=None)
+
+
+@contextmanager
+def scoring_run(run: Any) -> Iterator[None]:
+    """Expose ``run`` (a ``RunResult``) to metrics evaluated in this block.
+
+    Args:
+        run: The run result being scored.
+
+    Yields:
+        Nothing; the run is visible via :func:`current_scoring_run`.
+    """
+    token = _SCORING_RUN.set(run)
+    try:
+        yield
+    finally:
+        _SCORING_RUN.reset(token)
+
+
+def current_scoring_run() -> Any:
+    """Return the ``RunResult`` currently being scored, if any."""
+    return _SCORING_RUN.get()
+
+
+def _decode_json_dict(text: str | None) -> dict[str, Any] | None:
+    """Return ``text`` parsed as a JSON object, or ``None`` when it is not one."""
+    import json
+
+    if not text:
+        return None
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        value = json.loads(stripped)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+_STRUCTURED_HEADER = re.compile(
+    r"^[ \t]*##[ \t]*Expected structured output[ \t]*$", re.MULTILINE | re.IGNORECASE
+)
+
+
+def _expected_structured(expected: str | None) -> dict[str, Any] | None:
+    """Recover ``expected_output`` from an ``AgentExample.to_datapoint`` reference."""
+    if not expected:
+        return None
+    header = _STRUCTURED_HEADER.search(expected)
+    if header is None:
+        return None
+    rest = expected[header.end() :]
+    following = _ANY_SECTION_HEADER.search(rest)
+    return _decode_json_dict(rest[: following.start()] if following else rest)
+
+
+class ScoreMetricAdapter(BaseMetric):
+    """Run a sync ``score(example, prediction)`` metric as an optimize metric.
+
+    Class-agent metrics (:mod:`agentomatic.agents.metrics` — e.g.
+    ``ExactKeyMatchMetric``, ``ContainsTermsMetric``, ``agents.WeightedMetric``)
+    implement ``score(example, prediction) -> float``. ``PromptFitter`` scores
+    candidates through the async ``evaluate(query, response, expected,
+    context)`` protocol instead, so handing it such a metric used to fail with
+    ``AttributeError: ... has no attribute 'evaluate'``. This adapter rebuilds
+    an :class:`~agentomatic.agents.types.AgentExample` and a prediction dict
+    and calls ``score`` in a worker thread. Inside ``PromptFitter`` the
+    rebuilt example carries the dataset metadata (``must_include``, rubric
+    hints, …) and the prediction is the agent's full structured output, so a
+    class-agent metric scores exactly as it does in ``agent.evaluate``.
+
+    You rarely need it directly — :func:`as_optimize_metric` applies it
+    wherever an optimize metric is required.
+
+    Args:
+        metric: Object with ``score(example, prediction) -> float``.
+        name: Optional override name (defaults to ``metric.name``).
+    """
+
+    def __init__(self, metric: Any, name: str | None = None) -> None:
+        self.metric = metric
+        self.name = name or str(getattr(metric, "name", None) or "score_metric")
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> EvalResult:
+        """Score ``response`` with the wrapped sync metric."""
+        import asyncio
+
+        from agentomatic.agents.types import AgentExample
+
+        run = current_scoring_run()
+        run_meta = dict(getattr(run, "metadata", None) or {})
+        example_meta = dict(run_meta.get("example") or {})
+
+        answer = plain_expected(expected)
+        expected_output = _expected_structured(expected) or _decode_json_dict(answer)
+        if expected_output is None and answer is not None:
+            expected_output = {"response": answer}
+        example = AgentExample(
+            id=str(example_meta.get("id") or "fit"),
+            input={
+                "current_query": query,
+                "query": query,
+                "question": query,
+                **({"context": list(context)} if context else {}),
+            },
+            expected_output=expected_output,
+            metadata=example_meta,
+            split=str(example_meta.get("split") or "validation"),
+        )
+        output = run_meta.get("output")
+        prediction = (
+            dict(output)
+            if isinstance(output, dict)
+            else (_decode_json_dict(response) or {"response": response})
+        )
+        score = await asyncio.to_thread(self.metric.score, example, prediction)
+        return EvalResult(
+            metric_name=self.name,
+            score=max(0.0, min(1.0, float(score))),
+            reason=f"{type(self.metric).__name__}.score",
+        )
+
+
+def as_optimize_metric(metric: Any) -> BaseMetric:
+    """Coerce any supported metric into an optimize :class:`BaseMetric`.
+
+    Accepts, in order:
+
+    1. An ``OptimizeMetricAdapter`` — unwrapped to the optimize metric it
+       carries (keeps ``CompositeMetric`` per-dimension tracking intact).
+    2. A :class:`BaseMetric` (or any object with an async ``evaluate``).
+    3. A class-agent metric with ``score(example, prediction)`` — wrapped in
+       :class:`ScoreMetricAdapter`.
+
+    Args:
+        metric: The metric to coerce.
+
+    Returns:
+        A metric exposing ``async evaluate(query, response, expected, context)``.
+
+    Raises:
+        TypeError: When ``metric`` implements neither protocol.
+    """
+    import inspect
+
+    from agentomatic.agents.metrics import OptimizeMetricAdapter
+
+    if isinstance(metric, OptimizeMetricAdapter):
+        return as_optimize_metric(metric.optimize_metric)
+    if isinstance(metric, BaseMetric):
+        return metric
+    if inspect.iscoroutinefunction(getattr(metric, "evaluate", None)):
+        return cast(BaseMetric, metric)
+    if callable(getattr(metric, "score", None)):
+        return ScoreMetricAdapter(metric)
+    raise TypeError(
+        f"{type(metric).__name__} is not a usable metric: implement "
+        "`async evaluate(query, response, expected=None, context=None) -> EvalResult` "
+        "(agentomatic.optimize.BaseMetric) or "
+        "`score(example, prediction) -> float` (agentomatic.agents.Metric)."
+    )

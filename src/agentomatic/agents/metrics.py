@@ -16,6 +16,8 @@ import difflib
 from collections.abc import Callable, Sequence
 from typing import Any
 
+from loguru import logger
+
 from .types import AgentExample
 
 # ---------------------------------------------------------------------------
@@ -273,10 +275,10 @@ class WeightedMetric:
                 comp_name = getattr(comp_metric, "name", None) or "component"
                 comp_weight = 1.0
 
-            if not hasattr(comp_metric, "score"):
-                raise TypeError(
-                    f"Component '{comp_name}' does not implement the Metric.score protocol"
-                )
+            try:
+                comp_metric = as_agent_metric(comp_metric)
+            except TypeError as exc:
+                raise TypeError(f"Component '{comp_name}': {exc}") from exc
             components.append((str(comp_name), comp_metric, float(comp_weight)))
 
         total_weight = sum(w for _, _, w in components)
@@ -304,7 +306,8 @@ class WeightedMetric:
         for comp_name, comp_metric, comp_weight in self._components:
             try:
                 raw = comp_metric.score(example, prediction)
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - see docstring
+                logger.warning(f"WeightedMetric component '{comp_name}' failed: {exc}")
                 raw = 0.0
             component_scores[comp_name] = float(raw)
             weighted_sum += float(raw) * comp_weight
@@ -333,6 +336,16 @@ class OptimizeMetricAdapter:
       :func:`agentomatic.async_utils.run_sync` (persistent loop; works
       inside an existing event loop via a worker thread)
 
+    The adapter speaks **both** metric protocols, so the same object can be
+    used as a ``compile(metrics=[...])`` entry, inside ``agents.WeightedMetric``
+    / ``MetricLoss``, *and* as the ``metric=`` fit objective of
+    ``PromptFitterBridge`` / ``PromptFitter`` (which call the async
+    :meth:`evaluate`).
+
+    A failed evaluation (judge unreachable, unparsable reply) scores ``0.0``
+    and is logged and counted in :attr:`failures` — never a made-up
+    mid-scale score that would hide the outage from the optimizer.
+
     Args:
         optimize_metric: An instance of ``optimize.BaseMetric``.
         name: Optional override name.
@@ -352,10 +365,38 @@ class OptimizeMetricAdapter:
         optimize_metric: Any,
         name: str | None = None,
     ) -> None:
+        if not callable(getattr(optimize_metric, "evaluate", None)):
+            raise TypeError(
+                f"OptimizeMetricAdapter wraps an optimize metric with an async "
+                f"`evaluate(query, response, expected, context)`; got "
+                f"{type(optimize_metric).__name__}. Class-agent metrics with "
+                "`score(example, prediction)` can be used directly."
+            )
         self._metric = optimize_metric
         self.name = name or getattr(optimize_metric, "name", "adapted_metric")
         self.last_result: Any | None = None
         """Most recent ``EvalResult`` from :meth:`score` (for report rationales)."""
+        self.failures = 0
+        """Number of evaluations that failed and were scored ``0.0``."""
+
+    @property
+    def optimize_metric(self) -> Any:
+        """The wrapped ``optimize.BaseMetric``."""
+        return self._metric
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> Any:
+        """Delegate to the wrapped metric's async ``evaluate`` (fit objective path).
+
+        Returns:
+            The wrapped metric's ``EvalResult``.
+        """
+        return await self._metric.evaluate(query, response, expected, context)
 
     def score(
         self,
@@ -442,10 +483,44 @@ class OptimizeMetricAdapter:
         # async clients survive across fit → evaluate.
         try:
             result = run_sync(self._metric.evaluate(query, response, expected, context))
-        except Exception:
-            return 0.5  # judge unavailable — neutral, don't crash training
+        except Exception as exc:  # noqa: BLE001 - one failed judge call must not abort fit
+            self.failures += 1
+            logger.warning(f"Metric '{self.name}' failed ({exc}); scoring this example 0.0")
+            return 0.0
 
         self.last_result = result
         if (getattr(result, "metadata", None) or {}).get("evaluation_failed"):
+            self.failures += 1
             return 0.0
-        return float(getattr(result, "score", 0.5))
+        return float(getattr(result, "score", 0.0) or 0.0)
+
+
+def as_agent_metric(metric: Any) -> Any:
+    """Coerce any supported metric into the class-agent ``Metric`` protocol.
+
+    ``compile(metrics=[...])``, ``evaluate(metrics=[...])``,
+    ``agents.WeightedMetric`` and ``MetricLoss`` call the sync
+    ``score(example, prediction)``. An optimize metric (``LocalJudgeMetric``,
+    ``LLMJudgeMetric``, ``ExactMatchMetric``, …) only has the async
+    ``evaluate`` — it is wrapped in :class:`OptimizeMetricAdapter` so it can be
+    passed anywhere without manual wrapping.
+
+    Args:
+        metric: A class-agent metric or an optimize metric.
+
+    Returns:
+        An object with ``name`` and ``score(example, prediction) -> float``.
+
+    Raises:
+        TypeError: When ``metric`` implements neither protocol.
+    """
+    if callable(getattr(metric, "score", None)):
+        return metric
+    if callable(getattr(metric, "evaluate", None)):
+        return OptimizeMetricAdapter(metric)
+    raise TypeError(
+        f"{type(metric).__name__} is not a usable metric: implement "
+        "`score(example, prediction) -> float` (agentomatic.agents.Metric) or "
+        "`async evaluate(query, response, expected=None, context=None)` "
+        "(agentomatic.optimize.BaseMetric)."
+    )

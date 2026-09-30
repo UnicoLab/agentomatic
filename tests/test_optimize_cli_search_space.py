@@ -204,7 +204,7 @@ class TestWeightedMetric:
             WeightedMetric([(1, 2, 3, 4)])
 
     def test_component_missing_score_raises(self) -> None:
-        with pytest.raises(TypeError, match="Metric.score protocol"):
+        with pytest.raises(TypeError, match="not a usable metric"):
             WeightedMetric([("bad", object(), 1.0)])
 
     def test_bare_metric_defaults_to_weight_one(self) -> None:

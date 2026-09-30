@@ -558,6 +558,10 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         """
         if metrics is None:
             metrics = list(self._compile_metrics)
+        else:
+            from .metrics import as_agent_metric
+
+            metrics = [as_agent_metric(m) for m in metrics]
         if not metrics:
             # A metric is a live Python object, so it cannot be written to
             # ``config.json`` and does not come back with ``load()``. Say so
@@ -675,7 +679,11 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         Returns:
             Self for chaining.
         """
-        metrics = list(metrics or [])
+        from .metrics import as_agent_metric
+
+        # Optimize metrics (``LocalJudgeMetric``, ``ExactMatchMetric``, …) are
+        # wrapped so they can be listed here directly.
+        metrics = [as_agent_metric(m) for m in (metrics or [])]
         if not metrics:
             logger.warning(
                 "compile() called without metrics — fit()/evaluate() will "
