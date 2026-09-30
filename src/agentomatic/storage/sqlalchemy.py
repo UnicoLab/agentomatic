@@ -69,6 +69,10 @@ def _ensure_logs_resource_type_columns(sync_conn: Any) -> None:
     upgrades = (
         ("agent_invocation_logs", "resource_type", "VARCHAR(32) DEFAULT 'agent'"),
         ("log_analyses", "resource_type", "VARCHAR(32) DEFAULT 'agent'"),
+        # Feedback text, so /feedback/export can build optimization examples.
+        ("feedback", "query", "TEXT"),
+        ("feedback", "response", "TEXT"),
+        ("feedback", "correction", "TEXT"),
     )
     for table, column, col_type in upgrades:
         if table not in inspector.get_table_names():
@@ -371,6 +375,9 @@ class SQLAlchemyStore(BaseStore):
         comment: str | None = None,
         message_id: int | None = None,
         feedback_type: str = "thumbs",
+        query: str = "",
+        response: str = "",
+        correction: str | None = None,
     ) -> dict[str, Any]:
         """Record user feedback."""
         async with self._session() as session:
@@ -382,6 +389,9 @@ class SQLAlchemyStore(BaseStore):
                 comment=comment,
                 message_id=message_id,
                 feedback_type=feedback_type,
+                query=query or None,
+                response=response or None,
+                correction=correction,
             )
             session.add(fb)
             await session.commit()

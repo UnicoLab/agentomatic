@@ -196,6 +196,55 @@ def test_basic_templates_send_a_real_system_message(project_app, template: str) 
     assert _texts(payload)[-1] == "ping"
 
 
+@pytest.mark.parametrize("template", ("basic", "full"))
+def test_studio_debug_shows_state_and_history(project_app, template: str) -> None:
+    """The Debug view's State / Time-travel tabs were empty for class agents."""
+    client, _ = project_app
+    agent = TEMPLATES[template]
+    thread_id = client.post(f"/api/v1/{agent}/threads", json={"title": "t"}).json()["id"]
+    _stream_turn(client, agent, thread_id, "debug me")
+
+    state = client.get(f"/studio/agents/{agent}/threads/{thread_id}/state").json()
+    assert state["state"], state
+    assert state["checkpoint_id"]
+    history = client.get(f"/studio/agents/{agent}/threads/{thread_id}/history").json()
+    assert history, "no checkpoints recorded"
+    assert all(c["metadata"].get("node") for c in history)
+    assert history[0]["id"] == state["checkpoint_id"]  # newest first
+
+
+def test_agent_folder_pipelines_are_served(project_app) -> None:
+    """``agents/<name>/pipeline.yaml`` (the extraction template ships one) was
+    never discovered: the platform scanned the agents folder as a project root."""
+    client, _ = project_app
+    listed = client.get("/api/v1/pipelines").json()
+    listed = listed["pipelines"] if isinstance(listed, dict) else listed
+    names = {p["name"] for p in listed}
+    assert TEMPLATES["extraction"] in names
+
+
+def test_feedback_export_uses_the_default_store(project_app) -> None:
+    """With the default (ephemeral) store configured, export returned nothing:
+    the store dropped the query, response and correction."""
+    client, _ = project_app
+    agent = TEMPLATES["basic"]
+    recorded = client.post(
+        f"/api/v1/{agent}/feedback",
+        json={
+            "query": "What is the refund window?",
+            "response": "No idea.",
+            "correction": "30 days for annual plans.",
+            "rating": 1,
+            "user_id": "u",
+        },
+    )
+    assert recorded.status_code == 200, recorded.text
+    export = client.get(f"/api/v1/{agent}/feedback/export").json()
+    assert export["count"] >= 1
+    rows = [line for line in export["data"].splitlines() if "refund window" in line]
+    assert rows and "30 days for annual plans." in rows[0]
+
+
 @pytest.mark.parametrize("template", list(TEMPLATES))
 class TestTasks:
     def test_async_task_succeeds(self, project_app, template: str) -> None:

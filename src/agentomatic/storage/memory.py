@@ -171,6 +171,9 @@ class MemoryStore(BaseStore):
         comment: str | None = None,
         message_id: int | None = None,
         feedback_type: str = "thumbs",
+        query: str = "",
+        response: str = "",
+        correction: str | None = None,
     ) -> dict[str, Any]:
         fb = {
             "id": len(self._feedback) + 1,
@@ -181,6 +184,9 @@ class MemoryStore(BaseStore):
             "comment": comment,
             "message_id": message_id,
             "feedback_type": feedback_type,
+            "query": query,
+            "response": response,
+            "correction": correction,
             "created_at": datetime.now(UTC).isoformat(),
         }
         self._feedback.append(fb)

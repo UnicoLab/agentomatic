@@ -102,15 +102,22 @@ class FeedbackCollector:
 
         # Store via backend
         if self._store and hasattr(self._store, "add_feedback"):
+            base_kwargs: dict[str, Any] = {
+                "thread_id": thread_id or "",
+                "user_id": user_id,
+                "agent_name": agent_name,
+                "rating": rating,
+                "comment": comment,
+                "feedback_type": feedback_type,
+            }
+            text_kwargs = {"query": query, "response": response, "correction": correction}
             try:
-                await self._store.add_feedback(
-                    thread_id=thread_id or "",
-                    user_id=user_id,
-                    agent_name=agent_name,
-                    rating=rating,
-                    comment=comment,
-                    feedback_type=feedback_type,
-                )
+                try:
+                    await self._store.add_feedback(**base_kwargs, **text_kwargs)
+                except TypeError:
+                    # A custom store with the older signature: the text is
+                    # still kept in the export buffer below.
+                    await self._store.add_feedback(**base_kwargs)
             except Exception as exc:
                 logger.warning(f"Failed to store feedback: {exc}")
 
@@ -149,6 +156,15 @@ class FeedbackCollector:
         import json
 
         records = await self.get_feedback(agent_name=agent_name, limit=10000)
+        if not any(r.get("query") for r in records):
+            # A store that does not keep the exchange text (older custom
+            # stores): export what this process buffered instead of nothing.
+            async with self._lock:
+                records = [
+                    f.to_dict()
+                    for f in self._buffer
+                    if not agent_name or f.agent_name == agent_name
+                ]
         lines = []
         for r in records:
             # Convert to optimization-friendly format

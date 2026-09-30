@@ -833,18 +833,16 @@ name: {name}
 description: "Multi-step agent pipeline"
 version: "1.0.0"
 
-# Input contract
-input:
+# Input contract (validated before the first step)
+input_schema:
   query:
     type: string
     required: true
 
-# Output contract
-output:
+# Output contract (checked after the last step; strict_schema: true to enforce)
+output_schema:
   response:
     type: string
-  steps_completed:
-    type: array
 
 # Pipeline steps — executed in order
 steps:
@@ -855,7 +853,8 @@ steps:
   - name: process
     agent: processor
     description: "Process based on classification"
-    condition: "len(ctx.steps.classify.output.get('response', '')) > 0"
+    # Conditions are Python expressions over `ctx` (not `$.` mappings).
+    condition: "len(ctx.get_step_output('classify').get('response', '')) > 0"
 
   - name: format
     agent: formatter

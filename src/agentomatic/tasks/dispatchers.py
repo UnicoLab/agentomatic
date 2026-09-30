@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from loguru import logger
 from pydantic import ValidationError
 
-from .manager import TaskInputValidationError
+from .manager import TargetFailedError, TaskInputValidationError
 
 if TYPE_CHECKING:
     from agentomatic.core.registry import AgentRegistry
@@ -278,7 +278,12 @@ def make_endpoint_dispatcher(registry: EndpointRegistry) -> Dispatcher:
             result = await endpoint.call(payload)
         else:
             result = await endpoint.handle(request)
-        return _to_jsonable(result)
+        jsonable = _to_jsonable(result)
+        if isinstance(jsonable, dict) and jsonable.get("ok") is False and "results" in jsonable:
+            raise TargetFailedError(
+                f"Endpoint '{target}': no upstream call succeeded", result=jsonable
+            )
+        return jsonable
 
     return run
 
@@ -386,6 +391,13 @@ def make_pipeline_dispatcher(
         jsonable = _to_jsonable(result)
         if isinstance(jsonable, dict) and partial:
             jsonable.setdefault("checkpoints", partial)
+        # ``partial`` (some steps failed under on_error: continue) is a
+        # completed run; ``failed`` is not.
+        if str(getattr(result, "status", "")) == "failed":
+            raise TargetFailedError(
+                f"Pipeline '{target}' failed: {getattr(result, 'error', None) or 'see steps'}",
+                result=jsonable,
+            )
         return jsonable
 
     return run

@@ -158,3 +158,53 @@ class TestBrokenConditionsSurface:
 
             assert body["steps"]["branch"]["status"] == "failed"
             assert body["steps"]["after"]["status"] == "success"
+
+
+PIPELINE_CONTINUE = """
+name: continue_condition
+on_error: continue
+steps:
+  - name: seed
+    transform: "return {'n': 4}"
+  - name: branch
+    condition: "ctx.get_step_output('seed').get('n') > 2 and missing_name"
+    transform: "return {'branch': 'long'}"
+  - name: after
+    transform: "return {'done': True}"
+"""
+
+
+class TestPipelineLevelContinue:
+    def test_pipeline_on_error_continue_applies_to_condition_errors(self, tmp_path) -> None:
+        """``on_error: continue`` used to be ignored for condition failures."""
+        with TestClient(_platform(tmp_path, PIPELINE_CONTINUE).build()) as client:
+            body = client.post(
+                "/api/v1/pipelines/continue_condition/run", json={"input": {}}
+            ).json()
+
+            assert body["steps"]["branch"]["status"] == "failed"
+            assert body["steps"]["after"]["status"] == "success"
+            assert body["status"] == "partial"
+
+
+def test_the_scaffolded_pipeline_template_declares_real_contracts() -> None:
+    """``--template pipeline`` wrote ``input:``/``output:`` (ignored keys) and a
+    ``ctx.steps.<name>.output`` condition that always raised at run time."""
+    from agentomatic.cli.templates import _pipeline_yaml
+    from agentomatic.pipelines.context import PipelineContext
+    from agentomatic.pipelines.engine import PipelineEngine
+    from agentomatic.pipelines.loader import PipelineLoader
+    from agentomatic.pipelines.models import StepResult, StepStatus
+
+    config = PipelineLoader.from_yaml_string(_pipeline_yaml("scaffolded"))
+    assert config.input_schema == {"query": {"type": "string", "required": True}}
+    assert config.output_schema is not None
+
+    ctx = PipelineContext(input_data={"query": "q"})
+    ctx.steps["classify"] = StepResult(
+        name="classify", status=StepStatus.SUCCESS, output={"response": "billing"}
+    )
+    engine = PipelineEngine.__new__(PipelineEngine)
+    for step in config.steps:
+        if getattr(step, "condition", None):
+            assert engine._evaluate_condition(step.condition, ctx) is True  # noqa: SLF001

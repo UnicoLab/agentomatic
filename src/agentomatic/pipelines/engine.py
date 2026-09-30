@@ -407,10 +407,19 @@ class PipelineEngine:
                     await self._report_step_progress(
                         exec_pos + 1, total_steps, step_config.name, "failed"
                     )
-                    if step_config.on_error is ErrorPolicy.SKIP:
+                    # Same policy as any other failed step: the step's own
+                    # ``on_error: skip``, or the pipeline's ``on_error:
+                    # continue``, lets the rest run (final status: partial).
+                    if (
+                        step_config.on_error is ErrorPolicy.SKIP
+                        or self.config.on_error == "continue"
+                    ):
                         continue
                     pipeline_result.status = PipelineStatus.FAILED
                     pipeline_result.error = f"Step '{step_config.name}' failed: {exc}"
+                    if self.config.on_error == "rollback":
+                        await self._run_rollbacks(ctx, pipeline_result)
+                        return
                     break
                 if not should_run:
                     logger.info(f"  ⏭️ Skipping '{step_config.name}' (condition not met)")

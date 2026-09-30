@@ -533,7 +533,8 @@ def _iter_pipeline_files(directory: Path) -> Iterator[Path]:
       ``pipelines`` (flat project layout), plus ``pipeline.yaml`` inside each
       of its subfolders (the scaffolded per-pipeline layout).
     - The same two shapes under a ``pipelines/`` subdirectory.
-    - ``pipeline.yaml`` / ``pipeline.yml`` inside each ``agents/*/`` folder.
+    - ``pipeline.yaml`` / ``pipeline.yml`` inside each ``agents/*/`` folder,
+      or inside each subfolder of *directory* when it is the agents folder.
 
     Args:
         directory: Root directory to scan.
@@ -558,11 +559,18 @@ def _iter_pipeline_files(directory: Path) -> Iterator[Path]:
     if pipelines_dir.is_dir():
         yield from _iter_pipeline_dir(pipelines_dir)
 
-    # 3. pipeline.yaml inside each `agents/*/` folder
-    agents_dir = directory / "agents"
-    if agents_dir.is_dir():
-        for agent_folder in sorted(agents_dir.iterdir()):
-            if not agent_folder.is_dir():
+    # 3. pipeline.yaml inside each agent folder — under `agents/` when
+    #    *directory* is the project root, or directly in *directory* when the
+    #    caller passes the agents folder itself (the platform does, and the
+    #    folder need not be called ``agents``).
+    agent_roots = [directory / "agents"]
+    if directory.name != "pipelines":
+        agent_roots.append(directory)
+    for root in agent_roots:
+        if not root.is_dir():
+            continue
+        for agent_folder in sorted(root.iterdir()):
+            if not agent_folder.is_dir() or agent_folder.name.startswith((".", "_")):
                 continue
             for suffix in ("yaml", "yml"):
                 candidate = agent_folder / f"pipeline.{suffix}"

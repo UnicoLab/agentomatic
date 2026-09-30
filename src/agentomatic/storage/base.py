@@ -159,8 +159,14 @@ class BaseStore(ABC):
         comment: str | None = None,
         message_id: int | None = None,
         feedback_type: str = "thumbs",
+        query: str = "",
+        response: str = "",
+        correction: str | None = None,
     ) -> dict[str, Any]:
         """Record user feedback on an agent response.
+
+        ``query`` / ``response`` / ``correction`` make the record usable as an
+        optimization example (``GET /feedback/export``).
 
         Default implementation returns a stub. Override for persistence.
         """
@@ -170,6 +176,9 @@ class BaseStore(ABC):
             "agent_name": agent_name,
             "rating": rating,
             "feedback_type": feedback_type,
+            "query": query,
+            "response": response,
+            "correction": correction,
             "status": "not_persisted",
         }
 

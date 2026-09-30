@@ -141,6 +141,11 @@ class FeedbackModel(Base):
     feedback_type: Mapped[str] = mapped_column(
         String(32), default="thumbs"
     )  # thumbs, rating, text
+    # The rated exchange (and an optional corrected answer) — what makes a
+    # feedback row usable as an optimization example.
+    query: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correction: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -155,6 +160,9 @@ class FeedbackModel(Base):
             "rating": self.rating,
             "comment": self.comment,
             "feedback_type": self.feedback_type,
+            "query": self.query or "",
+            "response": self.response or "",
+            "correction": self.correction,
             "created_at": iso_utc(self.created_at),
         }
 

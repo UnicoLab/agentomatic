@@ -365,6 +365,22 @@ class AgentRegistry:
                 return agent
         return None
 
+    def resolve_name(self, name_or_slug: str) -> str | None:
+        """Return the registered name for a folder name or slug (``None`` if unknown).
+
+        Per-agent state (connections, prompts, stores) is keyed by the
+        registered name, while URLs and Studio may use the slug.
+        """
+        if name_or_slug in self._agents:
+            return name_or_slug
+        mapped = self._slug_index.get(name_or_slug)
+        if mapped is not None and mapped in self._agents:
+            return mapped
+        for name, agent in self._agents.items():
+            if agent.manifest and agent.manifest.slug == name_or_slug:
+                return name
+        return None
+
     def all(self) -> dict[str, RegisteredAgent]:
         """Get all registered agents."""
         return dict(self._agents)

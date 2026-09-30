@@ -50,9 +50,15 @@ class ConnectionsMiddleware(BaseHTTPMiddleware):
         if not path.startswith(prefix):
             return None
         segment = path[len(prefix) :].split("/", 1)[0]
-        if not segment or self._registry.get(segment) is None:
+        if not segment:
             return None
-        return segment
+        # URLs may carry the slug; connection scopes are keyed by the
+        # registered name (they differ when manifest.slug != folder name).
+        resolve = getattr(self._registry, "resolve_name", None)
+        if callable(resolve):
+            name = resolve(segment)
+            return name if isinstance(name, str) else None
+        return segment if self._registry.get(segment) is not None else None
 
     async def dispatch(
         self,

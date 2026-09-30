@@ -528,6 +528,41 @@ async def test_connections_middleware_sets_request_state():
     assert captured["connections"].get("svc") is not None
 
 
+async def test_connections_middleware_resolves_a_slug_to_the_agent_scope():
+    """URLs may use the slug; the scope is keyed by the registered name."""
+    from types import SimpleNamespace
+
+    from agentomatic.core.manifest import AgentManifest, RegisteredAgent
+    from agentomatic.core.registry import AgentRegistry
+    from agentomatic.middleware.connections import ConnectionsMiddleware
+
+    register_connections(
+        "weather_bot", [HttpConnectionConfig(name="svc", base_url="https://svc.test")]
+    )
+    registry = AgentRegistry()
+    agent = RegisteredAgent(
+        manifest=AgentManifest(name="weather_bot", slug="weather-bot", description="d")
+    )
+    registry._agents["weather_bot"] = agent  # noqa: SLF001 - as discovery does
+    registry._index_slug("weather_bot", agent)  # noqa: SLF001
+    mw = ConnectionsMiddleware(app=object(), registry=registry, api_prefix="/api/v1")
+
+    captured = {}
+
+    async def call_next(request):
+        captured["connections"] = request.state.connections
+        captured["agent"] = request.state.agent_name
+        return "ok"
+
+    request = SimpleNamespace(
+        url=SimpleNamespace(path="/api/v1/weather-bot/chat"),
+        state=SimpleNamespace(),
+    )
+    await mw.dispatch(request, call_next)
+    assert captured["agent"] == "weather_bot"
+    assert captured["connections"].get("svc") is not None
+
+
 async def test_connections_middleware_falls_back_to_platform():
     from types import SimpleNamespace
 
