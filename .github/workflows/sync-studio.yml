@@ -165,8 +165,10 @@ jobs:
 
           ---
           *This PR was automatically created by the [sync-studio workflow](https://github.com/UnicoLab/agentomatic/actions/workflows/sync-studio.yml).*" \
-              --label "automated,studio-ui" \
               --base main
 
             echo "✅ Pull request created successfully"
+            # Labels are best-effort: a missing label must not fail the sync.
+            gh pr edit "${BRANCH}" --add-label "automated,studio-ui" \
+              || echo "::warning::Could not add labels (create 'automated' and 'studio-ui')"
           fi
