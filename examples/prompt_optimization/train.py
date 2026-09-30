@@ -9,7 +9,7 @@ from agentomatic.stacks.manager import StackManager
 from agentomatic.providers import apply_stack_defaults, get_llm_for_agent
 from agentomatic.config.settings import load_environment
 from agentomatic.optimize import TrainCliSettings, print_train_result, train_and_report
-from agentomatic.optimize import PromptSearchSpace
+from agentomatic.optimize import PromptSearchSpace, generate_fit_report, evaluate_agent
 from pathlib import Path
 from rich.console import Console
 from agentomatic.config.settings import load_environment
@@ -147,3 +147,13 @@ history = agent.fit(
 logger.info("Training completed.")
 logger.info(history.summary())
 logger.info(history.history)   # list[float] — per-round best scores
+
+
+# evals and reporting
+scores = evaluate_agent(agent, dataset.test or dataset.validation).scores
+generate_fit_report(
+    history,
+    output_path=f"reports/train_{AGENT}.html",
+    keras_history=history.history,
+    eval_scores=scores,
+)
