@@ -59,6 +59,7 @@ def test_message_ids_are_strings() -> None:
 
 def test_operation_contracts_match_templated_paths() -> None:
     entry = _entry()
-    start = entry.index("async getOperationContract(")
-    body = entry[start : start + 1500]
-    assert "Object.keys(" in body and "RegExp(" in body, "no templated-path fallback"
+    # agentomatic-studio ``findPathItem``: a concrete path such as
+    # /api/v1/pipelines/<name>/run matches the published
+    # /api/v1/pipelines/{name}/run through a ``{placeholder}`` segment test.
+    assert "/^\\{([^}/]+)\\}$/" in entry, "no templated-path fallback in the contract lookup"
