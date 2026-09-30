@@ -1326,7 +1326,9 @@ class TestLatencyMetric:
 
         m = LatencyMetric()
         result = await m.evaluate("q", "resp")
-        assert result.score == 0.5
+        # No data is a failed evaluation, not a neutral 0.5 diluting composites.
+        assert result.score == 0.0
+        assert result.metadata["evaluation_failed"] is True
         assert "No latency data" in result.reason
 
 

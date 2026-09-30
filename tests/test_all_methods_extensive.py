@@ -667,15 +667,27 @@ class TestOptimizeMetricsAndJudges:
                     metadata={"evaluation_failed": True},
                 )
 
+        # A minority component failing counts as 0 at its full weight — it must
+        # never *raise* the composite (dropping it from the denominator did).
         comp = CompositeMetric(
+            metrics=[
+                OptWeightedMetric("ok", ok, weight=0.8),
+                OptWeightedMetric("bad", _Fail(criteria="x"), weight=0.2),
+            ]
+        )
+        r = await comp.evaluate("q", "yes", expected="yes")
+        assert r.score == pytest.approx(0.8)
+        assert not r.metadata.get("evaluation_failed")
+        assert r.metadata["failed_components"] == ["bad"]
+
+        # Half the weight failing is not a measurement any more.
+        half = CompositeMetric(
             metrics=[
                 OptWeightedMetric("ok", ok, weight=0.5),
                 OptWeightedMetric("bad", _Fail(criteria="x"), weight=0.5),
             ]
         )
-        r = await comp.evaluate("q", "yes", expected="yes")
-        assert r.score == pytest.approx(1.0)
-        assert not r.metadata.get("evaluation_failed")
+        assert (await half.evaluate("q", "yes", expected="yes")).metadata.get("evaluation_failed")
 
         all_bad = CompositeMetric(
             metrics=[

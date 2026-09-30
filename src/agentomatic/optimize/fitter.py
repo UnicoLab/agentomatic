@@ -1862,15 +1862,19 @@ class PromptFitter:
         panel: BaseMetric = judges[0] if len(judges) == 1 else MultiJudgePanel(judges=judges)
 
         if isinstance(metric, CompositeMetric):
-            metric._metrics.append(  # noqa: SLF001 - intentional augmentation
-                WeightedMetric(name="local_judges", metric=panel, weight=0.35)
-            )
-            metric._total_weight = sum(wm.weight for wm in metric._metrics)  # noqa: SLF001
+            # A new composite — appending to the caller's object added another
+            # judge entry on every fit (the bridge builds a fitter per epoch).
             logger.info(
                 "Augmented composite metric with {} local judge(s)",
                 len(judges),
             )
-            return metric
+            return CompositeMetric(
+                [
+                    *metric.metrics,
+                    WeightedMetric(name="local_judges", metric=panel, weight=0.35),
+                ],
+                name=metric.name,
+            )
 
         augmented = CompositeMetric(
             metrics=[

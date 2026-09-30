@@ -497,8 +497,17 @@ class ExampleResult:
 
     @property
     def passed(self) -> bool:
-        """Whether all scores are above 0.5."""
-        return all(s >= 0.5 for s in self.scores.values())
+        """Whether the example ran and every score is at least 0.5.
+
+        A crashed example (``error`` set, no scores) used to count as passed —
+        ``all([])`` is ``True`` — so a run where every transform failed
+        reported a 100% pass rate.
+        """
+        return (
+            self.error is None
+            and bool(self.scores)
+            and all(s >= 0.5 for s in self.scores.values())
+        )
 
 
 @dataclass

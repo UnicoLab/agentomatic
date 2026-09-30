@@ -60,11 +60,36 @@ def run_sync(coro: Coroutine[Any, Any, T]) -> T:
     except RuntimeError:
         return _thread_loop().run_until_complete(coro)
 
-    def _runner(c: Coroutine[Any, Any, T]) -> T:
-        return _thread_loop().run_until_complete(c)
+    if threading.current_thread() is _bridge_thread:
+        # Re-entrant call from code already running on the bridge loop: that
+        # loop is busy with our caller, so waiting on it would deadlock.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(lambda: _thread_loop().run_until_complete(coro)).result()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(_runner, coro).result()
+    # Inside a running loop (FastAPI, notebooks): run on ONE long-lived
+    # background loop. A fresh worker thread per call used to create — and
+    # never close — a new event loop each time, so async clients bound to
+    # the first call's loop failed on the next.
+    return asyncio.run_coroutine_threadsafe(coro, _bridge_loop()).result()
+
+
+_bridge_lock = threading.Lock()
+_bridge_thread: threading.Thread | None = None
+_bridge: asyncio.AbstractEventLoop | None = None
+
+
+def _bridge_loop() -> asyncio.AbstractEventLoop:
+    """Return the process-wide background loop used by :func:`run_sync`."""
+    global _bridge, _bridge_thread
+    with _bridge_lock:
+        if _bridge is None or _bridge.is_closed():
+            loop = asyncio.new_event_loop()
+            thread = threading.Thread(
+                target=loop.run_forever, name="agentomatic-run-sync", daemon=True
+            )
+            thread.start()
+            _bridge, _bridge_thread = loop, thread
+        return _bridge
 
 
 async def run_in_worker_thread(fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:

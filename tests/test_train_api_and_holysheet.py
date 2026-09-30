@@ -100,7 +100,9 @@ class TestStagedCompileFitEvaluate:
         )
         assert len(metrics) == 5
         assert getattr(loss, "name", None) or True
-        assert fit_metric.name == "composite"
+        # Candidates are selected on the same blend the loss reports.
+        assert fit_metric.name == "objective"
+        assert fit_metric.metric is loss.metric
 
     def test_compile_fit_evaluate_pipeline(self) -> None:
         from agentomatic.agents.types import AgentDataset, AgentExample

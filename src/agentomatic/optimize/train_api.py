@@ -537,7 +537,12 @@ def build_default_metrics(
     judge_dimensions: Sequence[str],
     judge_weight: float = 0.30,
 ) -> tuple[list[Any], Any, Any]:
-    """Build agent metrics, loss, and optimize-fit CustomMetric.
+    """Build agent metrics, loss, and the fit objective.
+
+    ``fit_metric`` (what PromptFitter *selects* candidates on) is the same
+    weighted blend the ``loss`` reports — judge included. It used to be a
+    judge-free structured score, so the optimizer could pick a candidate that
+    made the reported loss worse.
 
     Returns:
         ``(metrics, loss, fit_metric)`` ready for :func:`compile_agent`.
@@ -554,7 +559,6 @@ def build_default_metrics(
         agent_field_f1,
         agent_keyword_score,
         agent_schema_quality,
-        make_structured_fit_metric,
     )
 
     keys = list(required_keys)
@@ -590,7 +594,9 @@ def build_default_metrics(
             name="composite_loss",
         )
     )
-    fit_metric = make_structured_fit_metric(keys, name="composite")
+    from agentomatic.optimize.metrics import ScoreMetricAdapter
+
+    fit_metric = ScoreMetricAdapter(loss.metric, name="objective")
     return metrics, loss, fit_metric
 
 
@@ -847,7 +853,10 @@ def fit_agent(
     if callbacks is not None:
         cbs = list(callbacks)
     else:
-        cbs = [EarlyStopping(monitor="val_loss", patience=stop_patience, mode="min")]
+        # Without validation data ``val_loss`` never appears in the logs and
+        # the default callback silently never fired.
+        monitor = "val_loss" if val else "loss"
+        cbs = [EarlyStopping(monitor=monitor, patience=stop_patience, mode="min")]
 
     return agent.fit(
         dataset,

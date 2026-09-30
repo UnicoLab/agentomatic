@@ -520,9 +520,12 @@ class TestBug4CompositeMetricScore:
         expected_dict = {"answer": "42"}
         ex = self._make_example(expected=expected_dict)
         metric.score(ex, {"response": "r"})
-        # expected must be the JSON representation of the dict
+        # The same reference every path uses (AgentExample.to_datapoint): the
+        # dict travels as its "Expected structured output" JSON section.
+        from agentomatic.optimize.metrics import _expected_structured
+
         assert received_expected[0] is not None
-        assert json.loads(received_expected[0]) == expected_dict
+        assert _expected_structured(received_expected[0]) == expected_dict
 
     def test_score_does_not_raise_on_sub_metric_failure(self):
         class BrokenMetric(ExactMatchMetric):

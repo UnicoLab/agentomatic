@@ -150,13 +150,21 @@ class Callback:
 class EarlyStopping(Callback):
     """Stop training when a monitored metric stops improving.
 
+    Keras semantics: training stops once ``patience`` consecutive epochs
+    fail to improve ``monitor`` (``patience=0`` stops at the first one).
+
+    Note that ``val_loss`` is measured on the validation split — the same
+    data prompt candidates are selected on — so it is a selection score, not
+    an unbiased estimate. Keep a ``test`` split for that.
+
     Args:
         monitor: Log key to watch (default ``"loss"``).
-        mode: ``"min"``, ``"max"``, or ``"auto"`` (inferred from ``monitor``).
-        patience: Epochs with no improvement before stopping.
+        mode: ``"min"``, ``"max"``, or ``"auto"`` (``min`` when ``monitor``
+            ends with ``loss``).
+        patience: Non-improving epochs tolerated before stopping.
         min_delta: Minimum change to qualify as an improvement.
-        restore_best: If true, no-op placeholder for API parity (config is not
-            snapshotted); kept for forward compatibility.
+        restore_best: Restore the agent's ``compiled_config`` (prompt, params,
+            few-shot) from the best epoch when training ends.
     """
 
     def __init__(
@@ -173,16 +181,38 @@ class EarlyStopping(Callback):
         self.min_delta = abs(min_delta)
         self.restore_best = restore_best
         if mode == "auto":
-            mode = "min" if "loss" in monitor else "max"
+            mode = "min" if monitor.endswith("loss") else "max"
         self.mode = mode
         self._best: float | None = None
+        self._best_config: dict[str, Any] | None = None
         self._wait = 0
         self.stopped_epoch: int | None = None
 
     def on_train_begin(self, logs: dict[str, float] | None = None) -> None:
         self._best = None
+        self._best_config = None
         self._wait = 0
         self.stopped_epoch = None
+
+    def on_train_end(self, logs: dict[str, float] | None = None) -> None:
+        if not self.restore_best or self._best_config is None or self.agent is None:
+            return
+        current = dict(getattr(self.agent, "compiled_config", None) or {})
+        if current == self._best_config:
+            return
+        self.agent.compiled_config = dict(self._best_config)
+        for key, value in self._best_config.items():
+            if hasattr(self.agent, key):
+                try:
+                    setattr(self.agent, key, value)
+                except (AttributeError, TypeError):
+                    pass
+        invalidate = getattr(self.agent, "invalidate_graph", None)
+        if callable(invalidate):
+            invalidate()
+        logger.info(
+            f"EarlyStopping: restored the best epoch's config ({self.monitor}={self._best:.4f})"
+        )
 
     def _is_improvement(self, current: float) -> bool:
         if self._best is None:
@@ -200,9 +230,15 @@ class EarlyStopping(Callback):
         if self._is_improvement(current):
             self._best = current
             self._wait = 0
+            if self.restore_best and self.agent is not None:
+                import copy
+
+                self._best_config = copy.deepcopy(
+                    dict(getattr(self.agent, "compiled_config", None) or {})
+                )
             return
         self._wait += 1
-        if self._wait > self.patience:
+        if self._wait >= self.patience:
             self.stopped_epoch = epoch
             if self.agent is not None:
                 self.agent.stop_training = True

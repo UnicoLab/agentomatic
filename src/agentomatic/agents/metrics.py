@@ -13,12 +13,23 @@ Example::
 from __future__ import annotations
 
 import difflib
+import weakref
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from typing import Any
 
 from loguru import logger
 
 from .types import AgentExample
+
+#: Per-metric cache of successful judge results, keyed by what was judged.
+#: The same judge is routinely wrapped several times (as a compiled metric,
+#: inside a WeightedMetric, inside the loss); without this every wrapper paid
+#: for its own LLM call on the same (question, answer, reference).
+_RESULT_CACHE: weakref.WeakKeyDictionary[Any, OrderedDict[tuple[Any, ...], Any]] = (
+    weakref.WeakKeyDictionary()
+)
+_RESULT_CACHE_SIZE = 4096
 
 # ---------------------------------------------------------------------------
 # ResponseSimilarityMetric
@@ -469,24 +480,41 @@ class OptimizeMetricAdapter:
             elif isinstance(raw_ctx, list) and raw_ctx:
                 context = [str(c) for c in raw_ctx if c]
 
-        # --- serialise prediction as response string ---
-        response = str(
-            prediction.get("response")
-            or prediction.get("answer")
-            or _json.dumps(prediction, ensure_ascii=False)
-        )
+        # --- the text judged: the same rule PromptFitter scores with ---
+        # (structured ``output`` dict as JSON, else ``response``/``answer``),
+        # so a metric reports on exactly what candidates were selected on.
+        from agentomatic.optimize.runner import _response_text
 
-        # --- run evaluate() synchronously ---
-        # Wrap the entire call (including coro creation) so that metrics whose
-        # evaluate() raises synchronously (non-coroutine callables that throw)
-        # are also handled gracefully. Use persistent-loop run_sync so OpenAI
-        # async clients survive across fit → evaluate.
+        if isinstance(prediction.get("output"), dict) and prediction.get("output"):
+            response = _response_text(prediction)
+        else:
+            response = str(
+                prediction.get("response")
+                or prediction.get("answer")
+                or _json.dumps(prediction, ensure_ascii=False)
+            )
+
+        # --- run evaluate() synchronously (cached per metric) ---
+        key = (query, response, expected, tuple(context or ()))
         try:
-            result = run_sync(self._metric.evaluate(query, response, expected, context))
-        except Exception as exc:  # noqa: BLE001 - one failed judge call must not abort fit
-            self.failures += 1
-            logger.warning(f"Metric '{self.name}' failed ({exc}); scoring this example 0.0")
-            return 0.0
+            cache = _RESULT_CACHE.setdefault(self._metric, OrderedDict())
+        except TypeError:  # not weak-referenceable: no caching
+            cache = OrderedDict()
+        result = cache.get(key)
+        if result is None:
+            # Wrap the entire call (including coro creation) so that metrics
+            # whose evaluate() raises synchronously are handled too. Use the
+            # persistent-loop run_sync so async clients survive fit → evaluate.
+            try:
+                result = run_sync(self._metric.evaluate(query, response, expected, context))
+            except Exception as exc:  # noqa: BLE001 - one failed judge call must not abort fit
+                self.failures += 1
+                logger.warning(f"Metric '{self.name}' failed ({exc}); scoring this example 0.0")
+                return 0.0
+            if not (getattr(result, "metadata", None) or {}).get("evaluation_failed"):
+                cache[key] = result
+                if len(cache) > _RESULT_CACHE_SIZE:
+                    cache.popitem(last=False)
 
         self.last_result = result
         if (getattr(result, "metadata", None) or {}).get("evaluation_failed"):
