@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/status/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/optimization/class-agents/">
       
       
-        <link rel="prev" href="../tasks/">
+        <link rel="prev" href="../data/">
       
       
-        <link rel="next" href="../ingestion/">
+        <link rel="next" href="../prompt-fitter/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Status Dashboard - Agentomatic</title>
+        <title>Class Agents (compile / fit) - Agentomatic</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#status-dashboard" class="md-skip">
+        <a href="#class-agents-compile-fit-evaluate" class="md-skip">
           Skip to content
         </a>
       
@@ -140,7 +140,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Status Dashboard
+              Class Agents (compile / fit)
             
           </span>
         </div>
@@ -295,7 +295,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../class-agents/" class="md-tabs__link">
+        <a href="../../guide/class-agents/" class="md-tabs__link">
           
   
   
@@ -313,11 +313,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../optimization/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -335,13 +337,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../deployment/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../guide/deployment/" class="md-tabs__link">
           
   
   
@@ -363,7 +363,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../studio/" class="md-tabs__link">
+        <a href="../../guide/studio/" class="md-tabs__link">
           
   
   
@@ -808,7 +808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../class-agents/" class="md-nav__link">
+      <a href="../../guide/class-agents/" class="md-nav__link">
         
   
   
@@ -836,7 +836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent-structure/" class="md-nav__link">
+      <a href="../../guide/agent-structure/" class="md-nav__link">
         
   
   
@@ -864,7 +864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cookbook/" class="md-nav__link">
+      <a href="../../guide/cookbook/" class="md-nav__link">
         
   
   
@@ -892,7 +892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../templates/" class="md-nav__link">
+      <a href="../../guide/templates/" class="md-nav__link">
         
   
   
@@ -920,7 +920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../schemas/" class="md-nav__link">
+      <a href="../../guide/schemas/" class="md-nav__link">
         
   
   
@@ -948,7 +948,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prompts/" class="md-nav__link">
+      <a href="../../guide/prompts/" class="md-nav__link">
         
   
   
@@ -976,7 +976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
+      <a href="../../guide/configuration/" class="md-nav__link">
         
   
   
@@ -1004,7 +1004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../storage/" class="md-nav__link">
+      <a href="../../guide/storage/" class="md-nav__link">
         
   
   
@@ -1032,7 +1032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../middleware/" class="md-nav__link">
+      <a href="../../guide/middleware/" class="md-nav__link">
         
   
   
@@ -1060,7 +1060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../langgraph/" class="md-nav__link">
+      <a href="../../guide/langgraph/" class="md-nav__link">
         
   
   
@@ -1088,7 +1088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../langchain-adapter/" class="md-nav__link">
+      <a href="../../guide/langchain-adapter/" class="md-nav__link">
         
   
   
@@ -1116,7 +1116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ml-plugins/" class="md-nav__link">
+      <a href="../../guide/ml-plugins/" class="md-nav__link">
         
   
   
@@ -1144,7 +1144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../guide/testing/" class="md-nav__link">
         
   
   
@@ -1176,6 +1176,8 @@
       
   
   
+    
+  
   
   
     
@@ -1183,394 +1185,6 @@
       
         
           
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../../optimization/" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Optimization
-  
-
-    
-  </span>
-  
-  
-
-            </a>
-            
-              
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Optimization
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/how-it-works/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    How It Works
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Metrics, Judges & Loss
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/generalization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Generalization & Overfitting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/data/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Datasets & Augmentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/class-agents/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Class Agents (compile / fit)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/prompt-fitter/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Low Level (PromptFitter)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/cli/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI & Legacy API
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/examples/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Examples
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../optimization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prompt Optimization (moved)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
         
       
         
@@ -1609,17 +1223,18 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
     
   
-    Advanced
+    Optimization
   
 
     
@@ -1627,35 +1242,43 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Advanced
+    Optimization
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
+            
+              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../deployment/" class="md-nav__link">
+      <a href="../how-it-works/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Production Deployment
+    How It Works
   
 
     
@@ -1676,14 +1299,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../verifying-a-deployment/" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Verifying a Deployment
+    Metrics, Judges & Loss
   
 
     
@@ -1704,14 +1327,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../platform-features/" class="md-nav__link">
+      <a href="../generalization/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Platform Features
+    Generalization & Overfitting
   
 
     
@@ -1732,42 +1355,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../endpoints/" class="md-nav__link">
+      <a href="../data/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Custom Endpoints
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tasks/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tasks & Execution Modes
+    Datasets & Augmentation
   
 
     
@@ -1804,7 +1399,7 @@
   <span class="md-ellipsis">
     
   
-    Status Dashboard
+    Class Agents (compile / fit)
   
 
     
@@ -1822,7 +1417,7 @@
   <span class="md-ellipsis">
     
   
-    Status Dashboard
+    Class Agents (compile / fit)
   
 
     
@@ -1848,10 +1443,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-dashboard" class="md-nav__link">
+  <a href="#requirements-on-the-agent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The dashboard
+        Requirements on the agent
       
     </span>
   </a>
@@ -1859,22 +1454,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#json-shape" class="md-nav__link">
+  <a href="#step-by-step" class="md-nav__link">
     <span class="md-ellipsis">
       
-        JSON shape
+        Step by step
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="JSON shape">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiledatasetnone-metricsnone-optimizernone-lossnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compile(dataset=None, metrics=None, optimizer=None, loss=None)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promptfitterbridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PromptFitterBridge(...)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fitdatasetnone-epochs1-verbose1-callbacksnone-validation_datanone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit(dataset=None, *, epochs=1, verbose=1, callbacks=None, validation_data=None, ...)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit(dataset=None, *, epochs=1, verbose=1, callbacks=None, validation_data=None, ...)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#replay-occupancy" class="md-nav__link">
+  <a href="#callbacks-for-fit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Replay occupancy
+        Callbacks for fit()
       
     </span>
   </a>
@@ -1887,10 +1515,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-probes" class="md-nav__link">
+  <a href="#evaluatedataset-metricsnone" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related probes
+        evaluate(dataset, metrics=None)
       
     </span>
   </a>
@@ -1898,10 +1526,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#programmatic-use" class="md-nav__link">
+  <a href="#saving" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Programmatic use
+        Saving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-call-train_and_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One call: train_and_report
       
     </span>
   </a>
@@ -1924,7 +1563,412 @@
   
   
     <li class="md-nav__item">
-      <a href="../ingestion/" class="md-nav__link">
+      <a href="../prompt-fitter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Low Level (PromptFitter)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI & Legacy API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt Optimization (moved)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/verifying-a-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verifying a Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/platform-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/endpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks & Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ingestion/" class="md-nav__link">
         
   
   
@@ -1952,7 +1996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../connections/" class="md-nav__link">
+      <a href="../../guide/connections/" class="md-nav__link">
         
   
   
@@ -1980,7 +2024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../custom-connections/" class="md-nav__link">
+      <a href="../../guide/custom-connections/" class="md-nav__link">
         
   
   
@@ -2008,7 +2052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../observability/" class="md-nav__link">
+      <a href="../../guide/observability/" class="md-nav__link">
         
   
   
@@ -2036,7 +2080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../telemetry/" class="md-nav__link">
+      <a href="../../guide/telemetry/" class="md-nav__link">
         
   
   
@@ -2064,7 +2108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipelines/" class="md-nav__link">
+      <a href="../../guide/pipelines/" class="md-nav__link">
         
   
   
@@ -2092,7 +2136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../stacks/" class="md-nav__link">
+      <a href="../../guide/stacks/" class="md-nav__link">
         
   
   
@@ -2120,7 +2164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../llm-providers/" class="md-nav__link">
+      <a href="../../guide/llm-providers/" class="md-nav__link">
         
   
   
@@ -2148,7 +2192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../security/" class="md-nav__link">
+      <a href="../../guide/security/" class="md-nav__link">
         
   
   
@@ -2176,7 +2220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control-plane/" class="md-nav__link">
+      <a href="../../guide/control-plane/" class="md-nav__link">
         
   
   
@@ -2204,7 +2248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../delegation/" class="md-nav__link">
+      <a href="../../guide/delegation/" class="md-nav__link">
         
   
   
@@ -2303,7 +2347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../studio/" class="md-nav__link">
+      <a href="../../guide/studio/" class="md-nav__link">
         
   
   
@@ -2331,7 +2375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../deep-agents/" class="md-nav__link">
+      <a href="../../guide/deep-agents/" class="md-nav__link">
         
   
   
@@ -2359,7 +2403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../debug-ui/" class="md-nav__link">
+      <a href="../../guide/debug-ui/" class="md-nav__link">
         
   
   
@@ -2387,7 +2431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../demo/" class="md-nav__link">
+      <a href="../../guide/demo/" class="md-nav__link">
         
   
   
@@ -2742,10 +2786,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-dashboard" class="md-nav__link">
+  <a href="#requirements-on-the-agent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The dashboard
+        Requirements on the agent
       
     </span>
   </a>
@@ -2753,22 +2797,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#json-shape" class="md-nav__link">
+  <a href="#step-by-step" class="md-nav__link">
     <span class="md-ellipsis">
       
-        JSON shape
+        Step by step
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="JSON shape">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiledatasetnone-metricsnone-optimizernone-lossnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compile(dataset=None, metrics=None, optimizer=None, loss=None)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promptfitterbridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PromptFitterBridge(...)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fitdatasetnone-epochs1-verbose1-callbacksnone-validation_datanone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit(dataset=None, *, epochs=1, verbose=1, callbacks=None, validation_data=None, ...)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit(dataset=None, *, epochs=1, verbose=1, callbacks=None, validation_data=None, ...)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#replay-occupancy" class="md-nav__link">
+  <a href="#callbacks-for-fit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Replay occupancy
+        Callbacks for fit()
       
     </span>
   </a>
@@ -2781,10 +2858,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-probes" class="md-nav__link">
+  <a href="#evaluatedataset-metricsnone" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related probes
+        evaluate(dataset, metrics=None)
       
     </span>
   </a>
@@ -2792,10 +2869,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#programmatic-use" class="md-nav__link">
+  <a href="#saving" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Programmatic use
+        Saving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-call-train_and_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One call: train_and_report
       
     </span>
   </a>
@@ -2845,10 +2933,10 @@
     
     
       <li class="md-path__item">
-        <a href="../deployment/" class="md-path__link">
+        <a href="../" class="md-path__link">
           
   <span class="md-ellipsis">
-    Advanced
+    Optimization
   </span>
 
         </a>
@@ -2867,7 +2955,7 @@
 
 
   
-    <a href="https://github.com/UnicoLab/agentomatic/edit/main/docs/guide/status.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/UnicoLab/agentomatic/edit/main/docs/optimization/class-agents.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2876,106 +2964,361 @@
     
       
     
-    <a href="https://github.com/UnicoLab/agentomatic/raw/main/docs/guide/status.md" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/UnicoLab/agentomatic/raw/main/docs/optimization/class-agents.md" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
   
 
 
-<h1 id="status-dashboard">Status Dashboard<a class="headerlink" href="#status-dashboard" title="Permanent link">&para;</a></h1>
-<p>Every Agentomatic platform exposes a <strong>unified status page</strong> that shows the
-health of <em>everything</em> it manages — agents, ML plugins, custom endpoints,
-ingestors, and pipelines — plus the task executor and storage backend, in one
-place.</p>
+<h1 id="class-agents-compile-fit-evaluate">Class agents: compile, fit, evaluate<a class="headerlink" href="#class-agents-compile-fit-evaluate" title="Permanent link">&para;</a></h1>
+<p><code>BaseGraphAgent</code> has a Keras-style optimization API. You describe the data,
+what "good" means and how to search; <code>fit()</code> runs the
+<a href="../how-it-works/">optimization loop</a> once per epoch and keeps the best prompt.</p>
+<p>Runnable: <a href="../examples/"><code>examples/prompt_optimization/train.py</code></a> — every step
+below, with every option listed in comments.</p>
+<h2 id="requirements-on-the-agent">Requirements on the agent<a class="headerlink" href="#requirements-on-the-agent" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Nodes read the prompt with <code>self.resolve_system_prompt(default=...)</code> (see
+  <a href="../how-it-works/#the-agent-must-read-its-prompt-through-the-framework">How it works</a>).</li>
+<li><code>input_to_state(data)</code> builds the state from the example's <code>input</code>
+  (the question arrives as <code>data["current_query"]</code>).</li>
+<li><code>state_to_output(state)</code> returns a dict with the answer under <code>response</code>
+  (or your structured keys — metrics read them).</li>
+</ul>
+<h2 id="step-by-step">Step by step<a class="headerlink" href="#step-by-step" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.agents</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">CallableMetric</span><span class="p">,</span> <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">EpochDiffCallback</span><span class="p">,</span> <span class="n">MetricLoss</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">PromptFitterBridge</span><span class="p">,</span> <span class="n">WeightedMetric</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">LocalJudgeMetric</span><span class="p">,</span> <span class="n">PromptSearchSpace</span><span class="p">,</span> <span class="n">generate_fit_report</span><span class="p">,</span> <span class="n">load_data</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">merge_fit_results</span><span class="p">,</span> <span class="n">prepare_dataset</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 1. data — train / validation / holdout / test (see Datasets)</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">data</span> <span class="o">=</span> <span class="n">load_data</span><span class="p">(</span><span class="s2">&quot;agents/support/datasets/all.jsonl&quot;</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">data</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">prepare_dataset</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">n_examples</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                          <span class="n">model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                          <span class="n">llm_base_url</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000/v1&quot;</span><span class="p">)</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># 2. metrics — reported every epoch (see Metrics, judges &amp; loss)</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">judge</span> <span class="o">=</span> <span class="n">LocalJudgeMetric</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;judge&quot;</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                         <span class="n">criteria</span><span class="o">=</span><span class="s2">&quot;Correct, grounded, complete and concise.&quot;</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                         <span class="n">dimensions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;correctness&quot;</span><span class="p">,</span> <span class="s2">&quot;completeness&quot;</span><span class="p">])</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">facts</span> <span class="o">=</span> <span class="n">CallableMetric</span><span class="p">(</span><span class="s2">&quot;facts&quot;</span><span class="p">,</span> <span class="n">must_include_score</span><span class="p">)</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">quality</span> <span class="o">=</span> <span class="n">WeightedMetric</span><span class="p">([(</span><span class="s2">&quot;judge&quot;</span><span class="p">,</span> <span class="n">judge</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;facts&quot;</span><span class="p">,</span> <span class="n">facts</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">)],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;quality&quot;</span><span class="p">)</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="c1"># 3. loss — what fit() records as loss / val_loss</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="n">loss</span> <span class="o">=</span> <span class="n">MetricLoss</span><span class="p">(</span><span class="n">quality</span><span class="p">)</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="c1"># 4. optimizer — how candidates are proposed and selected</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="n">optimizer</span> <span class="o">=</span> <span class="n">PromptFitterBridge</span><span class="p">(</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    <span class="n">agent_name</span><span class="o">=</span><span class="n">agent</span><span class="o">.</span><span class="n">agent_name</span><span class="p">,</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    <span class="n">task_model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    <span class="n">rewrite_model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    <span class="n">llm_base_url</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000/v1&quot;</span><span class="p">,</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="n">llm_api_key</span><span class="o">=</span><span class="s2">&quot;local&quot;</span><span class="p">,</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>    <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;gepa_like&quot;</span><span class="p">,</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    <span class="n">metric</span><span class="o">=</span><span class="n">quality</span><span class="p">,</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    <span class="n">max_trials</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="n">search_space</span><span class="o">=</span><span class="n">PromptSearchSpace</span><span class="p">(</span><span class="n">optimize_system_prompt</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">optimize_few_shot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>                                   <span class="n">optimize_model_params</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>    <span class="n">min_confidence</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>           <span class="c1"># any PromptFitter keyword is passed through</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="p">)</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="c1"># 5. compile</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="n">agent</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="n">judge</span><span class="p">,</span> <span class="n">facts</span><span class="p">,</span> <span class="n">quality</span><span class="p">],</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">)</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="c1"># 6. fit — the test split is never used; measure it before and after</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a><span class="n">before</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a><span class="n">history</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="n">data</span><span class="p">,</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="n">epochs</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>    <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">EpochDiffCallback</span><span class="p">(</span><span class="n">epochs</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>               <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">monitor</span><span class="o">=</span><span class="s2">&quot;val_loss&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;min&quot;</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">1</span><span class="p">)],</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="p">)</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="n">after</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="c1"># 7. report, and keep the prompt if it earned it</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="n">generate_fit_report</span><span class="p">(</span><span class="n">history</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;reports/support.html&quot;</span><span class="p">,</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>                    <span class="n">baseline_eval</span><span class="o">=</span><span class="n">before</span><span class="p">,</span> <span class="n">final_eval</span><span class="o">=</span><span class="n">after</span><span class="p">,</span> <span class="n">eval_dataset</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="n">merge_fit_results</span><span class="p">(</span><span class="n">history</span><span class="o">.</span><span class="n">fit_results</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="s2">&quot;v2_fit&quot;</span><span class="p">,</span> <span class="n">agent_dir</span><span class="o">=</span><span class="s2">&quot;agents/support&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="compiledatasetnone-metricsnone-optimizernone-lossnone"><code>compile(dataset=None, metrics=None, optimizer=None, loss=None)</code><a class="headerlink" href="#compiledatasetnone-metricsnone-optimizernone-lossnone" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Route</th>
-<th>Purpose</th>
+<th>Argument</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>GET /status</code></td>
-<td>Self-contained, auto-refreshing HTML dashboard (no external assets)</td>
+<td><code>dataset</code></td>
+<td>Default data for <code>fit()</code>/<code>evaluate()</code>.</td>
 </tr>
 <tr>
-<td><code>GET /api/v1/status</code></td>
-<td>The same data as structured JSON (for your own tooling)</td>
+<td><code>metrics</code></td>
+<td>Reported metrics — either <a href="../metrics/#two-metric-families">family</a>. Names must be unique and not <code>loss</code>.</td>
+</tr>
+<tr>
+<td><code>optimizer</code></td>
+<td>A <code>PromptFitterBridge</code> (or any object with <code>optimize(agent, dataset, metrics) -&gt; dict</code>).</td>
+</tr>
+<tr>
+<td><code>loss</code></td>
+<td>A loss, or a metric (wrapped as <code>MetricLoss</code>).</td>
 </tr>
 </tbody>
 </table>
-<p>Both are mounted automatically — nothing to configure.</p>
-<h2 id="the-dashboard">The dashboard<a class="headerlink" href="#the-dashboard" title="Permanent link">&para;</a></h2>
-<p>Open <a href="http://localhost:8000/status"><code>http://localhost:8000/status</code></a> after
-starting the platform. It polls the JSON endpoint every few seconds and renders:</p>
-<ul>
-<li>an <strong>overall health</strong> indicator + platform version and uptime,</li>
-<li><strong>summary cards</strong> with healthy/total counts per resource type,</li>
-<li>a <strong>task panel</strong> (counts by status, currently running vs. max concurrency,
-  and which target types are runnable), and</li>
-<li>a <strong>storage panel</strong> plus <strong>per-resource tables</strong> with each item's health and
-  metadata.</li>
-</ul>
-<h2 id="json-shape">JSON shape<a class="headerlink" href="#json-shape" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  &quot;status&quot;: &quot;healthy&quot;,
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  &quot;platform&quot;: { &quot;name&quot;: &quot;...&quot;, &quot;version&quot;: &quot;1.0.0&quot;, &quot;uptime_seconds&quot;: 42.1, &quot;maintenance_mode&quot;: false },
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  &quot;summary&quot;: {
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    &quot;agents&quot;:    { &quot;total&quot;: 3, &quot;healthy&quot;: 3 },
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    &quot;plugins&quot;:   { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    &quot;endpoints&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2 },
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    &quot;ingestors&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    &quot;pipelines&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    &quot;connections&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2 }
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  },
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  &quot;resources&quot;: {
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    &quot;agents&quot;: { &quot;total&quot;: 3, &quot;healthy&quot;: 3, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;...&quot;: { &quot;status&quot;: &quot;healthy&quot; } } },
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    &quot;connections&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;fraud/main&quot;: { &quot;status&quot;: &quot;configured&quot; } } }
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  },
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  &quot;tasks&quot;: {
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    &quot;enabled&quot;: true,
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    &quot;total&quot;: 12,
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    &quot;by_status&quot;: { &quot;queued&quot;: 0, &quot;running&quot;: 1, &quot;succeeded&quot;: 10, &quot;failed&quot;: 1, &quot;cancelled&quot;: 0 },
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    &quot;running&quot;: 1,
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    &quot;max_concurrency&quot;: 8,
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    &quot;supported_targets&quot;: [&quot;agent&quot;, &quot;endpoint&quot;, &quot;ingestion&quot;, &quot;pipeline&quot;, &quot;plugin&quot;],
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    &quot;event_log&quot;: { &quot;tasks&quot;: 4, &quot;events&quot;: 61, &quot;bytes&quot;: 31232 }
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  },
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  &quot;streams&quot;: { &quot;streams&quot;: 2, &quot;frames&quot;: 9, &quot;bytes&quot;: 12408 },
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>  &quot;storage&quot;: { &quot;status&quot;: &quot;healthy&quot; },
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  &quot;generated_at&quot;: 1718900000.0
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>}
+<h2 id="promptfitterbridge"><code>PromptFitterBridge(...)</code><a class="headerlink" href="#promptfitterbridge" title="Permanent link">&para;</a></h2>
+<p>The bridge runs one <code>PromptFitter.fit</code> per epoch on the agent instance, starting
+from the agent's current prompt.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agent_name</code></td>
+<td><code>""</code></td>
+<td>Agent name (reports, <code>prompts.json</code>).</td>
+</tr>
+<tr>
+<td><code>task_model</code></td>
+<td><code>"ollama/qwen2.5:7b"</code></td>
+<td>Model for failure clustering and the optimizer's analysis calls. (The agent itself runs on its own LLM.)</td>
+</tr>
+<tr>
+<td><code>rewrite_model</code></td>
+<td><code>"openai/gpt-4.1"</code></td>
+<td>Model that writes the candidate prompts.</td>
+</tr>
+<tr>
+<td><code>llm_base_url</code>, <code>llm_api_key</code></td>
+<td>—</td>
+<td>OpenAI-compatible endpoint for optimizer and judge calls (also set as the process default at construction, so epoch-0 judge scoring uses it).</td>
+</tr>
+<tr>
+<td><code>optimizer</code></td>
+<td><code>"rewrite"</code></td>
+<td>See <a href="../how-it-works/#optimizers-how-candidates-are-proposed">optimizers</a>.</td>
+</tr>
+<tr>
+<td><code>metric</code></td>
+<td>compiled loss's metric, else first compiled metric</td>
+<td>The objective candidates are selected on.</td>
+</tr>
+<tr>
+<td><code>max_trials</code></td>
+<td><code>8</code></td>
+<td>Distinct candidates per epoch.</td>
+</tr>
+<tr>
+<td><code>**kwargs</code></td>
+<td></td>
+<td>Passed to <code>PromptFitter</code>: <code>search_space</code>, <code>patience</code>, <code>min_absolute_improvement</code>, <code>min_confidence</code>, <code>max_generalization_gap</code>, <code>holdout_tolerance</code>, <code>min_transfer_ratio</code>, <code>holdout_fraction</code>, <code>reflect_on</code>, <code>reflection_size</code>, <code>concurrency</code>, <code>callbacks</code>, <code>auto_report</code>, <code>experiment_dir</code>, … (see <a href="../prompt-fitter/#constructor-options">PromptFitter</a>).</td>
+</tr>
+</tbody>
+</table>
+<p>How the bridge splits your <code>AgentDataset</code>: <code>train</code> → what the optimizer
+learns from; <code>validation</code> → selection; <code>holdout</code> → the veto gate (or a slice of
+validation); <code>test</code> → dropped. Without a <code>validation</code> split, 20 % of train is
+carved off with a seeded shuffle.</p>
+<p>After each epoch: <code>agent._last_fit_result</code> is that epoch's <code>PromptFitResult</code>,
+<code>agent._last_optimize_status</code> is <code>"ok"</code> or <code>"skipped: &lt;reason&gt;"</code> (a failed
+optimizer never crashes <code>fit()</code>; check this when nothing changed), and the
+prompt is kept only if the epoch improved it.</p>
+<h2 id="fitdatasetnone-epochs1-verbose1-callbacksnone-validation_datanone"><code>fit(dataset=None, *, epochs=1, verbose=1, callbacks=None, validation_data=None, ...)</code><a class="headerlink" href="#fitdatasetnone-epochs1-verbose1-callbacksnone-validation_datanone" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>epochs</code></td>
+<td>Optimization passes; each starts from the previous best.</td>
+</tr>
+<tr>
+<td><code>verbose</code></td>
+<td><code>0</code> silent, <code>1</code> one line per epoch.</td>
+</tr>
+<tr>
+<td><code>callbacks</code></td>
+<td><code>agentomatic.agents</code> callbacks (below).</td>
+</tr>
+<tr>
+<td><code>validation_data</code></td>
+<td>Examples for <code>val_*</code> logs (default: the validation split).</td>
+</tr>
+<tr>
+<td><code>search_space</code>, <code>optimize_mode</code>, <code>optimize_prompt</code>, <code>optimize_params</code>, <code>optimize_few_shot</code>, <code>model_param_space</code>, <code>max_trials</code>, <code>**optimize_kwargs</code></td>
+<td>Per-call overrides for the bridge. Given without a compiled optimizer, <code>fit()</code> builds a <code>PromptFitterBridge</code> from them.</td>
+</tr>
+</tbody>
+</table>
+<p>Before the first epoch, <code>fit()</code> records a baseline row (epoch −1), so the
+curve starts at the true starting loss.</p>
+<p>Returns a <code>History</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>history.history</code></td>
+<td><code>{"loss": [...], "val_loss": [...], "judge": [...], "val_judge": [...], ...}</code> — baseline first</td>
+</tr>
+<tr>
+<td><code>history.epoch</code></td>
+<td>Epoch indices (<code>-1</code> = baseline)</td>
+</tr>
+<tr>
+<td><code>history.fit_results</code></td>
+<td>One <code>PromptFitResult</code> per optimized epoch</td>
+</tr>
+<tr>
+<td><code>history.params</code></td>
+<td>Epochs, optimizer, metric names, split sizes</td>
+</tr>
+<tr>
+<td><code>history.best("val_loss", mode="min")</code>, <code>history.final("loss")</code>, <code>history.summary()</code></td>
+<td>Helpers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="callbacks-for-fit">Callbacks for <code>fit()</code><a class="headerlink" href="#callbacks-for-fit" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Callback</th>
+<th>Options</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EarlyStopping</code></td>
+<td><code>monitor="loss"</code>, <code>mode="auto"</code> (min for <code>*loss</code>), <code>patience=0</code>, <code>min_delta=0.0</code>, <code>restore_best=False</code></td>
+<td>Stops when <code>monitor</code> stops improving; <code>restore_best</code> restores the best epoch's prompt/config</td>
+</tr>
+<tr>
+<td><code>EpochDiffCallback</code></td>
+<td><code>epochs=1</code>, <code>prompt_key="system_prompt"</code></td>
+<td>Prints loss and a unified prompt diff after each epoch; <code>per_epoch</code> keeps the records</td>
+</tr>
+<tr>
+<td>your own <code>Callback</code> subclass</td>
+<td><code>on_train_begin/end</code>, <code>on_epoch_begin/end(epoch, logs)</code></td>
+<td>Anything; set <code>self.agent.stop_training = True</code> to stop</td>
+</tr>
+</tbody>
+</table>
+<p>These are different from the <code>agentomatic.optimize</code> callbacks
+(<code>EarlyStopping</code>, <code>ModelCheckpoint</code>, …), which control the fitter's inner
+trial loop — pass those to the bridge as <code>callbacks=[...]</code>. Passing one to
+<code>fit()</code> raises a <code>TypeError</code> that says so.</p>
+<h2 id="evaluatedataset-metricsnone"><code>evaluate(dataset, metrics=None)</code><a class="headerlink" href="#evaluatedataset-metricsnone" title="Permanent link">&para;</a></h2>
+<p>Runs the agent on each example and scores it with <code>metrics</code> (default: the
+compiled ones). Returns an <code>EvaluationReport</code>: <code>scores</code> (mean per metric),
+<code>example_results</code> (per example: <code>prediction</code>, <code>scores</code>, <code>error</code>,
+<code>duration_ms</code>, judge rationale in <code>metadata</code>) and <code>metadata</code>
+(<code>metric_failures</code>, <code>transform_errors</code>). Pass two reports (before and after
+<code>fit()</code>) to <a href="../reports/"><code>generate_fit_report</code></a> for a per-example comparison.</p>
+<h2 id="saving">Saving<a class="headerlink" href="#saving" title="Permanent link">&para;</a></h2>
+<p><code>agent.save(path)</code> writes the compiled config (best prompt, params, few-shot
+examples) and <code>fit_history.json</code>; <code>Agent.load(path)</code> / <code>agent.load_compiled(path)</code>
+restore them. <code>PromptFitResult.apply(version=..., agent_dir=...)</code> instead writes a
+new version to the agent's <code>prompts.json</code>.</p>
+<h2 id="one-call-train_and_report">One call: <code>train_and_report</code><a class="headerlink" href="#one-call-train_and_report" title="Permanent link">&para;</a></h2>
+<p>Scaffolded projects (<code>agentomatic init NAME --template basic|full|…</code>) ship
+<code>agents/NAME/train.py</code>, which wraps the steps above in <code>train_and_report</code> and
+reads the model endpoint from the project's stack:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>agents/NAME/train.py<span class="w"> </span>--epochs<span class="w"> </span><span class="m">2</span><span class="w"> </span>--trials<span class="w"> </span><span class="m">12</span><span class="w"> </span>--augment<span class="w"> </span>--n-examples<span class="w"> </span><span class="m">40</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">AGENTOMATIC_STACK</span><span class="o">=</span>gemini<span class="w"> </span>python<span class="w"> </span>agents/NAME/train.py<span class="w"> </span>--optimizer<span class="w"> </span>gepa_like<span class="w"> </span>--apply
 </span></code></pre></div>
-<h3 id="replay-occupancy">Replay occupancy<a class="headerlink" href="#replay-occupancy" title="Permanent link">&para;</a></h3>
-<p><code>tasks.event_log</code> and <code>streams</code> report what the replay buffers currently
-hold — the history that makes
-<a href="../tasks/#resuming-a-dropped-stream">dropped streams resumable</a>. They hold
-memory, so <code>bytes</code> is the number to watch when sizing a container: if it sits
-at the configured ceiling, raise it or lower retention with
-<code>AGENTOMATIC_TASK_EVENT_MAX_MB</code> / <code>AGENTOMATIC_STREAM_MAX_MB</code>, or turn replay
-off entirely (<code>AGENTOMATIC_TASK_EVENT_LOG=none</code>,
-<code>AGENTOMATIC_STREAM_REPLAY=0</code>). See
-<a href="../configuration/">Configuration</a>.</p>
-<p><code>event_log</code> is absent when a registered custom backend does not report
-occupancy — <code>stats</code> is not part of the <code>TaskEventLog</code> contract.</p>
-<p>The top-level <code>status</code> is <code>degraded</code> if any resource (including a configured
-connection) is unhealthy or storage is unhealthy, otherwise <code>healthy</code> — handy
-for a single uptime check.</p>
-<h2 id="related-probes">Related probes<a class="headerlink" href="#related-probes" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>GET /health</code> — aggregate health (agents, plugins, endpoints, ingestors,
-  pipelines, storage) for load balancers.</li>
-<li><code>GET /readiness</code> — Kubernetes-style readiness probe.</li>
-<li><code>GET /api/v1/status</code> — the rich snapshot used by the dashboard.</li>
-</ul>
-<h2 id="programmatic-use">Programmatic use<a class="headerlink" href="#programmatic-use" title="Permanent link">&para;</a></h2>
-<p>Build the same payload yourself (e.g. to push into your own monitoring):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.core.status</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_status_payload</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">snapshot</span> <span class="o">=</span> <span class="k">await</span> <span class="n">build_status_payload</span><span class="p">(</span><span class="n">platform</span><span class="p">)</span>
-</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag / env (<code>AGENTOMATIC_…</code>)</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--stack</code></td>
+<td><code>local</code></td>
+<td>Stack whose <code>default</code> / <code>rewrite</code> LLM profiles are used</td>
+</tr>
+<tr>
+<td><code>--epochs</code></td>
+<td><code>2</code></td>
+<td>Epochs</td>
+</tr>
+<tr>
+<td><code>--trials</code></td>
+<td><code>12</code></td>
+<td>Candidates per epoch</td>
+</tr>
+<tr>
+<td><code>--patience</code></td>
+<td><code>2</code></td>
+<td>Fitter patience</td>
+</tr>
+<tr>
+<td><code>--optimizer</code></td>
+<td><code>rewrite</code></td>
+<td><code>rewrite</code>, <code>gepa_like</code>, <code>mipro_like</code>, <code>few_shot_bootstrap</code>, <code>param_search</code></td>
+</tr>
+<tr>
+<td><code>--dataset</code></td>
+<td><code>datasets/all.jsonl</code></td>
+<td>Dataset path</td>
+</tr>
+<tr>
+<td><code>--augment</code>, <code>--n-examples</code>, <code>--persist</code></td>
+<td>off</td>
+<td>Augmentation (see <a href="../data/#augmentation">Datasets</a>)</td>
+</tr>
+<tr>
+<td><code>--apply</code>, <code>--apply-as</code></td>
+<td>off, <code>v2_fit</code></td>
+<td>Write the prompt to <code>prompts.json</code> if it improved</td>
+</tr>
+<tr>
+<td><code>--min-improvement</code></td>
+<td><code>0.001</code></td>
+<td>Minimum validation lift</td>
+</tr>
+<tr>
+<td><code>--persist-fit-store</code></td>
+<td>off</td>
+<td>Also store retrain artefacts in <code>AGENTOMATIC_FIT_STORE_URL</code> / <code>DATABASE_URL</code></td>
+</tr>
+</tbody>
+</table>
+<p>In Python, <code>train_and_report(agent, config=TrainConfig(...))</code> accepts the same
+settings plus <code>required_keys</code>, <code>judge_criteria</code>, <code>judge_dimensions</code>,
+<code>judge_weight</code>, <code>sequential</code>, <code>concurrency</code>, <code>optimize_model_params</code>,
+<code>augment_strategies</code>, <code>augment_model</code> and <code>evaluate_baseline</code> (default on:
+score the test split before <em>and</em> after, for the report). It returns a
+<code>TrainResult</code> with <code>history</code>, <code>fit_result</code> (merged across epochs),
+<code>fit_results</code>, <code>baseline_eval_scores</code>, <code>eval_scores</code>, <code>report_path</code>,
+<code>optimize_status</code>, <code>applied_version</code> and <code>dataset_sizes</code>.</p>
+<p>The staged primitives it uses are public too: <code>build_default_metrics</code>,
+<code>compile_agent</code>, <code>fit_agent</code>, <code>evaluate_agent</code>.</p>
 
 
 
@@ -3013,7 +3356,7 @@ for a single uptime check.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../tasks/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Tasks &amp; Execution Modes">
+          <a href="../data/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Datasets &amp; Augmentation">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3023,20 +3366,20 @@ for a single uptime check.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Tasks & Execution Modes
+                Datasets & Augmentation
               </div>
             </div>
           </a>
         
         
           
-          <a href="../ingestion/" class="md-footer__link md-footer__link--next" aria-label="Next: Ingestion &amp; RAG">
+          <a href="../prompt-fitter/" class="md-footer__link md-footer__link--next" aria-label="Next: Low Level (PromptFitter)">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Ingestion & RAG
+                Low Level (PromptFitter)
               </div>
             </div>
             <div class="md-footer__button md-icon">

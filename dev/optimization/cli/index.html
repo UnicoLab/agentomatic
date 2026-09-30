@@ -12,13 +12,13 @@
         <meta name="author" content="UnicoLab">
       
       
-        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/guide/status/">
+        <link rel="canonical" href="https://unicolab.github.io/agentomatic/latest/optimization/cli/">
       
       
-        <link rel="prev" href="../tasks/">
+        <link rel="prev" href="../reports/">
       
       
-        <link rel="next" href="../ingestion/">
+        <link rel="next" href="../examples/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Status Dashboard - Agentomatic</title>
+        <title>CLI & Legacy API - Agentomatic</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#status-dashboard" class="md-skip">
+        <a href="#cli-legacy-api" class="md-skip">
           Skip to content
         </a>
       
@@ -140,7 +140,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Status Dashboard
+              CLI & Legacy API
             
           </span>
         </div>
@@ -295,7 +295,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../class-agents/" class="md-tabs__link">
+        <a href="../../guide/class-agents/" class="md-tabs__link">
           
   
   
@@ -313,11 +313,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../optimization/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -335,13 +337,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../deployment/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../guide/deployment/" class="md-tabs__link">
           
   
   
@@ -363,7 +363,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../studio/" class="md-tabs__link">
+        <a href="../../guide/studio/" class="md-tabs__link">
           
   
   
@@ -808,7 +808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../class-agents/" class="md-nav__link">
+      <a href="../../guide/class-agents/" class="md-nav__link">
         
   
   
@@ -836,7 +836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agent-structure/" class="md-nav__link">
+      <a href="../../guide/agent-structure/" class="md-nav__link">
         
   
   
@@ -864,7 +864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cookbook/" class="md-nav__link">
+      <a href="../../guide/cookbook/" class="md-nav__link">
         
   
   
@@ -892,7 +892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../templates/" class="md-nav__link">
+      <a href="../../guide/templates/" class="md-nav__link">
         
   
   
@@ -920,7 +920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../schemas/" class="md-nav__link">
+      <a href="../../guide/schemas/" class="md-nav__link">
         
   
   
@@ -948,7 +948,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prompts/" class="md-nav__link">
+      <a href="../../guide/prompts/" class="md-nav__link">
         
   
   
@@ -976,7 +976,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
+      <a href="../../guide/configuration/" class="md-nav__link">
         
   
   
@@ -1004,7 +1004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../storage/" class="md-nav__link">
+      <a href="../../guide/storage/" class="md-nav__link">
         
   
   
@@ -1032,7 +1032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../middleware/" class="md-nav__link">
+      <a href="../../guide/middleware/" class="md-nav__link">
         
   
   
@@ -1060,7 +1060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../langgraph/" class="md-nav__link">
+      <a href="../../guide/langgraph/" class="md-nav__link">
         
   
   
@@ -1088,7 +1088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../langchain-adapter/" class="md-nav__link">
+      <a href="../../guide/langchain-adapter/" class="md-nav__link">
         
   
   
@@ -1116,7 +1116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ml-plugins/" class="md-nav__link">
+      <a href="../../guide/ml-plugins/" class="md-nav__link">
         
   
   
@@ -1144,7 +1144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../guide/testing/" class="md-nav__link">
         
   
   
@@ -1176,6 +1176,8 @@
       
   
   
+    
+  
   
   
     
@@ -1183,394 +1185,6 @@
       
         
           
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../../optimization/" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Optimization
-  
-
-    
-  </span>
-  
-  
-
-            </a>
-            
-              
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Optimization
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/how-it-works/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    How It Works
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Metrics, Judges & Loss
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/generalization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Generalization & Overfitting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/data/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Datasets & Augmentation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/class-agents/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Class Agents (compile / fit)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/prompt-fitter/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Low Level (PromptFitter)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/cli/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI & Legacy API
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../optimization/examples/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Examples
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../optimization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prompt Optimization (moved)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
         
       
         
@@ -1609,17 +1223,18 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
     
   
-    Advanced
+    Optimization
   
 
     
@@ -1627,35 +1242,43 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Advanced
+    Optimization
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
+            
+              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../deployment/" class="md-nav__link">
+      <a href="../how-it-works/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Production Deployment
+    How It Works
   
 
     
@@ -1676,14 +1299,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../verifying-a-deployment/" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Verifying a Deployment
+    Metrics, Judges & Loss
   
 
     
@@ -1704,14 +1327,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../platform-features/" class="md-nav__link">
+      <a href="../generalization/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Platform Features
+    Generalization & Overfitting
   
 
     
@@ -1732,14 +1355,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../endpoints/" class="md-nav__link">
+      <a href="../data/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Custom Endpoints
+    Datasets & Augmentation
   
 
     
@@ -1760,14 +1383,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../tasks/" class="md-nav__link">
+      <a href="../class-agents/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Tasks & Execution Modes
+    Class Agents (compile / fit)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prompt-fitter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Low Level (PromptFitter)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
   
 
     
@@ -1804,7 +1483,7 @@
   <span class="md-ellipsis">
     
   
-    Status Dashboard
+    CLI & Legacy API
   
 
     
@@ -1822,7 +1501,7 @@
   <span class="md-ellipsis">
     
   
-    Status Dashboard
+    CLI & Legacy API
   
 
     
@@ -1848,10 +1527,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-dashboard" class="md-nav__link">
+  <a href="#before-you-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The dashboard
+        Before you start
       
     </span>
   </a>
@@ -1859,22 +1538,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#json-shape" class="md-nav__link">
+  <a href="#recommended-cli-fitter-modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        JSON shape
+        Recommended: CLI fitter modes
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="JSON shape">
+    <nav class="md-nav" aria-label="Recommended: CLI fitter modes">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#replay-occupancy" class="md-nav__link">
+  <a href="#mode-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Replay occupancy
+        Mode reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-only-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter-only search
       
     </span>
   </a>
@@ -1887,10 +1577,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-probes" class="md-nav__link">
+  <a href="#compatibility-api-promptoptimizer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related probes
+        Compatibility API: PromptOptimizer
       
     </span>
   </a>
@@ -1898,10 +1588,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#programmatic-use" class="md-nav__link">
+  <a href="#local-omlx-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Programmatic use
+        Local oMLX verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production checklist
       
     </span>
   </a>
@@ -1924,7 +1625,328 @@
   
   
     <li class="md-nav__item">
-      <a href="../ingestion/" class="md-nav__link">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt Optimization (moved)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/verifying-a-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verifying a Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/platform-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/endpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tasks & Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ingestion/" class="md-nav__link">
         
   
   
@@ -1952,7 +1974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../connections/" class="md-nav__link">
+      <a href="../../guide/connections/" class="md-nav__link">
         
   
   
@@ -1980,7 +2002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../custom-connections/" class="md-nav__link">
+      <a href="../../guide/custom-connections/" class="md-nav__link">
         
   
   
@@ -2008,7 +2030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../observability/" class="md-nav__link">
+      <a href="../../guide/observability/" class="md-nav__link">
         
   
   
@@ -2036,7 +2058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../telemetry/" class="md-nav__link">
+      <a href="../../guide/telemetry/" class="md-nav__link">
         
   
   
@@ -2064,7 +2086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipelines/" class="md-nav__link">
+      <a href="../../guide/pipelines/" class="md-nav__link">
         
   
   
@@ -2092,7 +2114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../stacks/" class="md-nav__link">
+      <a href="../../guide/stacks/" class="md-nav__link">
         
   
   
@@ -2120,7 +2142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../llm-providers/" class="md-nav__link">
+      <a href="../../guide/llm-providers/" class="md-nav__link">
         
   
   
@@ -2148,7 +2170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../security/" class="md-nav__link">
+      <a href="../../guide/security/" class="md-nav__link">
         
   
   
@@ -2176,7 +2198,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control-plane/" class="md-nav__link">
+      <a href="../../guide/control-plane/" class="md-nav__link">
         
   
   
@@ -2204,7 +2226,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../delegation/" class="md-nav__link">
+      <a href="../../guide/delegation/" class="md-nav__link">
         
   
   
@@ -2303,7 +2325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../studio/" class="md-nav__link">
+      <a href="../../guide/studio/" class="md-nav__link">
         
   
   
@@ -2331,7 +2353,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../deep-agents/" class="md-nav__link">
+      <a href="../../guide/deep-agents/" class="md-nav__link">
         
   
   
@@ -2359,7 +2381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../debug-ui/" class="md-nav__link">
+      <a href="../../guide/debug-ui/" class="md-nav__link">
         
   
   
@@ -2387,7 +2409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../demo/" class="md-nav__link">
+      <a href="../../guide/demo/" class="md-nav__link">
         
   
   
@@ -2742,10 +2764,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-dashboard" class="md-nav__link">
+  <a href="#before-you-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The dashboard
+        Before you start
       
     </span>
   </a>
@@ -2753,22 +2775,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#json-shape" class="md-nav__link">
+  <a href="#recommended-cli-fitter-modes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        JSON shape
+        Recommended: CLI fitter modes
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="JSON shape">
+    <nav class="md-nav" aria-label="Recommended: CLI fitter modes">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#replay-occupancy" class="md-nav__link">
+  <a href="#mode-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Replay occupancy
+        Mode reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-only-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter-only search
       
     </span>
   </a>
@@ -2781,10 +2814,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-probes" class="md-nav__link">
+  <a href="#compatibility-api-promptoptimizer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related probes
+        Compatibility API: PromptOptimizer
       
     </span>
   </a>
@@ -2792,10 +2825,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#programmatic-use" class="md-nav__link">
+  <a href="#local-omlx-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Programmatic use
+        Local oMLX verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production checklist
       
     </span>
   </a>
@@ -2845,10 +2889,10 @@
     
     
       <li class="md-path__item">
-        <a href="../deployment/" class="md-path__link">
+        <a href="../" class="md-path__link">
           
   <span class="md-ellipsis">
-    Advanced
+    Optimization
   </span>
 
         </a>
@@ -2867,7 +2911,7 @@
 
 
   
-    <a href="https://github.com/UnicoLab/agentomatic/edit/main/docs/guide/status.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/UnicoLab/agentomatic/edit/main/docs/optimization/cli.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2876,106 +2920,192 @@
     
       
     
-    <a href="https://github.com/UnicoLab/agentomatic/raw/main/docs/guide/status.md" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/UnicoLab/agentomatic/raw/main/docs/optimization/cli.md" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
   
 
 
-<h1 id="status-dashboard">Status Dashboard<a class="headerlink" href="#status-dashboard" title="Permanent link">&para;</a></h1>
-<p>Every Agentomatic platform exposes a <strong>unified status page</strong> that shows the
-health of <em>everything</em> it manages — agents, ML plugins, custom endpoints,
-ingestors, and pipelines — plus the task executor and storage backend, in one
-place.</p>
+<h1 id="cli-legacy-api">CLI &amp; legacy API<a class="headerlink" href="#cli-legacy-api" title="Permanent link">&para;</a></h1>
+<p><code>agentomatic optimize</code> optimizes an agent that is <strong>already running</strong> behind
+the Agentomatic API, from a terminal. It uses the same <code>PromptFitter</code> engine,
+datasets and acceptance rules as the Python APIs (<a href="../how-it-works/">How it works</a>).
+For in-process agents and full control, prefer
+<a href="../class-agents/">class agents</a> or <a href="../prompt-fitter/"><code>PromptFitter</code></a>.</p>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">&para;</a></h2>
+<p>Install the optimization dependencies and create a dataset with a stable,
+measurable expectation for each request:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;agentomatic[optimize]&quot;</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>{&quot;query&quot;:&quot;What is the refund period?&quot;,&quot;expected_answer&quot;:&quot;30 days&quot;}
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{&quot;query&quot;:&quot;How do I reset my password?&quot;,&quot;expected_answer&quot;:&quot;reset, password&quot;}
+</span></code></pre></div>
+<p><code>query</code> is required. <code>expected_answer</code>, <code>context</code> (a list of strings), and
+<code>metadata</code> are optional. Use <code>exact_match</code> when the expected answer should
+match exactly; use <code>contains</code> with comma-separated required phrases when a
+response can vary in wording. For generative quality, use a calibrated judge
+metric and a held-out test dataset.</p>
+<p>Start the target platform before running the API-backed paths:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>agentomatic<span class="w"> </span>run<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+</span></code></pre></div>
+<h2 id="recommended-cli-fitter-modes">Recommended: CLI fitter modes<a class="headerlink" href="#recommended-cli-fitter-modes" title="Permanent link">&para;</a></h2>
+<p>The CLI has two families. <code>prompt_only</code> is the legacy default; every other
+mode uses the modern <code>PromptFitter</code> path.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Prompt + configuration rewrite against the running agent.</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>support_bot<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--dataset<span class="w"> </span>eval.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--val-dataset<span class="w"> </span>validation.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--test-dataset<span class="w"> </span>holdout.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span>--mode<span class="w"> </span>rewrite<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span>--metrics<span class="w"> </span>contains<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span>--llm<span class="w"> </span>omlx/Qwen3.5-9B-MLX-4bit<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span>--rewrite-llm<span class="w"> </span>omlx/Qwen3.5-9B-MLX-4bit<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span>--host<span class="w"> </span>http://127.0.0.1:8000<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span>--max-trials<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span>--apply
+</span></code></pre></div>
+<p><code>--dataset</code> is what the optimizer learns from, <code>--val-dataset</code> what candidates
+are selected on, and <code>--test-dataset</code> the fitter's <strong>holdout gate</strong> — it can
+only veto candidates (<a href="../generalization/#data-roles">Generalization</a>). Keep a
+further test set outside the command and evaluate it afterwards.</p>
+<p><code>--apply</code> writes a prompt version only when the result passes the fitter's
+improvement and generalization guards. Omit it to inspect the report first.
+The command writes reports and trial artifacts under <code>.optimize/</code> by default.</p>
+<h3 id="mode-reference">Mode reference<a class="headerlink" href="#mode-reference" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Route</th>
-<th>Purpose</th>
+<th>CLI mode</th>
+<th>Fitter optimizer</th>
+<th>Best for</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>GET /status</code></td>
-<td>Self-contained, auto-refreshing HTML dashboard (no external assets)</td>
+<td><code>rewrite</code></td>
+<td><code>RewriteOptimizer</code></td>
+<td>Improving system instructions from failure patterns</td>
 </tr>
 <tr>
-<td><code>GET /api/v1/status</code></td>
-<td>The same data as structured JSON (for your own tooling)</td>
+<td><code>gepa_like</code></td>
+<td><code>GEPALikeOptimizer</code></td>
+<td>Targeted edits once evaluator feedback is useful</td>
+</tr>
+<tr>
+<td><code>mipro_like</code></td>
+<td><code>MIPROLikeOptimizer</code></td>
+<td>Exploring prompt and few-shot combinations</td>
+</tr>
+<tr>
+<td><code>few_shot</code></td>
+<td><code>FewShotBootstrapOptimizer</code></td>
+<td>Selecting strong demonstrations from labelled data</td>
+</tr>
+<tr>
+<td><code>param_search</code></td>
+<td><code>ParamSearchOptimizer</code></td>
+<td>Searching model, RAG, or tool parameter grids</td>
+</tr>
+<tr>
+<td><code>apo</code></td>
+<td><code>APOOptimizer</code></td>
+<td>Trace-aware critique and edit search</td>
 </tr>
 </tbody>
 </table>
-<p>Both are mounted automatically — nothing to configure.</p>
-<h2 id="the-dashboard">The dashboard<a class="headerlink" href="#the-dashboard" title="Permanent link">&para;</a></h2>
-<p>Open <a href="http://localhost:8000/status"><code>http://localhost:8000/status</code></a> after
-starting the platform. It polls the JSON endpoint every few seconds and renders:</p>
-<ul>
-<li>an <strong>overall health</strong> indicator + platform version and uptime,</li>
-<li><strong>summary cards</strong> with healthy/total counts per resource type,</li>
-<li>a <strong>task panel</strong> (counts by status, currently running vs. max concurrency,
-  and which target types are runnable), and</li>
-<li>a <strong>storage panel</strong> plus <strong>per-resource tables</strong> with each item's health and
-  metadata.</li>
-</ul>
-<h2 id="json-shape">JSON shape<a class="headerlink" href="#json-shape" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  &quot;status&quot;: &quot;healthy&quot;,
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  &quot;platform&quot;: { &quot;name&quot;: &quot;...&quot;, &quot;version&quot;: &quot;1.0.0&quot;, &quot;uptime_seconds&quot;: 42.1, &quot;maintenance_mode&quot;: false },
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  &quot;summary&quot;: {
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    &quot;agents&quot;:    { &quot;total&quot;: 3, &quot;healthy&quot;: 3 },
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    &quot;plugins&quot;:   { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    &quot;endpoints&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2 },
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    &quot;ingestors&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    &quot;pipelines&quot;: { &quot;total&quot;: 1, &quot;healthy&quot;: 1 },
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    &quot;connections&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2 }
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  },
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  &quot;resources&quot;: {
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    &quot;agents&quot;: { &quot;total&quot;: 3, &quot;healthy&quot;: 3, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;...&quot;: { &quot;status&quot;: &quot;healthy&quot; } } },
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    &quot;connections&quot;: { &quot;total&quot;: 2, &quot;healthy&quot;: 2, &quot;degraded&quot;: 0, &quot;items&quot;: { &quot;fraud/main&quot;: { &quot;status&quot;: &quot;configured&quot; } } }
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  },
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  &quot;tasks&quot;: {
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    &quot;enabled&quot;: true,
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    &quot;total&quot;: 12,
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    &quot;by_status&quot;: { &quot;queued&quot;: 0, &quot;running&quot;: 1, &quot;succeeded&quot;: 10, &quot;failed&quot;: 1, &quot;cancelled&quot;: 0 },
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    &quot;running&quot;: 1,
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    &quot;max_concurrency&quot;: 8,
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    &quot;supported_targets&quot;: [&quot;agent&quot;, &quot;endpoint&quot;, &quot;ingestion&quot;, &quot;pipeline&quot;, &quot;plugin&quot;],
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    &quot;event_log&quot;: { &quot;tasks&quot;: 4, &quot;events&quot;: 61, &quot;bytes&quot;: 31232 }
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  },
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  &quot;streams&quot;: { &quot;streams&quot;: 2, &quot;frames&quot;: 9, &quot;bytes&quot;: 12408 },
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>  &quot;storage&quot;: { &quot;status&quot;: &quot;healthy&quot; },
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  &quot;generated_at&quot;: 1718900000.0
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>}
+<p><code>--mode</code> accepts exactly the values in the first column plus <code>prompt_only</code>.
+The fitter API also accepts the aliases <code>mipro</code>, <code>gepa</code>, and
+<code>few_shot_bootstrap</code>; prefer the CLI spellings above in new scripts.</p>
+<h3 id="parameter-only-search">Parameter-only search<a class="headerlink" href="#parameter-only-search" title="Permanent link">&para;</a></h3>
+<p>Use a search space to make the allowed changes explicit. This avoids an
+optimization run silently tuning parameters you did not intend to change.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># search-space.yaml</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">optimize_system_prompt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">optimize_few_shot</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nt">optimize_model_params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">search_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tpe</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nt">model_param_space</span><span class="p">:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.5</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">top_p</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0.8</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.95</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nt">rag_param_space</span><span class="p">:</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="nt">top_k</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">8</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<h3 id="replay-occupancy">Replay occupancy<a class="headerlink" href="#replay-occupancy" title="Permanent link">&para;</a></h3>
-<p><code>tasks.event_log</code> and <code>streams</code> report what the replay buffers currently
-hold — the history that makes
-<a href="../tasks/#resuming-a-dropped-stream">dropped streams resumable</a>. They hold
-memory, so <code>bytes</code> is the number to watch when sizing a container: if it sits
-at the configured ceiling, raise it or lower retention with
-<code>AGENTOMATIC_TASK_EVENT_MAX_MB</code> / <code>AGENTOMATIC_STREAM_MAX_MB</code>, or turn replay
-off entirely (<code>AGENTOMATIC_TASK_EVENT_LOG=none</code>,
-<code>AGENTOMATIC_STREAM_REPLAY=0</code>). See
-<a href="../configuration/">Configuration</a>.</p>
-<p><code>event_log</code> is absent when a registered custom backend does not report
-occupancy — <code>stats</code> is not part of the <code>TaskEventLog</code> contract.</p>
-<p>The top-level <code>status</code> is <code>degraded</code> if any resource (including a configured
-connection) is unhealthy or storage is unhealthy, otherwise <code>healthy</code> — handy
-for a single uptime check.</p>
-<h2 id="related-probes">Related probes<a class="headerlink" href="#related-probes" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>GET /health</code> — aggregate health (agents, plugins, endpoints, ingestors,
-  pipelines, storage) for load balancers.</li>
-<li><code>GET /readiness</code> — Kubernetes-style readiness probe.</li>
-<li><code>GET /api/v1/status</code> — the rich snapshot used by the dashboard.</li>
-</ul>
-<h2 id="programmatic-use">Programmatic use<a class="headerlink" href="#programmatic-use" title="Permanent link">&para;</a></h2>
-<p>Build the same payload yourself (e.g. to push into your own monitoring):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.core.status</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_status_payload</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">snapshot</span> <span class="o">=</span> <span class="k">await</span> <span class="n">build_status_payload</span><span class="p">(</span><span class="n">platform</span><span class="p">)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>support_bot<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--dataset<span class="w"> </span>eval.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--mode<span class="w"> </span>param_search<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--search-space<span class="w"> </span>search-space.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--search-method<span class="w"> </span>tpe<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>--no-optimize-prompt<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span>--param<span class="w"> </span><span class="nv">temperature</span><span class="o">=</span><span class="m">0</span>.0,0.2,0.5<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span>--max-trials<span class="w"> </span><span class="m">18</span>
 </span></code></pre></div>
+<p><code>--param</code> adds or replaces a model parameter grid entry. <code>--search-method</code>
+accepts <code>grid</code>, <code>random</code>, or <code>tpe</code>. For <code>apo</code>, <code>--node-match</code> scopes trace
+critique to matching graph-node or subagent names; <code>--n-runners</code> sets fitter
+evaluation concurrency.</p>
+<p>Run <code>agentomatic optimize --help</code> for the complete, version-specific CLI
+contract. Do not use undocumented commands such as <code>agentomatic eval</code>,
+<code>agentomatic route</code>, or <code>agentomatic promote</code>: they are not Agentomatic CLI
+commands.</p>
+<h2 id="compatibility-api-promptoptimizer">Compatibility API: <code>PromptOptimizer</code><a class="headerlink" href="#compatibility-api-promptoptimizer" title="Permanent link">&para;</a></h2>
+<p><code>PromptOptimizer</code> and CLI <code>--mode prompt_only</code> remain available for existing
+API-backed integrations. It supports three legacy strategies only:
+<code>iterative_rewrite</code>, <code>few_shot</code>, and <code>chain_of_thought</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dataset</span><span class="p">,</span> <span class="n">PromptOptimizer</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">optimizer</span> <span class="o">=</span> <span class="n">PromptOptimizer</span><span class="p">(</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">agent</span><span class="o">=</span><span class="s2">&quot;support_bot&quot;</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;contains&quot;</span><span class="p">],</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">strategy</span><span class="o">=</span><span class="s2">&quot;iterative_rewrite&quot;</span><span class="p">,</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">llm</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">api_base</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000&quot;</span><span class="p">,</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">)</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="n">dataset</span> <span class="o">=</span> <span class="n">Dataset</span><span class="o">.</span><span class="n">from_jsonl</span><span class="p">(</span><span class="s2">&quot;eval.jsonl&quot;</span><span class="p">)</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="n">target_score</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="p">)</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">report</span><span class="p">())</span>
+</span></code></pre></div>
+<p>Equivalent CLI:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>agentomatic<span class="w"> </span>optimize<span class="w"> </span>support_bot<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--dataset<span class="w"> </span>eval.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--mode<span class="w"> </span>prompt_only<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--strategy<span class="w"> </span>iterative_rewrite<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--host<span class="w"> </span>http://127.0.0.1:8000
+</span></code></pre></div>
+<p>Do not use old names such as <code>mipro</code>, <code>ensemble</code>, or
+<code>bootstrap_randomsearch</code> with <code>--strategy</code>; they are not legacy CLI strategy
+values. Use the fitter modes above instead.</p>
+<h2 id="local-omlx-verification">Local oMLX verification<a class="headerlink" href="#local-omlx-verification" title="Permanent link">&para;</a></h2>
+<p>The live optimization tests exercise the actual OpenAI-compatible provider
+path. Point them at a real local model rather than demo mode:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OMLX_BASE_URL</span><span class="o">=</span>http://127.0.0.1:8000/v1
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OMLX_API_KEY</span><span class="o">=</span><span class="nb">local</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AGENTOMATIC_LIVE_MODEL</span><span class="o">=</span>omlx/Qwen3.5-9B-MLX-4bit
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_live_omlx_optimize.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>tests/test_live_omlx_keras_optimize.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>-q<span class="w"> </span>--override-ini<span class="o">=</span><span class="s1">&#39;addopts=&#39;</span>
+</span></code></pre></div>
+<p>Those tests are intentionally skipped when no reachable model endpoint is
+configured. The standard test suite still verifies deterministic optimizer
+logic, but a production rollout should run the live suite with a real model and
+your own representative evaluation dataset.</p>
+<h2 id="production-checklist">Production checklist<a class="headerlink" href="#production-checklist" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Keep a labelled validation set and a separate held-out test set.</li>
+<li>Use a deterministic metric or a calibrated judge before trusting a score.</li>
+<li>Run without <code>--apply</code> first and review the report, prompt diff, and failure
+   clusters.</li>
+<li>Verify the saved version in a staging deployment with the same auth,
+   connections, tools, and model configuration as production.</li>
+<li>Run the <a href="../../guide/verifying-a-deployment/">deployment verifier</a> before promoting
+   the application through your normal release process.</li>
+</ol>
 
 
 
@@ -3013,7 +3143,7 @@ for a single uptime check.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../tasks/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Tasks &amp; Execution Modes">
+          <a href="../reports/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Reports">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3023,20 +3153,20 @@ for a single uptime check.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Tasks & Execution Modes
+                Reports
               </div>
             </div>
           </a>
         
         
           
-          <a href="../ingestion/" class="md-footer__link md-footer__link--next" aria-label="Next: Ingestion &amp; RAG">
+          <a href="../examples/" class="md-footer__link md-footer__link--next" aria-label="Next: Examples">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Ingestion & RAG
+                Examples
               </div>
             </div>
             <div class="md-footer__button md-icon">
