@@ -147,7 +147,7 @@ It works with **any agent framework** — LangGraph, LangChain, Deep Agent, or r
 
     DSPy-inspired prompt fitting with **5 optimizer strategies** (GEPA, MIPRO, rewrite, few-shot bootstrap, param search). Train against a local LLM — no cloud keys, no HTTP server — using the `compile → fit → evaluate` ML lifecycle.
 
-    [:octicons-arrow-right-24: Optimization Guide](guide/optimization.md)
+    [:octicons-arrow-right-24: Optimization Guide](optimization/index.md)
 
 </div>
 
@@ -493,7 +493,7 @@ app = platform.build()
 
     Register and debug Deep Agent workflows with full Studio support.
 
-- :material-tune-vertical:{ .lg .middle } **[Prompt Optimization](guide/optimization.md)**
+- :material-tune-vertical:{ .lg .middle } **[Prompt Optimization](optimization/index.md)**
 
     ---
 

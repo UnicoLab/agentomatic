@@ -236,6 +236,12 @@ register_vector_store_adapter("my_db", MyDbStore)  # upsert/query/delete
   `"skipped: <reason>"`).
 - Model defaults resolve provider-agnostically from `AGENTOMATIC_TASK_MODEL` /
   `LLM__MODEL` before any local fallback.
+- Data roles: **train** is what the optimizer learns from, **validation** selects
+  candidates, **holdout** only vetoes (no transfer / regression / widened gap),
+  **test** is never passed to the fitter — `agent.evaluate(data.test)` before and
+  after `fit()`. `generate_fit_report(history, baseline_eval=..., final_eval=...)`
+  shows the prompt diff, every candidate's decision and reason, and per-example
+  answers. Guide: `docs/optimization/`; runnable: `examples/prompt_optimization/`.
 
 ## Project conventions (match these when editing the framework)
 

@@ -1234,7 +1234,7 @@ Each log entry includes `resource_type`, `resource_name` (and BC
 `recommendations`. Offline train can also audit retrain runs with
 `TrainConfig.persist_fit_store` / `fit_store_url` →
 `AGENTOMATIC_FIT_STORE_URL` / `DATABASE_URL` (`OptimizationRunStore`).
-See [Prompt Optimization](optimization.md).
+See [Prompt Optimization](../optimization/index.md).
 
 !!! note "Current gaps"
     - **Async tasks are not recorded** in invocation logs. Synchronous

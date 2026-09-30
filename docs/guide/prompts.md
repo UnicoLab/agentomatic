@@ -157,6 +157,6 @@ async def generate_response(state: dict[str, Any]) -> dict[str, Any]:
 | Topic | Link |
 |-------|------|
 | Agent structure & discovery | [Agent Structure](agent-structure.md) |
-| Prompt optimization | [Optimization](optimization.md) |
+| Prompt optimization | [Optimization](../optimization/index.md) |
 | A/B prompt routing | [Platform Features](platform-features.md) |
 | Class-based agent integration | [Class-Based Agents](class-agents.md) |

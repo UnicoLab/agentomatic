@@ -764,7 +764,7 @@ Failure cluster 2:
 agentomatic run
 
 # 2. Prepare a labelled JSONL evaluation dataset (query + expected_answer).
-# See docs/guide/optimization.md for the format and metric guidance.
+# See docs/optimization/ for the format, metrics and anti-overfitting guidance.
 
 # 3. Optimize a running agent with the current fitter CLI.
 agentomatic optimize scope_agent \

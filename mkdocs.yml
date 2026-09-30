@@ -135,6 +135,18 @@ nav:
     - LangChain Adapter: guide/langchain-adapter.md
     - ML Plugins: guide/ml-plugins.md
     - Testing Your Agents: guide/testing.md
+  - Optimization:
+    - Overview: optimization/index.md
+    - How It Works: optimization/how-it-works.md
+    - Metrics, Judges & Loss: optimization/metrics.md
+    - Generalization & Overfitting: optimization/generalization.md
+    - Datasets & Augmentation: optimization/data.md
+    - Class Agents (compile / fit): optimization/class-agents.md
+    - Low Level (PromptFitter): optimization/prompt-fitter.md
+    - Reports: optimization/reports.md
+    - CLI & Legacy API: optimization/cli.md
+    - Examples: optimization/examples.md
+    - Prompt Optimization (moved): guide/optimization.md
   - Advanced:
     - Production Deployment: guide/deployment.md
     - Verifying a Deployment: guide/verifying-a-deployment.md
@@ -145,7 +157,6 @@ nav:
     - Ingestion & RAG: guide/ingestion.md
     - Per-Agent Connections: guide/connections.md
     - Custom DB & Vector Connections: guide/custom-connections.md
-    - Prompt Optimization: guide/optimization.md
     - Observability & Monitoring: guide/observability.md
     - Telemetry & Feedback: guide/telemetry.md
     - Pipelines: guide/pipelines.md

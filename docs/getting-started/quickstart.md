@@ -671,7 +671,7 @@ Now that your first agent is running, explore these resources:
 | **[Deep Agent Integration](../guide/deep-agents.md)** | Register and debug Deep Agent workflows with full Studio support |
 | **[Chat Interface](../guide/debug-ui.md)** | Chainlit-based conversational testing |
 | **[Prompt Management](../guide/prompts.md)** | Template versioning, hot-reload, and A/B testing |
-| **[Prompt Optimization](../guide/optimization.md)** | Auto-tune prompts with DSPy-inspired optimization |
+| **[Prompt Optimization](../optimization/index.md)** | Auto-tune prompts with DSPy-inspired optimization |
 | **[Storage Backends](../guide/storage.md)** | Configure PostgreSQL, SQLite, or custom adapters |
 | **[Middleware](../guide/middleware.md)** | Auth, rate limiting, metrics, and custom middleware |
 | **[Configuration](../guide/configuration.md)** | Platform settings, CORS, environment variables |
