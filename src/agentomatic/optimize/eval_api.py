@@ -159,10 +159,16 @@ def select_examples(
 def resolve_eval_dataset_path(agent_dir: Path, *, prefer_augmented: bool = False) -> Path:
     """Resolve default eval JSONL path under ``agent_dir/datasets``."""
     datasets = Path(agent_dir) / "datasets"
-    augmented = datasets / "all.augmented.jsonl"
     seed = datasets / "all.jsonl"
-    if prefer_augmented and augmented.exists():
-        return augmented
+    if prefer_augmented:
+        # ``prepare_dataset`` writes ``<seed>.augmented.jsonl``; older runs and
+        # hand-written scripts used ``all_augmented.jsonl``.
+        for name in ("all.augmented.jsonl", "all_augmented.jsonl"):
+            if (datasets / name).exists():
+                return datasets / name
+        found = sorted(datasets.glob("*augmented*.jsonl"))
+        if found:
+            return found[0]
     return seed
 
 

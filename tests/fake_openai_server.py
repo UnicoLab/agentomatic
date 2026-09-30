@@ -20,6 +20,7 @@ Every request body is recorded on :attr:`FakeOpenAIServer.requests`.
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 import socket
@@ -36,6 +37,7 @@ IMPROVED_PROMPT = (
 )
 
 _VAGUE_ANSWER = "Thanks for reaching out! Our team is happy to help with that."
+_AUGMENT_COUNTER = itertools.count(1)
 
 
 def _words(text: str) -> set[str]:
@@ -76,15 +78,22 @@ def _judge_reply(prompt: str) -> str:
 
 
 def _augment_reply(prompt: str) -> str:
-    match = re.search(r"```json\s*\n(.*?)```", prompt, re.S)
-    seeds = json.loads(match.group(1)) if match else []
+    """Answer a one-seed augmentation prompt with ``k`` distinct variations."""
+    seed_match = re.search(r"## Seed example\n(\{.*?\})\n", prompt, re.S)
+    seed = json.loads(seed_match.group(1)) if seed_match else {"query": "question"}
+    count = re.search(r"Write (\d+) new", prompt)
+    k = int(count.group(1)) if count else 1
+    keep = "must stay exactly the seed's expected_answer" in prompt
+    query = str(seed.get("query", "")).rstrip("?")
     out = []
-    for i, seed in enumerate(seeds):
-        query = str(seed.get("query", "")).rstrip("?")
+    for i in range(k):
+        n = next(_AUGMENT_COUNTER)
         out.append(
             {
-                "query": f"Quick question {i}: {query.lower()}?",
-                "expected_answer": seed.get("expected_answer", ""),
+                "query": f"Variant {n}: {query.lower()}?",
+                "expected_answer": seed.get("expected_answer", "")
+                if keep
+                else f"Generated answer {n}",
             }
         )
     return json.dumps(out)
