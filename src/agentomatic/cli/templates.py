@@ -218,6 +218,7 @@ from agentomatic.agents import BaseGraphAgent
 class {title}State:
     """Agent state — per-run transient data."""
     request: str = ""
+    messages: list[Any] = field(default_factory=list)
     context: list[str] = field(default_factory=list)
     output: dict[str, Any] = field(default_factory=dict)
 
@@ -253,14 +254,21 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         g.set_finish_point("process")
         return g.compile()
 
+    def _turns(self, state: {title}State) -> list[Any]:
+        """Build the chat messages for the model: system prompt, then the turns.
+
+        ``/chat`` and Studio chat load the thread into ``state.messages``,
+        ending with the current turn, so the agent answers in context. A
+        one-shot call (``/invoke``, tasks, ``fit``) has just the request.
+        """
+        turns = state.messages or [{{"role": "user", "content": state.request}}]
+        return [{{"role": "system", "content": self._system_prompt()}}, *turns]
+
     def process(self, state: {title}State) -> {title}State:
-        prompt = self._system_prompt()
         state.context = [f"Processed: {{state.request}}"]
         if self.llm is not None:
             try:
-                result = self.llm.invoke(
-                    f"{{prompt}}\\n\\nUser: {{state.request}}"
-                )
+                result = self.llm.invoke(self._turns(state))
                 text = getattr(result, "content", None) or str(result)
             except Exception as exc:  # noqa: BLE001
                 text = f"Result for: {{state.request}} (llm error: {{exc}})"
@@ -273,7 +281,10 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return state
 
     def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
-        return {title}State(request=input_data.get("current_query", ""))
+        return {title}State(
+            request=input_data.get("current_query", ""),
+            messages=input_data.get("messages", []),
+        )
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:
         return state.output

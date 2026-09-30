@@ -55,6 +55,7 @@ import json
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Generic
 
@@ -73,6 +74,14 @@ from .types import (
     Optimizer,
     StateT,
     TraceEvent,
+)
+
+# Per-request system-prompt overrides, keyed by agent ``id()``. A ContextVar
+# rather than an instance attribute: concurrent requests (and the optimizer
+# scoring several candidate prompts at once) share one agent instance, and an
+# attribute let one run read — or clear — another run's prompt mid-flight.
+_REQUEST_PROMPTS: ContextVar[dict[int, str]] = ContextVar(
+    "agentomatic_request_prompts", default={}
 )
 
 
@@ -126,10 +135,6 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         self.stop_training: bool = False
         self._fit_optimize_options: dict[str, Any] | None = None
 
-        # Per-request system prompt override (set during transform / atransform /
-        # streaming so node methods can call ``resolve_system_prompt()``).
-        self._request_system_prompt: str | None = None
-
         # Evaluation
         self.evaluation_history: list[EvaluationReport] = []
 
@@ -139,6 +144,25 @@ class BaseGraphAgent(ABC, Generic[StateT]):
     # ==================================================================
     # Prompt resolution (optimize / fit / stacks)
     # ==================================================================
+
+    @property
+    def _request_system_prompt(self) -> str | None:
+        """Per-request prompt override of the run in the current context.
+
+        Set during ``transform`` / ``atransform`` / streaming so node methods
+        can call :meth:`resolve_system_prompt`. Context-local, so concurrent
+        runs on one instance never see each other's override.
+        """
+        return _REQUEST_PROMPTS.get().get(id(self))
+
+    @_request_system_prompt.setter
+    def _request_system_prompt(self, value: str | None) -> None:
+        prompts = dict(_REQUEST_PROMPTS.get())
+        if value is None:
+            prompts.pop(id(self), None)
+        else:
+            prompts[id(self)] = value
+        _REQUEST_PROMPTS.set(prompts)
 
     @staticmethod
     def _extract_prompt_override(input_data: dict[str, Any] | None) -> str | None:

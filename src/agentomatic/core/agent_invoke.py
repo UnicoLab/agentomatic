@@ -84,12 +84,10 @@ def build_invoke_state(
 
     user_id = data.get("user_id") or "default-user"
     thread_id = data.get("thread_id") or default_thread_id or f"thread_{uuid.uuid4().hex[:12]}"
-    context = data.get("context") if isinstance(data.get("context"), dict) else {}
-    if not isinstance(context, dict):
-        context = {}
-    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
-    if not isinstance(metadata, dict):
-        metadata = {}
+    # Copy the nested dicts: the payload is often a stored record (a task's
+    # ``input``), and the knob mirroring below must not write back into it.
+    context = dict(data["context"]) if isinstance(data.get("context"), dict) else {}
+    metadata = dict(data["metadata"]) if isinstance(data.get("metadata"), dict) else {}
 
     # Preserve every non-structural top-level key (extras + known knobs).
     extras = {k: v for k, v in data.items() if k not in _STRUCTURAL_KEYS}

@@ -145,6 +145,7 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_ENABLE_CONTROL_PLANE` / `AGENTOMATIC_CONTROL_TOKEN` | Control plane |
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` | Rate limiting |
 | `AGENTOMATIC_LOGS_HISTORY` | Persist per-agent invoke/chat/stream history (default off) |
+| `AGENTOMATIC_EPHEMERAL_THREADS` | With no store/DB configured, keep chat threads in a bounded in-memory store (default on; `0` disables — thread routes then answer 400) |
 | `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` | Enable LLM analysis over those logs (default off) |
 | `AGENTOMATIC_INGESTION_ROOT` | Confine ingestion source/output paths to this dir (default: cwd) |
 | `AGENTOMATIC_TASK_EVENT_LOG` | Task-event replay backend: `memory` (default), `none` to disable, or a registered provider |

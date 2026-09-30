@@ -76,13 +76,35 @@ def report_stage_sync(
     total: int | None = None,
     message: str = "",
 ) -> None:
-    """Schedule :func:`report_stage` from a sync graph node (no-op if no loop/ctx)."""
+    """Schedule :func:`report_stage` from a sync graph node (no-op if no loop/ctx).
+
+    Sync nodes run in a worker thread (see
+    :func:`~agentomatic.async_utils.run_in_worker_thread`), where there is no
+    running loop. The report is then handed to the loop serving the task, so
+    progress keeps flowing to ``GET /tasks/{id}/events``.
+    """
     ctx = get_task_context()
     if ctx is None:
         return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        from agentomatic.async_utils import owner_loop
+
+        origin = owner_loop()
+        if origin is None or origin.is_closed():
+            return
+
+        async def _forward() -> None:
+            await ctx.report(
+                stage=stage,
+                percent=percent,
+                current=current,
+                total=total,
+                message=message or stage,
+            )
+
+        asyncio.run_coroutine_threadsafe(_forward(), origin)
         return
     task = loop.create_task(
         report_stage(

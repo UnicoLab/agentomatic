@@ -41,6 +41,31 @@ def _run_coro_sync(coro: Any) -> Any:
     return run_sync(coro)
 
 
+async def _acall_node(node: GraphNode[Any], state: Any) -> Any:
+    """Run one node from an async execution path.
+
+    Async handlers are awaited on the loop. Sync handlers run in a worker
+    thread: template nodes make blocking LLM calls (``llm.invoke``), and
+    running those inline froze the whole server — task submission, polling,
+    SSE progress and health checks — until the model answered.
+
+    Args:
+        node: Node to execute.
+        state: Current graph state.
+
+    Returns:
+        The handler's return value (``None`` means "state mutated in place").
+    """
+    if inspect.iscoroutinefunction(node.handler):
+        return await node.handler(state)
+    from agentomatic.async_utils import run_in_worker_thread
+
+    result = await run_in_worker_thread(node, state)
+    if inspect.iscoroutine(result):
+        result = await result
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Graph Node
 # ---------------------------------------------------------------------------
@@ -241,8 +266,8 @@ class AgentGraph(Generic[StateT]):
     async def ainvoke(self, state: StateT) -> StateT:
         """Execute the graph asynchronously.
 
-        Async node handlers are awaited; sync handlers are
-        called directly.
+        Async node handlers are awaited; sync handlers run in a worker
+        thread so blocking calls (LLM, HTTP) do not stall the event loop.
 
         Args:
             state: Initial state.
@@ -263,10 +288,7 @@ class AgentGraph(Generic[StateT]):
 
             try:
                 logger.debug(f"🔄 Executing node: {current_node_name}")
-                if inspect.iscoroutinefunction(node.handler):
-                    result = await node.handler(state)
-                else:
-                    result = node(state)
+                result = await _acall_node(node, state)
                 if result is not None:
                     state = result
                 trace.finish(status="success")
@@ -336,10 +358,7 @@ class AgentGraph(Generic[StateT]):
 
             try:
                 logger.debug(f"🔄 Executing node: {current_node_name}")
-                if inspect.iscoroutinefunction(node.handler):
-                    result = await node.handler(state)
-                else:
-                    result = node(state)
+                result = await _acall_node(node, state)
                 if result is not None:
                     state = result
                 trace.finish(status="success")
@@ -436,10 +455,7 @@ class AgentGraph(Generic[StateT]):
             }
 
             try:
-                if inspect.iscoroutinefunction(node.handler):
-                    result = await node.handler(state)
-                else:
-                    result = node(state)
+                result = await _acall_node(node, state)
                 if result is not None:
                     state = result
                 trace.finish(status="success")

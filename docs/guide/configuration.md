@@ -189,6 +189,7 @@ directory, host, port, and stack values passed to `agentomatic run`.
 | `AGENTOMATIC_ENABLE_CONTROL_PLANE` / `AGENTOMATIC_CONTROL_TOKEN` | control plane | `true` / empty in generated `main.py`; `false` in CLI fallback | Mount control-plane routes and protect mutations |
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` / `AGENTOMATIC_RATE_LIMIT_TRUST_PROXY_HEADERS` | rate limiting | `false` / `false` | Enable the limiter; trust forwarded client IPs only behind a trusted proxy |
 | `AGENTOMATIC_LOGS_HISTORY` / `DATABASE_URL` | invocation history / storage | `false` / empty | Persist logs and threads using an async SQLAlchemy URL |
+| `AGENTOMATIC_EPHEMERAL_THREADS` | thread-store fallback | `true` | With no `store=`, MEMORY connection or database URL, keep conversation threads in a bounded in-memory store (1000 threads, lost on restart) so Studio chat and `/chat` history work out of the box. `0` disables it — thread routes then answer `400 Thread storage not configured` |
 | `AGENTOMATIC_ARTIFACT_ROOT` | `artifact_root` | `.local/artifacts` | Versioned plugin/model artifact bundles |
 | `AGENTOMATIC_PLUGIN_AUTORELOAD` | `plugin_autoreload` | `false` | Watch the promoted artifact version and reload plugins safely |
 | `AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL` | `plugin_autoreload_interval` | `5` | Seconds between artifact-pointer checks |

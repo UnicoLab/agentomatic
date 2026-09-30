@@ -487,12 +487,21 @@ By default the chain advances only on configured triggers (`timeout`,
 
 ## 🧠 12. Conversation Memory & Session Management
 
-Agentomatic provides **automatic conversation memory** for all deployed agents. When a thread store is configured, every `/chat` and `/invoke` call automatically:
+Agentomatic provides **automatic conversation memory** for all deployed agents. When a thread store is configured, every `/chat`, `/invoke` and Studio chat run automatically:
 
 1. **Loads prior conversation history** into the agent's `messages` state
 2. **Invokes the agent** with that state
 3. **Persists** both user and assistant messages to the store
 4. **Summarises** older messages when the conversation grows long
+
+!!! note "No store configured? Threads still work"
+    A freshly scaffolded project configures no database. Instead of failing
+    every thread route with `400 Thread storage not configured` (which made
+    Studio's *New Chat* unusable), the platform falls back to a bounded
+    in-memory store — capped at 1000 threads, oldest evicted first, lost on
+    restart — and logs a warning. Configure `store=SQLAlchemyStore(...)`, a
+    `MEMORY` connection, or `DATABASE_URL` / `AGENTOMATIC_DB_URL` for durable
+    history; set `AGENTOMATIC_EPHEMERAL_THREADS=0` to disable the fallback.
 
 !!! warning "Your agent has to *read* `messages` — loading it is not enough"
     The platform fills `state["messages"]` and reports `history_loaded`.

@@ -36,6 +36,41 @@ if TYPE_CHECKING:
     from agentomatic.storage.base import BaseStore
 
 
+def _reply_text(payload: Any) -> str:
+    """Find the assistant reply in a Studio run's final output.
+
+    Adapters report the final *state*, whose shape is agent-defined: a class
+    agent nests its output (``{"output": {"output": {"response": ...}}}``), a
+    LangGraph agent keeps ``response`` or an AI message at the end of
+    ``messages``. Breadth-first search for the shallowest non-empty
+    ``response`` string, then fall back to the last assistant message.
+
+    Args:
+        payload: The run's recorded output.
+
+    Returns:
+        The reply text, or ``""`` when none is found.
+    """
+    queue: list[Any] = [payload]
+    messages: list[Any] = []
+    while queue:
+        node = queue.pop(0)
+        if isinstance(node, dict):
+            response = node.get("response")
+            if isinstance(response, str) and response.strip():
+                return response
+            if isinstance(node.get("messages"), list) and not messages:
+                messages = node["messages"]
+            queue.extend(v for v in node.values() if isinstance(v, dict))
+    for message in reversed(messages):
+        role = message.get("role") or message.get("type") if isinstance(message, dict) else None
+        if role in ("assistant", "ai"):
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content
+    return ""
+
+
 def _now_iso() -> str:
     """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(UTC).isoformat()
@@ -184,6 +219,78 @@ def create_studio_router(
         agent = _resolve_agent(name)
         return agent, _adapter_for(agent)
 
+    # Studio chat must behave like ``/chat``: load the thread's history into
+    # ``state["messages"]`` before the run and persist the turn afterwards.
+    # Without it a chatbot answered every Studio message as if it were the
+    # first, and a reopened thread showed no messages at all.
+    memory = None
+    if store is not None:
+        from agentomatic.core.memory_manager import ConversationMemoryManager
+
+        memory = ConversationMemoryManager(store=store)
+
+    async def _attach_history(agent: Any, state: dict[str, Any]) -> str | None:
+        """Load thread history into ``state``; return the query to persist.
+
+        Args:
+            agent: Registered agent being run.
+            state: Initial run state (mutated in place).
+
+        Returns:
+            The user query when the turn should be saved after the run, else
+            ``None`` (no store, no chat-shaped query, or a structured input).
+        """
+        query = state.get("current_query")
+        # ``bool(store)`` is False until lifespan has resolved a real store.
+        if memory is None or not store or not isinstance(query, str) or not query.strip():
+            return None
+        try:
+            thread_id = await memory.get_or_create_thread(
+                state.get("thread_id"),
+                state.get("user_id") or "default-user",
+                agent.name,
+                title=query[:60],
+            )
+            state["thread_id"] = thread_id
+            state["messages"] = await memory.load_history(thread_id, query)
+        except Exception as exc:  # noqa: BLE001 - memory must never break a run
+            logger.warning(f"Studio history loading failed: {exc}")
+            return None
+        return query
+
+    async def _with_memory(
+        frames: AsyncGenerator[str, None],
+        agent: Any,
+        run_id: str,
+        thread_id: str,
+        query: str | None,
+    ) -> AsyncGenerator[str, None]:
+        """Relay run frames, then save the turn once the run has completed."""
+        async for frame in frames:
+            yield frame
+        await _save_turn(agent, run_id, thread_id, query)
+
+    async def _save_turn(agent: Any, run_id: str, thread_id: str, query: str | None) -> None:
+        """Persist ``query`` and the run's reply to the thread (best-effort)."""
+        if memory is None or query is None:
+            return
+        run = tracker.get_run(run_id)
+        if run is None or run.status != "completed":
+            return
+        reply = _reply_text(run.output)
+        if not reply:
+            return
+        try:
+            await memory.save_turn(
+                thread_id,
+                query,
+                reply,
+                agent_name=getattr(agent, "slug", None) or agent.name,
+                assistant_metadata={"run_id": run_id, "source": "studio"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Studio turn persistence failed: {exc}")
+
     # ==================================================================
     # Discovery endpoints
     # ==================================================================
@@ -315,12 +422,15 @@ def create_studio_router(
         )
 
         state = _build_studio_state(request, thread_id)
+        query = await _attach_history(_agent, state)
+        thread_id = state.get("thread_id") or thread_id
 
         # Execute — consume the stream to completion, discard SSE frames
         async for _frame in tracker.execute_with_adapter(
             adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
         ):
             pass
+        await _save_turn(_agent, run.id, thread_id, query)
 
         # Return the final run info
         updated_run = tracker.get_run(run.id)
@@ -349,11 +459,24 @@ def create_studio_router(
         )
 
         state = _build_studio_state(request, thread_id)
+        query = await _attach_history(_agent, state)
+        thread_id = state.get("thread_id") or thread_id
 
         return StreamingResponse(
             numbered_stream(
-                tracker.execute_with_adapter(
-                    adapter, state, run.id, thread_id, request.checkpoint_id, request.breakpoints
+                _with_memory(
+                    tracker.execute_with_adapter(
+                        adapter,
+                        state,
+                        run.id,
+                        thread_id,
+                        request.checkpoint_id,
+                        request.breakpoints,
+                    ),
+                    _agent,
+                    run.id,
+                    thread_id,
+                    query,
                 ),
                 stream_id=run.id,
                 owner=f"studio:{name}",
