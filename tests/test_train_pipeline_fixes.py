@@ -244,7 +244,7 @@ class TestClassAgentStreaming:
 
 class TestFitterEvalHonesty:
     @pytest.mark.asyncio
-    async def test_evaluate_config_skips_failed_judge(self, monkeypatch) -> None:
+    async def test_evaluate_config_counts_failed_judge_as_zero(self, monkeypatch) -> None:
         from agentomatic.optimize.dataset import Dataset
         from agentomatic.optimize.fitter import PromptFitter
         from agentomatic.optimize.runner import RunResult
@@ -287,6 +287,8 @@ class TestFitterEvalHonesty:
             ),
             metric,
         )
-        # Only the successful point contributes → avg 1.0, not 0.5.
-        assert avg == pytest.approx(1.0)
+        # The failed judge call counts as 0.0 (not skipped): skipping it let a
+        # candidate that breaks the judge on hard inputs outscore one that
+        # answers them. The failure stays visible in the details.
+        assert avg == pytest.approx(0.5)
         assert any(d.get("error") for d in details)

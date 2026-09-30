@@ -499,8 +499,16 @@ class RewriteOptimizer(BaseFitterOptimizer):
         dataset_sample: list[dict[str, Any]],
         eval_results: list[dict[str, Any]],
     ) -> str:
-        """Append concrete grounding tips mined from expected answers."""
+        """Append grounding tips distilled from the *training* labels.
+
+        Only what the dataset author declared is used: ``must_include`` terms
+        (from the expected output or the example metadata) and the output keys
+        every labelled example shares. Arbitrary tokens from expected answers
+        are not mined — stuffing a prompt with them overfits the data it came
+        from. Both inputs are training data (the fitter reflects on train).
+        """
         must_terms: list[str] = []
+        key_sets: list[frozenset[str]] = []
         for src in list(dataset_sample or []) + list(eval_results or []):
             expected = (
                 src.get("expected_answer") or src.get("expected") or src.get("expected_output")
@@ -509,38 +517,42 @@ class RewriteOptimizer(BaseFitterOptimizer):
             if isinstance(expected, dict):
                 exp_dict = expected
             elif isinstance(expected, str) and "## Expected structured output" in expected:
+                blob = expected.split("## Expected structured output", 1)[1].split("\n## ", 1)[0]
                 try:
-                    exp_dict = json.loads(expected.split("## Expected structured output", 1)[1])
-                except (json.JSONDecodeError, TypeError, IndexError):
+                    parsed = json.loads(blob)
+                    exp_dict = parsed if isinstance(parsed, dict) else {}
+                except (json.JSONDecodeError, TypeError):
                     exp_dict = {}
-            for term in exp_dict.get("must_include") or []:
+            if exp_dict:
+                key_sets.append(frozenset(k for k in exp_dict if k != "must_include"))
+            meta = src.get("metadata") if isinstance(src.get("metadata"), dict) else {}
+            for term in list(exp_dict.get("must_include") or []) + list(
+                meta.get("must_include") or []
+            ):
                 t = str(term).strip()
                 if t and t.lower() not in {x.lower() for x in must_terms}:
                     must_terms.append(t)
-            for key in ("content", "next_action"):
-                val = exp_dict.get(key)
-                if isinstance(val, str) and val.strip():
-                    for tok in val.split():
-                        if len(tok) > 5 and tok.lower() not in {x.lower() for x in must_terms}:
-                            must_terms.append(tok)
-                            if len(must_terms) >= 12:
-                                break
-            if len(must_terms) >= 12:
-                break
-        if not must_terms:
+        shared_keys = sorted(frozenset.intersection(*key_sets)) if key_sets else []
+        if not must_terms and len(shared_keys) < 2:
             return system_prompt
-        tip = (
-            "\n\n## Fit tips (from labelled demos)\n"
-            "- Ground every answer ONLY in the provided snapshot; never invent budgets "
-            "or stakeholders.\n"
-            "- Always return non-empty JSON keys `content` and `next_action`.\n"
-            "- Prefer concrete next actions (≥4 words) tied to unknowns/status.\n"
-            "- When relevant, include these anchors naturally: " + ", ".join(must_terms[:10]) + "."
-        )
+        lines = [
+            "",
+            "",
+            "## Fit tips (from labelled training examples)",
+            "- Ground every answer only in the provided input and context; never invent facts.",
+        ]
+        if len(shared_keys) >= 2:
+            lines.append("- Return every required field: " + ", ".join(shared_keys) + ".")
+        if must_terms:
+            lines.append(
+                "- When relevant, state these required facts explicitly: "
+                + ", ".join(must_terms[:10])
+                + "."
+            )
         base = (system_prompt or "").rstrip()
         if "## Fit tips" in base:
             return base
-        return base + tip
+        return base + "\n".join(lines)
 
 
 # =====================================================================

@@ -446,10 +446,16 @@ async def _call_ollama(
 
 
 def _normalize_llm_text(text: str) -> str:
-    """Strip thinking / reasoning preambles before returning optimize text."""
-    from agentomatic.providers.message_utils import strip_thinking_for_json
+    """Strip thinking / reasoning preambles before returning optimize text.
 
-    return strip_thinking_for_json(text or "").strip()
+    Only the reasoning is removed. Fenced blocks are kept: this used to return
+    the *first* fenced block, so a rewritten prompt that quoted the old prompt
+    in a fence (or contained a ```json example) was silently replaced by that
+    fragment. JSON callers extract their object in ``call_with_json``.
+    """
+    from agentomatic.providers.message_utils import split_thinking_text
+
+    return split_thinking_text(text or "").answer.strip()
 
 
 def _is_openai_compatible_local(base_url: str | None) -> bool:
@@ -641,6 +647,13 @@ async def _call_openai(
             response = await asyncio.wait_for(c.chat.completions.create(**kwargs), timeout=timeout)
 
         choice = response.choices[0]
+        if getattr(choice, "finish_reason", None) == "length":
+            logger.warning(
+                "LLM reply from '{}' was cut off at max_tokens={} — the output is "
+                "truncated (raise max_tokens or ask for less per call).",
+                model_name,
+                max_tokens,
+            )
         message = choice.message
         content = message.content or ""
         reasoning = getattr(message, "reasoning_content", None) or ""

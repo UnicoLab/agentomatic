@@ -756,7 +756,7 @@ class TestPromptFitterHelpers:
         assert any(wm.name == "local_judges" for wm in aug.metrics)
 
     @pytest.mark.asyncio
-    async def test_evaluate_config_skips_failed_and_averages(self, monkeypatch) -> None:
+    async def test_evaluate_config_counts_failed_points_as_zero(self, monkeypatch) -> None:
         a = _DemoAgent()
         f = PromptFitter(
             agent="demo",
@@ -792,7 +792,9 @@ class TestPromptFitterHelpers:
             ),
             metric,
         )
-        assert avg == pytest.approx(1.0)
+        # A failed evaluation counts as 0.0 — averaging only the points that
+        # worked let a candidate that breaks the judge on hard inputs win.
+        assert avg == pytest.approx(0.5)
         assert any(d.get("error") for d in details)
 
     def test_param_suggestions_and_baseline_load(self, tmp_path: Path, monkeypatch) -> None:

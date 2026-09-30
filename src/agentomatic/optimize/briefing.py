@@ -388,21 +388,38 @@ def build_full_optimization_briefing(
     return "\n\n".join(sections)
 
 
+#: A line that is only ``---`` — the delimiter the rewrite instructions ask for.
+_DELIMITER_LINE = re.compile(r"^[ \t]*-{3,}[ \t]*$", re.MULTILINE)
+#: A trailing commentary block a model appends after the prompt.
+_TRAILING_NOTES = re.compile(
+    r"\n\s*\n(?:\*\*)?(?:changes|notes?|explanation|rationale|what changed)(?:\*\*)?\s*:.*\Z",
+    re.S | re.I,
+)
+
+
 def extract_prompt_text(raw: str, *, fallback: str = "") -> str:
-    """Pull the final system-prompt text out of a free-form LLM reply."""
+    """Pull the final system-prompt text out of a free-form LLM reply.
+
+    The rewrite instructions ask for reasoning, then the prompt after a line
+    containing only ``---``. Only such a *line* delimits: a prompt that uses
+    ``---`` inside a sentence (or as its own section rule, after the first
+    delimiter) is kept whole. A fenced block is unwrapped only when it is
+    labelled ``text`` / ``markdown`` / ``prompt`` or wraps the whole reply —
+    a ```json example *inside* the new prompt must survive.
+    """
     new_prompt = (raw or "").strip()
-    if "---" in new_prompt:
-        new_prompt = new_prompt.split("---", 1)[-1].strip()
     if "<thinking>" in new_prompt and "</thinking>" in new_prompt:
         new_prompt = new_prompt.split("</thinking>", 1)[-1].strip()
-    # Prefer fenced blocks when present
-    fence = re.search(r"```(?:text|markdown|prompt)?\s*\n(.*?)```", new_prompt, re.S | re.I)
+    delimiter = _DELIMITER_LINE.search(new_prompt)
+    if delimiter:
+        new_prompt = new_prompt[delimiter.end() :].strip()
+    fence = re.search(r"```(?:text|markdown|prompt)[ \t]*\n(.*?)```", new_prompt, re.S | re.I)
     if fence:
         new_prompt = fence.group(1).strip()
-    elif new_prompt.startswith("```"):
-        lines = new_prompt.split("\n")
-        end = -1 if lines[-1].strip() == "```" else len(lines)
-        new_prompt = "\n".join(lines[1:end]).strip()
+    elif new_prompt.startswith("```") and new_prompt.rstrip().endswith("```"):
+        lines = new_prompt.strip().split("\n")
+        new_prompt = "\n".join(lines[1:-1]).strip()
+    new_prompt = _TRAILING_NOTES.sub("", new_prompt).strip()
     # Drop common labels
     for prefix in ("Improved system prompt:", "New system prompt:", "System prompt:"):
         if new_prompt.lower().startswith(prefix.lower()):

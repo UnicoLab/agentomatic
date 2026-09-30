@@ -746,7 +746,9 @@ def compile_agent(
             patience=patience,
             concurrency=concurrency,
             sequential=sequential,
-            experiment_dir=str(experiment_dir) if experiment_dir else None,
+            # ``None`` reached PromptFitter as a path and every artefact
+            # (report, result JSON) failed to save.
+            experiment_dir=str(experiment_dir) if experiment_dir else ".optimize",
             auto_report=auto_report,
             drain_seconds=drain_seconds,
         )

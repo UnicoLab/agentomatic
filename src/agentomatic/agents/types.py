@@ -339,7 +339,17 @@ class AgentExample:
 
 @dataclass
 class AgentDataset:
-    """Collection of agent examples with train/val/test splits.
+    """Collection of agent examples with train / validation / holdout / test splits.
+
+    Split roles during prompt optimization:
+
+    * ``train`` — what the optimizer learns from (failures, judge feedback,
+      few-shot demonstrations).
+    * ``validation`` (or ``val``) — what candidates are scored and selected on.
+    * ``holdout`` (optional) — the unseen gate that can only *veto* an overfit
+      candidate. Without it, a slice of validation is reserved automatically.
+    * ``test`` — never touched by optimization; evaluate it yourself after
+      ``fit()`` for an unbiased estimate.
 
     Example::
 
@@ -350,6 +360,22 @@ class AgentDataset:
     name: str = "dataset"
     examples: list[AgentExample] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    #: Split labels the dataset understands; anything else belongs to no split.
+    KNOWN_SPLITS = frozenset({"train", "validation", "val", "holdout", "test"})
+
+    def __post_init__(self) -> None:
+        unknown = sorted({e.split for e in self.examples if e.split not in self.KNOWN_SPLITS})
+        if unknown:
+            from loguru import logger
+
+            logger.warning(
+                "AgentDataset '{}': split label(s) {} are not one of {} — those "
+                "examples belong to no split and are ignored by fit()/evaluate splits.",
+                self.name,
+                unknown,
+                sorted(self.KNOWN_SPLITS),
+            )
 
     # --- Properties for split access ---
 
@@ -362,6 +388,11 @@ class AgentDataset:
     def validation(self) -> list[AgentExample]:
         """Return validation examples."""
         return [e for e in self.examples if e.split in ("validation", "val")]
+
+    @property
+    def holdout(self) -> list[AgentExample]:
+        """Return held-out gate examples (``split="holdout"``)."""
+        return [e for e in self.examples if e.split == "holdout"]
 
     @property
     def test(self) -> list[AgentExample]:

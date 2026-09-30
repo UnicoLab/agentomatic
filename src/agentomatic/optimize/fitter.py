@@ -149,20 +149,25 @@ def _wrap_local_agent(agent: Any) -> Any:
 
         async fn(query, *, prompt_override, context, invoke) -> str
 
-    The *prompt_override* is injected via two mechanisms so that agents
-    which read from state metadata honour it:
+    The *prompt_override* travels in the request (``system_prompt_override``
+    at the top level and in ``metadata``), which
+    :meth:`~agentomatic.agents.base.BaseGraphAgent.resolve_system_prompt`
+    reads per run — so concurrent candidate evaluations on one instance never
+    see each other's prompt. Only objects that are *not* a ``BaseGraphAgent``
+    additionally get ``agent.system_prompt`` / ``compiled_config`` swapped
+    for the call; that shared-state swap is serialised with a lock (it raced
+    under ``concurrency > 1`` and could leave a candidate prompt behind).
 
-    1. Temporarily set ``agent.system_prompt = prompt_override`` (if the
-       attribute exists) and restore the original value after the call.
-    2. Include ``metadata.system_prompt_override`` in the input dict so
-       graph nodes that inspect metadata also receive the override.
-
-    The output dict is serialised to JSON; plain string outputs are
-    returned as-is.
+    A dict output is returned as-is (the runner derives the scored text and
+    keeps the structured output for metrics); other outputs as a string.
     """
     import asyncio
     import inspect
-    import json as _json
+
+    from agentomatic.agents.base import BaseGraphAgent
+
+    swaps_attributes = not isinstance(agent, BaseGraphAgent)
+    swap_lock = asyncio.Lock()
 
     async def _callable(
         query: str,
@@ -199,9 +204,23 @@ def _wrap_local_agent(agent: Any) -> Any:
             if "temperature" in model_params:
                 input_data.setdefault("temperature", model_params["temperature"])
 
-        # Temporarily override the agent's system_prompt attribute so that
-        # nodes which read self.system_prompt pick up the candidate prompt.
-        # Track whether we successfully mutated so we restore even when the
+        if not swaps_attributes:
+            if hasattr(agent, "atransform") and inspect.iscoroutinefunction(agent.atransform):
+                output = await agent.atransform(input_data)
+            else:
+                output = await asyncio.to_thread(agent.transform, input_data)
+            return output if isinstance(output, dict) else str(output or "")
+
+        async with swap_lock:
+            return await _call_with_swapped_attributes(input_data, prompt_override, model_params)
+
+    async def _call_with_swapped_attributes(
+        input_data: dict[str, Any],
+        prompt_override: str | None,
+        model_params: dict[str, Any] | None,
+    ) -> Any:
+        # Duck-typed agents may read ``self.system_prompt`` directly: swap it
+        # for the call. Track whether we mutated so we restore even when the
         # original value was ``None`` / empty (otherwise the override sticks).
         original_prompt: str | None = None
         prompt_overridden = False
@@ -248,14 +267,7 @@ def _wrap_local_agent(agent: Any) -> Any:
                     pass
 
         if isinstance(output, dict):
-            # Prefer structured output, else response field, else full dict
-            inner = output.get("output")
-            if isinstance(inner, dict) and inner:
-                return _json.dumps(inner, ensure_ascii=False)
-            response = output.get("response")
-            if response is not None:
-                return str(response)
-            return _json.dumps(output, ensure_ascii=False)
+            return output
         return str(output) if output is not None else ""
 
     return _callable
@@ -342,6 +354,34 @@ class PromptFitter:
         Pass count when SLM auto-detect fires (default 3).
     llm_default_passes : int
         Pass count when LLM auto-detect fires (default 2).
+    max_generalization_gap : float
+        Largest part of a candidate's validation gain allowed *not* to show up
+        on the held-out slice (default ``0.15``; half the gain for large gains).
+    holdout_fraction : float
+        Share of the validation set reserved as the held-out gate when no
+        ``testset`` is passed to :meth:`fit` (default ``0.2``).
+    min_transfer_ratio : float
+        Share of a validation gain that must also appear on the held-out
+        slice (default ``0.25``). Rejects prompts fitted to the validation
+        examples. ``0`` disables the rule.
+    holdout_tolerance : float
+        Held-out regression tolerated as noise (default ``0.02``).
+    min_confidence : float
+        Paired-bootstrap confidence required that a candidate beats the
+        incumbent on validation (default ``0.8``). Rejects "improvements" that
+        are judge noise. ``0`` disables the test.
+    reflect_on : str
+        Data the optimizer *learns from* (failures, judge feedback, few-shot
+        demos): ``"train"`` (default — never the data candidates are selected
+        on) or ``"validation"`` (legacy; the proposer sees the selection set).
+    reflection_size : int
+        Train examples evaluated per incumbent for reflection (default 8).
+
+    Anti-overfitting, in one place: proposals are built from **train**,
+    candidates are **selected** on validation (with a paired-confidence test),
+    and a **held-out** slice that neither step sees can only *veto* a
+    candidate (regression, missing transfer, widened gap). The ``test`` split
+    should never be passed here — keep it for your final ``agent.evaluate``.
 
     Examples
     --------
@@ -403,6 +443,11 @@ class PromptFitter:
         baseline_few_shot_examples: list[dict[str, Any]] | None = None,
         max_generalization_gap: float = 0.15,
         holdout_fraction: float = 0.2,
+        min_transfer_ratio: float = 0.25,
+        holdout_tolerance: float = 0.02,
+        min_confidence: float = 0.8,
+        reflect_on: str = "train",
+        reflection_size: int = 8,
         drain_seconds: float = 1.5,
         sequential: bool | None = None,
         trace_store_path: str | None = None,
@@ -439,6 +484,13 @@ class PromptFitter:
         self.llm_default_passes = llm_default_passes
         self.max_generalization_gap = max_generalization_gap
         self.holdout_fraction = holdout_fraction
+        self.min_transfer_ratio = max(0.0, float(min_transfer_ratio))
+        self.holdout_tolerance = abs(float(holdout_tolerance))
+        self.min_confidence = min(1.0, max(0.0, float(min_confidence)))
+        if reflect_on not in ("train", "validation"):
+            raise ValueError("reflect_on must be 'train' or 'validation'")
+        self.reflect_on = reflect_on
+        self.reflection_size = max(1, int(reflection_size))
         self.drain_seconds = drain_seconds
         # Optional pre-set baseline: overrides prompts.json on first step.
         # Used by PromptFitterBridge to compound improvements across epochs.
@@ -483,6 +535,8 @@ class PromptFitter:
         #: Set when an evaluation scored nothing at all, so the summary can say
         #: the reported score is not a measurement.
         self._eval_blackout: str = ""
+        #: Blackout message of the most recent ``_evaluate_config`` call only.
+        self._last_eval_blackout: str = ""
         self._reward_adapter = MetricRewardAdapter()
 
         # Fitter optimizer — lazy-imported to avoid circular deps
@@ -642,6 +696,7 @@ class PromptFitter:
         # ── Generalization safety net: always reserve a holdout ──────
         from agentomatic.optimize.learning import (
             check_generalization,
+            paired_improvement_confidence,
             split_holdout,
             synthesize_epoch_learning,
         )
@@ -662,13 +717,16 @@ class PromptFitter:
             # Tiny valsets: borrow holdout from train so generalization
             # safety stays always-on (never silently skip).
             if not hold_pts and len(trainset) >= 2:
-                _fit_train, hold_pts = split_holdout(
+                fit_train, hold_pts = split_holdout(
                     list(trainset),
                     fraction=self.holdout_fraction,
                     min_size=1,
                 )
                 fit_pts = list(valset)
                 holdout_source = "trainset"
+                # The gate must stay unseen: the optimizer learns from train,
+                # so the carved examples leave the train pool.
+                trainset = Dataset.from_list(_as_dicts(fit_train))
             if hold_pts:
                 # Rebuild fit valset only when we carved holdout out of it.
                 if holdout_source == "valset":
@@ -700,9 +758,27 @@ class PromptFitter:
             metric,
         )
         logger.info("📊 Baseline score: {:.4f}", baseline_score)
+        # Only a blackout of the baseline invalidates the whole run; a single
+        # broken candidate must not flag a healthy fit (it used to stick).
+        baseline_blackout = self._last_eval_blackout
+        self._eval_blackout = baseline_blackout
         if baseline_dims:
             for dim, val in baseline_dims.items():
                 logger.debug("   {}: {:.4f}", dim, val)
+        best_point_scores = [float(d.get("avg_score", 0.0) or 0.0) for d in baseline_details]
+
+        # ── Reflection data: what the optimizer LEARNS from ─────────────
+        # Failure analysis, judge feedback and few-shot demos are drawn from
+        # train, never from the validation examples candidates are selected
+        # on — a proposer that reads validation gold answers writes prompts
+        # that memorise them (validation ↑, unseen data flat).
+        reflect_set = self._reflection_set(trainset, fit_valset)
+        if reflect_set is fit_valset:
+            reflect_details = baseline_details
+        else:
+            _, _, reflect_details = await self._evaluate_config(
+                baseline_config, reflect_set, metric
+            )
 
         saturation_warning = ""
         if baseline_score >= _SATURATION_SCORE:
@@ -744,7 +820,7 @@ class PromptFitter:
 
         # ── Step 3: Cluster failures ─────────────────────────────────
         logger.info("🔍 Step 3/10 — Clustering baseline failures")
-        failures = [d for d in baseline_details if d.get("avg_score", 1.0) < _FAILURE_THRESHOLD]
+        failures = [d for d in reflect_details if d.get("avg_score", 1.0) < _FAILURE_THRESHOLD]
         failure_clusters_raw: list[dict[str, Any]] = []
         if failures:
             logger.info("   Found {} failures (score < {:.1f})", len(failures), _FAILURE_THRESHOLD)
@@ -797,7 +873,11 @@ class PromptFitter:
         best_holdout_score = baseline_holdout_score
         no_improvement_rounds = 0
 
-        max_rounds = max(1, self.max_trials // _CANDIDATES_PER_ROUND)
+        max_rounds = max(1, -(-self.max_trials // _CANDIDATES_PER_ROUND))
+        # ``max_trials`` is a budget of *distinct candidates evaluated*;
+        # duplicates of an already-scored config are skipped for free.
+        seen_configs = {self._config_fingerprint(baseline_config)}
+        evaluated_candidates = 0
         logger.info(
             "🔄 Starting optimisation: {} rounds × {} candidates = {} max evals",
             max_rounds,
@@ -844,7 +924,7 @@ class PromptFitter:
             minibatch_size / max(len(val_points), 1),
         )
 
-        eval_results = self._build_eval_results(baseline_details, metric)
+        eval_results = self._build_eval_results(reflect_details, metric)
 
         # Effective patience: never exceed max_rounds so early stopping can
         # still fire, but honour the configured ``self.patience`` (wired from
@@ -863,7 +943,7 @@ class PromptFitter:
             )
         )
 
-        def _record_round(
+        async def _record_round(
             *,
             round_idx: int,
             round_t0: float,
@@ -871,7 +951,7 @@ class PromptFitter:
             accepted_name: str,
             n_candidates: int,
         ) -> None:
-            """Always append score + prompt history for Keras-style curves."""
+            """Append score + prompt history and emit ``ROUND_END`` (every path)."""
             nonlocal eval_results
             round_elapsed = time.perf_counter() - round_t0
             logger.info(
@@ -907,8 +987,39 @@ class PromptFitter:
                 len(epoch_learning.what_failed),
                 "; ".join(epoch_learning.next_focus[:2]) or "n/a",
             )
+            # Emitted on every path — skipped rounds used to end silently, so
+            # iteration-based callbacks (EarlyStopping, ModelCheckpoint) never
+            # saw them.
+            await self._callbacks.emit(
+                OptimizationEvent.ROUND_END,
+                EventData(
+                    agent=self.agent,
+                    experiment_id=experiment_id,
+                    round_idx=round_idx,
+                    total_rounds=max_rounds,
+                    score=best_score,
+                    best_score=best_score,
+                    baseline_score=baseline_score,
+                    elapsed_seconds=round_elapsed,
+                    score_history=[rs.score for rs in score_history],
+                    prompt=best_config.system_prompt,
+                ),
+            )
 
         for round_idx in range(max_rounds):
+            if round_idx and self._callbacks.stop_requested():
+                was_early_stopped = True
+                early_stop_reason = early_stop_reason or (
+                    f"callback stop_requested before round {round_idx + 1}"
+                )
+                break
+            if evaluated_candidates >= self.max_trials:
+                logger.info(
+                    "   Trial budget used: {}/{} candidates evaluated",
+                    evaluated_candidates,
+                    self.max_trials,
+                )
+                break
             round_t0 = time.perf_counter()
             round_num = round_idx + 1
             logger.info("── Round {}/{} ──", round_num, max_rounds)
@@ -983,7 +1094,7 @@ class PromptFitter:
                 candidates = await self._optimizer.propose(
                     current_config=best_config,
                     eval_results=eval_results,
-                    dataset_sample=train_points[:20],
+                    dataset_sample=self._sample_points(train_points, 20, seed=round_idx),
                     search_space=self._search_space,
                     iteration=round_idx,
                     context=opt_context,
@@ -991,7 +1102,7 @@ class PromptFitter:
             except Exception as exc:
                 logger.error("   Candidate proposal failed: {}", exc)
                 no_improvement_rounds += 1
-                _record_round(
+                await _record_round(
                     round_idx=round_idx,
                     round_t0=round_t0,
                     round_improved=False,
@@ -1011,10 +1122,39 @@ class PromptFitter:
                     break
                 continue
 
+            unique: list[PromptCandidate] = []
+            for cand in candidates:
+                fingerprint = self._config_fingerprint(cand.config)
+                if fingerprint in seen_configs:
+                    trials.append(
+                        {
+                            "round": round_num,
+                            "name": cand.name,
+                            "source": cand.source,
+                            "phase": "skipped",
+                            "score": None,
+                            "system_prompt": getattr(cand.config, "system_prompt", "") or "",
+                            "decision": "duplicate",
+                            "reason": "Identical to a config already evaluated — not re-scored.",
+                        }
+                    )
+                    continue
+                seen_configs.add(fingerprint)
+                unique.append(cand)
+            if len(unique) < len(candidates):
+                logger.info(
+                    "   Skipped {} duplicate candidate(s) (same config as one already "
+                    "scored — a failing rewrite model often re-proposes the current prompt)",
+                    len(candidates) - len(unique),
+                )
+            remaining_budget = max(0, self.max_trials - evaluated_candidates)
+            candidates = unique[:remaining_budget]
+            evaluated_candidates += len(candidates)
+
             if not candidates:
-                logger.warning("   No candidates produced — skipping round")
+                logger.warning("   No new candidates produced — skipping round")
                 no_improvement_rounds += 1
-                _record_round(
+                await _record_round(
                     round_idx=round_idx,
                     round_t0=round_t0,
                     round_improved=False,
@@ -1036,6 +1176,7 @@ class PromptFitter:
             # ── Step 5: Score candidates on minibatch ────────────────
             logger.info("   ⚡ Step 5 — Minibatch scoring ({} pts)", len(minibatch_dataset))
             candidate_scores: list[tuple[PromptCandidate, float, dict[str, float]]] = []
+            mini_trials: dict[int, dict[str, Any]] = {}
 
             for cand in candidates:
                 try:
@@ -1048,20 +1189,25 @@ class PromptFitter:
                     cand.scores = dict(cand_dims)
                     candidate_scores.append((cand, cand_score, cand_dims))
 
-                    trials.append(
-                        {
-                            "round": round_num,
-                            "name": cand.name,
-                            "source": cand.source,
-                            "phase": "minibatch",
-                            "score": cand_score,
-                            "dimensions": dict(cand_dims),
-                            "mutation_notes": cand.mutation_notes,
-                            "critique": (cand.metadata or {}).get("critique", ""),
-                            "resource_versions": len(self._resource_registry.history()),
-                            "trace_count": len(self._trace_store),
-                        }
-                    )
+                    mini_trial = {
+                        "round": round_num,
+                        "name": cand.name,
+                        "source": cand.source,
+                        "phase": "minibatch",
+                        "score": cand_score,
+                        "dimensions": dict(cand_dims),
+                        "system_prompt": getattr(cand.config, "system_prompt", "") or "",
+                        "model_params": dict(getattr(cand.config, "model_params", {}) or {}),
+                        "few_shot_count": len(getattr(cand.config, "few_shot_examples", []) or []),
+                        "mutation_notes": cand.mutation_notes,
+                        "critique": (cand.metadata or {}).get("critique", ""),
+                        "resource_versions": len(self._resource_registry.history()),
+                        "trace_count": len(self._trace_store),
+                        "decision": "screened",
+                        "reason": "",
+                    }
+                    trials.append(mini_trial)
+                    mini_trials[id(cand)] = mini_trial
                     await self._callbacks.emit(
                         OptimizationEvent.CANDIDATE_EVALUATED,
                         EventData(
@@ -1091,7 +1237,7 @@ class PromptFitter:
             if not candidate_scores:
                 logger.warning("   All candidates failed — skipping round")
                 no_improvement_rounds += 1
-                _record_round(
+                await _record_round(
                     round_idx=round_idx,
                     round_t0=round_t0,
                     round_improved=False,
@@ -1115,14 +1261,41 @@ class PromptFitter:
                 key=lambda t: (t[1], -_candidate_source_rank(t[0].source or "")),
                 reverse=True,
             )
+            # Compare against the incumbent's score on the *same* minibatch
+            # (not its full-validation score — different examples).
+            mini_n = len(minibatch_dataset)
+            incumbent_mini = (
+                sum(best_point_scores[:mini_n]) / mini_n
+                if mini_n and len(best_point_scores) >= mini_n
+                else best_score
+            )
             promotable = [
-                (cand, sc, dims) for cand, sc, dims in candidate_scores if sc > best_score
+                (cand, sc, dims) for cand, sc, dims in candidate_scores if sc > incumbent_mini
             ][:_TOP_K_CANDIDATES]
+            promoted_ids = {id(cand) for cand, _, _ in promotable}
+            for cand, sc, _ in candidate_scores:
+                trial = mini_trials.get(id(cand))
+                if trial is None:
+                    continue
+                if id(cand) in promoted_ids:
+                    trial["decision"] = "promoted"
+                    trial["reason"] = (
+                        f"Minibatch {sc:.4f} > incumbent {incumbent_mini:.4f} — "
+                        "promoted to full validation."
+                    )
+                else:
+                    trial["decision"] = "not_promoted"
+                    trial["reason"] = (
+                        f"Minibatch {sc:.4f} ≤ incumbent {incumbent_mini:.4f} on the same examples."
+                    )
 
             if not promotable:
-                logger.info("   No candidates beat current best ({:.4f})", best_score)
+                logger.info(
+                    "   No candidates beat the incumbent on the minibatch ({:.4f})",
+                    incumbent_mini,
+                )
                 no_improvement_rounds += 1
-                _record_round(
+                await _record_round(
                     round_idx=round_idx,
                     round_t0=round_t0,
                     round_improved=False,
@@ -1184,24 +1357,36 @@ class PromptFitter:
                         holdout_score=cand_holdout,
                         max_gap=self.max_generalization_gap,
                         min_holdout_improvement=0.0,
-                        baseline_holdout=baseline_holdout_score,
+                        baseline_holdout=best_holdout_score,
+                        baseline_fit=best_score,
+                        min_transfer_ratio=self.min_transfer_ratio,
+                        holdout_tolerance=self.holdout_tolerance,
                     )
-                    trials.append(
-                        {
-                            "round": round_num,
-                            "name": cand.name,
-                            "source": cand.source,
-                            "phase": "full_val",
-                            "score": full_score,
-                            "holdout_score": cand_holdout,
-                            "generalization": gen_check.to_dict(),
-                            "dimensions": dict(full_dims),
-                            "system_prompt": getattr(cand.config, "system_prompt", "") or "",
-                            "prompt_preview": (
-                                (getattr(cand.config, "system_prompt", "") or "")[:240]
-                            ),
-                        }
+                    cand_points = [float(d.get("avg_score", 0.0) or 0.0) for d in full_details]
+                    confidence = paired_improvement_confidence(
+                        cand_points, best_point_scores, seed=round_idx
                     )
+                    full_trial: dict[str, Any] = {
+                        "round": round_num,
+                        "name": cand.name,
+                        "source": cand.source,
+                        "phase": "full_val",
+                        "score": full_score,
+                        "mini_score": mini_score,
+                        "incumbent_score": best_score,
+                        "holdout_score": cand_holdout,
+                        "incumbent_holdout_score": best_holdout_score,
+                        "confidence": round(confidence, 4),
+                        "generalization": gen_check.to_dict(),
+                        "dimensions": dict(full_dims),
+                        "system_prompt": getattr(cand.config, "system_prompt", "") or "",
+                        "prompt_preview": (
+                            (getattr(cand.config, "system_prompt", "") or "")[:240]
+                        ),
+                        "decision": "rejected",
+                        "reason": "",
+                    }
+                    trials.append(full_trial)
                     logger.info(
                         "      {} full-val: {:.4f} (minibatch was {:.4f})"
                         + (f", holdout={cand_holdout:.4f}" if cand_holdout is not None else ""),
@@ -1221,10 +1406,20 @@ class PromptFitter:
                         composite_baseline=best_score,
                         composite_candidate=full_score,
                     )
+                    if accept and self.min_confidence > 0 and confidence < self.min_confidence:
+                        accept = False
+                        reason = (
+                            f"Not significant: P(candidate > incumbent) = {confidence:.2f} < "
+                            f"{self.min_confidence:.2f} over {len(cand_points)} validation "
+                            "example(s) — likely judge noise"
+                        )
+                        logger.info("      🎲 {}", reason)
                     if accept and not gen_check.ok:
                         accept = False
                         reason = f"Generalization safety net: {gen_check.reason}"
                         logger.warning("      🛡️  {}", reason)
+                    full_trial["decision"] = "accepted" if accept else "rejected"
+                    full_trial["reason"] = reason
 
                     if accept:
                         logger.info(
@@ -1263,7 +1458,14 @@ class PromptFitter:
                         best_score = full_score
                         best_dims = dict(full_dims)
                         best_holdout_score = cand_holdout
-                        eval_results = self._build_eval_results(full_details, metric)
+                        best_point_scores = cand_points
+                        if reflect_set is fit_valset:
+                            reflect_details = full_details
+                        else:
+                            _, _, reflect_details = await self._evaluate_config(
+                                cand.config, reflect_set, metric
+                            )
+                        eval_results = self._build_eval_results(reflect_details, metric)
                         round_improved = True
                         accepted_name = cand.name
                         # Keep APO beam / TPE observations in sync with accepts.
@@ -1335,27 +1537,12 @@ class PromptFitter:
             else:
                 no_improvement_rounds += 1
 
-            _record_round(
+            await _record_round(
                 round_idx=round_idx,
                 round_t0=round_t0,
                 round_improved=round_improved,
                 accepted_name=accepted_name,
                 n_candidates=len(candidates) if candidates else 0,
-            )
-            await self._callbacks.emit(
-                OptimizationEvent.ROUND_END,
-                EventData(
-                    agent=self.agent,
-                    experiment_id=experiment_id,
-                    round_idx=round_idx,
-                    total_rounds=max_rounds,
-                    score=best_score,
-                    best_score=best_score,
-                    baseline_score=baseline_score,
-                    elapsed_seconds=time.perf_counter() - round_t0,
-                    score_history=[rs.score for rs in score_history],
-                    prompt=best_config.system_prompt,
-                ),
             )
 
             if tracker is not None and tracker_exp_id is not None:
@@ -1396,7 +1583,11 @@ class PromptFitter:
                 )
                 break
 
-            if not round_improved and no_improvement_rounds >= effective_patience:
+            if (
+                not round_improved
+                and no_improvement_rounds >= effective_patience
+                and round_idx < max_rounds - 1
+            ):
                 was_early_stopped = True
                 early_stop_reason = (
                     f"no improvement for {effective_patience} round(s) "
@@ -1423,7 +1614,7 @@ class PromptFitter:
             baseline_config,
             best_config,
         )
-        blackout = getattr(self, "_eval_blackout", "")
+        blackout = self._eval_blackout = baseline_blackout
         if blackout:
             # Ahead of every other advisory: nothing else in this report means
             # anything if no datapoint was ever scored.
@@ -1508,9 +1699,12 @@ class PromptFitter:
             early_stop_reason=early_stop_reason,
             dataset_sizes={
                 "train": len(trainset),
+                "reflection": len(reflect_set) if reflect_set is not fit_valset else 0,
                 "fit_val": len(fit_valset),
                 "holdout": len(holdout_set) if holdout_set is not None else 0,
-                "test": len(testset) if testset is not None else 0,
+                "test": (
+                    len(testset) if testset is not None and testset is not holdout_set else 0
+                ),
             },
         )
 
@@ -1714,6 +1908,8 @@ class PromptFitter:
             *eval_details* is a list of dicts with per-point results.
         """
         points = [dp.to_dict() for dp in dataset]
+        # Per call: one broken candidate must not flag the rest of the run.
+        self._last_eval_blackout = self._eval_blackout = ""
 
         # Publish a versioned resource snapshot for this evaluation.
         resource_id: str | None = None
@@ -1927,13 +2123,24 @@ class PromptFitter:
             else:
                 cause = f"the metric scored none of {len(run_results)} response(s)"
                 first_error = metric_errors[0] if metric_errors else ""
-            self._eval_blackout = (
+            self._last_eval_blackout = (
                 f"No datapoint could be evaluated: {cause}. The score below is "
                 "not a measurement."
                 + (f" First error: {first_error[:200]}" if first_error else "")
             )
-            logger.error("❌ {}", self._eval_blackout)
-        avg_score = sum(scores) / scored_count if scored_count else 0.0
+            self._eval_blackout = self._last_eval_blackout
+            logger.error("❌ {}", self._last_eval_blackout)
+        failed_count = len(run_results) - scored_count
+        if run_results and 0 < failed_count < len(run_results):
+            logger.warning(
+                "   {}/{} point(s) failed (agent error or metric failure) and count as 0.0",
+                failed_count,
+                len(run_results),
+            )
+        # Failed points count as 0.0: averaging only the points that worked let
+        # a candidate that crashes the agent on hard inputs outscore one that
+        # answers them all (and the selection score disagreed with evaluate()).
+        avg_score = sum(scores) / len(run_results) if run_results else 0.0
         per_dim: dict[str, float] = {
             dim: sum(vals) / len(vals) for dim, vals in dim_accumulators.items() if vals
         }
@@ -1941,6 +2148,62 @@ class PromptFitter:
             self._resource_registry.update_score(resource_id, avg_score)
 
         return avg_score, per_dim, eval_details
+
+    def _reflection_set(self, trainset: Dataset, fit_valset: Dataset) -> Dataset:
+        """Return the data the optimizer reflects on (never the selection set).
+
+        Args:
+            trainset: Training data (proposals may learn from it).
+            fit_valset: Validation data candidates are selected on.
+
+        Returns:
+            A deterministic sample of ``trainset`` (``reflection_size``), or
+            ``fit_valset`` itself for ``reflect_on="validation"`` or when
+            there is no training data (with a warning).
+        """
+        if self.reflect_on == "validation":
+            return fit_valset
+        points = list(trainset)
+        if not points:
+            logger.warning(
+                "⚠️  No training data: the optimizer will learn from the validation "
+                "set it is selected on — high overfitting risk. Add a train split."
+            )
+            return fit_valset
+        sample = self._sample_points(points, self.reflection_size, seed=0)
+        return Dataset.from_list([p.to_dict() if hasattr(p, "to_dict") else p for p in sample])
+
+    @staticmethod
+    def _sample_points(points: list[Any], k: int, *, seed: int) -> list[Any]:
+        """Deterministic sample of up to ``k`` points drawn across the whole list.
+
+        ``points[:k]`` only ever showed the optimizer the first rows — with an
+        augmented dataset, never the synthetic ones appended at the end.
+        """
+        import random
+
+        if len(points) <= k:
+            return list(points)
+        rng = random.Random(seed)
+        return [points[i] for i in sorted(rng.sample(range(len(points)), k))]
+
+    @staticmethod
+    def _config_fingerprint(config: PromptRuntimeConfig) -> str:
+        """Stable identity of everything a candidate may change."""
+        import hashlib
+
+        payload = {
+            "system_prompt": (config.system_prompt or "").strip(),
+            "user_template": getattr(config, "user_template", "") or "",
+            "few_shot": getattr(config, "few_shot_examples", None) or [],
+            "model_params": getattr(config, "model_params", None) or {},
+            "rag_params": getattr(config, "rag_params", None) or {},
+            "tool_params": getattr(config, "tool_params", None) or {},
+            "output_contract": getattr(config, "output_contract", None),
+            "model_choice": getattr(config, "model_choice", None),
+        }
+        raw = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _prompt_with_few_shot(config: PromptRuntimeConfig) -> str:

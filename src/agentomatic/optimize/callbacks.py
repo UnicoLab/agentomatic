@@ -133,6 +133,12 @@ class Callback:
         best_score = getattr(data, "best_score", None)
 
         if name == "FIT_START":
+            # A callback instance may be reused across fits (the bridge builds
+            # a new PromptFitter every epoch): a stop requested in the last
+            # fit must not end the next one before it starts.
+            ctx.stop_requested = False
+            ctx.prompt_override = False
+            ctx.scores_history = []
             ctx.agent_name = str(getattr(data, "agent", "") or "")
             ctx.experiment_id = str(getattr(data, "experiment_id", "") or "")
             ctx.total_iterations = int(getattr(data, "total_rounds", 0) or 0)

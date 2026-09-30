@@ -175,6 +175,10 @@ class GridSearchOptimizer:
 # ---------------------------------------------------------------------------
 
 
+#: Section header PromptFitter uses when baking demonstrations into a prompt.
+_FEW_SHOT_HEADER = "## Few-shot examples"
+
+
 class PromptFitterBridge:
     """Bridge that runs the ``optimize.PromptFitter`` engine from ``fit()``.
 
@@ -275,6 +279,13 @@ class PromptFitterBridge:
         self.llm_base_url = llm_base_url
         self.llm_api_key = llm_api_key
         self.kwargs = kwargs
+        if llm_base_url or llm_api_key:
+            # fit() scores the epoch-0 baseline (judges included) before any
+            # PromptFitter exists; route those calls to the same endpoint now
+            # instead of the OMLX_BASE_URL / default fallback.
+            from agentomatic.optimize.llm_caller import LLMCaller
+
+            LLMCaller.configure(base_url=llm_base_url, api_key=llm_api_key)
 
     def optimize(
         self,
@@ -310,26 +321,41 @@ class PromptFitterBridge:
         if not len(opt_dataset):
             return _skip("empty dataset")
 
-        trainset, valset, testset = self._split_three(opt_dataset)
-        metric = self._resolve_metric()
+        trainset, valset, gateset = self._split_three(opt_dataset)
+        metric = self._resolve_metric(agent, metrics)
         if metric is None:
             return _skip("no usable metric")
+        n_test = sum(
+            1
+            for p in getattr(opt_dataset, "points", [])
+            if (getattr(p, "metadata", None) or {}).get("split") == "test"
+        )
         logger.info(
-            "PromptFitterBridge: train={} (proposals) · validation={} (selection) · "
-            "test={} (held out — generalization gate only)",
+            "PromptFitterBridge: train={} (optimizer learns from) · validation={} "
+            "(candidates selected on) · holdout={} (veto-only gate) · test={} "
+            "(never used — evaluate it after fit)",
             len(trainset),
             len(valset),
-            len(testset) if testset is not None else "auto-reserved from validation",
+            len(gateset) if gateset is not None else "auto-reserved from validation",
+            n_test,
         )
 
         try:
-            result = self._run_async(fitter.fit(trainset, valset, metric, testset=testset))
+            result = self._run_async(fitter.fit(trainset, valset, metric, testset=gateset))
         except RuntimeError as exc:
             return _skip(f"cannot run fitter here ({exc})")
         except Exception as exc:  # noqa: BLE001
             return _skip(f"fit failed ({exc})")
 
         agent._last_fit_result = result  # noqa: SLF001 - intentional handoff
+        # Every epoch's result, so reports show the ORIGINAL prompt → final
+        # prompt across epochs (the last result alone starts from the prompt
+        # an earlier epoch already improved).
+        history = getattr(agent, "_fit_results", None)
+        if not isinstance(history, list):
+            history = []
+            agent._fit_results = history  # noqa: SLF001
+        history.append(result)
         agent._last_optimize_status = "ok"  # noqa: SLF001
         logger.info(f"PromptFitterBridge: fit complete for '{name}'")
         return self._extract_config(agent, result)
@@ -427,7 +453,9 @@ class PromptFitterBridge:
             }
         # Same compounding for few-shot examples accepted by an earlier epoch.
         baseline_few_shot: list[dict[str, Any]] = []
-        if isinstance(compiled_cfg, dict):
+        if isinstance(compiled_cfg, dict) and _FEW_SHOT_HEADER not in (baseline_prompt or ""):
+            # (A prompt that already has its demonstrations baked in — see
+            # ``_extract_config`` — must not get them appended a second time.)
             raw_few_shot = compiled_cfg.get("few_shot_examples") or []
             if isinstance(raw_few_shot, list):
                 baseline_few_shot = [fs for fs in raw_few_shot if isinstance(fs, dict)]
@@ -446,34 +474,61 @@ class PromptFitterBridge:
             **kwargs,
         )
 
-    def _resolve_metric(self) -> Any | None:
-        """Return the fit objective metric (default: ExactMatch)."""
+    def _resolve_metric(self, agent: Any = None, metrics: Sequence[Any] = ()) -> Any | None:
+        """Return the metric candidates are selected on.
+
+        Order: the bridge's ``metric=``; else the metric behind the compiled
+        ``loss`` (what ``fit()`` reports as ``loss``/``val_loss``); else the
+        first compiled metric; else ``ExactMatchMetric``. Selecting on the
+        same objective that is reported keeps "the optimizer improved it"
+        and "the loss went down" the same statement.
+        """
         if self.metric is not None:
             return self.metric
-        try:
-            from agentomatic.optimize.metrics import ExactMatchMetric
+        from agentomatic.optimize.metrics import ExactMatchMetric, as_optimize_metric
 
-            return ExactMatchMetric()
-        except Exception:  # noqa: BLE001
-            return None
+        loss_metric = getattr(getattr(agent, "_loss", None), "metric", None)
+        for candidate, source in (
+            (loss_metric, "compiled loss"),
+            (next(iter(metrics), None), "first compiled metric"),
+        ):
+            if candidate is None:
+                continue
+            try:
+                resolved = as_optimize_metric(candidate)
+            except TypeError:
+                continue
+            logger.info(
+                "PromptFitterBridge: selecting candidates on the {} ('{}')",
+                source,
+                getattr(candidate, "name", type(candidate).__name__),
+            )
+            return resolved
+        logger.info("PromptFitterBridge: no metric given — selecting on ExactMatchMetric")
+        return ExactMatchMetric()
 
     @staticmethod
     def _split_three(opt_dataset: Any) -> tuple[Any, Any, Any | None]:
-        """Split into ``(train, validation, test)`` without leaking ``test``.
+        """Split into ``(train, validation, holdout)``; ``test`` is never used.
 
-        * ``train`` — failure analysis and few-shot demonstrations.
+        * ``train`` — what the optimizer learns from (failures, feedback,
+          few-shot demonstrations).
         * ``validation`` — the only data candidates are scored/selected on.
-        * ``test`` — handed to the fitter as its held-out ``testset``: it is
-          never used for selection, only for the generalization gate that
-          rejects an overfit candidate (and for the reported holdout score).
+        * ``holdout`` — optional ``split="holdout"`` examples: the unseen gate
+          that can only *veto* an overfit candidate. ``None`` lets the fitter
+          reserve a slice of validation instead.
+        * ``test`` — dropped here. A test set that gates or selects candidates
+          is no longer an unbiased estimate; evaluate it after ``fit()``.
 
-        The ``test`` split used to be folded into the validation pool, so the
-        "held-out" score was measured on data the winner had been picked on.
+        (The test split used to be folded into the selection pool, so the
+        "held-out" score was measured on data the winner had been picked on.)
 
         Without a ``validation`` split, validation is carved (20%) from
-        ``train``. Without a ``test`` split, ``None`` is returned and the
-        fitter reserves its own holdout slice from validation.
+        ``train`` after a seeded shuffle — never ``train == validation``
+        unless only one example exists.
         """
+        import random
+
         from agentomatic.optimize.dataset import Dataset
 
         points = list(getattr(opt_dataset, "points", []) or [])
@@ -483,22 +538,27 @@ class PromptFitterBridge:
 
         train = [p for p in points if _split_of(p) == "train"]
         val = [p for p in points if _split_of(p) in ("validation", "val")]
-        test = [p for p in points if _split_of(p) == "test"]
-        testset = Dataset(points=test) if test else None
+        hold = [p for p in points if _split_of(p) == "holdout"]
+        gate = Dataset(points=hold) if hold else None
+        if not train and not val:
+            # Nothing labelled for optimization (e.g. only ``test``): fall back
+            # to an unlabelled 80/20 cut of what is not test.
+            train = [p for p in points if _split_of(p) not in ("test", "holdout")]
         if train and not val and len(train) >= 2:
-            cut = max(1, int(round(len(train) * 0.8)))
-            cut = min(cut, len(train) - 1)
-            train, val = train[:cut], train[cut:]
-        if train and val:
-            return Dataset(points=train), Dataset(points=val), testset
+            shuffled = list(train)
+            random.Random(0).shuffle(shuffled)
+            cut = min(max(1, int(round(len(shuffled) * 0.8))), len(shuffled) - 1)
+            train, val = shuffled[:cut], shuffled[cut:]
         if val and not train:
-            return Dataset(points=val), Dataset(points=val), testset
-        if test and not train and not val:
-            # Only a test split was labelled: nothing else to learn from.
-            train_ds, val_ds = PromptFitterBridge._split(Dataset(points=test))
-            return train_ds, val_ds, None
-        train_ds, val_ds = PromptFitterBridge._split(opt_dataset)
-        return train_ds, val_ds, None
+            logger.warning(
+                "PromptFitterBridge: no train split — the optimizer will learn from the "
+                "validation examples it selects on (overfitting risk). Label some rows "
+                'split="train".'
+            )
+            train = list(val)
+        if not val:
+            val = list(train)
+        return Dataset(points=train), Dataset(points=val), gate
 
     @staticmethod
     def _split(opt_dataset: Any) -> tuple[Any, Any]:
@@ -553,6 +613,11 @@ class PromptFitterBridge:
         best = getattr(result, "best_config", None)
         if best is None:
             return {}
+        if getattr(result, "improved", True) is False:
+            # Nothing was accepted: applying the fitter's *baseline* would still
+            # change the agent (the baseline may have been resolved from
+            # prompts.json while the agent served its own default).
+            return {}
         raw = best.to_dict() if hasattr(best, "to_dict") else dict(getattr(best, "__dict__", {}))
         config: dict[str, Any] = {}
         for key in (*cls._APPLICABLE_KEYS, *cls._APPLICABLE_BLOCKS):
@@ -572,6 +637,15 @@ class PromptFitterBridge:
                 if param_value is None:
                     continue
                 config[param_key] = param_value
+        if config.get("few_shot_examples") and config.get("system_prompt"):
+            # Candidates were *scored* with their demonstrations baked into
+            # the prompt; serve them the same way (resolve_system_prompt does
+            # not read ``few_shot_examples``), or the fitted score never shows
+            # up in production.
+            from agentomatic.optimize.fitter import PromptFitter
+
+            if _FEW_SHOT_HEADER not in config["system_prompt"]:
+                config["system_prompt"] = PromptFitter._prompt_with_few_shot(best)  # noqa: SLF001
         return config
 
     @staticmethod
