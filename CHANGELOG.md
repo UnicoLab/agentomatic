@@ -2,6 +2,79 @@
 
 <!-- version list -->
 
+## v1.15.0 (2026-09-30)
+
+### Bug Fixes
+
+- **deps**: Upgrade locked anyio, PyJWT, urllib3 and virtualenv past advisories
+  ([`20eb8ae`](https://github.com/UnicoLab/agentomatic/commit/20eb8ae7ae6601bdb58761b2cf7590b23924af00))
+
+- **optimize**: Accept every metric protocol everywhere; hold the test split out of selection
+  ([`868755f`](https://github.com/UnicoLab/agentomatic/commit/868755f8fbd3f2f3513fafb2198387c2bde53c98))
+
+- **optimize**: Data augmentation actually adds usable, leak-free rows
+  ([`7a46ae7`](https://github.com/UnicoLab/agentomatic/commit/7a46ae70f5044f1e5c80d1ab4fc11df7a5255f62))
+
+- **optimize**: Judge scores and metric aggregation mean what they say
+  ([`950baa3`](https://github.com/UnicoLab/agentomatic/commit/950baa352c616d48d57ec882ccfd561900de9506))
+
+- **studio**: Chat, debug, tasks, pipelines and feedback work with template agents
+  ([`8b45d7d`](https://github.com/UnicoLab/agentomatic/commit/8b45d7d386e42aa4c2996969321fe2e1b5440809))
+
+- **studio,tasks**: Make template agents chat, thread and run as tasks out of the box
+  ([`8cc6ac0`](https://github.com/UnicoLab/agentomatic/commit/8cc6ac0f1890c0c1021efcd6b34452c5ad8584cb))
+
+### Chores
+
+- Ignore ModelCheckpoint's default output directory
+  ([`921a97d`](https://github.com/UnicoLab/agentomatic/commit/921a97d5cf05b4a1d577cc05e59d80925eef8cd7))
+
+- Sync uv.lock with the 1.14.0 project version
+  ([`9b88a71`](https://github.com/UnicoLab/agentomatic/commit/9b88a7111ed98e6912a497c984d3410c9693bc60))
+
+- **studio**: Rebuild the Studio UI 0.4.1 bundle with patched dependencies
+  ([`1428e2d`](https://github.com/UnicoLab/agentomatic/commit/1428e2d25fd3142eac862924aad34c7ef994f274))
+
+- **studio**: Ship the Studio UI 0.4.1 build from source
+  ([`b5b60d1`](https://github.com/UnicoLab/agentomatic/commit/b5b60d121505c099f0ec90980ad3c1e54df44da0))
+
+### Continuous Integration
+
+- Keep pre-commit fixers off the synced Studio bundle
+  ([`54ce4a0`](https://github.com/UnicoLab/agentomatic/commit/54ce4a0acac89176e979dfff70938d1ab57bd381))
+
+- **sync-studio**: Do not fail the sync when PR labels are missing
+  ([`69e1636`](https://github.com/UnicoLab/agentomatic/commit/69e16366ae302aca7a8d906af06b7059937690c4))
+
+### Documentation
+
+- Adding prompt optimization low level example
+  ([`e94084a`](https://github.com/UnicoLab/agentomatic/commit/e94084a1b3dd8d6ed47f1b9fb66dca4ef51f0e7b))
+
+- Adding report generation
+  ([`9c45d4e`](https://github.com/UnicoLab/agentomatic/commit/9c45d4ea8e5ad3099c4e38034e140f998ac66d6e))
+
+- Cleaning tmp files
+  ([`f82af42`](https://github.com/UnicoLab/agentomatic/commit/f82af4274e05765f936a5bf4bc88d7f72fdd95b8))
+
+- Improving examples
+  ([`93863d3`](https://github.com/UnicoLab/agentomatic/commit/93863d3d2052a82f19715d1bae41c704390d00dd))
+
+- **optimization**: A dedicated section covering the whole mechanism
+  ([`dcc74af`](https://github.com/UnicoLab/agentomatic/commit/dcc74af80a6d5533da8be0d01e083f644f91d593))
+
+### Features
+
+- **examples**: Working prompt-optimization examples, low to high level
+  ([`7d04c78`](https://github.com/UnicoLab/agentomatic/commit/7d04c785f13d6545ce4faa3909e10af3bec91907))
+
+- **optimize**: An anti-overfitting mechanism for prompt optimization
+  ([`a39b603`](https://github.com/UnicoLab/agentomatic/commit/a39b603b8dd1f180dd1eae6ddba192ee894033cb))
+
+- **optimize**: Fit reports show what changed and whether it helped
+  ([`735f9c5`](https://github.com/UnicoLab/agentomatic/commit/735f9c5d8ac5da927523fbcbc46063655fd65651))
+
+
 ## v1.14.0 (2026-09-16)
 
 ### Bug Fixes
