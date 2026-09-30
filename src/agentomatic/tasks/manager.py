@@ -55,6 +55,24 @@ class TaskInputValidationError(ValueError):
     """Raised when a resource rejects a task payload before it is queued."""
 
 
+class TargetFailedError(RuntimeError):
+    """The target ran to completion but reported a failure.
+
+    A pipeline whose status is ``failed`` or an endpoint whose every upstream
+    call failed returns normally, so its task used to be marked ``succeeded``.
+    Dispatchers raise this instead; the task is marked ``failed`` and keeps
+    the target's own result (step errors, upstream responses) for debugging.
+
+    Args:
+        message: What failed, shown as the task's error.
+        result: The JSON-safe result the target returned.
+    """
+
+    def __init__(self, message: str, result: Any = None) -> None:
+        super().__init__(message)
+        self.result = result
+
+
 class TaskManager:
     """Run and track platform resources as uniform, cancellable tasks.
 
@@ -390,6 +408,17 @@ class TaskManager:
                     if delay > 0:
                         await asyncio.sleep(delay)
 
+            if isinstance(last_error, TargetFailedError):
+                # The target's own report (e.g. which pipeline step failed and
+                # why) — already what its HTTP route returns, so not sanitised.
+                logger.error(f"Task {record.id} failed: {last_error}")
+                await self._finalize(
+                    record,
+                    TaskStatus.FAILED,
+                    result=last_error.result,
+                    error=str(last_error),
+                )
+                return
             logger.exception(f"Task {record.id} failed after {record.attempts} attempts")
             # Raw exception text routinely carries DSNs/paths, and this
             # record is served verbatim by GET /tasks/{id}, /result and the
@@ -444,6 +473,8 @@ class TaskManager:
                     raise asyncio.CancelledError
                 try:
                     results[index] = await dispatcher(record.target, payload, ctx)
+                except TargetFailedError as exc:
+                    results[index] = {"error": str(exc), "result": exc.result}
                 except Exception as exc:  # noqa: BLE001 - collect per-item errors
                     # Per-item errors are returned to the caller too.
                     results[index] = {

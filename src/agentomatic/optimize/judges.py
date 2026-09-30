@@ -19,10 +19,36 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from agentomatic.optimize.metrics import BaseMetric, EvalResult, MetricResult
+from agentomatic.optimize.metrics import (
+    _JUDGE_SCORE_KEYS,
+    BaseMetric,
+    EvalResult,
+    MetricResult,
+    coerce_judge_score,
+)
 
 if TYPE_CHECKING:
     from agentomatic.optimize.llm_types import LLMSpec
+
+
+def _as_list(value: Any) -> list[str]:
+    """Coerce a judge field that should be a list of strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, (list, tuple)):
+        return [str(v) for v in value if str(v).strip()]
+    return [str(value)]
+
+
+def _judge_failed(result: MetricResult) -> bool:
+    """True when a judge's ``MetricResult`` marks a failed evaluation."""
+    flag = getattr(result, "_judge_failed", None)
+    if flag is not None:
+        return bool(flag)
+    return (result.feedback or "").startswith("Judge evaluation failed:")
+
 
 # =====================================================================
 # Local SLM Judge
@@ -56,12 +82,20 @@ class LocalJudgeMetric(BaseMetric):
         dimensions: list[str] | None = None,
         weight: float = 1.0,
         temperature: float = 0.0,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> None:
         self.name = name
         self.model = model
         self.criteria = criteria
         self.dimensions = dimensions or ["correctness", "completeness", "relevance"]
+        #: Informational only — weight a judge inside ``CompositeMetric`` /
+        #: ``WeightedMetric`` (this value is not read by the judge itself).
         self.weight = weight
+        #: Endpoint for this judge only (else ``LLMCaller`` defaults / env).
+        self.base_url = base_url
+        self.api_key = api_key
         # Default 0.0 for reproducible scoring across epochs (reduces 0.33↔0.67
         # oscillation from sampling noise at temp>0).
         self.temperature = temperature
@@ -79,7 +113,7 @@ class LocalJudgeMetric(BaseMetric):
         the ``"metric_result"`` key.
         """
         metric_result = await self.evaluate_rich(query, response, expected, context)
-        failed = metric_result.feedback.startswith("Judge evaluation failed:")
+        failed = bool(getattr(metric_result, "_judge_failed", False))
         extras = getattr(metric_result, "_judge_extras", {}) or {}
         return EvalResult(
             metric_name=self.name,
@@ -93,6 +127,8 @@ class LocalJudgeMetric(BaseMetric):
                 "what_worked": extras.get("what_worked", []),
                 "what_failed": extras.get("what_failed", []),
                 "improvement_hints": extras.get("improvement_hints", []),
+                "score_source": extras.get("score_source", ""),
+                "raw_score": extras.get("raw_score"),
             },
         )
 
@@ -154,22 +190,40 @@ class LocalJudgeMetric(BaseMetric):
                 model=self.model,
                 prompt=prompt,
                 temperature=self.temperature,
+                base_url=self.base_url,
+                api_key=self.api_key,
             )
-            if not data or "overall_score" not in data:
-                raise ValueError("Judge returned no overall_score")
+            if not isinstance(data, dict) or not data:
+                raise ValueError("Judge returned no JSON object")
 
-            overall = max(0.0, min(1.0, float(data["overall_score"])))
+            # Per-dimension scores, each parsed on its own (one malformed
+            # dimension used to discard a perfectly good overall score).
+            dims: dict[str, float] = {}
+            raw_dims = data.get("dimensions") or data.get("scores") or {}
+            if isinstance(raw_dims, dict):
+                lowered = {str(k).lower(): v for k, v in raw_dims.items()}
+                for d in self.dimensions:
+                    value = coerce_judge_score(lowered.get(d.lower()))
+                    if value is not None:
+                        dims[d] = value
+
+            raw_overall = next((data[k] for k in _JUDGE_SCORE_KEYS if k in data), None)
+            overall = coerce_judge_score(raw_overall)
+            score_source = "overall"
+            if overall is None and dims:
+                # Small models often return only the dimension scores.
+                overall = sum(dims.values()) / len(dims)
+                score_source = "dimension_mean"
+            if overall is None:
+                raise ValueError(
+                    f"Judge reply has no usable score (keys: {sorted(data)[:8]}, "
+                    f"overall={raw_overall!r})"
+                )
+
             feedback = str(data.get("feedback", ""))
             motivation = str(data.get("motivation", "")).strip()
             if motivation and motivation not in feedback:
                 feedback = f"{feedback}\n\nMotivation: {motivation}".strip()
-
-            dims: dict[str, float] = {}
-            raw_dims = data.get("dimensions", {})
-            if isinstance(raw_dims, dict):
-                for d in self.dimensions:
-                    if d in raw_dims:
-                        dims[d] = max(0.0, min(1.0, float(raw_dims[d])))
             # Missing dimensions inherit the overall score (not a fabricated 0.5).
             for d in self.dimensions:
                 dims.setdefault(d, overall)
@@ -178,23 +232,28 @@ class LocalJudgeMetric(BaseMetric):
             # Attach rich judge fields for epoch learnings / rewrite briefings.
             rich_meta = {
                 "motivation": motivation,
-                "what_worked": list(data.get("what_worked") or []),
-                "what_failed": list(data.get("what_failed") or []),
-                "improvement_hints": list(data.get("improvement_hints") or []),
+                "what_worked": _as_list(data.get("what_worked")),
+                "what_failed": _as_list(data.get("what_failed")),
+                "improvement_hints": _as_list(data.get("improvement_hints")),
+                "score_source": score_source,
+                "raw_score": raw_overall,
             }
-            # MetricResult may not have a metadata field — stash on feedback path
-            # via a dynamic attribute used by LocalJudgeMetric.evaluate().
+            # MetricResult has no metadata field — stash via dynamic attributes
+            # read by LocalJudgeMetric.evaluate() / MultiJudgePanel.
             result._judge_extras = rich_meta  # type: ignore[attr-defined]
+            result._judge_failed = False  # type: ignore[attr-defined]
             return result
 
         except Exception as exc:
             logger.warning(f"LocalJudgeMetric '{self.name}' failed: {exc}")
             # Honest failure — never fabricate a mid-scale score.
-            return MetricResult(
+            failed = MetricResult(
                 score=0.0,
                 feedback=f"Judge evaluation failed: {exc}",
                 dimensions={d: 0.0 for d in self.dimensions},
             )
+            failed._judge_failed = True  # type: ignore[attr-defined]
+            return failed
 
 
 # =====================================================================
@@ -203,10 +262,15 @@ class LocalJudgeMetric(BaseMetric):
 
 
 class MultiJudgePanel(BaseMetric):
-    """Run multiple judges in parallel and aggregate their results.
+    """Run several judges in parallel and aggregate their scores.
 
-    Supports aggregation by average (default) or majority vote.
-    Optionally weighted by judge calibration scores.
+    A panel reduces the variance and self-preference of a single judge
+    ("mixture of experts"). Judges that fail are dropped; each remaining
+    judge keeps *its own* weight.
+
+    Aggregations: ``"average"`` (weighted mean, default), ``"median"``
+    (robust to one outlier judge — ``"majority"`` is an alias), ``"min"``
+    (pessimistic: every judge must be satisfied), ``"max"``.
 
     Example::
 
@@ -216,24 +280,39 @@ class MultiJudgePanel(BaseMetric):
                 LocalJudgeMetric(name="judge_llama", model="ollama/llama3.1:8b"),
             ],
             aggregation="average",
+            weights=[2.0, 1.0],
         )
     """
 
     name = "multi_judge_panel"
+
+    _AGGREGATIONS = ("average", "median", "min", "max")
 
     def __init__(
         self,
         judges: list[LocalJudgeMetric],
         aggregation: str = "average",
         weights: list[float] | None = None,
+        *,
+        name: str = "multi_judge_panel",
     ) -> None:
         if not judges:
             raise ValueError("MultiJudgePanel requires at least one judge")
+        aggregation = {"majority": "median", "majority_vote": "median"}.get(
+            aggregation, aggregation
+        )
+        if aggregation not in self._AGGREGATIONS:
+            raise ValueError(
+                f"Unknown aggregation '{aggregation}'. Choose from {list(self._AGGREGATIONS)}."
+            )
+        self.name = name
         self._judges = judges
         self._aggregation = aggregation
-        self._weights = weights or [1.0] * len(judges)
+        self._weights = list(weights) if weights is not None else [1.0] * len(judges)
         if len(self._weights) != len(judges):
             raise ValueError("Number of weights must match number of judges")
+        if any(w < 0 for w in self._weights) or sum(self._weights) <= 0:
+            raise ValueError("Judge weights must be >= 0 with a positive total")
 
     async def evaluate(
         self,
@@ -246,92 +325,75 @@ class MultiJudgePanel(BaseMetric):
         tasks = [judge.evaluate_rich(query, response, expected, context) for judge in self._judges]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        valid_results: list[MetricResult] = []
-        for r in results:
-            if isinstance(r, MetricResult):
-                valid_results.append(r)
-            elif isinstance(r, Exception):
-                logger.warning(f"MultiJudgePanel: judge failed: {r}")
+        # Keep each judge's weight attached to its own result: dropping failed
+        # judges used to shift the weights onto the wrong judges.
+        usable: list[tuple[MetricResult, float, str]] = []
+        failures: list[str] = []
+        for judge, weight, r in zip(self._judges, self._weights, results, strict=True):
+            judge_name = getattr(judge, "name", "judge")
+            if isinstance(r, BaseException):
+                logger.warning(f"MultiJudgePanel: judge '{judge_name}' raised: {r}")
+                failures.append(judge_name)
+            elif isinstance(r, MetricResult) and not _judge_failed(r):
+                usable.append((r, weight, judge_name))
+            else:
+                failures.append(judge_name)
 
-        if not valid_results:
+        if not usable or sum(w for _, w, _ in usable) <= 0:
             return EvalResult(
                 metric_name=self.name,
                 score=0.0,
-                reason="All judges failed",
-                metadata={"evaluation_failed": True},
+                reason="All judges failed" if not usable else "All usable judges have weight 0",
+                metadata={"evaluation_failed": True, "failed_judges": failures},
             )
 
-        # LocalJudgeMetric soft-fails into MetricResult; treat those as failures
-        # so fitter/composite metrics can skip dishonest zero scores.
-        failed_flags = [
-            (r.feedback or "").startswith("Judge evaluation failed:") for r in valid_results
-        ]
-        if all(failed_flags):
-            return EvalResult(
-                metric_name=self.name,
-                score=0.0,
-                reason="All judges failed",
-                metadata={
-                    "evaluation_failed": True,
-                    "individual_scores": [r.score for r in valid_results],
-                    "metric_result": valid_results[0],
-                },
-            )
-
-        usable = [r for r, failed in zip(valid_results, failed_flags) if not failed]
-        if not usable:
-            usable = valid_results
-
-        # Aggregate
-        if self._aggregation == "average":
-            aggregated = self._aggregate_average(usable)
-        else:
-            aggregated = self._aggregate_average(usable)
-
-        # Collect all feedback
-        feedback_parts = [r.feedback for r in usable if r.feedback]
+        score, dimensions = self._aggregate(usable)
+        feedback_parts = [f"[{name}] {r.feedback}" for r, _, name in usable if r.feedback]
         combined_feedback = " | ".join(feedback_parts)
-
         metric_result = MetricResult(
-            score=aggregated["score"],
+            score=score,
             feedback=combined_feedback,
-            dimensions=aggregated["dimensions"],
+            dimensions=dimensions,
         )
-
         return EvalResult(
             metric_name=self.name,
-            score=aggregated["score"],
+            score=score,
             reason=combined_feedback,
             metadata={
-                "individual_scores": [r.score for r in usable],
+                "individual_scores": {name: r.score for r, _, name in usable},
+                "failed_judges": failures,
+                "aggregation": self._aggregation,
+                "dimensions": dimensions,
                 "metric_result": metric_result,
                 "evaluation_failed": False,
             },
         )
 
-    def _aggregate_average(self, results: list[MetricResult]) -> dict[str, Any]:
-        """Weighted average aggregation."""
-        weights = self._weights[: len(results)]
-        total_w = sum(weights)
+    def _aggregate(
+        self, usable: list[tuple[MetricResult, float, str]]
+    ) -> tuple[float, dict[str, float]]:
+        """Aggregate scores (per ``aggregation``) and dimensions (weighted mean)."""
+        import statistics
 
-        weighted_score = sum(r.score * w for r, w in zip(results, weights)) / total_w
-
-        # Aggregate dimensions
-        all_dim_keys: set[str] = set()
-        for r in results:
-            all_dim_keys.update(r.dimensions.keys())
+        scores = [r.score for r, _, _ in usable]
+        if self._aggregation == "median":
+            score = float(statistics.median(scores))
+        elif self._aggregation == "min":
+            score = min(scores)
+        elif self._aggregation == "max":
+            score = max(scores)
+        else:
+            total_w = sum(w for _, w, _ in usable)
+            score = sum(r.score * w for r, w, _ in usable) / total_w
 
         dimensions: dict[str, float] = {}
-        for key in all_dim_keys:
-            dim_vals = [
-                (r.dimensions.get(key, 0.0), w)
-                for r, w in zip(results, weights)
-                if key in r.dimensions
-            ]
-            if dim_vals:
-                dimensions[key] = sum(v * w for v, w in dim_vals) / sum(w for _, w in dim_vals)
-
-        return {"score": weighted_score, "dimensions": dimensions}
+        keys = {k for r, _, _ in usable for k in r.dimensions}
+        for key in keys:
+            pairs = [(r.dimensions[key], w) for r, w, _ in usable if key in r.dimensions]
+            weight = sum(w for _, w in pairs)
+            if weight > 0:
+                dimensions[key] = sum(v * w for v, w in pairs) / weight
+        return score, dimensions
 
 
 # =====================================================================

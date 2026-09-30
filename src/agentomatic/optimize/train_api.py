@@ -91,6 +91,9 @@ class TrainConfig:
         fit_store_url: Explicit DB URL for auditable retrain persistence
             (overrides env). Same dialects as platform storage
             (Postgres, SQLite, …).
+        evaluate_baseline: Also evaluate the held-out split *before* fit so
+            the report shows per-example answers and scores before vs after
+            (one extra pass over the test split). Default ``True``.
     """
 
     agent_name: str
@@ -133,6 +136,8 @@ class TrainConfig:
     # --- auditable fit / retrain persistence --------------------------------
     persist_fit_store: bool = False
     fit_store_url: str | None = None
+    # --- reporting -----------------------------------------------------------
+    evaluate_baseline: bool = True
 
     def __post_init__(self) -> None:
         """Normalise ``nr_examples`` → ``n_examples`` alias."""
@@ -158,6 +163,11 @@ class TrainResult:
     augmented: bool = False
     persist_path: Path | None = None
     agent_name: str = ""
+    baseline_eval_scores: dict[str, float] = field(default_factory=dict)
+    """Held-out scores *before* fit (empty with ``evaluate_baseline=False``)."""
+    fit_results: list[Any] = field(default_factory=list)
+    """One ``PromptFitResult`` per epoch; ``fit_result`` merges them (initial
+    prompt → final prompt across all epochs)."""
 
     def print_summary(self, console: Any | None = None) -> None:
         """Pretty-print a Rich summary of this train run.
@@ -226,7 +236,9 @@ def print_train_result(result: TrainResult, *, console: Any | None = None) -> No
             f"prompt_changed={base_p != best_p} base_len={len(base_p)} best_len={len(best_p)}"
         )
 
-    console.print(f"evaluate scores={result.eval_scores}")
+    if result.baseline_eval_scores:
+        console.print(f"held-out scores before fit={result.baseline_eval_scores}")
+    console.print(f"held-out scores after fit={result.eval_scores}")
     console.print(f"[green]Report:[/green] {result.report_path}")
     try:
         rsize = Path(result.report_path).stat().st_size if result.report_path else 0
@@ -369,47 +381,92 @@ def _model_spec(entry: Any) -> str:
     return f"{mapped}/{entry.model}"
 
 
-def _datapoint_to_example(dp: Any, *, idx: int, split: str = "train") -> Any:
-    """Convert an optimize ``DataPoint`` into an ``AgentExample``."""
+#: Input keys that carry the user question (replaced in an augmented copy).
+_QUERY_KEYS = ("current_query", "query", "question", "request")
+
+
+def _augmented_example(seed: Any, dp: Any, *, strategy: str, idx: int) -> Any | None:
+    """Build a synthetic ``AgentExample`` that mirrors its seed's schema.
+
+    The seed's ``input`` is copied with only the question replaced, so extra
+    input fields (context, ids, custom keys) survive. The label follows the
+    strategy:
+
+    * label-preserving strategies (paraphrase, perturbation, …) keep the
+      seed's ``expected_output`` **and** metadata (``must_include``, rubric
+      hints) — the answer is the same;
+    * other strategies (expansion, adversarial, …) take the generated answer,
+      shaped like the seed's ``expected_output``. A row whose answer cannot
+      be expressed in the seed's schema is dropped (never padded with
+      invented fields).
+
+    Args:
+        seed: The seed ``AgentExample``.
+        dp: The generated ``DataPoint``.
+        strategy: Augmentation strategy that produced it.
+        idx: Running index for the new id.
+
+    Returns:
+        The new example, or ``None`` when it cannot match the seed schema.
+    """
     from agentomatic.agents.types import AgentExample
+    from agentomatic.optimize.metrics import plain_expected
+    from agentomatic.optimize.synthesizer import LABEL_PRESERVING_STRATEGIES
 
-    expected_raw = getattr(dp, "expected_answer", None)
-    expected: dict[str, Any] | None
-    if isinstance(expected_raw, dict):
-        expected = dict(expected_raw)
-    elif isinstance(expected_raw, str) and expected_raw.strip():
-        try:
-            parsed = json.loads(expected_raw)
-            expected = parsed if isinstance(parsed, dict) else {"content": expected_raw}
-        except (json.JSONDecodeError, TypeError):
-            expected = {"content": expected_raw, "next_action": "Follow up with stakeholder."}
+    query = str(getattr(dp, "query", "") or "").strip()
+    if not query:
+        return None
+    inp = dict(seed.input or {})
+    replaced = False
+    for key in _QUERY_KEYS:
+        if key in inp:
+            inp[key] = query
+            replaced = True
+    if not replaced:
+        inp["current_query"] = query
+
+    seed_expected = seed.expected_output
+    preserving = strategy in LABEL_PRESERVING_STRATEGIES
+    if preserving:
+        expected = dict(seed_expected) if isinstance(seed_expected, dict) else seed_expected
+        metadata = dict(seed.metadata or {})
     else:
-        expected = {"content": "", "next_action": ""}
-
-    query = str(getattr(dp, "query", "") or "")
-    meta = dict(getattr(dp, "metadata", None) or {})
-    meta.setdefault("source", "augment")
-    meta.setdefault("split", split)
-    ctx = getattr(dp, "context", None) or []
-    inp: dict[str, Any] = {
-        "current_query": query,
-        "query": query,
-        "question": query,
-    }
-    if ctx:
-        # Prefer structured context when the synthesizer echoed JSON.
+        raw = plain_expected(getattr(dp, "expected_answer", None)) or ""
+        parsed: Any = None
         try:
-            inp["context"] = json.loads(ctx[0]) if isinstance(ctx[0], str) else ctx[0]
-        except (json.JSONDecodeError, TypeError, IndexError):
-            inp["context"] = ctx
-
+            parsed = json.loads(raw) if raw.strip().startswith("{") else None
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        text_keys = (
+            [k for k, v in seed_expected.items() if isinstance(v, str)]
+            if isinstance(seed_expected, dict)
+            else []
+        )
+        if isinstance(parsed, dict) and (
+            not isinstance(seed_expected, dict) or set(seed_expected) <= set(parsed)
+        ):
+            expected = parsed
+        elif (
+            raw.strip()
+            and isinstance(seed_expected, dict)
+            and len(seed_expected) == 1
+            and text_keys
+        ):
+            expected = {text_keys[0]: raw.strip()}
+        elif raw.strip() and seed_expected is None:
+            expected = {"response": raw.strip()}
+        else:
+            return None  # cannot honour the seed schema without inventing fields
+        metadata = {}
+    metadata.update({"source": "augment", "strategy": strategy, "parent_id": seed.id})
     return AgentExample(
-        id=f"aug_{idx:04d}",
+        id=f"{seed.id or 'seed'}~aug{idx:04d}",
         input=inp,
         expected_output=expected,
-        metadata=meta,
-        tags=["augmented"],
-        split=split,
+        metadata=metadata,
+        rubric=dict(seed.rubric or {}),
+        tags=[*list(seed.tags or []), "augmented"],
+        split="train",
     )
 
 
@@ -425,102 +482,155 @@ def prepare_dataset(
     strategies: list[str] | None = None,
     llm_base_url: str | None = None,
     llm_api_key: str | None = None,
+    per_call: int = 4,
+    max_tokens: int = 4096,
+    strict: bool = False,
 ) -> tuple[Any, Path | None]:
     """Optionally augment (and persist) an :class:`AgentDataset`.
+
+    Augmentation only ever grows the **train** split, seeded from train rows:
+    validation / holdout / test stay untouched, and generated questions that
+    duplicate — or nearly duplicate — any of them are discarded (a paraphrase
+    of a test question in train inflates every score measured on it).
+
+    Every run records ``dataset.metadata["augment_stats"]`` (requested, LLM
+    calls, parsed, duplicates, near-duplicates, empty calls, added per
+    strategy) and warns when fewer rows than requested were added.
 
     Args:
         dataset: Seed ``AgentDataset``.
         augment: Run LLM augmentation when True.
-        n_examples: Target total size (keeps originals + fills with synth).
+        n_examples: Target **total** size of the dataset after augmentation
+            (default: 3× the seed size). New rows are added to train only.
         persist: Write the resulting dataset to disk.
         persist_path: Destination JSONL path.
-        seed_path: Original seed path (used to derive default persist path).
-        model: Augmentation LLM spec.
-        strategies: Augmentation strategies.
-        llm_base_url / llm_api_key: Optional OpenAI-compatible routing.
+        seed_path: Original seed path (derives the default persist path,
+            ``<seed>.augmented.jsonl``; the seed file is never overwritten).
+        model: Augmentation LLM spec (``omlx/…``, ``openai/…``, ``ollama/…``).
+        strategies: Augmentation strategies. Label-preserving ones
+            (``paraphrase``, ``perturbation``, ``add_noise``, ``simplify``,
+            ``formality_shift``) keep the seed's answer and metadata; the
+            others (``expansion``, ``adversarial``, ``edge_case``,
+            ``complicate``) get a generated answer.
+        llm_base_url / llm_api_key: OpenAI-compatible endpoint for ``model``
+            (used for these calls only — no process-wide side effect).
+        per_call: Variations requested per LLM call (small = not truncated).
+        max_tokens: Reply budget per LLM call.
+        strict: Raise when fewer rows than requested could be added.
 
     Returns:
         ``(dataset, written_path_or_none)``.
+
+    Raises:
+        RuntimeError: With ``strict=True``, when augmentation fell short.
     """
     from agentomatic.agents import AgentDataset
     from agentomatic.async_utils import run_sync
-    from agentomatic.optimize.dataset import Dataset
-    from agentomatic.optimize.llm_caller import LLMCaller
     from agentomatic.optimize.synthesizer import DataSynthesizer
 
     written: Path | None = None
     out_ds = dataset
 
     if augment:
-        if llm_base_url or llm_api_key:
-            LLMCaller.configure(base_url=llm_base_url, api_key=llm_api_key)
-
-        seed_n = max(len(dataset.examples), 1)
-        target = int(n_examples) if n_examples and n_examples > 0 else seed_n * 3
-        need = max(0, target - seed_n)
+        seeds = list(dataset.train)
+        protected = [
+            e.to_datapoint().query
+            for e in [*dataset.validation, *getattr(dataset, "holdout", []), *dataset.test]
+        ]
+        target = int(n_examples) if n_examples and n_examples > 0 else len(dataset.examples) * 3
+        need = max(0, target - len(dataset.examples))
         strategies = list(strategies or ["paraphrase", "perturbation", "expansion"])
-        seed_used = min(10, seed_n)
-        # Rough inverse of synthesizer yield: ~strategies × (M // strategies) × seeds
-        multiplier = max(1, (need + max(seed_used, 1) - 1) // max(seed_used, 1))
-
-        logger.info(
-            "Augmenting dataset: seed={} target≈{} multiplier={} strategies={}",
-            seed_n,
-            target,
-            multiplier,
-            strategies,
-        )
-
-        train_examples = list(dataset.train) or list(dataset.examples)
-        seed_opt = Dataset(points=[e.to_datapoint() for e in train_examples])
-        synth = DataSynthesizer(model=model)
-
-        async def _run() -> Dataset:
-            return await synth.augment(
-                seed_opt,
-                strategies=strategies,
-                multiplier=multiplier,
+        stats: dict[str, Any] = {"requested": need, "added": 0, "target_total": target}
+        new_examples: list[Any] = []
+        if not seeds:
+            logger.warning(
+                "Augmentation skipped: the dataset has no train split. Only training "
+                "rows may seed synthetic data — validation/test would leak into training."
             )
+        elif need == 0:
+            logger.info(
+                "Augmentation skipped: dataset already has {} ≥ {} examples",
+                len(dataset.examples),
+                target,
+            )
+        else:
+            logger.info(
+                "Augmenting train split: {} seed(s) → +{} example(s) (target total {}) "
+                "strategies={} model={}",
+                len(seeds),
+                need,
+                target,
+                strategies,
+                model,
+            )
+            synth = DataSynthesizer(
+                model=model, base_url=llm_base_url, api_key=llm_api_key, max_tokens=max_tokens
+            )
+            seed_points = [e.to_datapoint() for e in seeds]
+            try:
+                items, stats = run_sync(
+                    synth.augment_points(
+                        seed_points,
+                        n_new=need,
+                        strategies=strategies,
+                        per_call=per_call,
+                        existing_queries=[e.to_datapoint().query for e in dataset.examples],
+                        protected_queries=protected,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Dataset augmentation failed ({}); using the seed dataset", exc)
+                items, stats = [], {**stats, "error": str(exc)}
+            dropped = 0
+            for seed_idx, strategy, point in items:
+                example = _augmented_example(
+                    seeds[seed_idx], point, strategy=strategy, idx=len(new_examples)
+                )
+                if example is None:
+                    dropped += 1
+                    continue
+                new_examples.append(example)
+            stats = {**stats, "target_total": target, "schema_mismatch": dropped}
+            stats["added"] = len(new_examples)
 
-        try:
-            augmented_opt = run_sync(_run())
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Dataset augmentation failed ({}); using seed dataset", exc)
-            augmented_opt = seed_opt
-
-        seed_queries = {p.query for p in seed_opt.points}
-        merged = list(dataset.examples)
-        for dp in augmented_opt.points:
-            if dp.query in seed_queries:
-                continue
-            merged.append(_datapoint_to_example(dp, idx=len(merged), split="train"))
-            seed_queries.add(dp.query)
-            if len(merged) >= target:
-                break
+        if augment and stats.get("added", 0) < stats.get("requested", 0):
+            message = (
+                f"Augmentation added {stats.get('added', 0)}/{stats.get('requested', 0)} "
+                f"requested examples (stats: { {k: v for k, v in stats.items() if k != 'by_strategy'} })."
+            )
+            if strict:
+                raise RuntimeError(message)
+            logger.warning(message)
 
         out_ds = AgentDataset(
             name=getattr(dataset, "name", "dataset"),
-            examples=merged,
+            examples=[*dataset.examples, *new_examples],
             metadata={
                 **dict(getattr(dataset, "metadata", None) or {}),
-                "augmented": True,
+                "augmented": bool(new_examples),
                 "augment_target": target,
+                "augment_stats": stats,
             },
         )
-        logger.info("Augmented dataset: {} → {} examples", seed_n, len(out_ds.examples))
+        logger.info(
+            "Dataset: {} → {} examples (train {} → {})",
+            len(dataset.examples),
+            len(out_ds.examples),
+            len(seeds),
+            len(out_ds.train),
+        )
 
     if persist:
         if persist_path is not None:
             dest = Path(persist_path)
         elif seed_path is not None:
             seed = Path(seed_path)
-            dest = seed.with_name(
-                seed.stem + (".augmented.jsonl" if augment else seed.suffix or ".jsonl")
-            )
-            if not augment:
-                dest = seed  # overwrite / rewrite seed when persist-only
+            # Never overwrite the seed file (persist-only used to rewrite it
+            # and drop any keys AgentExample does not model).
+            suffix = ".augmented.jsonl" if augment else ".prepared.jsonl"
+            dest = seed.with_name(seed.stem + suffix)
         else:
-            dest = Path("datasets") / "all.augmented.jsonl"
+            dest = Path("datasets") / ("all.augmented.jsonl" if augment else "all.prepared.jsonl")
         dest.parent.mkdir(parents=True, exist_ok=True)
         out_ds.to_jsonl(dest)
         written = dest
@@ -537,7 +647,12 @@ def build_default_metrics(
     judge_dimensions: Sequence[str],
     judge_weight: float = 0.30,
 ) -> tuple[list[Any], Any, Any]:
-    """Build agent metrics, loss, and optimize-fit CustomMetric.
+    """Build agent metrics, loss, and the fit objective.
+
+    ``fit_metric`` (what PromptFitter *selects* candidates on) is the same
+    weighted blend the ``loss`` reports — judge included. It used to be a
+    judge-free structured score, so the optimizer could pick a candidate that
+    made the reported loss worse.
 
     Returns:
         ``(metrics, loss, fit_metric)`` ready for :func:`compile_agent`.
@@ -554,7 +669,6 @@ def build_default_metrics(
         agent_field_f1,
         agent_keyword_score,
         agent_schema_quality,
-        make_structured_fit_metric,
     )
 
     keys = list(required_keys)
@@ -590,7 +704,9 @@ def build_default_metrics(
             name="composite_loss",
         )
     )
-    fit_metric = make_structured_fit_metric(keys, name="composite")
+    from agentomatic.optimize.metrics import ScoreMetricAdapter
+
+    fit_metric = ScoreMetricAdapter(loss.metric, name="objective")
     return metrics, loss, fit_metric
 
 
@@ -623,6 +739,11 @@ class CompiledAgent:
     def fit_result(self) -> Any | None:
         """Last :class:`~agentomatic.optimize.PromptFitResult` from fit."""
         return getattr(self.agent, "_last_fit_result", None)
+
+    @property
+    def fit_results(self) -> list[Any]:
+        """Every epoch's ``PromptFitResult`` from the last :func:`fit_agent`."""
+        return list(getattr(self.agent, "_fit_results", None) or [])
 
     @property
     def optimize_status(self) -> str:
@@ -746,7 +867,9 @@ def compile_agent(
             patience=patience,
             concurrency=concurrency,
             sequential=sequential,
-            experiment_dir=str(experiment_dir) if experiment_dir else None,
+            # ``None`` reached PromptFitter as a path and every artefact
+            # (report, result JSON) failed to save.
+            experiment_dir=str(experiment_dir) if experiment_dir else ".optimize",
             auto_report=auto_report,
             drain_seconds=drain_seconds,
         )
@@ -845,7 +968,10 @@ def fit_agent(
     if callbacks is not None:
         cbs = list(callbacks)
     else:
-        cbs = [EarlyStopping(monitor="val_loss", patience=stop_patience, mode="min")]
+        # Without validation data ``val_loss`` never appears in the logs and
+        # the default callback silently never fired.
+        monitor = "val_loss" if val else "loss"
+        cbs = [EarlyStopping(monitor=monitor, patience=stop_patience, mode="min")]
 
     return agent.fit(
         dataset,
@@ -912,7 +1038,7 @@ def run_train(
         :class:`TrainResult` with history, fit artefacts, and report path.
     """
     from agentomatic.config.settings import load_environment
-    from agentomatic.optimize.report import generate_fit_report
+    from agentomatic.optimize.report import generate_fit_report, merge_fit_results
     from agentomatic.providers import apply_stack_defaults
     from agentomatic.stacks.manager import StackManager
 
@@ -1037,6 +1163,13 @@ def run_train(
             verbose=config.verbose,
         )
 
+        # The split optimization never sees; scored before AND after fit so
+        # the report can show what changed, example by example.
+        held_out = dataset.test or dataset.validation or dataset.train
+        baseline_report = (
+            evaluate_agent(compiled, held_out) if config.evaluate_baseline and held_out else None
+        )
+
         history = fit_agent(
             compiled,
             dataset,
@@ -1051,19 +1184,27 @@ def run_train(
         )
 
         status = compiled.optimize_status
-        fit_result = compiled.fit_result
+        # Every epoch's PromptFitResult, merged so reports and apply() compare
+        # the ORIGINAL prompt with the FINAL one (the last epoch alone starts
+        # from a prompt an earlier epoch already improved).
+        fit_results = list(getattr(history, "fit_results", None) or [])
+        if not fit_results and compiled.fit_result is not None:
+            fit_results = [compiled.fit_result]
+        fit_result = merge_fit_results(fit_results) if fit_results else None
 
-        held_out = dataset.test or dataset.validation or dataset.train
         eval_report = evaluate_agent(compiled, held_out)
         eval_scores = dict(getattr(eval_report, "scores", {}) or {})
 
         out = reports / f"train_{config.agent_name}.html"
         if fit_result is not None:
             generate_fit_report(
-                fit_result,
+                fit_results,
                 output_path=out,
                 keras_history=getattr(history, "history", None),
-                eval_scores=eval_scores,
+                baseline_eval=baseline_report,
+                final_eval=eval_report,
+                eval_dataset=held_out,
+                dataset_stats=(getattr(dataset, "metadata", None) or {}).get("augment_stats"),
                 dataset_sizes=sizes,
                 optimizer_name=config.optimizer,
                 stack_name=stack_name,
@@ -1116,9 +1257,12 @@ def run_train(
             model=model,
             rewrite_model=rewrite_model,
             optimizer=config.optimizer,
-            augmented=bool(config.augment),
+            # What actually happened, not what was asked for.
+            augmented=bool((getattr(dataset, "metadata", None) or {}).get("augmented")),
             persist_path=persist_written,
             agent_name=config.agent_name,
+            baseline_eval_scores=dict(getattr(baseline_report, "scores", None) or {}),
+            fit_results=fit_results,
         )
     finally:
         if bound_fit_store is not None:

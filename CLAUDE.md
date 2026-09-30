@@ -145,6 +145,7 @@ into the image/compose that drive the same `main.py`.
 | `AGENTOMATIC_ENABLE_CONTROL_PLANE` / `AGENTOMATIC_CONTROL_TOKEN` | Control plane |
 | `AGENTOMATIC_ENABLE_RATE_LIMIT` | Rate limiting |
 | `AGENTOMATIC_LOGS_HISTORY` | Persist per-agent invoke/chat/stream history (default off) |
+| `AGENTOMATIC_EPHEMERAL_THREADS` | With no store/DB configured, keep chat threads in a bounded in-memory store (default on; `0` disables — thread routes then answer 400) |
 | `AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS` | Enable LLM analysis over those logs (default off) |
 | `AGENTOMATIC_INGESTION_ROOT` | Confine ingestion source/output paths to this dir (default: cwd) |
 | `AGENTOMATIC_TASK_EVENT_LOG` | Task-event replay backend: `memory` (default), `none` to disable, or a registered provider |
@@ -235,6 +236,12 @@ register_vector_store_adapter("my_db", MyDbStore)  # upsert/query/delete
   `"skipped: <reason>"`).
 - Model defaults resolve provider-agnostically from `AGENTOMATIC_TASK_MODEL` /
   `LLM__MODEL` before any local fallback.
+- Data roles: **train** is what the optimizer learns from, **validation** selects
+  candidates, **holdout** only vetoes (no transfer / regression / widened gap),
+  **test** is never passed to the fitter — `agent.evaluate(data.test)` before and
+  after `fit()`. `generate_fit_report(history, baseline_eval=..., final_eval=...)`
+  shows the prompt diff, every candidate's decision and reason, and per-example
+  answers. Guide: `docs/optimization/`; runnable: `examples/prompt_optimization/`.
 
 ## Project conventions (match these when editing the framework)
 

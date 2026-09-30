@@ -897,62 +897,204 @@ def _build_eval_report_html(
 </div></body></html>"""
 
 
+def merge_fit_results(results: list[Any]) -> Any:
+    """Merge per-epoch ``PromptFitResult`` objects into one run-level result.
+
+    Each ``fit()`` epoch re-optimizes from the previous epoch's best prompt,
+    so the *last* result alone starts from an already-improved prompt. The
+    merged result keeps the **first** epoch's baseline (the prompt you
+    started with) and the **last** epoch's best, concatenates the score and
+    prompt histories, and tags every trial with its 1-based ``epoch``.
+
+    Args:
+        results: ``PromptFitResult`` objects in epoch order (at least one).
+
+    Returns:
+        A new ``PromptFitResult`` (the inputs are not modified).
+    """
+    import dataclasses
+
+    if not results:
+        raise ValueError("merge_fit_results() needs at least one PromptFitResult")
+    first, last = results[0], results[-1]
+    if len(results) == 1 and all("epoch" in t for t in first.trials or []):
+        return first
+    # The epoch that produced the final config: its suggestions, parameter
+    # changes and failure analysis describe what you keep (a later epoch that
+    # found nothing better would otherwise report "no improvement").
+    source = next((r for r in reversed(results) if r.improved), last)
+    trials = [
+        {**t, "epoch": t.get("epoch", i)}
+        for i, r in enumerate(results, 1)
+        for t in (r.trials or [])
+    ]
+    metric_deltas: dict[str, float] = {}
+    for r in results:  # each epoch's delta is vs its own start → they chain
+        for key, value in (r.metric_deltas or {}).items():
+            metric_deltas[key] = metric_deltas.get(key, 0.0) + float(value)
+    merged = dataclasses.replace(
+        last,
+        baseline_config=first.baseline_config,
+        baseline_score=first.baseline_score,
+        baseline_holdout_score=first.baseline_holdout_score,
+        baseline_examples=list(first.baseline_examples or []),
+        trials=trials,
+        score_history=[s for r in results for s in (r.score_history or [])],
+        prompt_history=[p for r in results for p in (r.prompt_history or [])],
+        duration_seconds=sum(float(r.duration_seconds or 0.0) for r in results),
+        metric_deltas=metric_deltas,
+        param_suggestions=dict(source.param_suggestions or {}),
+        suggestions=list(source.suggestions or []),
+        failure_clusters=list(source.failure_clusters or []),
+    )
+    if last.deployment_recommendation is not None or source.deployment_recommendation:
+        try:
+            from agentomatic.optimize.deployment import build_deployment_recommendation
+
+            merged.deployment_recommendation = build_deployment_recommendation(
+                merged, version=f"v2_fit_{merged.experiment_id}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("deployment recommendation not rebuilt for merged fit: {}", exc)
+            merged.deployment_recommendation = source.deployment_recommendation
+    return merged
+
+
+def _fit_results_from(result: Any) -> tuple[list[Any], dict[str, list[float]] | None]:
+    """Normalise what callers pass to :func:`generate_fit_report`.
+
+    Accepts a ``PromptFitResult``, a list of them, a ``History`` returned by
+    ``agent.fit()`` (uses ``history.fit_results`` + ``history.history``) or
+    the agent itself (its per-epoch results from the last ``fit()``).
+    """
+    if isinstance(result, (list, tuple)):
+        results = [r for r in result if r is not None]
+        return results, None
+    if hasattr(result, "best_config") and hasattr(result, "baseline_config"):
+        return [result], None
+    if hasattr(result, "fit_results") and isinstance(getattr(result, "history", None), dict):
+        return list(result.fit_results or []), dict(result.history)
+    per_epoch = getattr(result, "_fit_results", None)
+    if isinstance(per_epoch, list) and per_epoch:
+        return list(per_epoch), None
+    last = getattr(result, "_last_fit_result", None)
+    if last is not None:
+        return [last], None
+    raise TypeError(
+        f"generate_fit_report() got {type(result).__name__}; pass a PromptFitResult, "
+        "a list of them, the History returned by agent.fit(), or the fitted agent."
+    )
+
+
 def generate_fit_report(
-    result: Any,  # PromptFitResult
+    result: Any,
     output_path: str | Path | None = None,
     *,
     keras_history: dict[str, list[float]] | None = None,
     eval_scores: dict[str, float] | None = None,
+    baseline_eval_scores: dict[str, float] | None = None,
+    baseline_eval: Any = None,
+    final_eval: Any = None,
+    eval_dataset: Any = None,
+    dataset_stats: dict[str, Any] | None = None,
     dataset_sizes: dict[str, int] | None = None,
     optimizer_name: str | None = None,
     stack_name: str | None = None,
     model_name: str | None = None,
     run_config: dict[str, Any] | None = None,
 ) -> str:
-    """Generate an interactive HTML report for ``PromptFitResult``.
+    """Generate an interactive HTML report (+ JSON sidecar) for a prompt fit.
 
-    Prefers HolySheet (nested sections/tabs, charts, full prompt accordion).
-    Falls back to the built-in static HTML when HolySheet is unavailable.
+    The report opens with what changed and whether it helped: a verdict
+    (validation, held-out gate and test before → after), the test
+    scoreboard, the initial → final prompt diff with every accepted change
+    in order, all candidates with the reason each was accepted or rejected,
+    and per-example answers before vs after. Curves, prompt-evolution
+    learnings, recommendations and failure clusters follow.
+
+    Prefers HolySheet; falls back to a built-in static HTML page.
 
     Args:
-        result: ``PromptFitResult`` from ``PromptFitter.fit()``.
+        result: A ``PromptFitResult``, a list of per-epoch results, the
+            ``History`` returned by ``agent.fit()`` (recommended — it carries
+            every epoch plus the loss curves), or the fitted agent.
         output_path: Path to write the HTML file. Auto-generated if None.
-        keras_history: Optional ``History.history`` dict (loss / val_loss…).
-        eval_scores: Optional held-out evaluate() scores.
-        dataset_sizes: Optional ``{{train, validation, test}}`` counts.
+            A ``<name>.json`` sidecar with the same data is written next to it.
+        keras_history: ``History.history`` dict (loss / val_loss…). Taken
+            from ``result`` automatically when a ``History`` is passed.
+        eval_scores: Test-split scores *after* fit (``report.scores``).
+        baseline_eval_scores: Test-split scores *before* fit.
+        baseline_eval: ``EvaluationReport`` before fit — enables the
+            per-example before/after table (preferred over the ``*_scores``).
+        final_eval: ``EvaluationReport`` after fit, on the same examples.
+        eval_dataset: The evaluated examples (``AgentDataset`` or list), to
+            show each question and expected answer next to the results.
+        dataset_stats: e.g. ``dataset.metadata["augment_stats"]``.
+        dataset_sizes: Optional ``{train, validation, test}`` counts.
         optimizer_name: Optimizer label for the header.
         stack_name: Stack name for the header.
         model_name: Task model label for the header.
         run_config: Optional train knobs (epochs, trials, judge dims, …).
 
     Returns:
-        Path to the generated report file.
+        Path to the generated HTML report.
+
+    Raises:
+        TypeError: ``result`` is none of the accepted types.
+        ValueError: ``result`` holds no fit results (e.g. the optimizer never
+            ran — check ``agent._last_optimize_status``).
     """
+    results, history_from_result = _fit_results_from(result)
+    if not results:
+        raise ValueError(
+            "No PromptFitResult to report: the optimizer did not produce one "
+            "(check agent._last_optimize_status for the reason)."
+        )
+    merged = merge_fit_results(results)
     if output_path is None:
-        output_path = Path(f".optimize/{result.agent}/fit_report_{result.experiment_id}.html")
+        output_path = Path(f".optimize/{merged.agent}/fit_report_{merged.experiment_id}.html")
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    history = keras_history or {}
-    scores = eval_scores or {}
+    history = keras_history or history_from_result or {}
+    after_scores = dict(getattr(final_eval, "scores", None) or eval_scores or {})
+    before_scores = dict(getattr(baseline_eval, "scores", None) or baseline_eval_scores or {})
     sizes = dataset_sizes or {}
     config = run_config or {}
-    opt_name = optimizer_name or ""
-    stack = stack_name or ""
-    model = model_name or ""
+    extras: dict[str, Any] = {
+        "epochs": results,
+        "baseline_eval": baseline_eval,
+        "final_eval": final_eval,
+        "eval_dataset": eval_dataset,
+        "baseline_eval_scores": before_scores,
+        "dataset_stats": dataset_stats,
+    }
+    _write_fit_report_json(
+        output_path.with_suffix(".json"),
+        merged,
+        epochs=results,
+        keras_history=history,
+        before_scores=before_scores,
+        after_scores=after_scores,
+        baseline_eval=baseline_eval,
+        final_eval=final_eval,
+        eval_dataset=eval_dataset,
+        dataset_stats=dataset_stats,
+    )
     try:
         from agentomatic.optimize.holysheet_reports import build_fit_holysheet_report
 
         path = build_fit_holysheet_report(
-            result,
+            merged,
             output_path,
             keras_history=history,
-            eval_scores=scores,
+            eval_scores=after_scores,
             dataset_sizes=sizes,
-            optimizer_name=opt_name,
-            stack_name=stack,
-            model_name=model,
+            optimizer_name=optimizer_name or "",
+            stack_name=stack_name or "",
+            model_name=model_name or "",
             run_config=config,
+            **extras,
         )
         logger.info("📊 Fit report (holysheet) generated: {}", path)
         return path
@@ -962,12 +1104,54 @@ def generate_fit_report(
         logger.warning("holysheet fit report failed ({}), using fallback HTML", exc)
 
     html_content = _build_fit_report_html(
-        result,
+        merged,
         keras_history=history,
+        before_scores=before_scores,
+        after_scores=after_scores,
+        epochs=len(results),
     )
     output_path.write_text(html_content, encoding="utf-8")
     logger.info("📊 Fit report generated: {}", output_path)
     return str(output_path)
+
+
+def _write_fit_report_json(
+    path: Path,
+    merged: Any,
+    *,
+    epochs: list[Any],
+    keras_history: dict[str, list[float]],
+    before_scores: dict[str, float],
+    after_scores: dict[str, float],
+    baseline_eval: Any,
+    final_eval: Any,
+    eval_dataset: Any,
+    dataset_stats: dict[str, Any] | None,
+) -> None:
+    """Machine-readable twin of the HTML report (never fails the report)."""
+    try:
+        from agentomatic.optimize.holysheet_reports import _example_rows
+
+        payload = {
+            "agent": merged.agent,
+            "initial_prompt": merged.baseline_config.system_prompt,
+            "final_prompt": merged.best_config.system_prompt,
+            "prompt_changed": merged.best_config.system_prompt
+            != merged.baseline_config.system_prompt,
+            "validation": {"initial": merged.baseline_score, "final": merged.best_score},
+            "holdout_gate": {
+                "initial": merged.baseline_holdout_score,
+                "final": merged.holdout_score,
+            },
+            "test": {"before": before_scores, "after": after_scores},
+            "test_examples": _example_rows(baseline_eval, final_eval, eval_dataset),
+            "epochs": [r.to_dict() for r in epochs],
+            "keras_history": keras_history,
+            "dataset_stats": dataset_stats or {},
+        }
+        path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("fit report JSON sidecar not written ({})", exc)
 
 
 def _prompt_evolution_entries(
@@ -996,6 +1180,9 @@ def _build_fit_report_html(
     result: Any,
     *,
     keras_history: dict[str, list[float]] | None = None,
+    before_scores: dict[str, float] | None = None,
+    after_scores: dict[str, float] | None = None,
+    epochs: int = 1,
 ) -> str:
     """Build the self-contained HTML for a PromptFitResult."""
     improvement = result.best_score - result.baseline_score
@@ -1227,23 +1414,49 @@ def _build_fit_report_html(
         {evo_blocks}
         """
 
+    # Test scoreboard (untouched split, before vs after)
+    before_scores = before_scores or {}
+    after_scores = after_scores or {}
+    scoreboard_section = ""
+    if before_scores or after_scores:
+        board_rows = ""
+        for key in sorted(set(before_scores) | set(after_scores)):
+            b = before_scores.get(key)
+            a = after_scores.get(key)
+            delta = f"{float(a) - float(b):+.4f}" if a is not None and b is not None else "—"
+            board_rows += (
+                f"<tr><td>{html.escape(key)}</td>"
+                f"<td>{'—' if b is None else f'{float(b):.4f}'}</td>"
+                f"<td>{'—' if a is None else f'{float(a):.4f}'}</td><td>{delta}</td></tr>"
+            )
+        scoreboard_section = f"""
+        <h2>🧾 Test Scoreboard (never seen during optimization)</h2>
+        <table>
+          <thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Δ</th></tr></thead>
+          <tbody>{board_rows}</tbody>
+        </table>
+        """
+
     # Trial table
     trial_section = ""
     if result.trials:
         trial_rows = ""
         for t in result.trials:
+            reason = t.get("reason") or t.get("mutation_notes") or ""
             trial_rows += f"""
             <tr>
+              <td>{t.get("epoch", 1)}</td>
               <td>{t.get("round", "—")}</td>
               <td><code>{html.escape(str(t.get("name", "")))}</code></td>
               <td>{html.escape(str(t.get("phase", "")))}</td>
-              <td>{float(t.get("score", 0.0)):.4f}</td>
-              <td style="color: #8b949e; font-size: 0.85rem;">{html.escape(str(t.get("mutation_notes", "") or "")[:220])}</td>
+              <td>{float(t.get("score", 0.0) or 0.0):.4f}</td>
+              <td>{html.escape(str(t.get("decision", "") or ""))}</td>
+              <td style="color: #8b949e; font-size: 0.85rem;">{html.escape(str(reason)[:220])}</td>
             </tr>"""
         trial_section = f"""
-        <h2>🧪 Trial History</h2>
+        <h2>🧪 Candidates ({epochs} epoch(s))</h2>
         <table>
-          <thead><tr><th>Round</th><th>Candidate</th><th>Phase</th><th>Score</th><th>Notes</th></tr></thead>
+          <thead><tr><th>Epoch</th><th>Round</th><th>Candidate</th><th>Phase</th><th>Score</th><th>Decision</th><th>Why</th></tr></thead>
           <tbody>{trial_rows}</tbody>
         </table>
         """
@@ -1255,8 +1468,8 @@ def _build_fit_report_html(
         difflib.unified_diff(
             baseline_prompt.splitlines(keepends=True),
             best_prompt.splitlines(keepends=True),
-            fromfile="baseline",
-            tofile="best",
+            fromfile="initial",
+            tofile="final",
             lineterm="",
         )
     )
@@ -1275,7 +1488,7 @@ def _build_fit_report_html(
             diff_html += f"<div>  {escaped}</div>"
 
     diff_section = f"""
-    <h2>📝 Prompt Diff</h2>
+    <h2>📝 Prompt Diff (initial → final)</h2>
     <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap;">
 {diff_html}
     </div>
@@ -1382,6 +1595,8 @@ def _build_fit_report_html(
   <p style="color: #8b949e;">Agent: <strong style="color: #58a6ff;">{html.escape(result.agent)}</strong> | Experiment: <code>{html.escape(result.experiment_id)}</code> | {timestamp}</p>
 
   {kpis}
+  {scoreboard_section}
+  {diff_section}
   {curve_section}
   {keras_section}
   {prompt_history_section}
@@ -1391,7 +1606,6 @@ def _build_fit_report_html(
   {cluster_section}
   {suggestion_section}
   {deployment_section}
-  {diff_section}
   {few_shot_section}
 
   <footer>Generated by Agentomatic PromptFitter — {timestamp}</footer>

@@ -48,3 +48,6 @@ site/
 # Poetry (legacy)
 poetry.lock
 inspiration/
+examples/prompt_optimization/out/
+# ModelCheckpoint default output (runtime artefacts, never committed)
+optimization_results/checkpoints/

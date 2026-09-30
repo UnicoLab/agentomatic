@@ -100,7 +100,9 @@ class TestStagedCompileFitEvaluate:
         )
         assert len(metrics) == 5
         assert getattr(loss, "name", None) or True
-        assert fit_metric.name == "composite"
+        # Candidates are selected on the same blend the loss reports.
+        assert fit_metric.name == "objective"
+        assert fit_metric.metric is loss.metric
 
     def test_compile_fit_evaluate_pipeline(self) -> None:
         from agentomatic.agents.types import AgentDataset, AgentExample
@@ -301,8 +303,16 @@ class TestStagedCompileFitEvaluate:
         )
 
         result = train_api_mod.run_train(agent, config=cfg, dataset=ds)
-        assert calls == ["compile", "fit", "evaluate"]
+        # The held-out split is scored before AND after fit (before/after report).
+        assert calls == ["compile", "evaluate", "fit", "evaluate"]
         assert result.eval_scores == {"m": 0.7}
+        assert result.baseline_eval_scores == {"m": 0.7}
+
+        calls.clear()
+        cfg.evaluate_baseline = False
+        result = train_api_mod.run_train(agent, config=cfg, dataset=ds)
+        assert calls == ["compile", "fit", "evaluate"]
+        assert result.baseline_eval_scores == {}
         assert result.optimizer == "rewrite"
 
 
@@ -430,8 +440,12 @@ class TestFitHolySheetReport:
                 if b.get("type") == "section"
             }
             assert sections.get("Run Configuration"), "Run Configuration section empty"
-            assert sections.get("Key Results"), "Key Results section empty"
+            assert sections.get("Verdict"), "Verdict section empty"
+            assert sections.get("What changed in the prompt"), "prompt diff section empty"
+            assert sections.get("All candidates"), "candidates section empty"
             assert sections.get("Recommendations"), "Recommendations section empty"
+            # HolySheet's viewer drops Accordion panels — nothing may hide in one.
+            assert not [b for b in flat if b.get("type") == "accordion"]
         # HolySheet interactive bundle is large; fallback is still richer than a stub.
         assert len(html) > 2000
 

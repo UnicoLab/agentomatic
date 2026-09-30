@@ -43,7 +43,7 @@ from .event_log import (
     create_event_log,
     register_event_log_provider,
 )
-from .manager import TaskInputValidationError, TaskManager
+from .manager import TargetFailedError, TaskInputValidationError, TaskManager
 from .models import (
     TargetType,
     TaskEvent,
@@ -73,6 +73,7 @@ __all__ = [
     "InMemoryTaskStore",
     "NullTaskEventLog",
     "SQLAlchemyTaskStore",
+    "TargetFailedError",
     "TargetNotFoundError",
     "TargetType",
     "TaskContext",

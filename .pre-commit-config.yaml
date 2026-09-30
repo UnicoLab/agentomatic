@@ -1,3 +1,8 @@
+# The Studio UI bundle is a build artifact synced from agentomatic-studio
+# releases (sync-studio.yml). Whitespace fixers would rewrite its minified
+# chunks, so the shipped files would no longer match the release tarball.
+exclude: ^src/agentomatic/studio/static/
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

@@ -17,9 +17,19 @@ class MemoryStore(BaseStore):
     All data is lost when the process stops. For production, use
     :class:`~agentomatic.storage.sqlalchemy.SQLAlchemyStore` or
     implement your own :class:`BaseStore` subclass.
+
+    Args:
+        max_threads: Optional cap on stored conversation threads. Once it is
+            reached, creating a thread evicts the least recently updated one
+            (with its messages, checkpoints and suspended states), so a
+            long-running process cannot grow without bound. ``None`` (the
+            default) keeps every thread.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_threads: int | None = None) -> None:
+        if max_threads is not None and max_threads < 1:
+            raise ValueError("max_threads must be at least 1")
+        self.max_threads = max_threads
         self._threads: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, list[dict[str, Any]]] = {}
         self._feedback: list[dict[str, Any]] = []
@@ -53,7 +63,19 @@ class MemoryStore(BaseStore):
         }
         self._threads[thread_id] = thread
         self._messages[thread_id] = []
+        await self._evict_overflow(keep=thread_id)
         return thread
+
+    async def _evict_overflow(self, *, keep: str) -> None:
+        """Drop least recently updated threads beyond :attr:`max_threads`."""
+        if self.max_threads is None or len(self._threads) <= self.max_threads:
+            return
+        by_age = sorted(
+            (tid for tid in self._threads if tid != keep),
+            key=lambda tid: self._threads[tid].get("updated_at") or "",
+        )
+        for tid in by_age[: len(self._threads) - self.max_threads]:
+            await self.delete_thread(tid)
 
     async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
         return self._threads.get(thread_id)
@@ -149,6 +171,9 @@ class MemoryStore(BaseStore):
         comment: str | None = None,
         message_id: int | None = None,
         feedback_type: str = "thumbs",
+        query: str = "",
+        response: str = "",
+        correction: str | None = None,
     ) -> dict[str, Any]:
         fb = {
             "id": len(self._feedback) + 1,
@@ -159,6 +184,9 @@ class MemoryStore(BaseStore):
             "comment": comment,
             "message_id": message_id,
             "feedback_type": feedback_type,
+            "query": query,
+            "response": response,
+            "correction": correction,
             "created_at": datetime.now(UTC).isoformat(),
         }
         self._feedback.append(fb)

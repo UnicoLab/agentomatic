@@ -830,7 +830,7 @@ tests/
 | [Class-Based Agents](class-agents.md) | Full reference for `BaseGraphAgent` |
 | [Agent Structure](agent-structure.md) | Folder layout and conventions |
 | [Configuration](configuration.md) | `agent.yaml` and environment config |
-| [Optimization](optimization.md) | `compile()` / `fit()` / `evaluate()` lifecycle |
+| [Optimization](../optimization/class-agents.md) | `compile()` / `fit()` / `evaluate()` lifecycle |
 | [Cookbook](cookbook.md) | Practical recipes and patterns |
 | [Studio Debugging](debug-ui.md) | Visual debugging with Agentomatic Studio |
 

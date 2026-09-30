@@ -270,6 +270,7 @@ def _env_example() -> str:
 # AGENTOMATIC_ENABLE_CONTROL_PLANE=0   # needs AGENTOMATIC_CONTROL_TOKEN
 # AGENTOMATIC_ENABLE_RATE_LIMIT=0
 # AGENTOMATIC_LOGS_HISTORY=0            # persist invoke/chat/stream history
+# AGENTOMATIC_EPHEMERAL_THREADS=1       # no DB? keep chat threads in memory (0 = off)
 # AGENTOMATIC_ALLOW_LOGSLLM_ANALYSIS=0  # LLM analysis over those logs
 # AGENTOMATIC_PLUGIN_AUTORELOAD=0       # reload plugins when artifact current changes
 # AGENTOMATIC_PLUGIN_AUTORELOAD_INTERVAL=5

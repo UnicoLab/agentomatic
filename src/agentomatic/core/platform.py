@@ -120,6 +120,26 @@ def _minimal_openapi_paths(routes: Any) -> dict[str, Any]:
     return paths
 
 
+_EPHEMERAL_MAX_THREADS = 1000
+"""Thread cap for the in-memory store used when no durable store is configured."""
+
+
+def _env_flag(var: str, default: bool) -> bool:
+    """Read a boolean feature flag from the environment.
+
+    Args:
+        var: Environment variable name.
+        default: Value used when the variable is unset or empty.
+
+    Returns:
+        ``True`` for ``1/true/yes/on`` (case-insensitive), else ``False``.
+    """
+    raw = os.getenv(var)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class _LazyStoreProxy(BaseStore):
     """Proxy that resolves ``platform._store`` at call time.
 
@@ -779,27 +799,40 @@ class AgentPlatform:
             await self._auto_derive_store_from_connections()
         if self._store is None:
             await self._auto_derive_store_from_database_url()
-        if self._store is None and self._logs_history:
-            if db_url_configured:
-                # A DB was configured — do not silently fall back to memory
-                # (that would make audit/logs look "on" while not persisting).
-                logger.error(
-                    "logs_history=True and a database URL is configured, but "
-                    "SQLAlchemyStore could not be initialised. Fix DATABASE_URL "
-                    "/ AGENTOMATIC_DB_URL / MEMORY connection — refusing "
-                    "ephemeral MemoryStore fallback."
-                )
-            else:
-                from agentomatic.storage import MemoryStore
+        if self._store is None and db_url_configured:
+            # A DB was configured — do not silently fall back to memory
+            # (that would make threads / audit logs look "on" while not
+            # persisting anything).
+            logger.error(
+                "A database URL is configured, but SQLAlchemyStore could not be "
+                "initialised. Fix DATABASE_URL / AGENTOMATIC_DB_URL / MEMORY "
+                "connection — refusing the ephemeral MemoryStore fallback, so "
+                "conversation threads"
+                + (" and invocation logs" if self._logs_history else "")
+                + " are unavailable."
+            )
+        elif self._store is None and (
+            self._logs_history or _env_flag("AGENTOMATIC_EPHEMERAL_THREADS", True)
+        ):
+            # Nothing durable is configured (the default for a freshly
+            # scaffolded project). Without *some* store every thread route
+            # answered 400 "Thread storage not configured" — and Studio's chat
+            # creates a thread before its first message, so chatting with any
+            # template agent failed out of the box. A bounded in-memory store
+            # keeps chat, /chat history and HITL approvals working, while the
+            # thread cap stops a long-running process growing without bound.
+            from agentomatic.storage import MemoryStore
 
-                self._store = MemoryStore()
-                self._provisional_memory_store = True
-                logger.warning(
-                    "logs_history=True without a durable store — using MemoryStore "
-                    "(ephemeral; lost on restart). Pass store=SQLAlchemyStore(...), "
-                    "declare a MEMORY connection, or set DATABASE_URL / "
-                    "AGENTOMATIC_DB_URL (Postgres, SQLite, or any SQLAlchemy async URL)."
-                )
+            self._store = MemoryStore(max_threads=_EPHEMERAL_MAX_THREADS)
+            self._provisional_memory_store = True
+            logger.warning(
+                "No durable store configured — using an in-memory store for "
+                f"conversation threads{' and invocation logs' if self._logs_history else ''} "
+                f"(ephemeral, lost on restart, capped at {_EPHEMERAL_MAX_THREADS} threads). "
+                "Pass store=SQLAlchemyStore(...), declare a MEMORY connection, or set "
+                "DATABASE_URL / AGENTOMATIC_DB_URL (Postgres, SQLite, or any SQLAlchemy "
+                "async URL). Set AGENTOMATIC_EPHEMERAL_THREADS=0 to disable this fallback."
+            )
 
     def _resolve_database_url(self) -> str | None:
         """Resolve the platform DB URL from env / active stack (if any).

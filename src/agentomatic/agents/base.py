@@ -55,6 +55,7 @@ import json
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Generic
 
@@ -73,6 +74,14 @@ from .types import (
     Optimizer,
     StateT,
     TraceEvent,
+)
+
+# Per-request system-prompt overrides, keyed by agent ``id()``. A ContextVar
+# rather than an instance attribute: concurrent requests (and the optimizer
+# scoring several candidate prompts at once) share one agent instance, and an
+# attribute let one run read — or clear — another run's prompt mid-flight.
+_REQUEST_PROMPTS: ContextVar[dict[int, str]] = ContextVar(
+    "agentomatic_request_prompts", default={}
 )
 
 
@@ -126,10 +135,6 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         self.stop_training: bool = False
         self._fit_optimize_options: dict[str, Any] | None = None
 
-        # Per-request system prompt override (set during transform / atransform /
-        # streaming so node methods can call ``resolve_system_prompt()``).
-        self._request_system_prompt: str | None = None
-
         # Evaluation
         self.evaluation_history: list[EvaluationReport] = []
 
@@ -139,6 +144,25 @@ class BaseGraphAgent(ABC, Generic[StateT]):
     # ==================================================================
     # Prompt resolution (optimize / fit / stacks)
     # ==================================================================
+
+    @property
+    def _request_system_prompt(self) -> str | None:
+        """Per-request prompt override of the run in the current context.
+
+        Set during ``transform`` / ``atransform`` / streaming so node methods
+        can call :meth:`resolve_system_prompt`. Context-local, so concurrent
+        runs on one instance never see each other's override.
+        """
+        return _REQUEST_PROMPTS.get().get(id(self))
+
+    @_request_system_prompt.setter
+    def _request_system_prompt(self, value: str | None) -> None:
+        prompts = dict(_REQUEST_PROMPTS.get())
+        if value is None:
+            prompts.pop(id(self), None)
+        else:
+            prompts[id(self)] = value
+        _REQUEST_PROMPTS.set(prompts)
 
     @staticmethod
     def _extract_prompt_override(input_data: dict[str, Any] | None) -> str | None:
@@ -534,6 +558,10 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         """
         if metrics is None:
             metrics = list(self._compile_metrics)
+        else:
+            from .metrics import as_agent_metric
+
+            metrics = [as_agent_metric(m) for m in metrics]
         if not metrics:
             # A metric is a live Python object, so it cannot be written to
             # ``config.json`` and does not come back with ``load()``. Say so
@@ -557,6 +585,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
 
         example_results: list[ExampleResult] = []
         metric_totals: dict[str, float] = {m.name: 0.0 for m in metrics}
+        metric_failures: dict[str, int] = {}
 
         for example in examples:
             t0 = time.perf_counter()
@@ -567,8 +596,11 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                 scores: dict[str, float] = {}
                 metric_meta: dict[str, Any] = {}
                 for metric in metrics:
+                    failures_before = getattr(metric, "failures", 0)
                     try:
                         score = metric.score(example, prediction)
+                        if getattr(metric, "failures", 0) > failures_before:
+                            metric_failures[metric.name] = metric_failures.get(metric.name, 0) + 1
                         scores[metric.name] = score
                         metric_totals[metric.name] += score
                         last = getattr(metric, "last_result", None)
@@ -588,6 +620,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                     except Exception as exc:
                         logger.warning(f"Metric '{metric.name}' error: {exc}")
                         scores[metric.name] = 0.0
+                        metric_failures[metric.name] = metric_failures.get(metric.name, 0) + 1
 
                 example_results.append(
                     ExampleResult(
@@ -618,7 +651,16 @@ class BaseGraphAgent(ABC, Generic[StateT]):
             dataset_name=dataset_name,
             scores=avg_scores,
             example_results=example_results,
+            metadata={
+                "metric_failures": metric_failures,
+                "transform_errors": sum(1 for r in example_results if r.error),
+            },
         )
+        if metric_failures:
+            logger.warning(
+                "evaluate(): metric failures scored as 0.0 — {} (check the judge endpoint)",
+                ", ".join(f"{k}: {v}/{len(examples)}" for k, v in metric_failures.items()),
+            )
 
         self.evaluation_history.append(report)
         return report
@@ -651,7 +693,20 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         Returns:
             Self for chaining.
         """
-        metrics = list(metrics or [])
+        from .metrics import as_agent_metric
+
+        # Optimize metrics (``LocalJudgeMetric``, ``ExactMatchMetric``, …) are
+        # wrapped so they can be listed here directly.
+        metrics = [as_agent_metric(m) for m in (metrics or [])]
+        names = [m.name for m in metrics]
+        duplicates = sorted({n for n in names if names.count(n) > 1})
+        if duplicates or "loss" in names:
+            # Epoch logs are keyed by metric name: duplicates were summed
+            # (two "quality" metrics reported 1.70) and "loss" was overwritten.
+            raise ValueError(
+                f"Metric names must be unique and not 'loss' (got {names}); "
+                "pass name=... to tell them apart."
+            )
         if not metrics:
             logger.warning(
                 "compile() called without metrics — fit()/evaluate() will "
@@ -788,9 +843,19 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         )
         self.history = history
         self.stop_training = False
+        # Per-epoch PromptFitResults (filled by PromptFitterBridge) — reset so
+        # a second fit() call does not report the previous run's epochs.
+        self._fit_results: list[Any] = []
 
         callbacks = list(callbacks or [])
         for cb in callbacks:
+            if not callable(getattr(cb, "set_agent", None)):
+                raise TypeError(
+                    f"{type(cb).__name__} is not an agent.fit() callback. Use "
+                    "agentomatic.agents.EarlyStopping / EpochDiffCallback here; "
+                    "agentomatic.optimize.EarlyStopping & co. belong to "
+                    "PromptFitter(callbacks=[...]) (the inner trial loop)."
+                )
             cb.set_agent(self)
             cb.set_params(history.params)
             cb.on_train_begin()
@@ -849,6 +914,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                     break
         finally:
             self._fit_optimize_options = None
+            history.fit_results = list(self._fit_results)
 
         for cb in callbacks:
             cb.on_train_end()

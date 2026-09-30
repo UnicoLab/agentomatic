@@ -218,6 +218,7 @@ from agentomatic.agents import BaseGraphAgent
 class {title}State:
     """Agent state — per-run transient data."""
     request: str = ""
+    messages: list[Any] = field(default_factory=list)
     context: list[str] = field(default_factory=list)
     output: dict[str, Any] = field(default_factory=dict)
 
@@ -253,14 +254,21 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         g.set_finish_point("process")
         return g.compile()
 
+    def _turns(self, state: {title}State) -> list[Any]:
+        """Build the chat messages for the model: system prompt, then the turns.
+
+        ``/chat`` and Studio chat load the thread into ``state.messages``,
+        ending with the current turn, so the agent answers in context. A
+        one-shot call (``/invoke``, tasks, ``fit``) has just the request.
+        """
+        turns = state.messages or [{{"role": "user", "content": state.request}}]
+        return [{{"role": "system", "content": self._system_prompt()}}, *turns]
+
     def process(self, state: {title}State) -> {title}State:
-        prompt = self._system_prompt()
         state.context = [f"Processed: {{state.request}}"]
         if self.llm is not None:
             try:
-                result = self.llm.invoke(
-                    f"{{prompt}}\\n\\nUser: {{state.request}}"
-                )
+                result = self.llm.invoke(self._turns(state))
                 text = getattr(result, "content", None) or str(result)
             except Exception as exc:  # noqa: BLE001
                 text = f"Result for: {{state.request}} (llm error: {{exc}})"
@@ -273,7 +281,10 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return state
 
     def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
-        return {title}State(request=input_data.get("current_query", ""))
+        return {title}State(
+            request=input_data.get("current_query", ""),
+            messages=input_data.get("messages", []),
+        )
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:
         return state.output
@@ -822,18 +833,16 @@ name: {name}
 description: "Multi-step agent pipeline"
 version: "1.0.0"
 
-# Input contract
-input:
+# Input contract (validated before the first step)
+input_schema:
   query:
     type: string
     required: true
 
-# Output contract
-output:
+# Output contract (checked after the last step; strict_schema: true to enforce)
+output_schema:
   response:
     type: string
-  steps_completed:
-    type: array
 
 # Pipeline steps — executed in order
 steps:
@@ -844,7 +853,8 @@ steps:
   - name: process
     agent: processor
     description: "Process based on classification"
-    condition: "len(ctx.steps.classify.output.get('response', '')) > 0"
+    # Conditions are Python expressions over `ctx` (not `$.` mappings).
+    condition: "len(ctx.get_step_output('classify').get('response', '')) > 0"
 
   - name: format
     agent: formatter
@@ -2186,7 +2196,7 @@ Flat script: ``TrainCliSettings`` (env + CLI) → agent → fit → report.
 Knobs: ``AGENTOMATIC_*`` env vars and/or ``--help`` flags.
 
 For staged Keras-like control (load → metrics → compile → fit → evaluate),
-see the commented block at the bottom of ``main`` and optimization.md.
+see the commented block at the bottom of ``main`` and docs/optimization/.
 
 Usage (from project root)::
 
@@ -2279,11 +2289,13 @@ def main(argv: list[str] | None = None) -> int:
     #     llm_base_url=entry.base_url, llm_api_key=entry.api_key or "local",
     #     agent_name=AGENT, max_trials=cli.trials, patience=cli.patience,
     # )
+    # held_out = data.test or data.validation  # never used to select candidates
+    # before = evaluate_agent(compiled, held_out)
     # history = fit_agent(compiled, data, epochs=cli.epochs, trials=cli.trials)
-    # scores = evaluate_agent(compiled, data.test or data.validation).scores
-    # generate_fit_report(compiled.fit_result,
+    # after = evaluate_agent(compiled, held_out)
+    # generate_fit_report(history,  # all epochs: original prompt → final prompt
     #                     output_path=HERE / "reports" / f"train_{{AGENT}}.html",
-    #                     keras_history=history.history, eval_scores=scores)
+    #                     baseline_eval=before, final_eval=after, eval_dataset=held_out)
 
     return 0
 

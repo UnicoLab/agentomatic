@@ -21,7 +21,9 @@ import difflib
 import os
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
@@ -105,6 +107,66 @@ class BaseMetric(ABC):
 # =====================================================================
 # Simple built-in metrics (no DeepEval required)
 # =====================================================================
+
+
+#: Keys a judge may use for its overall score (first match wins).
+_JUDGE_SCORE_KEYS = ("overall_score", "score", "overall", "final_score", "rating")
+
+_FRACTION = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\s*$")
+_PERCENT = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*%\s*$")
+
+
+def coerce_judge_score(value: Any) -> float | None:
+    """Normalise a judge's score to ``[0, 1]`` — or ``None`` when unusable.
+
+    Small local judges routinely ignore "score 0.0–1.0" and answer on another
+    scale. Clamping ``7`` (out of 10) or ``85`` (out of 100) to ``1.0`` made
+    every such reply a perfect score; they are rescaled instead:
+
+    * numbers in ``[0, 1]`` are kept; ``(1, 10]`` are divided by 10 and
+      ``(10, 100]`` by 100; anything else is unusable;
+    * strings: ``"0.8"``, ``"8/10"``, ``"80%"``;
+    * ``{"score": x}`` objects are unwrapped.
+
+    Args:
+        value: The raw score from the judge's JSON.
+
+    Returns:
+        The normalised score, or ``None`` (treat as a failed evaluation).
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, dict):
+        for key in ("score", "value", "overall_score"):
+            if key in value:
+                return coerce_judge_score(value[key])
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        fraction = _FRACTION.match(text)
+        if fraction:
+            num, den = float(fraction.group(1)), float(fraction.group(2))
+            return coerce_judge_score(num / den) if den > 0 else None
+        percent = _PERCENT.match(text)
+        if percent:
+            return coerce_judge_score(float(percent.group(1)) / 100.0)
+        try:
+            value = float(text)
+        except ValueError:
+            return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or number < 0:  # NaN or negative
+        return None
+    if number <= 1.0:
+        return number
+    if number <= 10.0:
+        return number / 10.0
+    if number <= 100.0:
+        return number / 100.0
+    return None
 
 
 #: Header that opens the plain answer inside a rich expected reference.
@@ -233,10 +295,16 @@ class LLMJudgeMetric(BaseMetric):
         model: LLMSpec = "ollama/mistral:7b",
         name: str = "llm_judge",
         temperature: float = 0.0,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ):
         self.criteria = criteria
         self.model = model
         self.name = name
+        #: Endpoint for this judge only (else LLMCaller defaults / env).
+        self.base_url = base_url
+        self.api_key = api_key
         # Default 0.0 for reproducible scoring across epochs (avoids 0.33↔0.67
         # oscillation from sampling noise at temp>0).
         self.temperature = temperature
@@ -251,7 +319,7 @@ class LLMJudgeMetric(BaseMetric):
         # Skip deepeval for local OpenAI-compatible / oMLX specs — DeepEval
         # cannot route those models and its retries burn minutes before
         # falling through to the raw-LLM judge.
-        if _prefer_raw_llm_judge(self.model):
+        if self.base_url or _prefer_raw_llm_judge(self.model):
             return await self._eval_llm(query, response, expected, context)
 
         # Try deepeval first; any failure (missing key, bad model, …)
@@ -285,6 +353,8 @@ class LLMJudgeMetric(BaseMetric):
             evaluation_params=[
                 evaluation_params_type.INPUT,
                 evaluation_params_type.ACTUAL_OUTPUT,
+                # Without it GEval never looked at the reference answer.
+                *([evaluation_params_type.EXPECTED_OUTPUT] if expected else []),
             ],
             model=self.model,  # type: ignore[arg-type]
         )
@@ -295,9 +365,16 @@ class LLMJudgeMetric(BaseMetric):
             retrieval_context=context or [],  # type: ignore[arg-type]
         )
         metric.measure(test_case)
+        if metric.score is None:
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason=metric.reason or "DeepEval returned no score",
+                metadata={"evaluation_failed": True},
+            )
         return EvalResult(
             metric_name=self.name,
-            score=metric.score or 0.0,
+            score=max(0.0, min(1.0, float(metric.score))),
             reason=metric.reason or "",
         )
 
@@ -321,18 +398,35 @@ class LLMJudgeMetric(BaseMetric):
                 prompt += f"CONTEXT:\n{chr(10).join(context[:3])}\n\n"
             prompt += 'Reply with ONLY a JSON object: {"score": 0.X, "reason": "..."}\n'
 
-            data = await call_llm_json(self.model, prompt, temperature=self.temperature)
-            if not data or "score" not in data:
+            if isinstance(self.model, str):
+                from agentomatic.optimize.llm_caller import LLMCaller
+
+                data = await LLMCaller.call_with_json(
+                    self.model,
+                    prompt,
+                    temperature=self.temperature,
+                    base_url=self.base_url,
+                    api_key=self.api_key,
+                )
+            else:
+                data = await call_llm_json(self.model, prompt, temperature=self.temperature)
+            raw = next(
+                (data[k] for k in _JUDGE_SCORE_KEYS if isinstance(data, dict) and k in data),
+                None,
+            )
+            score = coerce_judge_score(raw)
+            if score is None:
                 return EvalResult(
                     metric_name=self.name,
                     score=0.0,
-                    reason="LLM judge returned no parseable score",
+                    reason=f"LLM judge returned no usable score ({raw!r})",
                     metadata={"evaluation_failed": True},
                 )
             return EvalResult(
                 metric_name=self.name,
-                score=max(0.0, min(1.0, float(data.get("score", 0.0)))),
-                reason=str(data.get("reason", "")),
+                score=score,
+                reason=str(data.get("reason") or data.get("feedback") or ""),
+                metadata={"raw_score": raw},
             )
         except Exception as exc:
             logger.warning(f"LLM judge fallback failed: {exc}")
@@ -374,9 +468,19 @@ class CustomMetric(BaseMetric):
         else:
             score = await asyncio.to_thread(self.fn, query, response, expected, context)
 
+        value = float(score) if score is not None else float("nan")
+        if value != value or value in (float("inf"), float("-inf")):
+            # NaN compares False with everything: one NaN baseline used to
+            # block every candidate from ever being promoted.
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason=f"Custom metric '{self.name}' returned {score!r}",
+                metadata={"evaluation_failed": True},
+            )
         return EvalResult(
             metric_name=self.name,
-            score=float(score),
+            score=max(0.0, min(1.0, value)),
             reason=f"Custom metric '{self.name}'",
         )
 
@@ -434,7 +538,11 @@ class GEvalMetric(BaseMetric):
             from deepeval.metrics import GEval
             from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 
-            params = [getattr(LLMTestCaseParams, "ACTUAL_OUTPUT")]
+            # INPUT too: judging relevance without the question is guesswork.
+            params = [
+                getattr(LLMTestCaseParams, "INPUT"),
+                getattr(LLMTestCaseParams, "ACTUAL_OUTPUT"),
+            ]
             if expected:
                 params.append(getattr(LLMTestCaseParams, "EXPECTED_OUTPUT"))
 
@@ -453,14 +561,21 @@ class GEvalMetric(BaseMetric):
                 retrieval_context=context or [],  # type: ignore[arg-type]
             )
             metric.measure(test_case)
+            if metric.score is None:
+                return EvalResult(
+                    metric_name=self.name,
+                    score=0.0,
+                    reason=metric.reason or "DeepEval returned no score",
+                    metadata={"evaluation_failed": True},
+                )
             return EvalResult(
                 metric_name=self.name,
-                score=metric.score or 0.0,
+                score=max(0.0, min(1.0, float(metric.score))),
                 reason=metric.reason or "",
             )
         except ImportError:
             logger.debug(
-                "deepeval not installed — falling back to raw LLM judge for GEvalMetric '%s'",
+                "deepeval not installed — falling back to raw LLM judge for GEvalMetric '{}'",
                 self.name,
             )
         except Exception as exc:  # noqa: BLE001
@@ -506,20 +621,26 @@ class GEvalMetric(BaseMetric):
             )
 
             data = await call_llm_json(self.model, prompt, temperature=self.temperature)
-            if not data or "score" not in data:
+            raw = next(
+                (data[k] for k in _JUDGE_SCORE_KEYS if isinstance(data, dict) and k in data),
+                None,
+            )
+            score = coerce_judge_score(raw)
+            if score is None:
                 return EvalResult(
                     metric_name=self.name,
                     score=0.0,
-                    reason="GEval evaluation failed — no parseable score",
+                    reason=f"GEval evaluation failed — no usable score ({raw!r})",
                     metadata={"evaluation_failed": True},
                 )
             return EvalResult(
                 metric_name=self.name,
-                score=max(0.0, min(1.0, float(data["score"]))),
+                score=score,
                 reason=str(data.get("reason", "")),
+                metadata={"raw_score": raw},
             )
         except Exception as exc:
-            logger.warning("GEvalMetric fallback failed: %s", exc)
+            logger.warning("GEvalMetric fallback failed: {}", exc)
             return EvalResult(
                 metric_name=self.name,
                 score=0.0,
@@ -528,8 +649,28 @@ class GEvalMetric(BaseMetric):
             )
 
 
+#: DeepEval metrics where a HIGHER score is WORSE (``success = score <= threshold``).
+_LOWER_IS_BETTER_DEEPEVAL = frozenset({"BiasMetric", "ToxicityMetric", "HallucinationMetric"})
+
+
+def _higher_is_better(deepeval_metric: Any, score: float, flag: bool | None = None) -> float:
+    """Orient a DeepEval score so higher always means better (optimizers maximise)."""
+    lower_is_better = (
+        not flag
+        if flag is not None
+        else type(deepeval_metric).__name__ in _LOWER_IS_BETTER_DEEPEVAL
+    )
+    score = max(0.0, min(1.0, float(score)))
+    return 1.0 - score if lower_is_better else score
+
+
 class DeepEvalMetric(BaseMetric):
     """Wrap ANY DeepEval metric instance as an agentomatic BaseMetric.
+
+    Scores are oriented so **higher is better**: DeepEval's bias, toxicity and
+    hallucination metrics (where a higher score is worse) are inverted
+    automatically — maximising them used to push the optimizer toward toxic
+    or hallucinated answers. Override with ``higher_is_better=``.
 
     This is the universal adapter: pass in a fully-configured deepeval
     metric object and it will be called through our ``BaseMetric`` interface.
@@ -540,8 +681,15 @@ class DeepEvalMetric(BaseMetric):
         metric = DeepEvalMetric(AnswerRelevancyMetric(model="ollama/mistral:7b"))
     """
 
-    def __init__(self, deepeval_metric: Any, name: str | None = None):
+    def __init__(
+        self,
+        deepeval_metric: Any,
+        name: str | None = None,
+        *,
+        higher_is_better: bool | None = None,
+    ):
         self._metric = deepeval_metric
+        self._higher_is_better = higher_is_better
         self.name: str = (
             name
             or getattr(
@@ -574,10 +722,19 @@ class DeepEvalMetric(BaseMetric):
             retrieval_context=context or [],  # type: ignore[arg-type]
         )
         self._metric.measure(test_case)
+        raw = getattr(self._metric, "score", None)
+        if raw is None:
+            return EvalResult(
+                metric_name=self.name,
+                score=0.0,
+                reason=getattr(self._metric, "reason", "") or "DeepEval returned no score",
+                metadata={"evaluation_failed": True},
+            )
         return EvalResult(
             metric_name=self.name,
-            score=self._metric.score or 0.0,
+            score=_higher_is_better(self._metric, raw, self._higher_is_better),
             reason=getattr(self._metric, "reason", "") or "",
+            metadata={"raw_score": raw},
         )
 
 
@@ -652,9 +809,9 @@ class RedTeamMetric(BaseMetric):
         bias_score = bias_metric.score or 0.0
         toxicity_score = toxicity_metric.score or 0.0
 
-        # For red-team safety: high DeepEval scores = safe = good
-        # Combine as average safety score
-        combined = (bias_score + toxicity_score) / 2.0
+        # DeepEval bias/toxicity: HIGHER = worse. Safety is the complement
+        # (averaging them as "safety" used to rate toxic answers as safest).
+        combined = 1.0 - (bias_score + toxicity_score) / 2.0
 
         reasons = []
         if bias_metric.reason:
@@ -782,23 +939,37 @@ def _make_deepeval_metric(name: str, model: LLMSpec, **kwargs: Any) -> BaseMetri
                     md = results[0].metrics_data
                     if md:
                         first = md[0]
+                        if first.score is None:
+                            return EvalResult(
+                                metric_name=self.name,
+                                score=0.0,
+                                reason=first.reason or "DeepEval returned no score",
+                                metadata={"evaluation_failed": True},
+                            )
                         return EvalResult(
                             metric_name=self.name,
-                            score=first.score if first.score is not None else 0.0,
+                            score=_higher_is_better(self._metric, first.score),
                             reason=first.reason or "",
                         )
             except (ImportError, TypeError, AttributeError, Exception) as exc:
                 logger.debug(
-                    "deepeval.evaluate() unavailable or failed (%s), "
-                    "falling back to metric.measure()",
+                    "deepeval.evaluate() unavailable or failed ({}), falling back to measure()",
                     exc,
                 )
 
             # Fallback: direct measure call
             self._metric.measure(test_case)
+            raw = getattr(self._metric, "score", None)
+            if raw is None:
+                return EvalResult(
+                    metric_name=self.name,
+                    score=0.0,
+                    reason=getattr(self._metric, "reason", "") or "DeepEval returned no score",
+                    metadata={"evaluation_failed": True},
+                )
             return EvalResult(
                 metric_name=self.name,
-                score=self._metric.score or 0.0,
+                score=_higher_is_better(self._metric, raw),
                 reason=getattr(self._metric, "reason", "") or "",
             )
 
@@ -820,7 +991,9 @@ def resolve_metrics(
         - ``"red_team"`` — adversarial scoring
 
     Args:
-        metrics: List of metric names (str) or BaseMetric instances.
+        metrics: List of metric names (str) or metric instances — a
+            ``BaseMetric``, an ``OptimizeMetricAdapter`` or a class-agent
+            ``score(example, prediction)`` metric.
         model: LLM model for evaluation (used by DeepEval/LLM metrics).
 
     Returns:
@@ -828,13 +1001,12 @@ def resolve_metrics(
     """
     resolved: list[BaseMetric] = []
     for m in metrics:
-        if isinstance(m, BaseMetric):
-            resolved.append(m)
-        else:
-            m_any: Any = m
-            if not isinstance(m_any, str):
-                raise TypeError(f"Expected str or BaseMetric, got {type(m)}")
+        m_any: Any = m
+        if isinstance(m_any, str):
             resolved.append(_resolve_single(m_any, model))
+        else:
+            # Instances of either metric protocol (see ``as_optimize_metric``).
+            resolved.append(as_optimize_metric(m_any))
     return resolved
 
 
@@ -937,6 +1109,11 @@ class WeightedMetric:
     metric: BaseMetric
     weight: float = 1.0
 
+    def __post_init__(self) -> None:
+        # Accept class-agent ``score()`` metrics and ``OptimizeMetricAdapter``
+        # too: CompositeMetric awaits ``metric.evaluate`` on every component.
+        self.metric = as_optimize_metric(self.metric)
+
 
 class CompositeMetric(BaseMetric):
     """Weighted composition of multiple metrics returning ``MetricResult``.
@@ -958,9 +1135,19 @@ class CompositeMetric(BaseMetric):
 
     name = "composite"
 
-    def __init__(self, metrics: list[WeightedMetric]) -> None:
+    def __init__(self, metrics: list[WeightedMetric], *, name: str = "composite") -> None:
         if not metrics:
             raise ValueError("CompositeMetric requires at least one WeightedMetric")
+        negative = [m.name for m in metrics if m.weight < 0]
+        if negative:
+            # Every metric scores higher-is-better (LatencyMetric / CostMetric
+            # included), so a negative weight *rewards* the worse outcome.
+            raise ValueError(
+                f"CompositeMetric weights must be >= 0 (got negative for {negative}); "
+                "all metrics are higher-is-better — give efficiency terms a small "
+                "positive weight instead."
+            )
+        self.name = name
         self._metrics = metrics
         total_weight = sum(m.weight for m in metrics)
         if total_weight <= 0:
@@ -989,30 +1176,35 @@ class CompositeMetric(BaseMetric):
         dimensions: dict[str, float] = {}
         feedback_parts: list[str] = []
         weighted_sum = 0.0
-        active_weight = 0.0
-        failed_count = 0
+        failed: list[str] = []
 
         for wm in self._metrics:
             try:
                 result = await wm.metric.evaluate(query, response, expected, context)
                 if (result.metadata or {}).get("evaluation_failed"):
-                    failed_count += 1
+                    failed.append(wm.name)
                     dimensions[wm.name] = 0.0
                     if result.reason:
                         feedback_parts.append(f"[{wm.name}] {result.reason}")
                     continue
                 dimensions[wm.name] = result.score
                 weighted_sum += result.score * wm.weight
-                active_weight += wm.weight
                 if result.reason:
                     feedback_parts.append(f"[{wm.name}] {result.reason}")
             except Exception as exc:
                 logger.warning(f"CompositeMetric: sub-metric '{wm.name}' failed: {exc}")
                 dimensions[wm.name] = 0.0
-                failed_count += 1
+                failed.append(wm.name)
 
         feedback = " | ".join(feedback_parts)
-        if failed_count == len(self._metrics) or active_weight == 0:
+        failed_count = len(failed)
+        failed_weight = sum(wm.weight for wm in self._metrics if wm.name in failed)
+        # A failed component counts as 0 against the FULL weight. Dropping it
+        # from the denominator made a composite *rise* when its judge failed
+        # (judge 0.8 + format 1.0 → 0.83 working, 1.00 with the judge down).
+        # When the failed share is the majority, the result is not a
+        # measurement at all.
+        if failed_count == len(self._metrics) or failed_weight * 2 >= self._total_weight:
             return EvalResult(
                 metric_name=self.name,
                 score=0.0,
@@ -1024,7 +1216,7 @@ class CompositeMetric(BaseMetric):
                 },
             )
 
-        composite_score = weighted_sum / active_weight
+        composite_score = weighted_sum / self._total_weight
         metric_result = MetricResult(
             score=composite_score,
             feedback=feedback,
@@ -1039,6 +1231,7 @@ class CompositeMetric(BaseMetric):
                 "dimensions": dimensions,
                 "feedback": feedback,
                 "metric_result": metric_result,
+                "failed_components": failed,
             },
         )
 
@@ -1056,51 +1249,23 @@ class CompositeMetric(BaseMetric):
     def score(self, example: Any, prediction: Any) -> float:
         """Sync bridge for the ``agents.Metric`` protocol.
 
-        Allows ``optimize.CompositeMetric`` to be used directly as a
-        component in ``agents.WeightedMetric`` or ``agents.MetricLoss``
-        without wrapping in ``OptimizeMetricAdapter``.
-
-        Extracts ``query``, ``response``, and ``expected`` from
-        *example* / *prediction* and runs :meth:`evaluate` synchronously
-        via :func:`agentomatic.async_utils.run_sync` (persistent loop).
+        Lets ``CompositeMetric`` sit directly in ``compile(metrics=...)``,
+        ``agents.WeightedMetric`` or ``MetricLoss``. Delegates to
+        :class:`~agentomatic.agents.OptimizeMetricAdapter`, so the question,
+        response text and reference are extracted exactly as everywhere else
+        (this used to be a second, divergent bridge that judged the label and
+        the whole prediction JSON).
 
         Args:
-            example: An ``AgentExample`` with ``.input`` and
-                ``.expected_output``.
+            example: An ``AgentExample``.
             prediction: The agent's output dict.
 
         Returns:
-            Composite score in ``[0, 1]``.
+            Composite score in ``[0, 1]`` (``0.0`` when the evaluation failed).
         """
-        import json as _json
+        from agentomatic.agents.metrics import OptimizeMetricAdapter
 
-        from agentomatic.async_utils import run_sync
-
-        query = ""
-        inp = getattr(example, "input", example)
-        if hasattr(inp, "get"):
-            query = inp.get("query", inp.get("current_query", ""))
-        else:
-            query = str(inp)
-
-        response = (
-            _json.dumps(prediction, ensure_ascii=False)
-            if isinstance(prediction, dict)
-            else str(prediction)
-        )
-
-        exp_out = getattr(example, "expected_output", None)
-        expected = (
-            _json.dumps(exp_out, ensure_ascii=False)
-            if isinstance(exp_out, dict)
-            else (str(exp_out) if exp_out is not None else None)
-        )
-
-        try:
-            result = run_sync(self.evaluate(query, response, expected))
-        except Exception:
-            return 0.0
-        return float(getattr(result, "score", 0.0))
+        return OptimizeMetricAdapter(self, name=self.name).score(example, prediction)
 
 
 class DeterministicMetric(BaseMetric):
@@ -1219,9 +1384,12 @@ class DeterministicMetric(BaseMetric):
 class LatencyMetric(BaseMetric):
     """Deployment-aware latency metric that penalises slow responses.
 
-    Returns a score between 0.0 and 1.0 based on response latency.
-    Designed for use with **negative weight** in ``CompositeMetric``
-    to create latency pressure during optimization.
+    Returns a score between 0.0 and 1.0 based on response latency —
+    **higher is better** (faster), like every other metric. Give it a small
+    *positive* weight in ``CompositeMetric`` to add latency pressure.
+
+    Latency comes from ``context`` (``"latency:2.35"``) or, inside
+    ``PromptFitter``, from the measured duration of the agent call.
 
     Score mapping (default thresholds):
     - < 1s → 1.0 (excellent)
@@ -1237,10 +1405,10 @@ class LatencyMetric(BaseMetric):
             max_seconds=10.0,
         )
 
-        # In CompositeMetric with negative weight:
+        # In CompositeMetric — positive weight, higher = faster:
         CompositeMetric(metrics=[
-            WeightedMetric("quality", judge, weight=0.80),
-            WeightedMetric("latency", LatencyMetric(), weight=-0.10),
+            WeightedMetric("quality", judge, weight=0.90),
+            WeightedMetric("latency", LatencyMetric(), weight=0.10),
         ])
     """
 
@@ -1263,18 +1431,24 @@ class LatencyMetric(BaseMetric):
     ) -> EvalResult:
         """Score based on latency metadata.
 
-        The actual latency must be passed via ``context`` as the first
-        element in format ``"latency:2.35"`` or via the response metadata.
-        If no latency data is available, returns 0.5 (neutral).
+        Latency is read from ``context`` (``"latency:2.35"``), else from the
+        run being scored by ``PromptFitter``. Without either, the evaluation
+        is reported as failed (it used to return a neutral 0.5 that silently
+        diluted every composite).
         """
         latency = self._extract_latency(response, context)
+        if latency is None:
+            run = current_scoring_run()
+            duration_ms = getattr(run, "duration_ms", None) if run is not None else None
+            if duration_ms:
+                latency = float(duration_ms) / 1000.0
 
         if latency is None:
             return EvalResult(
                 metric_name=self.name,
-                score=0.5,
+                score=0.0,
                 reason="No latency data available",
-                metadata={"latency_seconds": None},
+                metadata={"latency_seconds": None, "evaluation_failed": True},
             )
 
         if latency <= self.target_seconds:
@@ -1313,8 +1487,9 @@ class LatencyMetric(BaseMetric):
 class CostMetric(BaseMetric):
     """Deployment-aware cost metric that penalises expensive responses.
 
-    Returns a score between 0.0 and 1.0 based on token usage / cost.
-    Designed for use with **negative weight** in ``CompositeMetric``.
+    Returns a score between 0.0 and 1.0 based on token usage / cost —
+    **higher is better** (cheaper). Give it a small *positive* weight in
+    ``CompositeMetric``.
 
     Score mapping:
     - < target_tokens → 1.0
@@ -1331,8 +1506,8 @@ class CostMetric(BaseMetric):
 
         # In CompositeMetric:
         CompositeMetric(metrics=[
-            WeightedMetric("quality", judge, weight=0.85),
-            WeightedMetric("cost", CostMetric(), weight=-0.05),
+            WeightedMetric("quality", judge, weight=0.95),
+            WeightedMetric("cost", CostMetric(), weight=0.05),
         ])
     """
 
@@ -1389,3 +1564,182 @@ class CostMetric(BaseMetric):
                         pass
         # Rough estimate: ~4 chars per token
         return max(1, len(response) // 4)
+
+
+# =====================================================================
+# Protocol bridge: agents.Metric (sync ``score``) ⇄ optimize.BaseMetric
+# =====================================================================
+
+#: The run being scored by ``PromptFitter`` (set around each ``evaluate``
+#: call). Lets example-aware metrics reach the dataset metadata and the
+#: agent's structured output, which the string-based ``evaluate`` signature
+#: cannot carry. ``None`` outside a fitter scoring pass.
+_SCORING_RUN: ContextVar[Any] = ContextVar("agentomatic_scoring_run", default=None)
+
+
+@contextmanager
+def scoring_run(run: Any) -> Iterator[None]:
+    """Expose ``run`` (a ``RunResult``) to metrics evaluated in this block.
+
+    Args:
+        run: The run result being scored.
+
+    Yields:
+        Nothing; the run is visible via :func:`current_scoring_run`.
+    """
+    token = _SCORING_RUN.set(run)
+    try:
+        yield
+    finally:
+        _SCORING_RUN.reset(token)
+
+
+def current_scoring_run() -> Any:
+    """Return the ``RunResult`` currently being scored, if any."""
+    return _SCORING_RUN.get()
+
+
+def _decode_json_dict(text: str | None) -> dict[str, Any] | None:
+    """Return ``text`` parsed as a JSON object, or ``None`` when it is not one."""
+    import json
+
+    if not text:
+        return None
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        value = json.loads(stripped)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+_STRUCTURED_HEADER = re.compile(
+    r"^[ \t]*##[ \t]*Expected structured output[ \t]*$", re.MULTILINE | re.IGNORECASE
+)
+
+
+def _expected_structured(expected: str | None) -> dict[str, Any] | None:
+    """Recover ``expected_output`` from an ``AgentExample.to_datapoint`` reference."""
+    if not expected:
+        return None
+    header = _STRUCTURED_HEADER.search(expected)
+    if header is None:
+        return None
+    rest = expected[header.end() :]
+    following = _ANY_SECTION_HEADER.search(rest)
+    return _decode_json_dict(rest[: following.start()] if following else rest)
+
+
+class ScoreMetricAdapter(BaseMetric):
+    """Run a sync ``score(example, prediction)`` metric as an optimize metric.
+
+    Class-agent metrics (:mod:`agentomatic.agents.metrics` — e.g.
+    ``ExactKeyMatchMetric``, ``ContainsTermsMetric``, ``agents.WeightedMetric``)
+    implement ``score(example, prediction) -> float``. ``PromptFitter`` scores
+    candidates through the async ``evaluate(query, response, expected,
+    context)`` protocol instead, so handing it such a metric used to fail with
+    ``AttributeError: ... has no attribute 'evaluate'``. This adapter rebuilds
+    an :class:`~agentomatic.agents.types.AgentExample` and a prediction dict
+    and calls ``score`` in a worker thread. Inside ``PromptFitter`` the
+    rebuilt example carries the dataset metadata (``must_include``, rubric
+    hints, …) and the prediction is the agent's full structured output, so a
+    class-agent metric scores exactly as it does in ``agent.evaluate``.
+
+    You rarely need it directly — :func:`as_optimize_metric` applies it
+    wherever an optimize metric is required.
+
+    Args:
+        metric: Object with ``score(example, prediction) -> float``.
+        name: Optional override name (defaults to ``metric.name``).
+    """
+
+    def __init__(self, metric: Any, name: str | None = None) -> None:
+        self.metric = metric
+        self.name = name or str(getattr(metric, "name", None) or "score_metric")
+
+    async def evaluate(
+        self,
+        query: str,
+        response: str,
+        expected: str | None = None,
+        context: list[str] | None = None,
+    ) -> EvalResult:
+        """Score ``response`` with the wrapped sync metric."""
+        import asyncio
+
+        from agentomatic.agents.types import AgentExample
+
+        run = current_scoring_run()
+        run_meta = dict(getattr(run, "metadata", None) or {})
+        example_meta = dict(run_meta.get("example") or {})
+
+        answer = plain_expected(expected)
+        expected_output = _expected_structured(expected) or _decode_json_dict(answer)
+        if expected_output is None and answer is not None:
+            expected_output = {"response": answer}
+        example = AgentExample(
+            id=str(example_meta.get("id") or "fit"),
+            input={
+                "current_query": query,
+                "query": query,
+                "question": query,
+                **({"context": list(context)} if context else {}),
+            },
+            expected_output=expected_output,
+            metadata=example_meta,
+            split=str(example_meta.get("split") or "validation"),
+        )
+        output = run_meta.get("output")
+        prediction = (
+            dict(output)
+            if isinstance(output, dict)
+            else (_decode_json_dict(response) or {"response": response})
+        )
+        score = await asyncio.to_thread(self.metric.score, example, prediction)
+        return EvalResult(
+            metric_name=self.name,
+            score=max(0.0, min(1.0, float(score))),
+            reason=f"{type(self.metric).__name__}.score",
+        )
+
+
+def as_optimize_metric(metric: Any) -> BaseMetric:
+    """Coerce any supported metric into an optimize :class:`BaseMetric`.
+
+    Accepts, in order:
+
+    1. An ``OptimizeMetricAdapter`` — unwrapped to the optimize metric it
+       carries (keeps ``CompositeMetric`` per-dimension tracking intact).
+    2. A :class:`BaseMetric` (or any object with an async ``evaluate``).
+    3. A class-agent metric with ``score(example, prediction)`` — wrapped in
+       :class:`ScoreMetricAdapter`.
+
+    Args:
+        metric: The metric to coerce.
+
+    Returns:
+        A metric exposing ``async evaluate(query, response, expected, context)``.
+
+    Raises:
+        TypeError: When ``metric`` implements neither protocol.
+    """
+    import inspect
+
+    from agentomatic.agents.metrics import OptimizeMetricAdapter
+
+    if isinstance(metric, OptimizeMetricAdapter):
+        return as_optimize_metric(metric.optimize_metric)
+    if isinstance(metric, BaseMetric):
+        return metric
+    if inspect.iscoroutinefunction(getattr(metric, "evaluate", None)):
+        return cast(BaseMetric, metric)
+    if callable(getattr(metric, "score", None)):
+        return ScoreMetricAdapter(metric)
+    raise TypeError(
+        f"{type(metric).__name__} is not a usable metric: implement "
+        "`async evaluate(query, response, expected=None, context=None) -> EvalResult` "
+        "(agentomatic.optimize.BaseMetric) or "
+        "`score(example, prediction) -> float` (agentomatic.agents.Metric)."
+    )

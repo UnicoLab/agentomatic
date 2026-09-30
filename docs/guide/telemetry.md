@@ -142,6 +142,13 @@ When enabled, Agentomatic mounts these three endpoints for **every registered ag
 2. `GET /api/v1/{agent}/feedback` — List historical feedback entries.
 3. `GET /api/v1/{agent}/feedback/export` — Export logs as a JSONL dataset.
 
+Each exported line is `{"query", "expected_answer", "metadata"}`, where
+`expected_answer` is the submitted `correction` (or the rated `response`), so
+the export can seed an [optimization dataset](../optimization/data.md). The
+thread store keeps `query`, `response` and `correction` with every feedback
+row (older SQL databases gain these columns automatically at startup); only
+rows with a `query` are exported.
+
 ### Submitting Feedback (Client Example)
 
 ```python

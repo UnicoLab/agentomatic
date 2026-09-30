@@ -158,7 +158,8 @@ class TestAPartialRunIsNotABlackout:
             ContainsMetric(),
         )
 
-        assert score == 1.0
+        # The failed point counts as 0.0; the average is still a measurement.
+        assert score == 0.5
         assert not fitter._eval_blackout  # noqa: SLF001
 
     @pytest.mark.asyncio

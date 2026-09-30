@@ -12,6 +12,7 @@ Provides the progressive context that makes prompt fitting actually improve:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -108,6 +109,12 @@ class GeneralizationCheck:
     holdout_score: float | None
     gap: float | None
     max_gap: float
+    #: Candidate − incumbent on the selection (validation) set.
+    fit_delta: float | None = None
+    #: Candidate − incumbent on the held-out set.
+    holdout_delta: float | None = None
+    #: How much the fit−holdout gap widened vs the incumbent.
+    gap_growth: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize for trials / artefacts."""
@@ -121,22 +128,46 @@ def check_generalization(
     max_gap: float = 0.15,
     min_holdout_improvement: float = 0.0,
     baseline_holdout: float | None = None,
+    baseline_fit: float | None = None,
+    min_transfer_ratio: float = 0.0,
+    holdout_tolerance: float = 0.02,
 ) -> GeneralizationCheck:
     """Reject candidates that look overfit to the optimisation set.
 
-    Rules (always applied when a holdout score is available):
+    The held-out slice is never used to *pick* candidates — only to veto
+    them. Two modes:
 
-    1. ``fit_score − holdout_score`` must not exceed *max_gap*.
-    2. If *baseline_holdout* is given, holdout must not regress below
-       ``baseline_holdout − epsilon`` and should improve by at least
-       *min_holdout_improvement* when that threshold is > 0.
+    **Incumbent-relative** (``baseline_fit`` and ``baseline_holdout`` given —
+    what :class:`~agentomatic.optimize.PromptFitter` uses). Deltas are
+    measured against the current best config on the same two slices:
+
+    1. *Gap growth* — ``(fit − holdout) − (baseline_fit − baseline_holdout)``,
+       the part of the validation gain that does not replicate on held-out
+       data, must not exceed ``max_gap`` (or half the validation gain, for
+       large gains). A dataset whose baseline already scores differently on
+       the two slices is not penalised for that.
+    2. *No held-out regression* — ``holdout − baseline_holdout`` must be
+       ``≥ −holdout_tolerance``.
+    3. *Transfer* — when the candidate improves validation by ``Δfit > 0``,
+       held-out must improve by at least ``min_transfer_ratio × Δfit``.
+       A prompt that memorised validation answers improves validation only;
+       this is the rule that rejects it. Skipped when the held-out slice is
+       already saturated (``baseline_holdout ≥ 0.99``).
+
+    **Absolute** (legacy — no ``baseline_fit``): ``fit − holdout ≤ max_gap``,
+    plus the regression rule when ``baseline_holdout`` is given.
 
     Args:
-        fit_score: Score on the set used for candidate selection (val).
-        holdout_score: Score on a held-out generalization slice / test.
-        max_gap: Maximum allowed ``fit − holdout`` gap.
-        min_holdout_improvement: Required holdout lift vs baseline.
-        baseline_holdout: Baseline holdout score for the same slice.
+        fit_score: Candidate score on the selection (validation) set.
+        holdout_score: Candidate score on the held-out slice.
+        max_gap: Maximum allowed gap (absolute mode) or gap growth.
+        min_holdout_improvement: Required held-out lift vs baseline.
+        baseline_holdout: Incumbent / baseline score on the held-out slice.
+        baseline_fit: Incumbent score on the selection set (enables the
+            incumbent-relative mode).
+        min_transfer_ratio: Share of the validation gain that must show up
+            on held-out data (``0`` disables the transfer rule).
+        holdout_tolerance: Held-out regression tolerated as noise.
 
     Returns:
         :class:`GeneralizationCheck` with accept/reject decision.
@@ -152,56 +183,121 @@ def check_generalization(
         )
 
     gap = fit_score - holdout_score
-    if gap > max_gap:
+    fit_delta = fit_score - baseline_fit if baseline_fit is not None else None
+    holdout_delta = holdout_score - baseline_holdout if baseline_holdout is not None else None
+    gap_growth = (
+        gap - (baseline_fit - baseline_holdout)
+        if baseline_fit is not None and baseline_holdout is not None
+        else None
+    )
+
+    def _result(ok: bool, reason: str) -> GeneralizationCheck:
         return GeneralizationCheck(
-            ok=False,
-            reason=(
-                f"Overfit risk: fit={fit_score:.4f} vs holdout={holdout_score:.4f} "
-                f"(gap={gap:+.4f} > max_gap={max_gap:.4f})"
-            ),
+            ok=ok,
+            reason=reason,
             fit_score=fit_score,
             holdout_score=holdout_score,
             gap=gap,
             max_gap=max_gap,
+            fit_delta=fit_delta,
+            holdout_delta=holdout_delta,
+            gap_growth=gap_growth,
         )
 
-    if baseline_holdout is not None:
-        holdout_delta = holdout_score - baseline_holdout
-        if holdout_delta < -0.02:
-            return GeneralizationCheck(
-                ok=False,
-                reason=(
-                    f"Holdout regression: {holdout_score:.4f} < baseline "
-                    f"{baseline_holdout:.4f} (Δ={holdout_delta:+.4f})"
-                ),
-                fit_score=fit_score,
-                holdout_score=holdout_score,
-                gap=gap,
-                max_gap=max_gap,
+    if gap_growth is not None:
+        # Large real gains leave some unreplicated noise on a small held-out
+        # slice; allow up to half the gain before calling it overfitting.
+        allowed = max(max_gap, 0.5 * fit_delta) if fit_delta and fit_delta > 0 else max_gap
+        if gap_growth > allowed:
+            return _result(
+                False,
+                f"Overfit risk: the validation/held-out gap widened by {gap_growth:+.4f} "
+                f"(> {allowed:.4f}); fit={fit_score:.4f}, holdout={holdout_score:.4f}",
+            )
+    elif gap > max_gap:
+        return _result(
+            False,
+            f"Overfit risk: fit={fit_score:.4f} vs holdout={holdout_score:.4f} "
+            f"(gap={gap:+.4f} > max_gap={max_gap:.4f})",
+        )
+
+    if holdout_delta is not None and baseline_holdout is not None:
+        if holdout_delta < -abs(holdout_tolerance):
+            return _result(
+                False,
+                f"Holdout regression: {holdout_score:.4f} < baseline "
+                f"{baseline_holdout:.4f} (Δ={holdout_delta:+.4f}, "
+                f"tolerance {holdout_tolerance:.4f})",
             )
         if min_holdout_improvement > 0 and holdout_delta < min_holdout_improvement:
-            return GeneralizationCheck(
-                ok=False,
-                reason=(
-                    f"Holdout improvement {holdout_delta:+.4f} below "
-                    f"min_holdout_improvement={min_holdout_improvement:.4f}"
-                ),
-                fit_score=fit_score,
-                holdout_score=holdout_score,
-                gap=gap,
-                max_gap=max_gap,
+            return _result(
+                False,
+                f"Holdout improvement {holdout_delta:+.4f} below "
+                f"min_holdout_improvement={min_holdout_improvement:.4f}",
             )
+        if (
+            min_transfer_ratio > 0
+            and fit_delta is not None
+            and fit_delta > 0
+            and baseline_holdout < 0.99
+        ):
+            required = min_transfer_ratio * fit_delta
+            if holdout_delta < required - 1e-9:
+                return _result(
+                    False,
+                    f"Does not transfer: validation improved {fit_delta:+.4f} but held-out "
+                    f"only {holdout_delta:+.4f} (< {min_transfer_ratio:.0%} of the gain = "
+                    f"{required:+.4f}) — likely fitted to the validation examples",
+                )
 
-    return GeneralizationCheck(
-        ok=True,
-        reason=(
-            f"Generalization OK: fit={fit_score:.4f}, holdout={holdout_score:.4f}, gap={gap:+.4f}"
-        ),
-        fit_score=fit_score,
-        holdout_score=holdout_score,
-        gap=gap,
-        max_gap=max_gap,
+    return _result(
+        True,
+        f"Generalization OK: fit={fit_score:.4f}, holdout={holdout_score:.4f}, gap={gap:+.4f}"
+        + (f", held-out Δ={holdout_delta:+.4f}" if holdout_delta is not None else ""),
     )
+
+
+def paired_improvement_confidence(
+    candidate: Sequence[float],
+    incumbent: Sequence[float],
+    *,
+    n_boot: int = 1000,
+    seed: int = 0,
+) -> float:
+    """Bootstrap confidence that ``candidate`` beats ``incumbent`` on average.
+
+    Both sequences are per-example scores on the *same* examples in the same
+    order. Resampling the paired differences estimates ``P(mean Δ > 0)`` —
+    a guard against accepting a candidate whose "improvement" is judge noise
+    on a handful of validation examples.
+
+    Args:
+        candidate: Candidate per-example scores.
+        incumbent: Incumbent per-example scores (same examples, same order).
+        n_boot: Bootstrap resamples.
+        seed: RNG seed (deterministic decisions).
+
+    Returns:
+        A probability in ``[0, 1]``; ``1.0`` when every paired difference is
+        positive, ``0.0`` when none is, ``0.5`` when the inputs are unusable.
+    """
+    import random
+
+    if not candidate or len(candidate) != len(incumbent):
+        return 0.5
+    diffs = [float(c) - float(i) for c, i in zip(candidate, incumbent, strict=True)]
+    if all(d > 0 for d in diffs):
+        return 1.0
+    if all(d <= 0 for d in diffs):
+        return 0.0
+    rng = random.Random(seed)
+    n = len(diffs)
+    wins = 0
+    for _ in range(max(1, n_boot)):
+        total = sum(diffs[rng.randrange(n)] for _ in range(n))
+        if total > 0:
+            wins += 1
+    return wins / max(1, n_boot)
 
 
 def synthesize_epoch_learning(

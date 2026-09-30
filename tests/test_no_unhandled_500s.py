@@ -13,8 +13,10 @@ thread-summary route.
 
 None of those were caught by testing individual features, because each was
 only reachable in a configuration no individual test happened to build. This
-module instead walks *every* mounted route and asserts none of them 5xx, in the
-default no-store posture that a fresh `agentomatic run` actually uses.
+module instead walks *every* mounted route and asserts none of them 5xx, both in
+the default posture a fresh `agentomatic run` uses (no store configured, so the
+platform falls back to a bounded in-memory store) and with that fallback
+disabled (``AGENTOMATIC_EPHEMERAL_THREADS=0``, genuinely no store).
 """
 
 from __future__ import annotations
@@ -59,9 +61,8 @@ _PROBE_BODY: dict[str, Any] = {
 _CONTROL_TOKEN = "sweep-control-token"
 
 
-@pytest.fixture(scope="module")
-def swept_app():
-    """A fully-featured platform in the DEFAULT posture: no store configured."""
+def _build_swept_app():
+    """A fully-featured platform with no store configured."""
     import tempfile
     from pathlib import Path
 
@@ -82,6 +83,21 @@ def swept_app():
         node_fn=echo,
     )
     return platform.build()
+
+
+@pytest.fixture(scope="module", params=["ephemeral-store", "no-store"])
+def swept_app(request):
+    """Both store postures: the default fallback, and the fallback disabled.
+
+    The flag is read at lifespan start-up, which runs each time a test enters
+    ``TestClient``, so it stays set for the lifetime of the module-scoped app.
+    """
+    with pytest.MonkeyPatch.context() as mp:
+        if request.param == "no-store":
+            mp.setenv("AGENTOMATIC_EPHEMERAL_THREADS", "0")
+        else:
+            mp.delenv("AGENTOMATIC_EPHEMERAL_THREADS", raising=False)
+        yield _build_swept_app()
 
 
 def _probe_targets(app) -> list[tuple[str, str, str]]:
@@ -136,9 +152,10 @@ def test_the_sweep_covers_a_meaningful_number_of_routes(swept_app) -> None:
     assert len(targets) >= 80, f"only {len(targets)} route/method pairs probed"
 
 
-def test_store_dependent_routes_answer_4xx_rather_than_crashing(swept_app) -> None:
+def test_store_dependent_routes_answer_4xx_rather_than_crashing(monkeypatch) -> None:
     """The specific regression: these need a store, and none is configured."""
-    with TestClient(swept_app, raise_server_exceptions=False) as client:
+    monkeypatch.setenv("AGENTOMATIC_EPHEMERAL_THREADS", "0")
+    with TestClient(_build_swept_app(), raise_server_exceptions=False) as client:
         for path in (
             "/api/v1/a1/optimization-runs",
             "/api/v1/a1/logs",
@@ -148,6 +165,23 @@ def test_store_dependent_routes_answer_4xx_rather_than_crashing(swept_app) -> No
             assert 400 <= response.status_code < 500, (
                 f"{path} -> {response.status_code} (expected a 4xx): {response.text[:160]}"
             )
+
+
+def test_default_posture_serves_thread_routes(monkeypatch) -> None:
+    """A fresh project configures no store — threads must still work.
+
+    Studio's "New Chat" creates a thread before the first message; without a
+    store that answered 400 "Thread storage not configured", so no chat could
+    ever start on a freshly scaffolded project.
+    """
+    monkeypatch.delenv("AGENTOMATIC_EPHEMERAL_THREADS", raising=False)
+    with TestClient(_build_swept_app(), raise_server_exceptions=False) as client:
+        created = client.post("/api/v1/a1/threads", json={"user_id": "u", "title": "New Chat"})
+        assert created.status_code == 200, created.text
+        thread_id = created.json()["id"]
+        assert client.get(f"/api/v1/a1/threads/{thread_id}").status_code == 200
+        assert client.get("/api/v1/a1/threads").json()["count"] == 1
+        assert client.get("/api/v1/a1/optimization-runs").status_code == 200
 
 
 def test_studio_graph_degrades_for_an_agent_without_a_graph(swept_app) -> None:

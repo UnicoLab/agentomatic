@@ -322,8 +322,12 @@ def test_train_template_uses_run_train() -> None:
     assert "result = train_and_report(" in src
     assert "# compiled = compile_agent(" in src
     assert "# history = fit_agent(" in src
-    assert "# scores = evaluate_agent(" in src
-    assert "# generate_fit_report(" in src
+    # The held-out split is scored before and after fit, and the report gets
+    # the History (all epochs: original prompt → final prompt).
+    assert "# before = evaluate_agent(" in src
+    assert "# after = evaluate_agent(" in src
+    assert "# generate_fit_report(history," in src
+    assert "baseline_eval=before, final_eval=after" in src
 
 
 def test_eval_template_uses_evaluate_and_report() -> None:

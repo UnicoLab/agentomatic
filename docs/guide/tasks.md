@@ -387,6 +387,13 @@ platform = AgentPlatform.from_folder(
 | `duration_ms` | `float \| None` | Wall-clock duration |
 | `callback_url` | `str \| None` | Completion webhook |
 
+A task is `failed` when its target raises **or reports failure**: a pipeline
+whose status is `failed`, or an endpoint none of whose upstream calls
+succeeded. The target's own report is kept in `result` (every step's status
+and error, every upstream response) and summarised in `error`. A pipeline that
+finished with status `partial` (some steps failed under `on_error: continue`)
+is a completed run, so its task `succeeded`; check `result.status`.
+
 ## Persistence & durability
 
 The default [`InMemoryTaskStore`][store] keeps records in a bounded, TTL-aware

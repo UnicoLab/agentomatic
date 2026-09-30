@@ -69,6 +69,7 @@ from agentomatic.agents.metrics import (
     OptimizeMetricAdapter,
     ResponseSimilarityMetric,
     WeightedMetric,
+    as_agent_metric,
 )
 from agentomatic.agents.optimizers import (
     GridSearchOptimizer,
@@ -116,6 +117,7 @@ __all__ = [
     "WeightedMetric",
     "ResponseSimilarityMetric",
     "OptimizeMetricAdapter",
+    "as_agent_metric",
     # Optimizers
     "NoOpOptimizer",
     "GridSearchOptimizer",

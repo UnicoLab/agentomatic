@@ -54,7 +54,13 @@ class DataSynthesizer:
     Args:
         model: LLM model for generation (e.g., "ollama/mistral:7b").
         temperature: Generation temperature (higher = more diverse).
-        api_base: Ollama/LLM API base URL.
+        api_base: Legacy, unused (kept for signature compatibility).
+        base_url: OpenAI-compatible endpoint for ``openai/`` / ``omlx/``
+            models, used per call (not a process-wide default).
+        api_key: API key for ``base_url``.
+        max_tokens: Reply budget per call. Replies cut at the limit used to
+            parse to *zero* examples silently; they are now salvaged and
+            flagged.
     """
 
     def __init__(
@@ -62,10 +68,17 @@ class DataSynthesizer:
         model: LLMSpec = "ollama/mistral:7b",
         temperature: float = 0.8,
         api_base: str = "http://localhost:11434",
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        max_tokens: int = 4096,
     ):
         self.model = model
         self.temperature = temperature
         self.api_base = api_base
+        self.base_url = base_url
+        self.api_key = api_key
+        self.max_tokens = max(256, int(max_tokens))
 
     # =================================================================
     # Generate from scratch
@@ -434,52 +447,8 @@ class DataSynthesizer:
         return self._parse_response(raw)
 
     def _parse_response(self, text: str) -> list[DataPoint]:
-        """Parse LLM response into DataPoints."""
-        if not text:
-            return []
-
-        # Try to extract JSON array from the response
-        points: list[DataPoint] = []
-        try:
-            # Find JSON array in the text
-            start = text.find("[")
-            end = text.rfind("]")
-            if start >= 0 and end > start:
-                json_str = text[start : end + 1]
-                items = json.loads(json_str)
-
-                for item in items:
-                    if isinstance(item, dict) and "query" in item:
-                        points.append(
-                            DataPoint(
-                                query=item["query"],
-                                expected_answer=item.get("expected_answer"),
-                                context=item.get("context", []),
-                                metadata={
-                                    k: v
-                                    for k, v in item.items()
-                                    if k not in ("query", "expected_answer", "context")
-                                },
-                            )
-                        )
-        except (json.JSONDecodeError, ValueError) as exc:
-            logger.warning(f"Failed to parse LLM response as JSON: {exc}")
-            # Try line-by-line parsing as fallback
-            for line in text.split("\n"):
-                line = line.strip()
-                if line.startswith("{") and "query" in line:
-                    try:
-                        item = json.loads(line)
-                        points.append(
-                            DataPoint(
-                                query=item["query"],
-                                expected_answer=item.get("expected_answer"),
-                            )
-                        )
-                    except json.JSONDecodeError:
-                        continue
-
-        return points
+        """Parse an LLM reply into DataPoints (see :func:`parse_generated_points`)."""
+        return parse_generated_points(text)
 
     async def _call_llm(self, prompt: str) -> str:
         """Call LLM API via the unified LLMCaller."""
@@ -487,7 +456,128 @@ class DataSynthesizer:
             self.model,
             prompt,
             temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            base_url=self.base_url,
+            api_key=self.api_key,
         )
+
+    # =================================================================
+    # Seed-anchored augmentation (used by ``prepare_dataset``)
+    # =================================================================
+
+    async def augment_points(
+        self,
+        seeds: list[DataPoint],
+        *,
+        n_new: int,
+        strategies: list[str] | None = None,
+        per_call: int = 4,
+        existing_queries: list[str] | None = None,
+        protected_queries: list[str] | None = None,
+        near_duplicate_ratio: float = 0.9,
+        rng_seed: int = 0,
+        max_calls: int | None = None,
+    ) -> tuple[list[tuple[int, str, DataPoint]], dict[str, Any]]:
+        """Generate ``n_new`` variations anchored to individual seeds.
+
+        One seed and one strategy per LLM call, asking for at most
+        ``per_call`` variations — a single call per strategy asking for dozens
+        of examples was routinely cut off at ``max_tokens`` and parsed to
+        nothing. Calls continue round-robin over (seed, strategy) pairs until
+        ``n_new`` unique examples exist or ``max_calls`` is spent.
+
+        Args:
+            seeds: Seed points (training data only — never validation/test).
+            n_new: Number of new examples wanted.
+            strategies: Augmentation strategies (see :meth:`augment`).
+            per_call: Variations requested per call.
+            existing_queries: Queries already in the dataset (exact dedupe).
+            protected_queries: Validation/holdout/test queries: exact *and*
+                near-duplicates are dropped (a paraphrase of a test question
+                in train inflates every score measured on it).
+            near_duplicate_ratio: ``difflib`` ratio at or above which a
+                generated query counts as a near-duplicate of a protected one.
+            rng_seed: Seed for the (seed, strategy) schedule.
+            max_calls: Call budget (default ``2 × ceil(n_new / per_call) + 4``).
+
+        Returns:
+            ``(items, stats)``: ``items`` are ``(seed_index, strategy, point)``;
+            ``stats`` counts calls, parsed, duplicates, near-duplicates, empty
+            or failed calls and additions per strategy.
+        """
+        import difflib
+        import random
+
+        strategies = [s for s in (strategies or ["paraphrase"]) if s in _STRATEGY_INSTRUCTIONS]
+        stats: dict[str, Any] = {
+            "requested": int(n_new),
+            "calls": 0,
+            "parsed": 0,
+            "duplicates": 0,
+            "near_duplicates": 0,
+            "empty_calls": 0,
+            "added": 0,
+            "by_strategy": {},
+        }
+        if n_new <= 0 or not seeds or not strategies:
+            return [], stats
+
+        def _norm(text: str) -> str:
+            return " ".join(str(text).lower().split())
+
+        seen = {_norm(q) for q in (existing_queries or [])}
+        seen.update(_norm(p.query) for p in seeds)
+        protected = [_norm(q) for q in (protected_queries or []) if q]
+        # Shuffled seeds, strategies rotating call by call: a short run still
+        # mixes every strategy, a long one covers every (seed, strategy) pair.
+        order = list(range(len(seeds)))
+        random.Random(rng_seed).shuffle(order)
+        pairs = [
+            (seed_idx, strategies[(pos + rnd) % len(strategies)])
+            for rnd in range(len(strategies))
+            for pos, seed_idx in enumerate(order)
+        ]
+        per_call = max(1, int(per_call))
+        budget = max_calls if max_calls is not None else 2 * -(-n_new // per_call) + 4
+
+        items: list[tuple[int, str, DataPoint]] = []
+        cursor = 0
+        while len(items) < n_new and stats["calls"] < budget:
+            seed_idx, strategy = pairs[cursor % len(pairs)]
+            cursor += 1
+            k = min(per_call, n_new - len(items))
+            prompt = _seed_prompt(seeds[seed_idx], strategy, k)
+            stats["calls"] += 1
+            raw = await self._call_llm(prompt)
+            points = parse_generated_points(raw)
+            if not points:
+                stats["empty_calls"] += 1
+                logger.warning(
+                    "Augmentation call {} ({}, seed {}) produced no parsable examples — "
+                    "reply starts: {!r}",
+                    stats["calls"],
+                    strategy,
+                    seed_idx,
+                    (raw or "")[:160],
+                )
+                continue
+            stats["parsed"] += len(points)
+            for point in points[:k]:
+                key = _norm(point.query)
+                if not key or key in seen:
+                    stats["duplicates"] += 1
+                    continue
+                if any(
+                    difflib.SequenceMatcher(None, key, other).ratio() >= near_duplicate_ratio
+                    for other in protected
+                ):
+                    stats["near_duplicates"] += 1
+                    continue
+                seen.add(key)
+                items.append((seed_idx, strategy, point))
+                stats["by_strategy"][strategy] = stats["by_strategy"].get(strategy, 0) + 1
+        stats["added"] = len(items)
+        return items, stats
 
     # =================================================================
     # DeepEval Integration
@@ -782,3 +872,149 @@ async def red_team(
     """
     synth = DataSynthesizer(model=model)
     return await synth.red_team(agent_description, n_samples, vulnerabilities)
+
+
+# =====================================================================
+# Parsing and seed prompts (module level — shared and testable)
+# =====================================================================
+
+#: Strategies whose variations keep the seed's answer (and its labels).
+LABEL_PRESERVING_STRATEGIES = frozenset(
+    {"paraphrase", "perturbation", "add_noise", "simplify", "formality_shift"}
+)
+
+_STRATEGY_INSTRUCTIONS: dict[str, str] = {
+    "paraphrase": "Rephrase the question in different words, keeping the exact same intent.",
+    "perturbation": (
+        "Rewrite the question the way a hurried user would: typos, informal wording, "
+        "abbreviations, fragments — same intent."
+    ),
+    "add_noise": "Add realistic noise (typos, filler words, punctuation slips) — same intent.",
+    "simplify": "Make the question shorter and plainer — same intent.",
+    "formality_shift": "Change the register (very formal or very casual) — same intent.",
+    "complicate": "Make the question longer and more detailed; answer it correctly.",
+    "expansion": "Ask a related follow-up question on the same topic; answer it correctly.",
+    "adversarial": (
+        "Ask a tricky variant (ambiguity, false premise, negation, edge case); "
+        "give the correct answer."
+    ),
+    "edge_case": "Ask about an edge case or exception to the rule; give the correct answer.",
+}
+
+_ITEM_LIST_KEYS = ("examples", "data", "items", "rows", "points", "variations", "results")
+
+
+def _seed_prompt(seed: DataPoint, strategy: str, k: int) -> str:
+    """Build the one-seed augmentation prompt."""
+    from agentomatic.optimize.metrics import plain_expected
+
+    answer = plain_expected(seed.expected_answer) or ""
+    keep = strategy in LABEL_PRESERVING_STRATEGIES
+    seed_json = json.dumps({"query": seed.query, "expected_answer": answer}, ensure_ascii=False)
+    return (
+        "You are a dataset augmentation expert.\n\n"
+        f"## Seed example\n{seed_json}\n\n"
+        f"## Task\n{_STRATEGY_INSTRUCTIONS[strategy]}\n"
+        f"Write {k} new, distinct variation(s) of the seed.\n"
+        + (
+            "The expected_answer must stay exactly the seed's expected_answer.\n"
+            if keep
+            else "Give each variation its own correct expected_answer.\n"
+        )
+        + "\nReply with ONLY a JSON array, no prose:\n"
+        '[{"query": "...", "expected_answer": "..."}]\n'
+    )
+
+
+def _item_to_point(item: dict[str, Any]) -> DataPoint | None:
+    """Map one generated JSON object onto a DataPoint (tolerant of key names)."""
+    query = item.get("query") or item.get("question") or item.get("input")
+    if isinstance(query, dict):
+        query = query.get("query") or query.get("current_query") or query.get("question")
+    if not isinstance(query, str) or not query.strip():
+        return None
+    expected: Any = item.get("expected_answer")
+    for key in ("expected", "answer", "expected_output", "response"):
+        if expected is None:
+            expected = item.get(key)
+    if isinstance(expected, dict):
+        expected = json.dumps(expected, ensure_ascii=False)
+    raw_context = item.get("context")
+    context: list[Any] = raw_context if isinstance(raw_context, list) else []
+    metadata = {
+        k: v
+        for k, v in item.items()
+        if k
+        not in {
+            "query",
+            "question",
+            "input",
+            "expected_answer",
+            "expected",
+            "answer",
+            "expected_output",
+            "response",
+            "context",
+        }
+    }
+    return DataPoint(
+        query=query.strip(),
+        expected_answer=str(expected) if expected is not None else None,
+        context=[str(c) for c in context],
+        metadata=metadata,
+    )
+
+
+def parse_generated_points(text: str) -> list[DataPoint]:
+    """Parse generated examples from an LLM reply, however it is wrapped.
+
+    Accepts a JSON array; an object wrapping one (``{"examples": [...]}``);
+    a single object; fenced blocks; prose around the JSON; one object per
+    line; and a reply cut off mid-array (every *complete* object before the
+    cut is kept). Each item needs a ``query`` (or ``question``).
+
+    Args:
+        text: Raw LLM reply.
+
+    Returns:
+        The parsed points (possibly empty).
+    """
+    from agentomatic.providers.jsonutil import extract_json
+
+    if not text or not text.strip():
+        return []
+    value = extract_json(text, expect="array")
+    items: list[Any] = []
+    if isinstance(value, list):
+        items = value
+    elif isinstance(value, dict):
+        wrapped = next((value[k] for k in _ITEM_LIST_KEYS if isinstance(value.get(k), list)), None)
+        items = wrapped if wrapped is not None else [value]
+    points = [p for p in (_item_to_point(i) for i in items if isinstance(i, dict)) if p]
+    if isinstance(value, list) and points:
+        return points
+    # Salvage: decode every complete object in the text (truncated arrays,
+    # JSONL, objects interleaved with prose). A lone object may just be the
+    # first line of a JSONL reply, so salvage runs for that case too.
+    decoder = json.JSONDecoder()
+    idx = text.find("{")
+    salvaged: list[DataPoint] = []
+    while idx != -1:
+        try:
+            obj, end = decoder.raw_decode(text, idx)
+        except json.JSONDecodeError:
+            idx = text.find("{", idx + 1)
+            continue
+        if isinstance(obj, dict):
+            point = _item_to_point(obj)
+            if point is not None:
+                salvaged.append(point)
+            else:
+                inner = next(
+                    (obj[k] for k in _ITEM_LIST_KEYS if isinstance(obj.get(k), list)), None
+                )
+                for item in inner or []:
+                    if isinstance(item, dict) and (p := _item_to_point(item)):
+                        salvaged.append(p)
+        idx = text.find("{", end)
+    return salvaged if len(salvaged) > len(points) else points

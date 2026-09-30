@@ -1326,7 +1326,9 @@ class TestLatencyMetric:
 
         m = LatencyMetric()
         result = await m.evaluate("q", "resp")
-        assert result.score == 0.5
+        # No data is a failed evaluation, not a neutral 0.5 diluting composites.
+        assert result.score == 0.0
+        assert result.metadata["evaluation_failed"] is True
         assert "No latency data" in result.reason
 
 
@@ -1516,7 +1518,8 @@ class TestWrapLocalAgent:
         agent = FakeAgent()
         fn = _wrap_local_agent(agent)
         result = await fn("hello", prompt_override=None, context=None, invoke=None)
-        assert result == "transformed:hello"
+        # Dicts pass through; AgentRunner derives the scored text.
+        assert result == {"response": "transformed:hello"}
 
     @pytest.mark.asyncio
     async def test_wrap_atransform(self):
@@ -1529,7 +1532,7 @@ class TestWrapLocalAgent:
         agent = FakeAsyncAgent()
         fn = _wrap_local_agent(agent)
         result = await fn("world", prompt_override=None, context=None, invoke=None)
-        assert result == "async:world"
+        assert result == {"response": "async:world"}
 
     @pytest.mark.asyncio
     async def test_wrap_output_dict(self):
@@ -1544,7 +1547,9 @@ class TestWrapLocalAgent:
         agent = FakeAgent()
         fn = _wrap_local_agent(agent)
         result = await fn("q", prompt_override=None, context=None, invoke=None)
-        data = json.loads(result)
+        from agentomatic.optimize.runner import _response_text
+
+        data = json.loads(_response_text(result))
         assert data == {"content": "foo", "next_action": "bar"}
 
     @pytest.mark.asyncio
@@ -1577,7 +1582,7 @@ class TestWrapLocalAgent:
         fn = _wrap_local_agent(agent)
         result = await fn("q", prompt_override="overridden", context=None, invoke=None)
         # response was generated with the override
-        assert result == "overridden"
+        assert result == {"response": "overridden"}
         # original prompt restored after call
         assert agent.system_prompt == "original"
 

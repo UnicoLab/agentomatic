@@ -459,7 +459,7 @@ def test_local_documentation_images_resolve_from_their_published_pages() -> None
 
 def test_optimization_guide_documents_only_supported_cli_paths() -> None:
     """Prevent removed optimization commands and modes returning to the docs."""
-    optimization = _doc("docs/guide/optimization.md")
+    optimization = _doc("docs/optimization/cli.md")
 
     assert "`PromptFitter`" in optimization
     assert "`PromptOptimizer`" in optimization
@@ -550,7 +550,7 @@ def test_parsable_documented_agentomatic_imports_resolve() -> None:
 
 def test_optimization_guide_matches_current_cli_contract() -> None:
     """Keep mode names and important flags tied to Click's public interface."""
-    optimization = _doc("docs/guide/optimization.md")
+    optimization = _doc("docs/optimization/cli.md")
     help_text = CliRunner().invoke(cli, ["optimize", "--help"]).output
 
     for token in (

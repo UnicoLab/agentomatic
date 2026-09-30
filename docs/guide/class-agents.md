@@ -1163,7 +1163,7 @@ agents/my_agent/
 
     Class scaffolds emit flat scripts (full abstraction):
     `TrainCliSettings` / `EvalCliSettings` →
-    [`train_and_report`](optimization.md) / [`evaluate_and_report`](optimization.md).
+    [`train_and_report`](../optimization/class-agents.md#one-call-train_and_report) / [`evaluate_and_report`](../optimization/reports.md#evaluation-only-reports).
     `train.py` also includes a **commented staged** path
     (`compile_agent` → `fit_agent` → `evaluate_agent`) for full control —
     same primitives under the hood.
@@ -1205,7 +1205,7 @@ agents/my_agent/
     ```
 
     For the current in-process fitter API and explicit search spaces, see
-    [Prompt Optimization](optimization.md#modern-python-api-promptfitter).
+    [Low level: PromptFitter](../optimization/prompt-fitter.md).
 
 ??? example "Generated `dataset.jsonl`"
 

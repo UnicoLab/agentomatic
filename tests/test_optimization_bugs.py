@@ -520,9 +520,12 @@ class TestBug4CompositeMetricScore:
         expected_dict = {"answer": "42"}
         ex = self._make_example(expected=expected_dict)
         metric.score(ex, {"response": "r"})
-        # expected must be the JSON representation of the dict
+        # The same reference every path uses (AgentExample.to_datapoint): the
+        # dict travels as its "Expected structured output" JSON section.
+        from agentomatic.optimize.metrics import _expected_structured
+
         assert received_expected[0] is not None
-        assert json.loads(received_expected[0]) == expected_dict
+        assert _expected_structured(received_expected[0]) == expected_dict
 
     def test_score_does_not_raise_on_sub_metric_failure(self):
         class BrokenMetric(ExactMatchMetric):
@@ -748,7 +751,9 @@ class TestBug5OptimizeMetricAdapter:
 
     # -- error handling -------------------------------------------------------
 
-    def test_score_returns_neutral_on_exception(self):
+    def test_score_is_zero_and_counted_on_exception(self):
+        """A failed judge must not invent a mid-scale score (it hid outages)."""
+
         class FailMetric:
             name = "fail"
 
@@ -758,9 +763,10 @@ class TestBug5OptimizeMetricAdapter:
         adapter = OptimizeMetricAdapter(FailMetric())
         ex = self._make_example()
         result = adapter.score(ex, {"response": "r"})
-        assert result == pytest.approx(0.5)  # neutral, not 0.0 crash
+        assert result == 0.0  # no crash, and no fabricated 0.5
+        assert adapter.failures == 1
 
-    def test_score_returns_neutral_on_sync_exception(self):
+    def test_score_is_zero_and_counted_on_sync_exception(self):
         class SyncFail:
             name = "sync_fail"
 
@@ -770,7 +776,8 @@ class TestBug5OptimizeMetricAdapter:
         adapter = OptimizeMetricAdapter(SyncFail())
         ex = self._make_example()
         result = adapter.score(ex, {"response": "r"})
-        assert result == pytest.approx(0.5)
+        assert result == 0.0
+        assert adapter.failures == 1
 
     # -- integration with training stack -------------------------------------
 
