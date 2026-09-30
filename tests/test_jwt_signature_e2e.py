@@ -87,12 +87,14 @@ def client(tmp_path, jwks, monkeypatch):
         def __exit__(self, *exc: object) -> None:
             return None
 
-    def _urlopen(url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+    def _open(_opener, url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
         target = getattr(url, "full_url", url)
         assert target == JWKS_URL, f"unexpected JWKS fetch: {target}"
         return _Response()
 
-    monkeypatch.setattr(urllib.request, "urlopen", _urlopen)
+    # Every urllib fetch goes through an opener: ``urlopen`` builds one, and
+    # PyJWT >= 2.14 builds its own (redirects refused) instead of calling it.
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", _open)
 
     class _HttpxResponse:
         status_code = 200
