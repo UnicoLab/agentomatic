@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="460" viewBox="0 0 980 460" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="980" height="460" fill="#0d1117" rx="12"/>
+<line x1="60" y1="30.0" x2="950" y2="30.0" stroke="#21262d" stroke-width="1"/>
+<text x="50" y="34.0" text-anchor="end" font-size="12" fill="#8b949e">1.00</text>
+<line x1="60" y1="104.0" x2="950" y2="104.0" stroke="#21262d" stroke-width="1"/>
+<text x="50" y="108.0" text-anchor="end" font-size="12" fill="#8b949e">0.80</text>
+<line x1="60" y1="178.0" x2="950" y2="178.0" stroke="#21262d" stroke-width="1"/>
+<text x="50" y="182.0" text-anchor="end" font-size="12" fill="#8b949e">0.60</text>
+<line x1="60" y1="252.0" x2="950" y2="252.0" stroke="#21262d" stroke-width="1"/>
+<text x="50" y="256.0" text-anchor="end" font-size="12" fill="#8b949e">0.40</text>
+<line x1="60" y1="326.0" x2="950" y2="326.0" stroke="#21262d" stroke-width="1"/>
+<text x="50" y="330.0" text-anchor="end" font-size="12" fill="#8b949e">0.20</text>
+<line x1="60" y1="400.0" x2="950" y2="400.0" stroke="#21262d" stroke-width="1"/>
+<text x="50" y="404.0" text-anchor="end" font-size="12" fill="#8b949e">0.00</text>
+<text x="60.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">base</text>
+<text x="149.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">1</text>
+<text x="238.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">2</text>
+<text x="327.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">3</text>
+<text x="416.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">4</text>
+<text x="505.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">5</text>
+<text x="594.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">6</text>
+<text x="683.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">7</text>
+<text x="772.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">8</text>
+<text x="861.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">9</text>
+<text x="950.0" y="420" text-anchor="middle" font-size="12" fill="#8b949e">10</text>
+<polyline points="60.0,30.0 149.0,82.9 238.0,82.9 327.0,188.6 416.0,241.4 505.0,241.4 594.0,241.4 683.0,241.4 772.0,241.4" fill="none" stroke="#58a6ff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="60.0" cy="30.0" r="3.5" fill="#58a6ff"/>
+<circle cx="149.0" cy="82.9" r="3.5" fill="#58a6ff"/>
+<circle cx="238.0" cy="82.9" r="3.5" fill="#58a6ff"/>
+<circle cx="327.0" cy="188.6" r="3.5" fill="#58a6ff"/>
+<circle cx="416.0" cy="241.4" r="3.5" fill="#58a6ff"/>
+<circle cx="505.0" cy="241.4" r="3.5" fill="#58a6ff"/>
+<circle cx="594.0" cy="241.4" r="3.5" fill="#58a6ff"/>
+<circle cx="683.0" cy="241.4" r="3.5" fill="#58a6ff"/>
+<circle cx="772.0" cy="241.4" r="3.5" fill="#58a6ff"/>
+<text x="958.0" y="245.4" font-size="12" fill="#58a6ff">rewrite 0.429</text>
+<polyline points="60.0,30.0 149.0,30.0 238.0,82.9 327.0,135.7 416.0,188.6 505.0,188.6 594.0,188.6 683.0,188.6 772.0,188.6" fill="none" stroke="#f0883e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="60.0" cy="30.0" r="3.5" fill="#f0883e"/>
+<circle cx="149.0" cy="30.0" r="3.5" fill="#f0883e"/>
+<circle cx="238.0" cy="82.9" r="3.5" fill="#f0883e"/>
+<circle cx="327.0" cy="135.7" r="3.5" fill="#f0883e"/>
+<circle cx="416.0" cy="188.6" r="3.5" fill="#f0883e"/>
+<circle cx="505.0" cy="188.6" r="3.5" fill="#f0883e"/>
+<circle cx="594.0" cy="188.6" r="3.5" fill="#f0883e"/>
+<circle cx="683.0" cy="188.6" r="3.5" fill="#f0883e"/>
+<circle cx="772.0" cy="188.6" r="3.5" fill="#f0883e"/>
+<text x="958.0" y="192.6" font-size="12" fill="#f0883e">gepa_like 0.571</text>
+<polyline points="60.0,30.0 149.0,82.9 238.0,82.9 327.0,188.6 416.0,241.4 505.0,294.3 594.0,347.1 683.0,400.0 772.0,400.0 861.0,400.0 950.0,400.0" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="60.0" cy="30.0" r="3.5" fill="#3fb950"/>
+<circle cx="149.0" cy="82.9" r="3.5" fill="#3fb950"/>
+<circle cx="238.0" cy="82.9" r="3.5" fill="#3fb950"/>
+<circle cx="327.0" cy="188.6" r="3.5" fill="#3fb950"/>
+<circle cx="416.0" cy="241.4" r="3.5" fill="#3fb950"/>
+<circle cx="505.0" cy="294.3" r="3.5" fill="#3fb950"/>
+<circle cx="594.0" cy="347.1" r="3.5" fill="#3fb950"/>
+<circle cx="683.0" cy="400.0" r="3.5" fill="#3fb950"/>
+<circle cx="772.0" cy="400.0" r="3.5" fill="#3fb950"/>
+<circle cx="861.0" cy="400.0" r="3.5" fill="#3fb950"/>
+<circle cx="950.0" cy="400.0" r="3.5" fill="#3fb950"/>
+<text x="958.0" y="404.0" font-size="12" fill="#3fb950">mipro_like 0.000</text>
+<polyline points="60.0,30.0 149.0,82.9 238.0,82.9 327.0,82.9 416.0,82.9 505.0,82.9" fill="none" stroke="#d2a8ff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="60.0" cy="30.0" r="3.5" fill="#d2a8ff"/>
+<circle cx="149.0" cy="82.9" r="3.5" fill="#d2a8ff"/>
+<circle cx="238.0" cy="82.9" r="3.5" fill="#d2a8ff"/>
+<circle cx="327.0" cy="82.9" r="3.5" fill="#d2a8ff"/>
+<circle cx="416.0" cy="82.9" r="3.5" fill="#d2a8ff"/>
+<circle cx="505.0" cy="82.9" r="3.5" fill="#d2a8ff"/>
+<text x="958.0" y="86.9" font-size="12" fill="#d2a8ff">few_shot_bootstrap 0.857</text>
+<polyline points="60.0,30.0 149.0,82.9 238.0,135.7 327.0,188.6 416.0,188.6 505.0,188.6 594.0,188.6 683.0,188.6" fill="none" stroke="#f85149" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="60.0" cy="30.0" r="3.5" fill="#f85149"/>
+<circle cx="149.0" cy="82.9" r="3.5" fill="#f85149"/>
+<circle cx="238.0" cy="135.7" r="3.5" fill="#f85149"/>
+<circle cx="327.0" cy="188.6" r="3.5" fill="#f85149"/>
+<circle cx="416.0" cy="188.6" r="3.5" fill="#f85149"/>
+<circle cx="505.0" cy="188.6" r="3.5" fill="#f85149"/>
+<circle cx="594.0" cy="188.6" r="3.5" fill="#f85149"/>
+<circle cx="683.0" cy="188.6" r="3.5" fill="#f85149"/>
+<text x="958.0" y="192.6" font-size="12" fill="#f85149">param_search 0.571</text>
+<rect x="60" y="432" width="12" height="12" rx="2" fill="#58a6ff"/>
+<text x="78" y="443" font-size="13" fill="#c9d1d9">rewrite</text>
+<rect x="188" y="432" width="12" height="12" rx="2" fill="#f0883e"/>
+<text x="206" y="443" font-size="13" fill="#c9d1d9">gepa_like</text>
+<rect x="340" y="432" width="12" height="12" rx="2" fill="#3fb950"/>
+<text x="358" y="443" font-size="13" fill="#c9d1d9">mipro_like</text>
+<rect x="504" y="432" width="12" height="12" rx="2" fill="#d2a8ff"/>
+<text x="522" y="443" font-size="13" fill="#c9d1d9">few_shot_bootstrap</text>
+<rect x="764" y="432" width="12" height="12" rx="2" fill="#f85149"/>
+<text x="782" y="443" font-size="13" fill="#c9d1d9">param_search</text>
+</svg>
