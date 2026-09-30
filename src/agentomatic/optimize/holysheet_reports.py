@@ -1,16 +1,69 @@
 """HolySheet dashboard builders for fit / eval reports.
 
-HolySheet ``Section`` / ``Tabs`` / ``Accordion`` only render content that is
-nested in ``children`` (or accordion ``panels``). Flat ``report.add(Section)``
-followed by sibling blocks produces empty section cards — these builders always
-nest content correctly.
+HolySheet ``Section`` / ``Tabs`` only render content that is nested in
+``children``. Flat ``report.add(Section)`` followed by sibling blocks produces
+empty section cards — these builders always nest content correctly.
+
+HolySheet's ``Accordion`` block is not rendered by its bundled viewer (panels
+are silently dropped), so panels are flattened with :func:`_panel_blocks`.
 """
 
 from __future__ import annotations
 
 import difflib
 import json
+import textwrap
 from typing import Any
+
+_DIFF_WIDTH = 100
+
+
+def _display_lines(text: str, width: int = _DIFF_WIDTH) -> list[str]:
+    """Split a prompt into lines wrapped at ``_DIFF_WIDTH`` for readable diffs.
+
+    Prompts are often one long line; a unified diff of that is a single
+    unreadable ``-``/``+`` pair. Wrapping first makes the diff show the
+    sentences that actually changed.
+    """
+    lines: list[str] = []
+    for raw in (text or "").splitlines():
+        lines.extend(textwrap.wrap(raw, width, break_on_hyphens=False) or [""])
+    return lines
+
+
+def _unified_diff(before: str, after: str, *, a: str = "before", b: str = "after") -> str:
+    """Unified diff of two prompts on wrapped lines ('' when identical)."""
+    if (before or "") == (after or ""):
+        return ""
+    return "\n".join(
+        difflib.unified_diff(
+            _display_lines(before), _display_lines(after), fromfile=a, tofile=b, lineterm=""
+        )
+    )
+
+
+def _wrapped(text: str, width: int = _DIFF_WIDTH) -> str:
+    """Prompt text wrapped for a code block (long lines would be cut off)."""
+    return "\n".join(_display_lines(text, width))
+
+
+def _panel_blocks(panels: list[dict[str, Any]]) -> list[Any]:
+    """Flatten accordion-style panels into always-visible blocks.
+
+    Each panel becomes a Markdown heading (title + subtitle) followed by its
+    children.
+    """
+    from holysheet import Markdown
+
+    blocks: list[Any] = []
+    for panel in panels:
+        subtitle = panel.get("subtitle")
+        heading = f"#### {panel.get('title', '')}"
+        if subtitle:
+            heading += f"\n\n_{subtitle}_"
+        blocks.append(Markdown(content=heading))
+        blocks.extend(panel.get("children") or [])
+    return blocks
 
 
 def _safe_json(value: Any, *, limit: int | None = None) -> str:
@@ -67,6 +120,8 @@ def _deployment_blocks(rec: Any) -> list[Any]:
 
     nested = data.get("deployment_recommendation")
     rollout = data.get("rollout") or nested or {}
+    if not isinstance(rollout, dict) and callable(getattr(rollout, "to_dict", None)):
+        rollout = rollout.to_dict()  # RolloutConfig is a slots dataclass (no __dict__)
     if hasattr(rollout, "__dict__") and not isinstance(rollout, dict):
         rollout = {
             "strategy": getattr(rollout, "strategy", None),
@@ -165,14 +220,8 @@ def _prompt_evolution_entries(
         score = float(entry.get("score") or 0.0)
         accepted = bool(entry.get("accepted"))
         new_prompt = snap or prev
-        diff_lines = list(
-            difflib.unified_diff(
-                prev.splitlines(keepends=True),
-                new_prompt.splitlines(keepends=True),
-                fromfile=f"v{len(versions) - 1}",
-                tofile=f"v{len(versions)}",
-                lineterm="",
-            )
+        diff_text = _unified_diff(
+            prev, new_prompt, a=f"v{len(versions) - 1}", b=f"v{len(versions)}"
         )
         versions.append(
             {
@@ -182,7 +231,7 @@ def _prompt_evolution_entries(
                 "accepted": accepted,
                 "candidate": str(entry.get("candidate_name") or ""),
                 "prompt": new_prompt,
-                "diff": "".join(diff_lines),
+                "diff": diff_text,
                 "what_worked": list(entry.get("what_worked") or []),
                 "what_failed": list(entry.get("what_failed") or []),
                 "next_focus": list(entry.get("next_focus") or []),
@@ -206,12 +255,22 @@ def build_fit_holysheet_report(
     stack_name: str = "",
     model_name: str = "",
     run_config: dict[str, Any] | None = None,
+    epochs: list[Any] | None = None,
+    baseline_eval: Any = None,
+    final_eval: Any = None,
+    eval_dataset: Any = None,
+    baseline_eval_scores: dict[str, float] | None = None,
+    dataset_stats: dict[str, Any] | None = None,
 ) -> str:
-    """Interactive HolySheet dashboard for a PromptFitResult."""
+    """Interactive HolySheet dashboard for a (merged, multi-epoch) PromptFitResult.
+
+    Section order: verdict, test scoreboard, what changed in the prompt,
+    epochs, all candidates, examples before vs after, data & settings (see
+    :func:`training_sections`), then run configuration, recommendations,
+    curves, prompt-evolution learnings and failure analysis.
+    """
     from holysheet import (
         KPI,
-        Accordion,
-        Callout,
         CodeBlock,
         Columns,
         DataTable,
@@ -228,8 +287,6 @@ def build_fit_holysheet_report(
     dataset_sizes = dataset_sizes or {}
     run_config = run_config or {}
 
-    improvement = float(result.best_score) - float(result.baseline_score)
-    status = "positive" if improvement > 0 else ("neutral" if improvement == 0 else "negative")
     opt_name = (
         optimizer_name
         or getattr(result, "optimizer_name", "")
@@ -257,36 +314,18 @@ def build_fit_holysheet_report(
         author="agentomatic",
     )
 
-    # ── Key results ────────────────────────────────────────────────────
-    kpis: list[Any] = [
-        KPI(label="Baseline Score", value=round(float(result.baseline_score), 4)),
-        KPI(
-            label="Best Score",
-            value=round(float(result.best_score), 4),
-            status="positive" if improvement > 0 else None,
-        ),
-        KPI(
-            label="Improvement",
-            value=round(improvement, 4),
-            delta=f"{improvement:+.4f}",
-            status=status,
-        ),
-        KPI(label="Trials", value=len(result.trials or [])),
-        KPI(
-            label="Duration",
-            value=round(float(result.duration_seconds or 0), 1),
-            unit="s",
-        ),
-    ]
-    if result.holdout_score is not None:
-        kpis.append(KPI(label="Holdout", value=round(float(result.holdout_score), 4)))
-    report.add(
-        Section(
-            title="Key Results",
-            description="Baseline vs best fit outcome",
-            children=[Columns(layout="equal", children=kpis)],
-        )
-    )
+    for block in training_sections(
+        result,
+        epochs=list(epochs or [result]),
+        baseline_eval=baseline_eval,
+        final_eval=final_eval,
+        eval_dataset=eval_dataset,
+        baseline_eval_scores=baseline_eval_scores,
+        eval_scores=eval_scores,
+        dataset_stats=dataset_stats,
+        dataset_sizes=dataset_sizes,
+    ):
+        report.add(block)
 
     # ── Run configuration ──────────────────────────────────────────────
     cfg_items = _info_items(
@@ -326,12 +365,7 @@ def build_fit_holysheet_report(
     rec_children: list[Any] = []
     suggestions = list(result.suggestions or [])
     if suggestions:
-        rec_children.append(
-            Callout(
-                content="\n".join(f"- {s}" for s in suggestions[:12]),
-                variant="note" if improvement > 0 else "highlight",
-            )
-        )
+        rec_children.append(Markdown(content="\n".join(f"- {s}" for s in suggestions[:12])))
     deployment = getattr(result, "deployment_recommendation", None)
     if deployment:
         rec_children.append(Markdown(content="### Deployment recommendation"))
@@ -567,21 +601,19 @@ def build_fit_holysheet_report(
         if meta_parts:
             children.append(Markdown(content="\n\n".join(meta_parts)))
         if item["diff"]:
-            children.append(CodeBlock(code=item["diff"], language="diff", title="Unified diff"))
+            children.append(
+                CodeBlock(code=item["diff"], language="diff", title="Change vs previous version")
+            )
+        elif item["version"] == 0:
+            children.append(
+                CodeBlock(code=_wrapped(item["prompt"]) or "(empty)", language="markdown")
+            )
         else:
             children.append(Markdown(content="_No text change vs previous version._"))
-        children.append(
-            CodeBlock(
-                code=item["prompt"] or "(empty prompt)",
-                language="markdown",
-                title=f"Full prompt ({len(item['prompt'])} chars)",
-            )
-        )
         evo_panels.append(
             {
                 "title": title,
                 "subtitle": f"{len(item['prompt'])} chars",
-                "default_expanded": item["version"] == 0 or is_best,
                 "children": children,
             }
         )
@@ -590,7 +622,7 @@ def build_fit_holysheet_report(
     if learn_rows:
         prompt_tab_children.append(DataTable(title="Epoch learnings (summary)", data=learn_rows))
     if evo_panels:
-        prompt_tab_children.append(Accordion(panels=evo_panels))
+        prompt_tab_children.extend(_panel_blocks(evo_panels))
     else:
         prompt_tab_children.append(Markdown(content="_No prompt history._"))
     if judge_rows:
@@ -602,131 +634,60 @@ def build_fit_holysheet_report(
             )
         )
 
-    # Baseline → best diff + full best prompt
-    diff_lines = list(
-        difflib.unified_diff(
-            baseline_prompt.splitlines(keepends=True),
-            best_prompt.splitlines(keepends=True),
-            fromfile="baseline",
-            tofile="best",
-            lineterm="",
-        )
-    )
-    summary_prompt_children: list[Any] = []
-    if diff_lines:
-        summary_prompt_children.append(
-            CodeBlock(code="".join(diff_lines), language="diff", title="Baseline → best")
-        )
-    else:
-        summary_prompt_children.append(
-            Markdown(content="_No prompt text change (baseline kept)._")
-        )
-    summary_prompt_children.append(
-        Accordion(
-            panels=[
-                {
-                    "title": f"Full baseline prompt ({len(baseline_prompt)} chars)",
-                    "default_expanded": False,
-                    "children": [
-                        CodeBlock(
-                            code=baseline_prompt or "(empty)",
-                            language="markdown",
-                        )
-                    ],
-                },
-                {
-                    "title": f"Full best prompt ({len(best_prompt)} chars)",
-                    "default_expanded": True,
-                    "children": [
-                        CodeBlock(
-                            code=best_prompt or "(empty)",
-                            language="markdown",
-                        )
-                    ],
-                },
-            ]
-        )
-    )
-
+    tabs: list[dict[str, Any]] = [{"label": "Prompt Evolution", "children": prompt_tab_children}]
     few_shot = list(getattr(result.best_config, "few_shot_examples", None) or [])
     if few_shot:
-        fs_panels = []
-        for i, ex in enumerate(few_shot, 1):
-            q = str(ex.get("query", ""))
-            r = str(ex.get("response", ""))
-            fs_panels.append(
-                {
-                    "title": f"Few-shot #{i}",
-                    "subtitle": q[:80],
-                    "default_expanded": i == 1,
-                    "children": [
-                        Markdown(content=f"**Query**\n\n{q}"),
-                        CodeBlock(code=r or "(empty)", language="json", title="Response"),
-                    ],
-                }
-            )
-        summary_prompt_children.append(Accordion(panels=fs_panels))
-
-    report.add(
-        Tabs(
-            tabs=[
-                {"label": "Prompt Evolution", "children": prompt_tab_children},
-                {"label": "Best Prompt", "children": summary_prompt_children},
-            ]
-        )
-    )
-
-    # ── Trials / failures ──────────────────────────────────────────────
-    trial_children: list[Any] = []
-    if result.trials:
-        trial_rows = [
+        fs_panels = [
             {
-                "round": t.get("round", "—"),
-                "name": str(t.get("name", "")),
-                "phase": str(t.get("phase", "")),
-                "score": round(float(t.get("score", 0.0)), 4),
-                "notes": str(t.get("mutation_notes", "") or t.get("accept_reason", "") or "")[
-                    :200
+                "title": f"Few-shot #{i}",
+                "subtitle": str(ex.get("query", ""))[:80],
+                "children": [
+                    Markdown(content=f"**Query**\n\n{ex.get('query', '')}"),
+                    CodeBlock(
+                        code=str(ex.get("response", "")) or "(empty)",
+                        language="json",
+                        title="Response",
+                    ),
                 ],
-                "critique": str(t.get("critique", "") or "")[:240],
             }
-            for t in result.trials
+            for i, ex in enumerate(few_shot, 1)
         ]
-        trial_children.append(DataTable(title="Candidates", data=trial_rows))
-        apo_critiques = [t for t in result.trials if str(t.get("critique") or "").strip()]
-        if apo_critiques:
-            critique_md = "\n\n".join(
-                f"**{t.get('name')}** (round {t.get('round')}):\n\n{str(t.get('critique'))[:800]}"
-                for t in apo_critiques[:8]
-            )
-            trial_children.append(
-                Markdown(content=("### Textual gradients / APO critiques\n\n" + critique_md))
-            )
-    else:
-        trial_children.append(Markdown(content="_No trials recorded._"))
+        tabs.append({"label": "Few-shot examples", "children": _panel_blocks(fs_panels)})
 
-    if result.failure_clusters:
-        fc_rows = []
-        for cluster in result.failure_clusters:
-            if isinstance(cluster, dict):
-                fc_rows.append(
-                    {
-                        "label": cluster.get("label", ""),
-                        "count": cluster.get("count", 0),
-                        "description": str(cluster.get("description", ""))[:300],
-                        "fix": str(cluster.get("suggested_fix", ""))[:300],
-                    }
-                )
-        if fc_rows:
-            trial_children.append(DataTable(title="Failure clusters", data=fc_rows))
+    report.add(Tabs(tabs=tabs))
 
-    report.add(
-        Section(
-            title="Trial History",
-            description="Candidate prompts evaluated during the fit",
-            children=trial_children,
+    # ── Failure analysis (critiques + clusters) ─────────────────────
+    failure_children: list[Any] = []
+    apo_critiques = [t for t in result.trials or [] if str(t.get("critique") or "").strip()]
+    if apo_critiques:
+        critique_md = "\n\n".join(
+            f"**{t.get('name')}** (epoch {t.get('epoch', 1)}, round {t.get('round')}):\n\n"
+            f"{str(t.get('critique'))[:800]}"
+            for t in apo_critiques[:8]
         )
-    )
+        failure_children.append(
+            Markdown(content=("### Textual gradients / APO critiques\n\n" + critique_md))
+        )
+    fc_rows = [
+        {
+            "label": cluster.get("label", ""),
+            "count": cluster.get("count", 0),
+            "description": str(cluster.get("description", ""))[:300],
+            "fix": str(cluster.get("suggested_fix", ""))[:300],
+        }
+        for cluster in result.failure_clusters or []
+        if isinstance(cluster, dict)
+    ]
+    if fc_rows:
+        failure_children.append(DataTable(title="Failure clusters (train split)", data=fc_rows))
+    if failure_children:
+        report.add(
+            Section(
+                title="Failure analysis",
+                description="What the optimizer saw going wrong on the reflection (train) data",
+                children=failure_children,
+            )
+        )
 
     report.export_html(str(output_path))
     return str(output_path)
@@ -781,7 +742,6 @@ def build_eval_holysheet_report(
     """Interactive HolySheet dashboard for an EvaluationReport."""
     from holysheet import (
         KPI,
-        Accordion,
         Callout,
         CodeBlock,
         Columns,
@@ -882,8 +842,9 @@ def build_eval_holysheet_report(
         )
 
     # Per-example table (compact) + accordion (full)
-    table_rows = []
-    panels = []
+    table_rows: list[dict[str, Any]] = []
+    score_keys: dict[str, None] = {}
+    panels: list[dict[str, Any]] = []
     rationale_rows = []
     for er in examples:
         er_scores = getattr(er, "scores", {}) or {}
@@ -893,21 +854,15 @@ def build_eval_holysheet_report(
         err = getattr(er, "error", None) or ""
         ms = round(float(getattr(er, "duration_ms", 0) or 0), 1)
         rationale = _example_judge_text(er)
-        table_rows.append(
-            {
-                "id": eid,
-                "passed": passed,
-                "judge": round(float(er_scores.get("judge", 0.0)), 3)
-                if "judge" in er_scores
-                else "—",
-                "f1": round(float(er_scores.get("f1", 0.0)), 3) if "f1" in er_scores else "—",
-                "keywords": round(float(er_scores.get("keywords", 0.0)), 3)
-                if "keywords" in er_scores
-                else "—",
-                "error": str(err)[:80],
-                "ms": ms,
-            }
-        )
+        row: dict[str, Any] = {"id": eid, "passed": passed}
+        for key, value in er_scores.items():
+            score_keys.setdefault(key, None)
+            try:
+                row[key] = round(float(value), 3)
+            except (TypeError, ValueError):
+                row[key] = str(value)
+        row.update({"error": str(err)[:80], "ms": ms})
+        table_rows.append(row)
         if rationale:
             rationale_rows.append({"id": eid, "rationale": rationale})
 
@@ -953,8 +908,10 @@ def build_eval_holysheet_report(
         panels.append(
             {
                 "title": f"{eid} · {'PASS' if passed else 'FAIL'}",
-                "subtitle": f"judge={er_scores.get('judge', '—')} · {ms}ms",
-                "default_expanded": (not passed) or bool(err),
+                "subtitle": " · ".join(
+                    [*(f"{k}={_fmt(v, 3)}" for k, v in er_scores.items()), f"{ms}ms"]
+                ),
+                "passed": passed and not err,
                 "children": panel_children,
             }
         )
@@ -964,12 +921,17 @@ def build_eval_holysheet_report(
         example_children.append(
             DataTable(
                 title="Per-example scores",
-                data=table_rows,
-                columns=["id", "passed", "judge", "f1", "keywords", "error", "ms"],
+                data=[
+                    {k: r.get(k, "—") for k in ["id", "passed", *score_keys, "error", "ms"]}
+                    for r in table_rows
+                ],
+                columns=["id", "passed", *score_keys, "error", "ms"],
             )
         )
     if panels:
-        example_children.append(Accordion(panels=panels))
+        # Failures first; details for at most 30 examples (all are in the table).
+        shown = sorted(panels, key=lambda panel: bool(panel.get("passed")))[:30]
+        example_children.extend(_panel_blocks(shown))
     else:
         example_children.append(Markdown(content="_No examples evaluated._"))
 
@@ -1046,3 +1008,479 @@ def build_eval_holysheet_report(
 
     hs.export_html(str(output_path))
     return str(output_path)
+
+
+# =====================================================================
+# Training-report sections (multi-epoch view, candidates, examples, data)
+# =====================================================================
+
+
+def _fmt(value: Any, digits: int = 4) -> str:
+    """Format a score (or '—')."""
+    if value is None:
+        return "—"
+    try:
+        return f"{float(value):.{digits}f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _scores_text(scores: dict[str, Any] | None) -> str:
+    """Compact 'metric=score' rendering of a per-example score dict."""
+    return " · ".join(f"{k}={_fmt(v, 2)}" for k, v in (scores or {}).items()) or "—"
+
+
+def training_sections(
+    merged: Any,
+    *,
+    epochs: list[Any],
+    baseline_eval: Any = None,
+    final_eval: Any = None,
+    eval_dataset: Any = None,
+    baseline_eval_scores: dict[str, float] | None = None,
+    eval_scores: dict[str, float] | None = None,
+    dataset_stats: dict[str, Any] | None = None,
+    dataset_sizes: dict[str, int] | None = None,
+) -> list[Any]:
+    """Build the report sections that explain *what the optimization did*.
+
+    Args:
+        merged: A ``PromptFitResult`` spanning all epochs (initial baseline →
+            final best, every trial tagged with its epoch).
+        epochs: The per-epoch ``PromptFitResult`` objects, in order.
+        baseline_eval: ``EvaluationReport`` on the untouched test split
+            *before* fit (optional).
+        final_eval: ``EvaluationReport`` on the same split *after* fit.
+        eval_dataset: Examples (``AgentDataset`` or list) to join inputs and
+            expected outputs onto the per-example results.
+        baseline_eval_scores: Scores-only alternative to ``baseline_eval``.
+        eval_scores: Scores-only alternative to ``final_eval``.
+        dataset_stats: e.g. ``dataset.metadata["augment_stats"]``.
+        dataset_sizes: Split sizes.
+
+    Returns:
+        HolySheet blocks, in display order.
+    """
+    from holysheet import (
+        KPI,
+        Callout,
+        CodeBlock,
+        Columns,
+        DataTable,
+        InfoList,
+        Markdown,
+        Section,
+    )
+
+    blocks: list[Any] = []
+    before_scores = dict(getattr(baseline_eval, "scores", None) or baseline_eval_scores or {})
+    after_scores = dict(getattr(final_eval, "scores", None) or eval_scores or {})
+    initial_prompt = getattr(merged.baseline_config, "system_prompt", "") or ""
+    final_prompt = getattr(merged.best_config, "system_prompt", "") or ""
+    val_delta = float(merged.best_score) - float(merged.baseline_score)
+
+    # ── Verdict ──────────────────────────────────────────────────────
+    kpis = [
+        KPI(label="Validation (initial)", value=round(float(merged.baseline_score), 4)),
+        KPI(
+            label="Validation (final)",
+            value=round(float(merged.best_score), 4),
+            delta=f"{val_delta:+.4f}",
+            status="positive" if val_delta > 0 else ("negative" if val_delta < 0 else None),
+        ),
+    ]
+    if merged.holdout_score is not None:
+        hold_before = merged.baseline_holdout_score
+        hold_delta = (
+            float(merged.holdout_score) - float(hold_before) if hold_before is not None else None
+        )
+        kpis.append(
+            KPI(
+                label="Held-out gate",
+                value=round(float(merged.holdout_score), 4),
+                delta=f"{hold_delta:+.4f}" if hold_delta is not None else None,
+            )
+        )
+    shared = [k for k in after_scores if k in before_scores]
+    for key in shared[:3]:
+        delta = float(after_scores[key]) - float(before_scores[key])
+        kpis.append(
+            KPI(
+                label=f"Test {key}",
+                value=round(float(after_scores[key]), 4),
+                delta=f"{delta:+.4f}",
+                status="positive" if delta > 0 else ("negative" if delta < 0 else None),
+            )
+        )
+    accepted = [t for t in merged.trials or [] if t.get("decision") == "accepted"]
+    verdict_lines = [
+        f"- **Prompt {'changed' if final_prompt != initial_prompt else 'unchanged'}** after "
+        f"{len(epochs)} epoch(s); {len(accepted)} candidate(s) accepted of "
+        f"{sum(1 for t in merged.trials or [] if t.get('phase') == 'minibatch')} scored.",
+        f"- Validation {_fmt(merged.baseline_score)} → {_fmt(merged.best_score)} "
+        f"(Δ {val_delta:+.4f}).",
+    ]
+    if merged.holdout_score is not None:
+        verdict_lines.append(
+            f"- Held-out gate (veto only, never selects): "
+            f"{_fmt(merged.baseline_holdout_score)} → {_fmt(merged.holdout_score)}."
+        )
+    if shared:
+        verdict_lines.append(
+            "- Untouched test split: "
+            + ", ".join(f"{k} {_fmt(before_scores[k])} → {_fmt(after_scores[k])}" for k in shared)
+            + "."
+        )
+    if merged.early_stop_reason:
+        verdict_lines.append(f"- Stop reason: {merged.early_stop_reason}.")
+    if final_prompt == initial_prompt:
+        headline = "Prompt unchanged: no candidate passed the acceptance rules."
+    elif shared:
+        key = shared[-1]
+        headline = (
+            f"Prompt improved: validation {_fmt(merged.baseline_score, 3)} → "
+            f"{_fmt(merged.best_score, 3)}, test {key} {_fmt(before_scores[key], 3)} → "
+            f"{_fmt(after_scores[key], 3)}."
+        )
+    else:
+        headline = (
+            f"Prompt changed: validation {_fmt(merged.baseline_score, 3)} → "
+            f"{_fmt(merged.best_score, 3)} (evaluate the test split for an unbiased number)."
+        )
+    blocks.append(
+        Section(
+            title="Verdict",
+            description="Initial vs final — validation (selection), held-out gate, test",
+            children=[
+                Columns(layout="equal", children=kpis),
+                Callout(content=headline, variant="note" if val_delta > 0 else "highlight"),
+                Markdown(content="\n".join(verdict_lines)),
+            ],
+        )
+    )
+
+    # ── Scoreboard ───────────────────────────────────────────────────
+    if before_scores or after_scores:
+        rows = [
+            {
+                "metric": key,
+                "test before": _fmt(before_scores.get(key)),
+                "test after": _fmt(after_scores.get(key)),
+                "Δ": (
+                    f"{float(after_scores[key]) - float(before_scores[key]):+.4f}"
+                    if key in before_scores and key in after_scores
+                    else "—"
+                ),
+            }
+            for key in sorted(set(before_scores) | set(after_scores))
+        ]
+        blocks.append(
+            Section(
+                title="Test scoreboard",
+                description="Every compiled metric on the split optimization never saw",
+                children=[
+                    DataTable(
+                        title="Test scores before vs after",
+                        data=rows,
+                        columns=["metric", "test before", "test after", "Δ"],
+                    )
+                ],
+            )
+        )
+
+    # ── What changed in the prompt ───────────────────────────────────
+    change_children: list[Any] = []
+    diff = _unified_diff(initial_prompt, final_prompt, a="initial", b="final")
+    change_children.append(
+        CodeBlock(code=diff, language="diff", title="Initial → final prompt")
+        if diff
+        else Markdown(content="_The prompt did not change: no candidate passed acceptance._")
+    )
+    change_children.append(
+        Columns(
+            layout="equal",
+            children=[
+                CodeBlock(
+                    code=_wrapped(initial_prompt, 64) or "(empty)",
+                    language="markdown",
+                    title=f"Initial prompt ({len(initial_prompt)} chars)",
+                ),
+                CodeBlock(
+                    code=_wrapped(final_prompt, 64) or "(empty)",
+                    language="markdown",
+                    title=f"Final prompt ({len(final_prompt)} chars)",
+                ),
+            ],
+        )
+    )
+    timeline = []
+    previous = initial_prompt
+    for trial in accepted:
+        prompt = str(trial.get("system_prompt") or "")
+        timeline.append(
+            {
+                "title": (
+                    f"Epoch {trial.get('epoch', 1)} · round {trial.get('round', '—')} · "
+                    f"{trial.get('name', '')} · validation {_fmt(trial.get('incumbent_score'))} → "
+                    f"{_fmt(trial.get('score'))} · held-out {_fmt(trial.get('holdout_score'))}"
+                ),
+                "children": [
+                    Markdown(content=f"**Why accepted:** {trial.get('reason') or '—'}"),
+                    CodeBlock(
+                        code=_unified_diff(previous, prompt, a="previous", b="accepted")
+                        or "(no text change — parameters / few-shot only)",
+                        language="diff",
+                        title="Change vs previous best",
+                    ),
+                ],
+            }
+        )
+        previous = prompt or previous
+    if timeline:
+        change_children.append(Markdown(content="### Accepted changes, in order"))
+        change_children.extend(_panel_blocks(timeline))
+    blocks.append(
+        Section(
+            title="What changed in the prompt",
+            description="Across all epochs: the prompt you started with vs the one you keep",
+            children=change_children,
+        )
+    )
+
+    # ── Epochs ───────────────────────────────────────────────────────
+    if len(epochs) > 1:
+        blocks.append(
+            Section(
+                title="Epochs",
+                description="Each fit() epoch re-optimizes from the previous best",
+                children=[
+                    DataTable(
+                        title="Per-epoch validation scores",
+                        data=[
+                            {
+                                "epoch": i + 1,
+                                "start": _fmt(r.baseline_score),
+                                "best": _fmt(r.best_score),
+                                "improved": "yes" if r.improved else "no",
+                                "held-out": _fmt(r.holdout_score),
+                                "candidates": sum(
+                                    1 for t in r.trials or [] if t.get("phase") == "minibatch"
+                                ),
+                                "stop": str(r.early_stop_reason or "")[:120],
+                            }
+                            for i, r in enumerate(epochs)
+                        ],
+                    )
+                ],
+            )
+        )
+
+    # ── Candidates ───────────────────────────────────────────────────
+    cand_rows = []
+    cand_panels: list[dict[str, Any]] = []
+    shown_prompts: set[str] = set()
+    full_by_name = {
+        (t.get("epoch"), t.get("name")): t
+        for t in merged.trials or []
+        if t.get("phase") == "full_val"
+    }
+    for t in merged.trials or []:
+        if t.get("phase") not in ("minibatch", "skipped"):
+            continue
+        full = full_by_name.get((t.get("epoch"), t.get("name")), {})
+        decision = full.get("decision") or t.get("decision") or ""
+        reason = full.get("reason") or t.get("reason") or ""
+        cand_rows.append(
+            {
+                "epoch": t.get("epoch", 1),
+                "round": t.get("round", "—"),
+                "candidate": str(t.get("name", "")),
+                "source": str(t.get("source", "")),
+                "minibatch": _fmt(t.get("score")),
+                "validation": _fmt(full.get("score")),
+                "held-out": _fmt(full.get("holdout_score")),
+                "confidence": _fmt(full.get("confidence"), 2),
+                "decision": decision,
+                "reason": str(reason)[:220],
+            }
+        )
+        prompt = str(t.get("system_prompt") or "")
+        # One panel per DISTINCT proposed prompt (duplicates are in the table).
+        if prompt and prompt not in shown_prompts and len(cand_panels) < 12:
+            shown_prompts.add(prompt)
+            notes = f"  \n**Notes:** {t.get('mutation_notes')}" if t.get("mutation_notes") else ""
+            cand_panels.append(
+                {
+                    "title": f"{t.get('name')} (epoch {t.get('epoch', 1)}) — "
+                    f"{decision or 'screened'}, minibatch {_fmt(t.get('score'))}",
+                    "children": [
+                        Markdown(
+                            content=f"**Decision:** {decision or '—'}  \n**Why:** {reason or '—'}"
+                            + notes
+                        ),
+                        CodeBlock(
+                            code=_unified_diff(initial_prompt, prompt, a="initial", b="candidate")
+                            or "(same text as the initial prompt)",
+                            language="diff",
+                            title="Candidate vs initial prompt",
+                        ),
+                    ],
+                }
+            )
+    cand_children: list[Any] = []
+    if cand_rows:
+        cand_children.append(
+            DataTable(
+                title="Candidates",
+                data=cand_rows,
+                columns=[
+                    "epoch",
+                    "round",
+                    "candidate",
+                    "source",
+                    "minibatch",
+                    "validation",
+                    "held-out",
+                    "confidence",
+                    "decision",
+                    "reason",
+                ],
+            )
+        )
+        if cand_panels:
+            cand_children.extend(_panel_blocks(cand_panels))
+    else:
+        cand_children.append(Markdown(content="_No candidates were scored._"))
+    blocks.append(
+        Section(
+            title="All candidates",
+            description=(
+                "Every proposed prompt, its scores and why it was accepted or rejected "
+                "(duplicates, not promoted, not significant, did not transfer, …)"
+            ),
+            children=cand_children,
+        )
+    )
+
+    # ── Examples: before vs after ────────────────────────────────────
+    example_rows = _example_rows(baseline_eval, final_eval, eval_dataset)
+    source = "untouched test split"
+    if not example_rows:
+        source = "validation examples (the selection set)"
+        after_by_query = {e.get("query"): e for e in merged.best_examples or []}
+        for before in merged.baseline_examples or []:
+            after = after_by_query.get(before.get("query"), {})
+            example_rows.append(
+                {
+                    "example": str(before.get("query", ""))[:120],
+                    "expected": str(before.get("expected", ""))[:240],
+                    "before": str(before.get("response", ""))[:300],
+                    "before score": _fmt(before.get("score"), 2),
+                    "after": str(after.get("response", ""))[:300],
+                    "after score": _fmt(after.get("score"), 2),
+                    "Δ": (
+                        f"{float(after['score']) - float(before['score']):+.2f}"
+                        if "score" in after and "score" in before
+                        else "—"
+                    ),
+                    "why (judge)": str(after.get("feedback") or before.get("feedback") or "")[
+                        :300
+                    ],
+                }
+            )
+    blocks.append(
+        Section(
+            title="Examples — before vs after",
+            description=f"Per-example answers and scores ({source})",
+            children=[
+                DataTable(title="Per-example results", data=example_rows)
+                if example_rows
+                else Markdown(content="_No per-example results available._")
+            ],
+        )
+    )
+
+    # ── Data ─────────────────────────────────────────────────────────
+    data_items = _info_items(
+        [(f"{k} examples", v) for k, v in (dataset_sizes or {}).items()]
+        + [(f"fitter · {k}", v) for k, v in (getattr(merged, "dataset_sizes", None) or {}).items()]
+    )
+    data_children: list[Any] = []
+    if data_items:
+        data_children.append(InfoList(title="Splits", items=data_items))
+    if dataset_stats:
+        by_strategy = dataset_stats.get("by_strategy") or {}
+        data_children.append(
+            InfoList(
+                title="Augmentation",
+                items=_info_items(
+                    [(k, v) for k, v in dataset_stats.items() if k != "by_strategy"]
+                    + [(f"added via {k}", v) for k, v in by_strategy.items()]
+                ),
+            )
+        )
+    settings = getattr(merged, "settings", None) or {}
+    if settings:
+        data_children.append(
+            InfoList(title="Fitter settings", items=_info_items(list(settings.items())))
+        )
+    if data_children:
+        blocks.append(
+            Section(
+                title="Data & settings",
+                description="What the optimizer learned from, selected on, and gated with",
+                children=data_children,
+            )
+        )
+    return blocks
+
+
+def _example_rows(baseline_eval: Any, final_eval: Any, eval_dataset: Any) -> list[dict[str, Any]]:
+    """Join before/after ``EvaluationReport`` example results by example id."""
+    if final_eval is None:
+        return []
+    examples = getattr(eval_dataset, "examples", eval_dataset) or []
+    by_id = {getattr(e, "id", None): e for e in examples}
+    before_by_id = {r.example_id: r for r in getattr(baseline_eval, "example_results", None) or []}
+    rows: list[dict[str, Any]] = []
+    for after in getattr(final_eval, "example_results", None) or []:
+        before = before_by_id.get(after.example_id)
+        example = by_id.get(after.example_id)
+        query = ""
+        expected = ""
+        if example is not None:
+            try:
+                point = example.to_datapoint()
+                query = point.query
+                from agentomatic.optimize.metrics import plain_expected
+
+                expected = plain_expected(point.expected_answer) or ""
+            except Exception:  # noqa: BLE001
+                query = str(getattr(example, "input", ""))
+        after_pred = after.prediction or {}
+        before_pred = (before.prediction if before else None) or {}
+        before_scores = (before.scores or {}) if before else {}
+        deltas = " · ".join(
+            f"{k} {float(v) - float(before_scores[k]):+.2f}"
+            for k, v in (after.scores or {}).items()
+            if k in before_scores
+        )
+        rationale = ""
+        for meta in (after.metadata or {}).values():
+            if isinstance(meta, dict) and meta.get("reason"):
+                rationale = str(meta["reason"])
+                break
+        rows.append(
+            {
+                "example": after.example_id,
+                "question": str(query)[:200],
+                "expected": str(expected)[:240],
+                "before": str(before_pred.get("response", before.error if before else ""))[:300],
+                "before scores": _scores_text(before.scores if before else None),
+                "after": str(after_pred.get("response", after.error or ""))[:300],
+                "after scores": _scores_text(after.scores),
+                "Δ": deltas or "—",
+                "why (judge)": rationale[:300],
+            }
+        )
+    return rows

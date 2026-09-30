@@ -175,7 +175,7 @@ def _wrap_local_agent(agent: Any) -> Any:
         prompt_override: str | None = None,
         context: list | None = None,
         invoke: dict | None = None,
-    ) -> str:
+    ) -> dict[str, Any] | str:
         input_data: dict[str, Any] = {"current_query": query}
         if invoke:
             input_data.update({k: v for k, v in invoke.items() if k != "current_query"})
@@ -271,6 +271,31 @@ def _wrap_local_agent(agent: Any) -> Any:
         return str(output) if output is not None else ""
 
     return _callable
+
+
+def _compact_examples(details: list[dict[str, Any]], limit: int = 50) -> list[dict[str, Any]]:
+    """Per-example results trimmed for reports (question, answer, score, why)."""
+    from agentomatic.optimize.metrics import plain_expected
+
+    rows: list[dict[str, Any]] = []
+    for d in details[:limit]:
+        feedback = d.get("feedback") or d.get("error") or ""
+        rows.append(
+            {
+                "query": str(d.get("query", ""))[:500],
+                "expected": str(plain_expected(d.get("expected")) or "")[:500],
+                "response": str(d.get("response", ""))[:800],
+                "score": round(float(d.get("avg_score", 0.0) or 0.0), 4),
+                "dimensions": {
+                    k: round(float(v), 4)
+                    for k, v in (d.get("dimensions") or {}).items()
+                    if isinstance(v, (int, float))
+                },
+                "feedback": str(feedback)[:500],
+                "failed": bool(d.get("error")),
+            }
+        )
+    return rows
 
 
 # =====================================================================
@@ -703,6 +728,7 @@ class PromptFitter:
 
         fit_valset = valset
         holdout_set: Dataset | None = testset
+        holdout_source_label = "testset argument" if testset is not None else "none"
         if holdout_set is None:
 
             def _as_dicts(pts: list[Any]) -> list[dict[str, Any]]:
@@ -732,6 +758,7 @@ class PromptFitter:
                 if holdout_source == "valset":
                     fit_valset = Dataset.from_list(_as_dicts(fit_pts))
                 holdout_set = Dataset.from_list(_as_dicts(hold_pts))
+                holdout_source_label = f"carved from {holdout_source}"
                 logger.info(
                     "🛡️  Generalization holdout: {} fit / {} holdout (from {})",
                     len(fit_valset),
@@ -766,6 +793,7 @@ class PromptFitter:
             for dim, val in baseline_dims.items():
                 logger.debug("   {}: {:.4f}", dim, val)
         best_point_scores = [float(d.get("avg_score", 0.0) or 0.0) for d in baseline_details]
+        best_details = baseline_details
 
         # ── Reflection data: what the optimizer LEARNS from ─────────────
         # Failure analysis, judge feedback and few-shot demos are drawn from
@@ -1459,6 +1487,7 @@ class PromptFitter:
                         best_dims = dict(full_dims)
                         best_holdout_score = cand_holdout
                         best_point_scores = cand_points
+                        best_details = full_details
                         if reflect_set is fit_valset:
                             reflect_details = full_details
                         else:
@@ -1697,6 +1726,24 @@ class PromptFitter:
             generalization_gap=gen_gap,
             optimizer_name=str(getattr(self._optimizer, "name", "") or ""),
             early_stop_reason=early_stop_reason,
+            baseline_examples=_compact_examples(baseline_details),
+            best_examples=_compact_examples(best_details),
+            settings={
+                "optimizer": str(getattr(self._optimizer, "name", "") or ""),
+                "max_trials": self.max_trials,
+                "patience": self.patience,
+                "min_absolute_improvement": self.min_absolute_improvement,
+                "min_confidence": self.min_confidence,
+                "min_transfer_ratio": self.min_transfer_ratio,
+                "max_generalization_gap": self.max_generalization_gap,
+                "holdout_tolerance": self.holdout_tolerance,
+                "holdout_source": holdout_source_label,
+                "reflect_on": self.reflect_on,
+                "task_model": str(self.task_model),
+                "rewrite_model": str(self.rewrite_model),
+                "metric": getattr(metric, "name", type(metric).__name__),
+                "candidates_evaluated": evaluated_candidates,
+            },
             dataset_sizes={
                 "train": len(trainset),
                 "reflection": len(reflect_set) if reflect_set is not fit_valset else 0,

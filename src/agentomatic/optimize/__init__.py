@@ -227,6 +227,7 @@ from agentomatic.optimize.report import (
     generate_eval_report,
     generate_fit_report,
     generate_html_report,
+    merge_fit_results,
 )
 from agentomatic.optimize.resources import ResourceBundle, ResourceRegistry
 from agentomatic.optimize.reward import (
@@ -527,6 +528,7 @@ __all__ = [
     "LatencyMetric",
     "CostMetric",
     "generate_fit_report",
+    "merge_fit_results",
 ]
 
 # Aliases for Optimize* prefixed names

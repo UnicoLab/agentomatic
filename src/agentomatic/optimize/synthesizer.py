@@ -528,8 +528,15 @@ class DataSynthesizer:
         seen = {_norm(q) for q in (existing_queries or [])}
         seen.update(_norm(p.query) for p in seeds)
         protected = [_norm(q) for q in (protected_queries or []) if q]
-        pairs = [(i, strat) for i in range(len(seeds)) for strat in strategies]
-        random.Random(rng_seed).shuffle(pairs)
+        # Shuffled seeds, strategies rotating call by call: a short run still
+        # mixes every strategy, a long one covers every (seed, strategy) pair.
+        order = list(range(len(seeds)))
+        random.Random(rng_seed).shuffle(order)
+        pairs = [
+            (seed_idx, strategies[(pos + rnd) % len(strategies)])
+            for rnd in range(len(strategies))
+            for pos, seed_idx in enumerate(order)
+        ]
         per_call = max(1, int(per_call))
         budget = max_calls if max_calls is not None else 2 * -(-n_new // per_call) + 4
 
@@ -932,7 +939,8 @@ def _item_to_point(item: dict[str, Any]) -> DataPoint | None:
             expected = item.get(key)
     if isinstance(expected, dict):
         expected = json.dumps(expected, ensure_ascii=False)
-    context = item.get("context") if isinstance(item.get("context"), list) else []
+    raw_context = item.get("context")
+    context: list[Any] = raw_context if isinstance(raw_context, list) else []
     metadata = {
         k: v
         for k, v in item.items()

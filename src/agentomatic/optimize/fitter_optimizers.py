@@ -525,7 +525,8 @@ class RewriteOptimizer(BaseFitterOptimizer):
                     exp_dict = {}
             if exp_dict:
                 key_sets.append(frozenset(k for k in exp_dict if k != "must_include"))
-            meta = src.get("metadata") if isinstance(src.get("metadata"), dict) else {}
+            raw_meta = src.get("metadata")
+            meta: dict[str, Any] = raw_meta if isinstance(raw_meta, dict) else {}
             for term in list(exp_dict.get("must_include") or []) + list(
                 meta.get("must_include") or []
             ):

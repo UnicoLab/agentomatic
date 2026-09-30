@@ -39,12 +39,17 @@ class History:
             ``"exact_match"``) to the list of values, one per epoch.
         epoch: The list of epoch indices recorded.
         params: Training parameters (epochs, optimizer, metric names, …).
+        fit_results: One ``PromptFitResult`` per epoch whose optimizer was a
+            ``PromptFitterBridge`` (empty otherwise). Pass the whole
+            ``History`` to :func:`agentomatic.optimize.generate_fit_report`
+            to see the original prompt → final prompt across all epochs.
     """
 
     def __init__(self, params: dict[str, Any] | None = None) -> None:
         self.history: dict[str, list[float]] = {}
         self.epoch: list[int] = []
         self.params: dict[str, Any] = dict(params or {})
+        self.fit_results: list[Any] = []
 
     def record(self, epoch: int, logs: dict[str, float]) -> None:
         """Append one epoch's ``logs`` to the history."""

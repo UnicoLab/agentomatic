@@ -843,6 +843,9 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         )
         self.history = history
         self.stop_training = False
+        # Per-epoch PromptFitResults (filled by PromptFitterBridge) — reset so
+        # a second fit() call does not report the previous run's epochs.
+        self._fit_results: list[Any] = []
 
         callbacks = list(callbacks or [])
         for cb in callbacks:
@@ -911,6 +914,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
                     break
         finally:
             self._fit_optimize_options = None
+            history.fit_results = list(self._fit_results)
 
         for cb in callbacks:
             cb.on_train_end()

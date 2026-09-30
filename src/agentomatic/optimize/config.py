@@ -349,6 +349,13 @@ class PromptFitResult:
     """Why the inner optimize loop stopped early, if it did."""
     dataset_sizes: dict[str, int] = field(default_factory=dict)
     """Dataset cardinalities used during fit (train/val/holdout/test)."""
+    baseline_examples: list[dict[str, Any]] = field(default_factory=list)
+    """Per-example validation results of the baseline (query, expected,
+    response, score, dimensions, feedback) — truncated, capped."""
+    best_examples: list[dict[str, Any]] = field(default_factory=list)
+    """Per-example validation results of the best config (same examples)."""
+    settings: dict[str, Any] = field(default_factory=dict)
+    """Fitter knobs used for this run (optimizer, budget, generalization gates…)."""
 
     # -- convenience properties ------------------------------------------
 
@@ -503,6 +510,9 @@ class PromptFitResult:
             "optimizer_name": self.optimizer_name,
             "early_stop_reason": self.early_stop_reason,
             "dataset_sizes": dict(self.dataset_sizes),
+            "baseline_examples": list(self.baseline_examples),
+            "best_examples": list(self.best_examples),
+            "settings": dict(self.settings),
             "deployment_recommendation": (
                 self.deployment_recommendation.to_dict()
                 if self.deployment_recommendation

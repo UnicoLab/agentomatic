@@ -91,6 +91,9 @@ class TrainConfig:
         fit_store_url: Explicit DB URL for auditable retrain persistence
             (overrides env). Same dialects as platform storage
             (Postgres, SQLite, …).
+        evaluate_baseline: Also evaluate the held-out split *before* fit so
+            the report shows per-example answers and scores before vs after
+            (one extra pass over the test split). Default ``True``.
     """
 
     agent_name: str
@@ -133,6 +136,8 @@ class TrainConfig:
     # --- auditable fit / retrain persistence --------------------------------
     persist_fit_store: bool = False
     fit_store_url: str | None = None
+    # --- reporting -----------------------------------------------------------
+    evaluate_baseline: bool = True
 
     def __post_init__(self) -> None:
         """Normalise ``nr_examples`` → ``n_examples`` alias."""
@@ -158,6 +163,11 @@ class TrainResult:
     augmented: bool = False
     persist_path: Path | None = None
     agent_name: str = ""
+    baseline_eval_scores: dict[str, float] = field(default_factory=dict)
+    """Held-out scores *before* fit (empty with ``evaluate_baseline=False``)."""
+    fit_results: list[Any] = field(default_factory=list)
+    """One ``PromptFitResult`` per epoch; ``fit_result`` merges them (initial
+    prompt → final prompt across all epochs)."""
 
     def print_summary(self, console: Any | None = None) -> None:
         """Pretty-print a Rich summary of this train run.
@@ -226,7 +236,9 @@ def print_train_result(result: TrainResult, *, console: Any | None = None) -> No
             f"prompt_changed={base_p != best_p} base_len={len(base_p)} best_len={len(best_p)}"
         )
 
-    console.print(f"evaluate scores={result.eval_scores}")
+    if result.baseline_eval_scores:
+        console.print(f"held-out scores before fit={result.baseline_eval_scores}")
+    console.print(f"held-out scores after fit={result.eval_scores}")
     console.print(f"[green]Report:[/green] {result.report_path}")
     try:
         rsize = Path(result.report_path).stat().st_size if result.report_path else 0
@@ -729,6 +741,11 @@ class CompiledAgent:
         return getattr(self.agent, "_last_fit_result", None)
 
     @property
+    def fit_results(self) -> list[Any]:
+        """Every epoch's ``PromptFitResult`` from the last :func:`fit_agent`."""
+        return list(getattr(self.agent, "_fit_results", None) or [])
+
+    @property
     def optimize_status(self) -> str:
         """Last optimize status string from the fitter bridge."""
         return str(getattr(self.agent, "_last_optimize_status", "") or "")
@@ -1021,7 +1038,7 @@ def run_train(
         :class:`TrainResult` with history, fit artefacts, and report path.
     """
     from agentomatic.config.settings import load_environment
-    from agentomatic.optimize.report import generate_fit_report
+    from agentomatic.optimize.report import generate_fit_report, merge_fit_results
     from agentomatic.providers import apply_stack_defaults
     from agentomatic.stacks.manager import StackManager
 
@@ -1146,6 +1163,13 @@ def run_train(
             verbose=config.verbose,
         )
 
+        # The split optimization never sees; scored before AND after fit so
+        # the report can show what changed, example by example.
+        held_out = dataset.test or dataset.validation or dataset.train
+        baseline_report = (
+            evaluate_agent(compiled, held_out) if config.evaluate_baseline and held_out else None
+        )
+
         history = fit_agent(
             compiled,
             dataset,
@@ -1160,19 +1184,27 @@ def run_train(
         )
 
         status = compiled.optimize_status
-        fit_result = compiled.fit_result
+        # Every epoch's PromptFitResult, merged so reports and apply() compare
+        # the ORIGINAL prompt with the FINAL one (the last epoch alone starts
+        # from a prompt an earlier epoch already improved).
+        fit_results = list(getattr(history, "fit_results", None) or [])
+        if not fit_results and compiled.fit_result is not None:
+            fit_results = [compiled.fit_result]
+        fit_result = merge_fit_results(fit_results) if fit_results else None
 
-        held_out = dataset.test or dataset.validation or dataset.train
         eval_report = evaluate_agent(compiled, held_out)
         eval_scores = dict(getattr(eval_report, "scores", {}) or {})
 
         out = reports / f"train_{config.agent_name}.html"
         if fit_result is not None:
             generate_fit_report(
-                fit_result,
+                fit_results,
                 output_path=out,
                 keras_history=getattr(history, "history", None),
-                eval_scores=eval_scores,
+                baseline_eval=baseline_report,
+                final_eval=eval_report,
+                eval_dataset=held_out,
+                dataset_stats=(getattr(dataset, "metadata", None) or {}).get("augment_stats"),
                 dataset_sizes=sizes,
                 optimizer_name=config.optimizer,
                 stack_name=stack_name,
@@ -1229,6 +1261,8 @@ def run_train(
             augmented=bool((getattr(dataset, "metadata", None) or {}).get("augmented")),
             persist_path=persist_written,
             agent_name=config.agent_name,
+            baseline_eval_scores=dict(getattr(baseline_report, "scores", None) or {}),
+            fit_results=fit_results,
         )
     finally:
         if bound_fit_store is not None:
