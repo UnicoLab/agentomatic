@@ -1806,6 +1806,7 @@ class PromptFitter:
                 continue
 
             try:
+                # TODO: check if thise should be calling metric.score or metric evaluate ? and check entire metrics code for inifications
                 eval_result: EvalResult = await metric.evaluate(
                     query=rr.query,
                     response=rr.response,

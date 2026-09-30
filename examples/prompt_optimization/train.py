@@ -44,6 +44,7 @@ logger.info("Agent initialized successfully.")
 # local dataset
 dataset, _full_data_path = prepare_dataset(
     dataset=load_data("datasets/all.jsonl"),
+    seed_path="datasets/all.jsonl",
     augment=True,
     n_examples=100,
     persist=True,
@@ -63,7 +64,7 @@ logger.info("Setting up judge metric.")
 judge = LocalJudgeMetric(
     model="omlx/Qwen3-Coder-30B-A3B-Instruct-MLX-4bit",
     criteria="Is the response relevant and accurate between 0-1 scoring?",
-    dimensions=None,  # ["correctness", "completeness", "relevance"]
+    dimensions=["correctness", "completeness", "relevance"],  # ["correctness", "completeness", "relevance"]
     weight=1.0,
     temperature=0.7,
 )
@@ -101,9 +102,9 @@ optimizer = PromptFitterBridge(
     rewrite_model="omlx/Qwen3-Coder-30B-A3B-Instruct-MLX-4bit",
     # live agent injected automatically from optimize()
     llm_base_url="http://127.0.0.1:8000/v1",  # local omlx / Ollama
-    llm_api_key="kurwamac",
+    llm_api_key=None,
     max_trials=8,
-    metric=[judge_m],
+    metric=judge_m,
     search_space=PromptSearchSpace(
         optimize_system_prompt=True,
         optimize_user_template=False,
@@ -112,7 +113,9 @@ optimizer = PromptFitterBridge(
     ),
     optimizer="gepa_like",
     auto_report=True,
-    concurrency=1,
+    concurrency=4,
+    min_absolute_improvement=0.001,
+    patience=2,
 )
 logger.info("Optimizer set up successfully.")
 
@@ -126,10 +129,19 @@ agent.compile(
 )
 logger.info("Agent compiled successfully.")
 
+logger.info("Defining callbacks")
+callbacks = [
+    EpochDiffCallback(epochs=epochs),
+    EarlyStopping(monitor="val_loss", patience=3, mode="min"),
+]
+
 logger.info("Starting training.")
 history = agent.fit(
-    dataset,
+    dataset=dataset,
+    # validation_data=dataset.test,
     epochs=2,
+    verbose=2,
+    callbacks=callbacks,
 )
 
 logger.info("Training completed.")
