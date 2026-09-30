@@ -6,7 +6,9 @@ by its prompt:
 * **agent** (``Policy snippets: … Question: …``) — answers *well* (quotes the
   snippets) only when the system prompt asks it to quote policy, and vaguely
   otherwise. A better prompt therefore measurably scores higher, which is
-  what makes an optimization run meaningful.
+  what makes an optimization run meaningful. A prompt that lists
+  ``Q: <question>`` / ``A: <answer>`` pairs is followed literally for those
+  exact questions — the memorising prompt an overfitting optimizer produces.
 * **judge** (``You are an expert evaluation judge``) — returns the
   ``overall_score`` JSON ``LocalJudgeMetric`` expects, scored by how many
   words of the expected answer the response recalls.
@@ -50,6 +52,10 @@ def _section(prompt: str, header: str) -> str:
 
 
 def _agent_reply(system: str, user: str) -> str:
+    question = user.rsplit("Question:", 1)[-1].strip()
+    memorised = dict(re.findall(r"^Q: (.+?)\s*\nA: (.+?)\s*$", system, re.M))
+    if question in memorised:
+        return memorised[question]
     snippets = [line[2:].strip() for line in user.splitlines() if line.startswith("- ")]
     if "quote" in system.lower() and snippets:
         return " ".join(snippets)

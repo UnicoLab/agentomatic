@@ -169,7 +169,9 @@ from agentomatic.optimize.judges import (
 )
 from agentomatic.optimize.learning import (
     EpochLearning,
+    GeneralizationCheck,
     check_generalization,
+    paired_improvement_confidence,
     synthesize_epoch_learning,
 )
 
@@ -196,6 +198,7 @@ from agentomatic.optimize.metrics import (
     CustomMetric,
     DeepEvalMetric,
     DeterministicMetric,
+    EvalResult,
     ExactMatchMetric,
     GEvalMetric,
     LatencyMetric,
@@ -205,6 +208,7 @@ from agentomatic.optimize.metrics import (
     ScoreMetricAdapter,
     WeightedMetric,
     as_optimize_metric,
+    coerce_judge_score,
     resolve_metrics,
 )
 from agentomatic.optimize.optimizer import OptimizationResult, PromptOptimizer
@@ -405,7 +409,9 @@ __all__ = [
     "ContainsMetric",
     "CustomMetric",
     "ScoreMetricAdapter",
+    "EvalResult",
     "as_optimize_metric",
+    "coerce_judge_score",
     "DeepEvalMetric",
     "ExactMatchMetric",
     "GEvalMetric",
@@ -518,7 +524,9 @@ __all__ = [
     "DimensionAnalyzer",
     # Epoch learning + generalization
     "EpochLearning",
+    "GeneralizationCheck",
     "check_generalization",
+    "paired_improvement_confidence",
     "synthesize_epoch_learning",
     # ── Deployment-first API ───────────────────────────────────────
     "EvalContract",

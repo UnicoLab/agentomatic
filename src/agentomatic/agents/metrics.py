@@ -409,6 +409,43 @@ class OptimizeMetricAdapter:
         """
         return await self._metric.evaluate(query, response, expected, context)
 
+    async def _evaluate_as_run(
+        self,
+        example: AgentExample,
+        prediction: dict[str, Any],
+        query: str,
+        response: str,
+        expected: str | None,
+        context: list[str] | None,
+    ) -> Any:
+        """Evaluate with the example exposed as the current scoring run.
+
+        Inside ``PromptFitter`` every metric sees the run being scored (the
+        example's metadata and the structured output), so a nested
+        class-agent metric — e.g. one reading ``metadata["must_include"]``
+        inside a ``CompositeMetric`` — scores the same during ``evaluate()``
+        as it did while candidates were selected.
+        """
+        from agentomatic.optimize.metrics import scoring_run
+        from agentomatic.optimize.runner import RunResult
+
+        run = RunResult(
+            query=query,
+            response=response,
+            expected=expected,
+            context=list(context or []),
+            metadata={
+                "example": {
+                    **(getattr(example, "metadata", None) or {}),
+                    "id": getattr(example, "id", ""),
+                    "split": getattr(example, "split", ""),
+                },
+                "output": dict(prediction),
+            },
+        )
+        with scoring_run(run):
+            return await self._metric.evaluate(query, response, expected, context)
+
     def score(
         self,
         example: AgentExample,
@@ -495,7 +532,7 @@ class OptimizeMetricAdapter:
             )
 
         # --- run evaluate() synchronously (cached per metric) ---
-        key = (query, response, expected, tuple(context or ()))
+        key = (getattr(example, "id", ""), query, response, expected, tuple(context or ()))
         try:
             cache = _RESULT_CACHE.setdefault(self._metric, OrderedDict())
         except TypeError:  # not weak-referenceable: no caching
@@ -506,7 +543,9 @@ class OptimizeMetricAdapter:
             # whose evaluate() raises synchronously are handled too. Use the
             # persistent-loop run_sync so async clients survive fit → evaluate.
             try:
-                result = run_sync(self._metric.evaluate(query, response, expected, context))
+                result = run_sync(
+                    self._evaluate_as_run(example, prediction, query, response, expected, context)
+                )
             except Exception as exc:  # noqa: BLE001 - one failed judge call must not abort fit
                 self.failures += 1
                 logger.warning(f"Metric '{self.name}' failed ({exc}); scoring this example 0.0")

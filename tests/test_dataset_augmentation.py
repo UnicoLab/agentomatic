@@ -56,7 +56,7 @@ class TestTheReportedCall:
             dataset,
             seed_path=EXAMPLE_DATASET,
             augment=True,
-            n_examples=30,
+            n_examples=40,
             persist=True,
             persist_path=tmp_path / "all_augmented.jsonl",
             model="omlx/fake-model",
@@ -65,29 +65,30 @@ class TestTheReportedCall:
             strategies=["expansion", "paraphrase"],
         )
         stats = out.metadata["augment_stats"]
-        assert len(out.examples) == 30
+        assert len(out.examples) == 40
         assert stats["added"] == 14 and out.metadata["augmented"] is True
         assert set(stats["by_strategy"]) == {"expansion", "paraphrase"}
         assert written == tmp_path / "all_augmented.jsonl"
-        assert len(written.read_text().splitlines()) == 30
+        assert len(written.read_text().splitlines()) == 40
 
     def test_only_train_grows(self, server) -> None:
         dataset = load_data(EXAMPLE_DATASET)
-        out, _ = _augment(dataset, server, n_examples=24)
+        out, _ = _augment(dataset, server, n_examples=34)
         assert len(out.train) == len(dataset.train) + 8
         assert [e.id for e in out.validation] == [e.id for e in dataset.validation]
         assert [e.id for e in out.test] == [e.id for e in dataset.test]
+        assert [e.id for e in out.holdout] == [e.id for e in dataset.holdout]
 
     def test_no_process_wide_endpoint_side_effect(self, server) -> None:
         before = (LLMCaller._default_base_url, LLMCaller._default_api_key)  # noqa: SLF001
-        _augment(load_data(EXAMPLE_DATASET), server, n_examples=20)
+        _augment(load_data(EXAMPLE_DATASET), server, n_examples=34)
         assert (LLMCaller._default_base_url, LLMCaller._default_api_key) == before  # noqa: SLF001
 
 
 class TestRowsMirrorTheSeed:
     def test_label_preserving_rows_keep_answer_and_metadata(self, server) -> None:
         dataset = load_data(EXAMPLE_DATASET)
-        out, _ = _augment(dataset, server, n_examples=20, strategies=["paraphrase"])
+        out, _ = _augment(dataset, server, n_examples=34, strategies=["paraphrase"])
         seeds = {e.id: e for e in dataset.examples}
         new = [e for e in out.examples if e.metadata.get("source") == "augment"]
         assert new
@@ -100,7 +101,7 @@ class TestRowsMirrorTheSeed:
 
     def test_generated_answers_use_the_seed_schema(self, server) -> None:
         out, _ = _augment(
-            load_data(EXAMPLE_DATASET), server, n_examples=20, strategies=["expansion"]
+            load_data(EXAMPLE_DATASET), server, n_examples=34, strategies=["expansion"]
         )
         new = [e for e in out.examples if e.metadata.get("source") == "augment"]
         assert new

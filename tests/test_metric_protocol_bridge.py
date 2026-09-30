@@ -163,6 +163,22 @@ class TestCompositionAcceptsEitherProtocol:
         assert result.metadata["dimensions"] == {"judge": 1.0, "terms": 1.0}
         assert result.score == pytest.approx(1.0)
 
+    def test_metadata_metrics_inside_a_composite_score_the_same_outside_fit(self) -> None:
+        """``evaluate()``/``compile(metrics=[composite])`` scored a nested
+        metadata-reading metric 0: only the fitter exposed the example."""
+        facts = CallableMetric(
+            "facts",
+            lambda ex, pred: float(
+                all(t in pred["response"] for t in ex.metadata["must_include"])
+            ),
+        )
+        composite = CompositeMetric([WeightedMetric(name="facts", metric=facts, weight=1)])
+        example = _example(must_include=["30 days"])
+        assert composite.score(example, {"response": "within 30 days"}) == pytest.approx(1.0)
+        assert OptimizeMetricAdapter(composite).score(
+            example, {"response": "no idea"}
+        ) == pytest.approx(0.0)
+
     def test_agents_weighted_metric_with_an_optimize_component(self) -> None:
         weighted = AgentWeightedMetric(
             [("judge", _StubJudge(0.4), 1), ("em", ExactMatchMetric(), 1)]
