@@ -2972,8 +2972,8 @@ automatically.</p>
 </tr>
 <tr>
 <td>Sees</td>
-<td>The whole <code>AgentExample</code> (input, expected output, <strong>metadata</strong>) and the output dict</td>
-<td>The question, the answer text, the reference text, retrieval context</td>
+<td>The whole <code>AgentExample</code> (input incl. context documents and other inputs, expected output, <strong>metadata</strong>, <strong>tags</strong>, rubric) and the output dict, the same in <code>fit()</code> and <code>evaluate()</code></td>
+<td>The question, the answer text, the reference text, the context documents (or what the agent retrieved). Inside <code>fit()</code> / <code>evaluate()</code>, <code>current_scoring_run()</code> also exposes the example</td>
 </tr>
 <tr>
 <td>Returns</td>
@@ -3143,6 +3143,12 @@ metric next to it.</p>
 <li><strong>Reference.</strong> Judges receive the example's expected answer (and, for
   <code>AgentExample</code>s, a rich reference: expected output, rubric, required facts).
   Write expected answers that state the facts a correct answer must contain.</li>
+<li><strong>Context.</strong> Judges receive the row's context documents. If the row has
+  none, they get what the agent says it retrieved (<code>retrieval_context</code> /
+  <code>citations</code> / <code>sources</code> in its output). Inside <code>fit()</code> and <code>evaluate()</code>
+  they also get the row's other inputs (a plan, a locale…), its metadata and
+  its tags, in an "Example inputs, metadata and tags" section, so an answer
+  is judged in that light. See <a href="../data/#what-each-stage-sees">what each stage sees</a>.</li>
 <li><strong>Deterministic.</strong> Keep <code>temperature=0.0</code>. A judge that scores the same
   answer differently each time makes every comparison noise; the
   <a href="../generalization/#the-acceptance-rules">significance rule</a> exists because

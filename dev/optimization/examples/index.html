@@ -2809,9 +2809,17 @@
 <p><a href="https://github.com/UnicoLab/agentomatic/tree/main/examples/prompt_optimization"><code>examples/prompt_optimization</code></a>
 contains runnable scripts, from scoring a few answers to a full training run.
 Each one is commented step by step and lists every option of the methods it
-uses. All of them optimize the same small <code>SupportAgent</code> (it answers Acme
-Cloud customer questions from a policy knowledge base) on a 26-row dataset
-split into train / validation / holdout / test.</p>
+uses. All of them optimize the same small RAG <code>SupportAgent</code>, which answers
+Acme Cloud customer questions from policy documents. Those are the documents a
+row sends (<code>context.documents</code>), or else the ones it retrieves from its own
+knowledge base, and it also takes the customer's plan into account. Two
+datasets are used, each split into train / validation / holdout / test:</p>
+<ul>
+<li><code>support.jsonl</code> has 26 rows, with tags and a <code>customer_plan</code> input where the
+  plan matters.</li>
+<li><code>policies.jsonl</code> has 20 rows. Each brings its own documents, plus a plan,
+  metadata, tags and a rubric.</li>
+</ul>
 <table>
 <thead>
 <tr>
@@ -2849,8 +2857,14 @@ split into train / validation / holdout / test.</p>
 <tr>
 <td><code>train.py</code></td>
 <td>high level</td>
-<td><code>load_data</code> → <code>prepare_dataset</code> → metrics → loss → <code>PromptFitterBridge</code> → <code>compile</code> → <code>fit</code> → test evaluation → <code>generate_fit_report</code></td>
+<td><code>load_data</code> → <code>prepare_dataset</code> → metrics → loss → <code>PromptFitterBridge</code> → <code>compile</code> → <code>fit</code> → test evaluation (overall and per tag) → <code>generate_fit_report</code></td>
 <td><a href="../class-agents/">Class agents</a></td>
+</tr>
+<tr>
+<td><code>rag_context.py</code></td>
+<td>RAG</td>
+<td>Rows with their own documents, plan, metadata, tags and rubric. Prints what the agent, the judge and the rewrite model see; context-aware metrics (<code>facts</code>, <code>grounded</code>); per-tag test scores; <code>--augment</code> keeps each seed's documents</td>
+<td><a href="../data/#rag-datasets">Datasets</a></td>
 </tr>
 </tbody>
 </table>
@@ -2864,6 +2878,7 @@ LM Studio or Ollama's <code>/v1</code> work the same way), then:</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>python<span class="w"> </span>examples/prompt_optimization/anti_overfitting.py
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>python<span class="w"> </span>examples/prompt_optimization/low_level_prompt_fitter.py<span class="w"> </span>--trials<span class="w"> </span><span class="m">8</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>python<span class="w"> </span>examples/prompt_optimization/train.py<span class="w"> </span>--epochs<span class="w"> </span><span class="m">2</span><span class="w"> </span>--trials<span class="w"> </span><span class="m">6</span><span class="w"> </span>--augment
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>python<span class="w"> </span>examples/prompt_optimization/rag_context.py<span class="w"> </span>--epochs<span class="w"> </span><span class="m">1</span><span class="w"> </span>--trials<span class="w"> </span><span class="m">4</span>
 </span></code></pre></div>
 <p>Every script takes <code>--base-url</code>, <code>--api-key</code>, <code>--model</code>, <code>--judge-model</code>,
 <code>--rewrite-model</code>, <code>--out-dir</code> and <code>--log-level</code> (or <code>OMLX_BASE_URL</code>,
@@ -2883,13 +2898,45 @@ LM Studio or Ollama's <code>/v1</code> work the same way), then:</p>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>+You are a precise Acme Cloud support assistant. Quote the relevant policy snippet verbatim, then answer in one short sentence. Never invent policy.
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  report: examples/prompt_optimization/out/train_report.html
 </span></code></pre></div>
+<p>What <code>rag_context.py</code> prints first, for one row (abridged):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>── What each stage sees — row policy_05
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>agent (input_to_state receives exactly this):
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  {&quot;current_query&quot;: &quot;How long are audit logs kept?&quot;, &quot;context&quot;: {&quot;documents&quot;: [{&quot;source&quot;: &quot;audit.md&quot;, &quot;content&quot;: &quot;Audit logs are kept for 400 days on Enterprise and 90 days on Team.&quot;}]}, &quot;customer_plan&quot;: &quot;team&quot;}
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>LLM judge — context documents:
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  - Audit logs are kept for 400 days on Enterprise and 90 days on Team. (source: audit.md)
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>LLM judge — other inputs, metadata and tags:
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  {&quot;inputs&quot;: {&quot;customer_plan&quot;: &quot;team&quot;}, &quot;metadata&quot;: {&quot;topic&quot;: &quot;security&quot;, &quot;difficulty&quot;: &quot;medium&quot;, &quot;must_include&quot;: [&quot;90 days&quot;]}, &quot;tags&quot;: [&quot;security&quot;, &quot;compliance&quot;, &quot;plan-specific&quot;]}
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>rewrite model (dataset sample in its briefing):
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>1. Q: How long are audit logs kept?
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>   - Context documents: Audit logs are kept for 400 days on Enterprise and 90 days on Team. (source: audit.md)
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>   - Other inputs: {&quot;customer_plan&quot;: &quot;team&quot;}
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>   - Example metadata: {&quot;topic&quot;: &quot;security&quot;, &quot;difficulty&quot;: &quot;medium&quot;, &quot;must_include&quot;: [&quot;90 days&quot;]}
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>   - Tags: security, compliance, plan-specific
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>   Expected:
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>     ## Expected answer
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>     On the Team plan, audit logs are kept for 90 days (400 days on Enterprise).
+</span></code></pre></div>
+<p>…and last, the test split per tag:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>── Test quality by tag (before → after)
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  backups         0.00 → 0.85
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  plan-specific   0.00 → 0.90
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  pricing         0.03 → 0.83
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  refusal         0.03 → 0.20
+</span></code></pre></div>
 <h2 id="tested">Tested<a class="headerlink" href="#tested" title="Permanent link">&para;</a></h2>
 <p><code>tests/test_prompt_optimization_examples.py</code> runs every script as a
 subprocess against a deterministic fake OpenAI-compatible server
 (<code>tests/fake_openai_server.py</code>) and checks the behaviour each one teaches:
 the prompt improves on validation <em>and</em> test, augmentation grows only train,
 the memorising prompt is rejected, and the report contains the prompts,
-candidates and per-example results.</p>
+candidates and per-example results. For <code>rag_context.py</code> it also checks the
+requests the fake server received:</p>
+<ul>
+<li>the agent answered from each row's documents and plan;</li>
+<li>judges saw the documents, the plan, the metadata and the tags;</li>
+<li>the rewrite model's briefing contained all of them;</li>
+<li>augmented rows kept their seed's documents.</li>
+</ul>
 
 
 

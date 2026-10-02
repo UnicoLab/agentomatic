@@ -1426,6 +1426,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-each-stage-sees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each stage sees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rag-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RAG datasets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#writing-good-examples" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2775,6 +2797,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-each-stage-sees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each stage sees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rag-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RAG datasets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#writing-good-examples" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2929,15 +2973,22 @@
 
 <h1 id="datasets-augmentation">Datasets &amp; augmentation<a class="headerlink" href="#datasets-augmentation" title="Permanent link">&para;</a></h1>
 <h2 id="the-dataset-file">The dataset file<a class="headerlink" href="#the-dataset-file" title="Permanent link">&para;</a></h2>
-<p>Class-agent datasets are JSONL, one <code>AgentExample</code> per line (the format every
-template's <code>datasets/all.jsonl</code> uses):</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;refund_2&quot;</span><span class="p">,</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w"> </span><span class="nt">&quot;split&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;validation&quot;</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w"> </span><span class="nt">&quot;input&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;current_query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;I bought an annual plan last week. Can I still get my money back?&quot;</span><span class="p">},</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w"> </span><span class="nt">&quot;expected_output&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;response&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Yes. Annual plans can be refunded within 30 days of purchase.&quot;</span><span class="p">},</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w"> </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;must_include&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;30 days&quot;</span><span class="p">],</span><span class="w"> </span><span class="nt">&quot;topic&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;refund&quot;</span><span class="p">},</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w"> </span><span class="nt">&quot;rubric&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;correctness&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;States the 30-day window for annual plans.&quot;</span><span class="p">},</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w"> </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;billing&quot;</span><span class="p">]}</span>
+<p>Class-agent datasets are JSONL, one <code>AgentExample</code> per line. Every
+template's <code>datasets/all.jsonl</code> uses this format. A row carries the whole
+case: the question, the documents the answer must come from, any other agent
+input, labels, tags and a rubric. All of it reaches the optimization, not
+just the question and the answer.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;policy_05&quot;</span><span class="p">,</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w"> </span><span class="nt">&quot;split&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;train&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w"> </span><span class="nt">&quot;input&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;current_query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;How long are audit logs kept?&quot;</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">           </span><span class="nt">&quot;context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;documents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;audit.md&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">               </span><span class="nt">&quot;content&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Audit logs are kept for 400 days on Enterprise and 90 days on Team.&quot;</span><span class="p">}]},</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">           </span><span class="nt">&quot;customer_plan&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;team&quot;</span><span class="p">},</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w"> </span><span class="nt">&quot;expected_output&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;response&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;On the Team plan, audit logs are kept for 90 days (400 days on Enterprise).&quot;</span><span class="p">},</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w"> </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;topic&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;security&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;difficulty&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;medium&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;must_include&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;90 days&quot;</span><span class="p">]},</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w"> </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;security&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;compliance&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;plan-specific&quot;</span><span class="p">],</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w"> </span><span class="nt">&quot;rubric&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;groundedness&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Every claim comes from the row&#39;s context documents.&quot;</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">            </span><span class="nt">&quot;plan&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Applies the policy to the customer&#39;s plan when one is given.&quot;</span><span class="p">}}</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2961,7 +3012,17 @@ template's <code>datasets/all.jsonl</code> uses):</p>
 <tr>
 <td><code>input</code></td>
 <td>yes</td>
-<td>What the agent receives — the same dict <code>input_to_state()</code> gets. The question is read from <code>question</code>, <code>query</code>, <code>current_query</code> or <code>request</code>. <code>input.context</code> becomes the judge's retrieval context.</td>
+<td>What the agent receives, unchanged: the same dict <code>input_to_state()</code> gets. The question is read from <code>question</code>, <code>query</code>, <code>current_query</code> or <code>request</code>.</td>
+</tr>
+<tr>
+<td><code>input.context</code></td>
+<td>no</td>
+<td>Documents the answer must come from (RAG). The value can be <code>{"documents": [...]}</code>, a list, or one string. A document is a string or a dict with <code>content</code> (or <code>text</code> / <code>page_content</code>) and an optional <code>source</code>.</td>
+</tr>
+<tr>
+<td>other <code>input.*</code> keys</td>
+<td>no</td>
+<td>Any other agent input: <code>messages</code> (earlier turns), a plan, a locale, a user profile, and so on.</td>
 </tr>
 <tr>
 <td><code>expected_output</code></td>
@@ -2971,17 +3032,17 @@ template's <code>datasets/all.jsonl</code> uses):</p>
 <tr>
 <td><code>metadata</code></td>
 <td>no</td>
-<td>Anything metrics need: required facts, topic, difficulty. Class-agent metrics read it (<code>example.metadata</code>).</td>
-</tr>
-<tr>
-<td><code>rubric</code></td>
-<td>no</td>
-<td>Per-dimension criteria, appended to the judge's reference.</td>
+<td>Labels metrics need: required facts (<code>must_include</code>), topic, difficulty.</td>
 </tr>
 <tr>
 <td><code>tags</code></td>
 <td>no</td>
-<td>Free-form labels.</td>
+<td>Grouping labels. Filter with <code>data.filter_by_tags(...)</code>, and break results down by tag.</td>
+</tr>
+<tr>
+<td><code>rubric</code></td>
+<td>no</td>
+<td>Per-dimension criteria, added to the judge's reference.</td>
 </tr>
 </tbody>
 </table>
@@ -2989,17 +3050,117 @@ template's <code>datasets/all.jsonl</code> uses):</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">data</span> <span class="o">=</span> <span class="n">load_data</span><span class="p">(</span><span class="s2">&quot;agents/support/datasets/all.jsonl&quot;</span><span class="p">)</span>    <span class="c1"># AgentDataset</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">data</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">holdout</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">test</span>    <span class="c1"># lists of AgentExample</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">billing</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">filter_by_tags</span><span class="p">(</span><span class="s2">&quot;billing&quot;</span><span class="p">)</span>                <span class="c1"># any-match</span>
 </span></code></pre></div>
 <p><code>PromptFitter</code> works on the simpler <code>agentomatic.optimize.Dataset</code> of
-<code>DataPoint(query, expected_answer, context, metadata)</code>. Convert, or build one
-directly:</p>
+<code>DataPoint(query, expected_answer, context, metadata, tags)</code>. Convert, or
+build one directly:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dataset</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">valset</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">to_datapoint</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">validation</span><span class="p">])</span>   <span class="c1"># keeps metadata</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">Dataset</span><span class="o">.</span><span class="n">from_list</span><span class="p">([{</span><span class="s2">&quot;query&quot;</span><span class="p">:</span> <span class="s2">&quot;Refund window?&quot;</span><span class="p">,</span> <span class="s2">&quot;expected_answer&quot;</span><span class="p">:</span> <span class="s2">&quot;30 days&quot;</span><span class="p">}])</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">Dataset</span><span class="o">.</span><span class="n">from_jsonl</span><span class="p">(</span><span class="s2">&quot;eval.jsonl&quot;</span><span class="p">)</span>        <span class="c1"># {&quot;query&quot;, &quot;expected_answer&quot;, &quot;context&quot;, &quot;metadata&quot;}</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">trainset</span><span class="p">,</span> <span class="n">valset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">ratio</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">valset</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">to_datapoint</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">validation</span><span class="p">])</span>   <span class="c1"># keeps everything</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">Dataset</span><span class="o">.</span><span class="n">from_list</span><span class="p">([{</span><span class="s2">&quot;query&quot;</span><span class="p">:</span> <span class="s2">&quot;Refund window?&quot;</span><span class="p">,</span> <span class="s2">&quot;expected_answer&quot;</span><span class="p">:</span> <span class="s2">&quot;30 days&quot;</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                    <span class="s2">&quot;context&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Refunds: 30 days.&quot;</span><span class="p">],</span> <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;billing&quot;</span><span class="p">],</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                    <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;invoke&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;customer_plan&quot;</span><span class="p">:</span> <span class="s2">&quot;team&quot;</span><span class="p">}}}])</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">Dataset</span><span class="o">.</span><span class="n">from_jsonl</span><span class="p">(</span><span class="s2">&quot;eval.jsonl&quot;</span><span class="p">)</span>   <span class="c1"># {&quot;query&quot;, &quot;expected_answer&quot;, &quot;context&quot;, &quot;metadata&quot;, &quot;tags&quot;}</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">trainset</span><span class="p">,</span> <span class="n">valset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">ratio</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
 </span></code></pre></div>
+<p><code>to_datapoint()</code> maps a row as follows:</p>
+<table>
+<thead>
+<tr>
+<th>Row field</th>
+<th><code>DataPoint</code> field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code> (except the question)</td>
+<td><code>metadata.invoke</code>, sent to the agent exactly as written</td>
+</tr>
+<tr>
+<td><code>input.context</code></td>
+<td><code>context</code>, as document texts such as <code>"Audit logs are kept … (source: audit.md)"</code></td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>metadata</code></td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td><code>tags</code></td>
+</tr>
+<tr>
+<td><code>rubric</code></td>
+<td>the expected reference, ahead of the answer, for the judge</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-each-stage-sees">What each stage sees<a class="headerlink" href="#what-each-stage-sees" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Receives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Agent</strong></td>
+<td><code>input</code> exactly as written: the question, <code>context</code>, <code>customer_plan</code> and the rest. Evaluation hands it a copy, so an agent that edits its input never changes the dataset.</td>
+</tr>
+<tr>
+<td><strong>Metrics</strong></td>
+<td>The whole row (<code>example.input</code>, <code>.metadata</code>, <code>.tags</code>, <code>.rubric</code>), the same inside <code>fit()</code>, in <code>evaluate()</code> and nested in a composite.</td>
+</tr>
+<tr>
+<td><strong>LLM judges</strong></td>
+<td>Question, answer, expected answer plus rubric, and the context documents. If the row has no documents, they get what the agent retrieved instead. Inside <code>fit()</code> / <code>evaluate()</code> they also get the other inputs, the metadata and the tags.</td>
+</tr>
+<tr>
+<td><strong>Rewrite model</strong></td>
+<td>Every failure, success and dataset sample in its <a href="../how-it-works/">briefing</a> shows <code>Context documents</code>, <code>Other inputs</code>, <code>Example metadata</code>, <code>Tags</code> and what the agent retrieved. It is told to write instructions that <em>use</em> such context and never to copy one row's facts into the prompt.</td>
+</tr>
+<tr>
+<td><strong>Augmenter</strong></td>
+<td>The seed's documents and other inputs (a "Seed context" section). Variations inherit a copy of them, plus the seed's tags (and <code>augmented</code>) and rubric.</td>
+</tr>
+<tr>
+<td><strong>Report</strong></td>
+<td>A <code>context</code> column in the per-example table: tags, documents, inputs and metadata.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="rag-datasets">RAG datasets<a class="headerlink" href="#rag-datasets" title="Permanent link">&para;</a></h2>
+<p>There are two ways for a RAG agent to get its documents. Both work with every
+stage above.</p>
+<ul>
+<li><strong>The row brings its documents</strong> (<code>input.context.documents</code>). The agent
+  answers from exactly those. The judge checks groundedness against them, and
+  the rewrite model reads them next to each answer. Use this to optimize the
+  <em>answering</em> prompt independently of retrieval quality, or when the gold
+  passages are known. The <code>rag</code> template reads them in <code>input_to_state</code>
+  (<code>context.documents</code>, flattened to <code>documents</code> over REST) and falls back to
+  its own retrieval when there are none.</li>
+<li><strong>The agent retrieves for itself.</strong> List what it used in the output under
+  <code>retrieval_context</code>, <code>citations</code>, <code>sources</code> or <code>documents</code>. These can be
+  strings or dicts with <code>content</code> and <code>source</code>. Judges then score
+  groundedness against those, and the rewrite model sees them as
+  <code>Retrieved by the agent</code>.</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">input_to_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">ctx</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">docs</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;documents&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">ctx</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">return</span> <span class="n">MyState</span><span class="p">(</span><span class="n">question</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;current_query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">documents</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">docs</span> <span class="ow">or</span> <span class="p">[]))</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">state_to_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="n">state</span><span class="o">.</span><span class="n">answer</span><span class="p">,</span> <span class="s2">&quot;citations&quot;</span><span class="p">:</span> <span class="n">state</span><span class="o">.</span><span class="n">citations</span><span class="p">}</span>   <span class="c1"># what it used</span>
+</span></code></pre></div>
+<p>Metrics can read the documents too. For example, a groundedness check that
+counts how many of the answer's words come from them:
+<a href="../examples/"><code>grounded_score</code></a>.</p>
+<p><code>examples/prompt_optimization/rag_context.py</code> runs the whole loop on rows
+that bring their own documents, plan, metadata, tags and rubric. It prints
+what each stage sees and reports test scores per tag.</p>
 <h2 id="writing-good-examples">Writing good examples<a class="headerlink" href="#writing-good-examples" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>One fact per expectation you care about.</strong> An expected answer is what the
@@ -3017,21 +3178,21 @@ directly:</p>
 <h2 id="augmentation">Augmentation<a class="headerlink" href="#augmentation" title="Permanent link">&para;</a></h2>
 <p><code>prepare_dataset(augment=True)</code> asks an LLM for variations of your <strong>train</strong>
 rows and adds the ones that are safe to learn from.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_dataset</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">data</span><span class="p">,</span> <span class="n">written</span> <span class="o">=</span> <span class="n">prepare_dataset</span><span class="p">(</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">data</span><span class="p">,</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">n_examples</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>                                    <span class="c1"># target TOTAL size</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">strategies</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;paraphrase&quot;</span><span class="p">,</span> <span class="s2">&quot;formality_shift&quot;</span><span class="p">,</span> <span class="s2">&quot;expansion&quot;</span><span class="p">],</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">llm_base_url</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000/v1&quot;</span><span class="p">,</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">llm_api_key</span><span class="o">=</span><span class="s2">&quot;local&quot;</span><span class="p">,</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">per_call</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">persist</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">persist_path</span><span class="o">=</span><span class="s2">&quot;agents/support/datasets/all.augmented.jsonl&quot;</span><span class="p">,</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">)</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;augment_stats&quot;</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_dataset</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">data</span><span class="p">,</span> <span class="n">written</span> <span class="o">=</span> <span class="n">prepare_dataset</span><span class="p">(</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">data</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">n_examples</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>                                    <span class="c1"># target TOTAL size</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">strategies</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;paraphrase&quot;</span><span class="p">,</span> <span class="s2">&quot;formality_shift&quot;</span><span class="p">,</span> <span class="s2">&quot;expansion&quot;</span><span class="p">],</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">llm_base_url</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000/v1&quot;</span><span class="p">,</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">llm_api_key</span><span class="o">=</span><span class="s2">&quot;local&quot;</span><span class="p">,</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">per_call</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">persist</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">persist_path</span><span class="o">=</span><span class="s2">&quot;agents/support/datasets/all.augmented.jsonl&quot;</span><span class="p">,</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="p">)</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;augment_stats&quot;</span><span class="p">])</span>
 </span></code></pre></div>
 <h3 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h3>
 <table>
@@ -3158,6 +3319,10 @@ before trusting scores computed on them.</p>
 <li>Generated questions that duplicate an existing one, or are ≥ 90 % similar
   to any validation / holdout / test question, are dropped (a paraphrase of a
   test question in train would inflate every score measured on it).</li>
+<li>The generator sees each seed's documents and other inputs (a "Seed
+  context" section) and is told to ask only what those documents answer.
+  Every variation inherits a copy of its seed's inputs, rubric and tags (plus
+  <code>augmented</code>), so a RAG row stays answerable.</li>
 <li>Each new row records <code>metadata.source = "augment"</code>, its <code>strategy</code> and its
   <code>parent_id</code>.</li>
 <li><code>data.metadata["augment_stats"]</code> records <code>requested</code>, <code>calls</code>, <code>parsed</code>,
@@ -3169,15 +3334,15 @@ before trusting scores computed on them.</p>
 <h2 id="generating-a-seed-dataset-from-scratch">Generating a seed dataset from scratch<a class="headerlink" href="#generating-a-seed-dataset-from-scratch" title="Permanent link">&para;</a></h2>
 <p><code>DataSynthesizer</code> can draft a first dataset from a description. Always review
 it and keep a human-written validation set.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataSynthesizer</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">synth</span> <span class="o">=</span> <span class="n">DataSynthesizer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span> <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000/v1&quot;</span><span class="p">)</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">dataset</span> <span class="o">=</span> <span class="k">await</span> <span class="n">synth</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A support assistant that explains refunds and account settings.&quot;</span><span class="p">,</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">n_samples</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">categories</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;refunds&quot;</span><span class="p">,</span> <span class="s2">&quot;security&quot;</span><span class="p">],</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">)</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">dataset</span><span class="o">.</span><span class="n">to_jsonl</span><span class="p">(</span><span class="s2">&quot;seed.jsonl&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agentomatic.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataSynthesizer</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">synth</span> <span class="o">=</span> <span class="n">DataSynthesizer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;omlx/Qwen3.5-9B-MLX-4bit&quot;</span><span class="p">,</span> <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://127.0.0.1:8000/v1&quot;</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">dataset</span> <span class="o">=</span> <span class="k">await</span> <span class="n">synth</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A support assistant that explains refunds and account settings.&quot;</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">n_samples</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">categories</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;refunds&quot;</span><span class="p">,</span> <span class="s2">&quot;security&quot;</span><span class="p">],</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">)</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">dataset</span><span class="o">.</span><span class="n">to_jsonl</span><span class="p">(</span><span class="s2">&quot;seed.jsonl&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 
 
