@@ -8,6 +8,7 @@ agents; ``TEMPLATES`` is the authoritative public registry.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 
 def _class_agent_get_graph_export(title: str) -> str:
@@ -27,7 +28,16 @@ def _class_agent_py(name: str, template: str = "basic") -> str:
     title = name.replace("_", " ").title().replace(" ", "")
 
     if template == "rag":
-        return f'''"""RAG class-based agent: {name}."""
+        return f'''"""RAG class-based agent: {name}.
+
+Documents sent with a request (``context.documents`` — a dataset row's
+reference passages, or results you retrieved upstream) are answered from as
+given; otherwise ``retrieve`` looks them up in your knowledge base. Either
+way the answer cites them and the output lists them under ``citations``, so
+judges can check groundedness and the prompt optimizer sees what each
+answer was built from.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -39,9 +49,30 @@ from agentomatic.agents import BaseGraphAgent
 @dataclass
 class {title}State:
     """Agent state — per-run transient data."""
+
     request: str = ""
+    #: Documents supplied with the request (``context.documents``).
+    documents: list[Any] = field(default_factory=list)
     citations: list[dict[str, Any]] = field(default_factory=list)
     output: dict[str, Any] = field(default_factory=dict)
+
+
+def _documents_from(context: Any) -> list[Any]:
+    """Documents from ``{{"documents": [...]}}``, a list, or one string."""
+    if isinstance(context, dict):
+        context = context.get("documents")
+    if isinstance(context, str):
+        context = [context]
+    return [doc for doc in context or [] if doc]
+
+
+def _as_citation(doc: Any, index: int) -> dict[str, Any]:
+    """A document as ``{{"content", "source"}}`` (strings get a positional source)."""
+    if isinstance(doc, dict):
+        content = doc.get("content") or doc.get("text") or doc.get("page_content") or ""
+        source = doc.get("source") or f"context[{{index}}]"
+        return {{"content": str(content), "source": str(source)}}
+    return {{"content": str(doc), "source": f"context[{{index}}]"}}
 
 
 class {title}Agent(BaseGraphAgent[{title}State]):
@@ -65,8 +96,7 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         # system_prompt_override, prompt_manager) — required for train/optimize.
         return self.resolve_system_prompt(
             default=(
-                "You are a helpful RAG assistant. "
-                "Ground answers in retrieved context."
+{_wrap_literal(_RAG_SYSTEM_PROMPT, " " * 16)}
             )
         )
 
@@ -80,19 +110,29 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         return g.compile()
 
     def retrieve(self, state: {title}State) -> {title}State:
-        # TODO: use get_connections("{name}").vector("kb").as_store() for real RAG
+        if state.documents:
+            # Supplied documents win: answer from exactly these.
+            state.citations = [
+                _as_citation(doc, i) for i, doc in enumerate(state.documents, start=1)
+            ]
+            return state
+        # TODO: look the question up in your knowledge base, e.g. in an async
+        # node: store = await get_connections("{name}").vector("kb").as_store()
         state.citations = [
             {{"content": f"Document about {{state.request}}", "source": "knowledge_base"}}
         ]
         return state
 
     def generate(self, state: {title}State) -> {title}State:
-        context = "\\n".join(d.get("content", "") for d in state.citations)
+        context = "\\n".join(
+            f"[{{i}}] {{d.get('content', '')}} (source: {{d.get('source', '')}})"
+            for i, d in enumerate(state.citations, start=1)
+        )
         prompt = self._system_prompt()
         if self.llm is not None:
             try:
                 msg = (
-                    f"{{prompt}}\\n\\nContext:\\n{{context}}\\n\\n"
+                    f"{{prompt}}\\n\\nContext documents:\\n{{context}}\\n\\n"
                     f"Question: {{state.request}}"
                 )
                 result = self.llm.invoke(msg)
@@ -107,12 +147,21 @@ class {title}Agent(BaseGraphAgent[{title}State]):
         state.output = {{
             "response": text,
             "agent_type": "{name}",
+            # What the answer was built from — judges score groundedness
+            # against it and the optimizer shows it next to each answer.
             "citations": state.citations,
         }}
         return state
 
     def input_to_state(self, input_data: dict[str, Any]) -> {title}State:
-        return {title}State(request=input_data.get("current_query", ""))
+        # ``context.documents`` arrives nested (and flattened to ``documents``
+        # over REST).
+        documents = _documents_from(input_data.get("context")) or _documents_from(
+            input_data.get("documents")
+        )
+        return {title}State(
+            request=input_data.get("current_query", ""), documents=documents
+        )
 
     def state_to_output(self, state: {title}State) -> dict[str, Any]:
         return state.output
@@ -361,18 +410,28 @@ def _api_py(name: str) -> str:
     return f'''"""Custom API router for {name}.\n\nExporting a module-level ``router`` REPLACES *all* auto-generated endpoints\nfor this agent — /invoke, /chat, /invoke/stream, /card and /health included.\n\nThis scaffold therefore names it ``custom_router``, which the registry does\nnot pick up, so the agent keeps its auto-generated endpoints out of the box.\nRename it to ``router`` when you genuinely want to take over the agent\'s\nroutes entirely (and re-add any of the generated ones you still need).\n"""\nfrom __future__ import annotations\n\nfrom fastapi import APIRouter\n\ncustom_router = APIRouter()\n\n\n@custom_router.get("/status")\nasync def status() -> dict:\n    """Custom status endpoint."""\n    return {{"agent": "{name}", "custom_router": True}}\n'''
 
 
-def _prompts_json() -> str:
-    return """{
-    "v1": {
-        "system": "You are a helpful AI assistant. Be concise and accurate.",
-        "user_template": "{query}"
-    },
-    "v2": {
-        "system": "You are an advanced AI assistant. Provide detailed, well-structured responses with examples when helpful.",
-        "user_template": "Please help with the following: {query}"
+#: The RAG template's system prompt — its in-code default and ``prompts.json``
+#: ``v1`` alike, so ``fit()`` optimizes the prompt the agent actually runs.
+_RAG_SYSTEM_PROMPT = (
+    "You are a helpful RAG assistant. Answer only from the numbered context "
+    "documents and cite the ones you used as [n]. If they do not contain the "
+    "answer, say so plainly instead of guessing."
+)
+
+
+def _prompts_json(system: str = "You are a helpful AI assistant. Be concise and accurate.") -> str:
+    """Return ``prompts.json`` whose ``v1`` system prompt is *system*."""
+    prompts = {
+        "v1": {"system": system, "user_template": "{query}"},
+        "v2": {
+            "system": (
+                "You are an advanced AI assistant. Provide detailed, well-structured "
+                "responses with examples when helpful."
+            ),
+            "user_template": "Please help with the following: {query}",
+        },
     }
-}
-"""
+    return json.dumps(prompts, indent=4, ensure_ascii=False) + "\n"
 
 
 def _langgraph_json(*, graph_target: str = "./agent.py:get_graph") -> str:
@@ -413,6 +472,31 @@ OMLX_API_KEY=
 """
 
 
+def _dataset_rows_doc() -> str:
+    """README section: the fields a ``datasets/all.jsonl`` row can carry."""
+    return """
+### Dataset rows
+
+One JSON object per line. Every field reaches the optimizer, not just the
+question and the answer:
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `split` | `train` (learned from) · `validation` (selects) · `holdout` (veto) · `test` (never used by fit) |
+| `input.current_query` | The question (`query` on the REST wire) |
+| `input.context.documents` | Documents the agent answers from (RAG); judges check groundedness against them |
+| other `input.*` keys | Any agent input — `messages` (earlier turns), a locale, a customer tier … |
+| `expected_output` | The reference answer |
+| `metadata` | Labels: `difficulty`, `must_include` facts … |
+| `tags` | Grouping labels (`dataset.filter_by_tags(...)`) |
+| `rubric` | Per-dimension criteria for the judge |
+
+The agent receives `input` exactly as written; metrics see the whole row; LLM
+judges see the context documents plus the other inputs, metadata and tags; the
+optimizer's rewrite model sees all of it next to each question.
+"""
+
+
 def _training_readme_section(name: str) -> str:
     """Return the train/eval README section shared by the custom-README templates."""
     return f"""
@@ -427,7 +511,7 @@ python agents/{name}/eval.py --split test             # score the result
 ```
 
 Replace the seed rows with real examples before trusting a score.
-"""
+{_dataset_rows_doc()}"""
 
 
 def _readme_md(name: str, template: str) -> str:
@@ -451,7 +535,7 @@ make -f agents/{name}/Makefile all                    # both, via the Makefile
 
 Replace the seed rows with real examples before trusting a score — they exist
 to prove the wiring, not to measure quality.
-"""
+{_dataset_rows_doc()}"""
 
     file_rows = ["| `agent.py` | Agent class definition |"]
     if template in ("full", "chatbot", "rag", "coordinator"):
@@ -1794,260 +1878,442 @@ clean:
 
 # --- Seed datasets ---------------------------------------------------------
 
-#: Dummy seed data per template family. Each entry is
-#: ``(split, query, expected_response, difficulty)``. The rows are small and
-#: obviously synthetic on purpose: they exist so ``train.py`` / ``eval.py``
-#: run end-to-end the moment an agent is scaffolded. Replace them with real
+#: Rubric every ``rag`` seed row carries (folded into the judge's reference).
+_RAG_RUBRIC: dict[str, str] = {
+    "groundedness": "Every claim is supported by the row's context documents.",
+    "citation": "The answer names or numbers the document it used.",
+    "refusal": "When the documents do not answer the question, the answer says so.",
+}
+
+
+def _seed(
+    split: str,
+    query: str,
+    response: str,
+    difficulty: str,
+    *,
+    tags: list[str],
+    documents: list[str] | None = None,
+    must_include: list[str] | None = None,
+    rubric: dict[str, str] | None = None,
+    history: list[tuple[str, str]] | None = None,
+) -> dict[str, Any]:
+    """One seed row (rendered to a full ``AgentExample`` by :func:`_dataset_jsonl`).
+
+    Args:
+        split: ``train`` / ``validation`` / ``test``.
+        query: The question.
+        response: The expected answer.
+        difficulty: ``easy`` / ``medium`` / ``hard`` (stored in ``metadata``).
+        tags: Labels for filtering and for the optimizer.
+        documents: Context documents the answer must come from (RAG).
+        must_include: Facts the answer must contain (``metadata.must_include``).
+        rubric: Per-dimension criteria for the judge.
+        history: Earlier ``(role, content)`` turns of a multi-turn row.
+
+    Returns:
+        The row as a dict.
+    """
+    return {
+        "split": split,
+        "query": query,
+        "response": response,
+        "difficulty": difficulty,
+        "tags": list(tags),
+        "documents": list(documents or []),
+        "must_include": list(must_include or []),
+        "rubric": dict(rubric or {}),
+        "history": list(history or []),
+    }
+
+
+#: Dummy seed data per template family, one :func:`_seed` row each. The
+#: rows are small and obviously synthetic on purpose: they exist so
+#: ``train.py`` / ``eval.py`` run end-to-end the moment an agent is
+#: scaffolded, and they show every field a row can carry — tags on all
+#: of them, context documents + required facts + a rubric on ``rag``,
+#: earlier turns on the multi-turn ``chatbot`` rows. Replace them with real
 #: examples before drawing conclusions from a score.
-_SEED_ROWS: dict[str, list[tuple[str, str, str, str]]] = {
+_SEED_ROWS: dict[str, list[dict[str, Any]]] = {
     "basic": [
-        (
+        _seed(
             "train",
             "Help me plan a two-day product launch",
-            "Day 1: finalise the release notes and brief support. Day 2: publish, announce, and monitor error rates.",
+            "Day 1: finalise the release notes and brief support. Day 2: publish, announce, and "
+            "monitor error rates.",
             "easy",
+            tags=["planning", "launch"],
         ),
-        (
+        _seed(
             "train",
             "Summarise this quarter's support backlog",
-            "The backlog is 212 tickets, down 8% quarter over quarter; billing questions are the largest category at 41%.",
+            "The backlog is 212 tickets, down 8% quarter over quarter; billing questions are the "
+            "largest category at 41%.",
             "medium",
+            tags=["summary", "support"],
         ),
-        (
+        _seed(
             "train",
             "Compare a managed database against self-hosting",
-            "Managed costs more per month but removes backup, patching, and failover work; self-hosting is cheaper only if you already have an on-call rota.",
+            "Managed costs more per month but removes backup, patching, and failover work; "
+            "self-hosting is cheaper only if you already have an on-call rota.",
             "medium",
+            tags=["comparison", "infrastructure"],
         ),
-        (
+        _seed(
             "train",
             "Draft a status update for a delayed migration",
-            "The migration slipped one week after a schema mismatch in staging. The fix is merged, and the new cutover date is the 14th.",
+            "The migration slipped one week after a schema mismatch in staging. The fix is "
+            "merged, and the new cutover date is the 14th.",
             "easy",
+            tags=["status-update", "migration"],
         ),
-        (
+        _seed(
             "validation",
             "Outline the risks of shipping on a Friday",
-            "Fewer engineers are available to respond, weekend traffic hides regressions, and a rollback competes with on-call load.",
+            "Fewer engineers are available to respond, weekend traffic hides regressions, and a "
+            "rollback competes with on-call load.",
             "medium",
+            tags=["risk", "release"],
         ),
-        (
+        _seed(
             "validation",
             "Explain rate limiting to a non-engineer",
-            "Rate limiting caps how often one caller may use a service, so a single heavy user cannot slow it down for everyone else.",
+            "Rate limiting caps how often one caller may use a service, so a single heavy user "
+            "cannot slow it down for everyone else.",
             "easy",
+            tags=["explanation", "non-technical"],
         ),
-        (
+        _seed(
             "test",
             "Analyse the risks of a single-region deployment",
-            "A regional outage takes the whole service down, latency is poor for distant users, and some data-residency rules cannot be met.",
+            "A regional outage takes the whole service down, latency is poor for distant users, "
+            "and some data-residency rules cannot be met.",
             "hard",
+            tags=["risk", "infrastructure"],
         ),
-        (
+        _seed(
             "test",
             "Explain retries with backoff in simple terms",
-            "When a call fails, wait a moment and try again, waiting a little longer each time so a struggling service is not overwhelmed.",
+            "When a call fails, wait a moment and try again, waiting a little longer each time "
+            "so a struggling service is not overwhelmed.",
             "easy",
+            tags=["explanation", "non-technical"],
         ),
     ],
     "chatbot": [
-        (
+        _seed(
             "train",
             "Hi! What can you help me with?",
-            "Hello! I can answer questions, talk through a problem with you, and keep track of what we have already covered.",
+            "Hello! I can answer questions, talk through a problem with you, and keep track of "
+            "what we have already covered.",
             "easy",
+            tags=["greeting"],
         ),
-        (
+        _seed(
             "train",
             "I'm trying to pick a laptop for data work",
-            "Happy to help. For data work the usual priorities are memory first, then CPU cores — how large are the datasets you work with?",
+            "Happy to help. For data work the usual priorities are memory first, then CPU cores "
+            "— how large are the datasets you work with?",
             "medium",
+            tags=["recommendation"],
         ),
-        (
+        _seed(
             "train",
             "16GB or 32GB of RAM?",
-            "If you regularly load datasets above a couple of gigabytes, 32GB pays for itself. For notebooks and dashboards, 16GB is usually enough.",
+            "If you regularly load datasets above a couple of gigabytes, 32GB pays for itself. "
+            "For notebooks and dashboards, 16GB is usually enough.",
             "medium",
+            tags=["recommendation", "follow-up", "multi-turn"],
+            history=[
+                ("user", "I'm trying to pick a laptop for data work"),
+                (
+                    "assistant",
+                    "Happy to help. For data work the usual priorities are memory first, then CPU "
+                    "cores — how large are the datasets you work with?",
+                ),
+            ],
         ),
-        (
+        _seed(
             "train",
             "Thanks, that helps. Anything else I should check?",
-            "Two things worth checking: the storage size, since datasets pile up, and whether the memory can be upgraded later.",
+            "Two things worth checking: the storage size, since datasets pile up, and whether "
+            "the memory can be upgraded later.",
             "easy",
+            tags=["follow-up", "multi-turn"],
+            history=[
+                ("user", "16GB or 32GB of RAM?"),
+                (
+                    "assistant",
+                    "If you regularly load datasets above a couple of gigabytes, 32GB pays for "
+                    "itself.",
+                ),
+            ],
         ),
-        (
+        _seed(
             "validation",
             "Can we change topic? Tell me about time zones",
-            "Of course. Time zones are offsets from UTC, and the tricky part is daylight saving, which shifts some of them twice a year.",
+            "Of course. Time zones are offsets from UTC, and the tricky part is daylight saving, "
+            "which shifts some of them twice a year.",
             "easy",
+            tags=["topic-change"],
         ),
-        (
+        _seed(
             "validation",
             "What did I ask you about earlier?",
-            "You asked about choosing a laptop for data work — memory size in particular — and then about time zones.",
+            "You asked about choosing a laptop for data work — memory size in particular — and "
+            "then about time zones.",
             "medium",
+            tags=["memory", "multi-turn"],
+            history=[
+                ("user", "I'm trying to pick a laptop for data work"),
+                ("assistant", "Memory first, then CPU cores — how large are your datasets?"),
+                ("user", "Can we change topic? Tell me about time zones"),
+                ("assistant", "Of course. Time zones are offsets from UTC."),
+            ],
         ),
-        (
+        _seed(
             "test",
             "I'm frustrated, nothing is working today",
-            "That sounds draining. Tell me what you tried last and what happened, and we can work back from there together.",
+            "That sounds draining. Tell me what you tried last and what happened, and we can "
+            "work back from there together.",
             "medium",
+            tags=["empathy"],
         ),
-        (
+        _seed(
             "test",
             "Goodbye!",
             "Goodbye! Come back any time if you want to pick this up again.",
             "easy",
+            tags=["closing"],
         ),
     ],
     "rag": [
-        (
+        _seed(
             "train",
             "What is the refund window in the support policy?",
             "Refunds are accepted within 30 days of purchase, according to the support policy.",
             "easy",
+            tags=["policy", "refunds"],
+            documents=[
+                "Support policy, section 2: refunds are accepted within 30 days of purchase.",
+            ],
+            must_include=["30 days"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "train",
             "Which regions does the platform run in?",
             "The platform runs in eu-west-1 and us-east-1, per the deployment overview.",
             "easy",
+            tags=["infrastructure"],
+            documents=[
+                "Deployment overview: the platform runs in two regions, eu-west-1 and us-east-1.",
+            ],
+            must_include=["eu-west-1", "us-east-1"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "train",
             "How long are audit logs retained?",
             "Audit logs are retained for 400 days, as stated in the compliance handbook.",
             "medium",
+            tags=["compliance", "retention"],
+            documents=[
+                "Compliance handbook: audit logs are retained for 400 days, then deleted.",
+            ],
+            must_include=["400 days"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "train",
             "Who approves a production database migration?",
-            "A production migration needs approval from the owning team lead and the on-call SRE, per the change policy.",
+            "A production migration needs approval from the owning team lead and the on-call "
+            "SRE, per the change policy.",
             "medium",
+            tags=["policy", "change-management"],
+            documents=[
+                "Change policy: a production database migration needs approval from the owning "
+                "team lead and the on-call SRE.",
+            ],
+            must_include=["team lead", "on-call SRE"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "validation",
             "What is the support response target for a Sev-1?",
-            "The Sev-1 response target is 15 minutes, around the clock, according to the support policy.",
+            "The Sev-1 response target is 15 minutes, around the clock, according to the support "
+            "policy.",
             "medium",
+            tags=["policy", "support"],
+            documents=[
+                "Support policy, section 5: Sev-1 incidents get a first response within 15 "
+                "minutes, 24/7.",
+            ],
+            must_include=["15 minutes"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "validation",
             "Does the free tier include SSO?",
             "No — the pricing page lists SSO as a paid-tier feature.",
             "easy",
+            tags=["pricing"],
+            documents=[
+                "Pricing page: SSO is included in the Team and Enterprise plans.",
+            ],
+            must_include=["paid"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "test",
             "Summarise the backup schedule and cite the source",
             "Backups run nightly and are kept for 35 days (source: operations runbook).",
             "hard",
+            tags=["operations", "citation"],
+            documents=[
+                "Operations runbook: backups run nightly and are kept for 35 days.",
+            ],
+            must_include=["nightly", "35 days"],
+            rubric=_RAG_RUBRIC,
         ),
-        (
+        _seed(
             "test",
-            "What happens when a document has no matching source?",
-            "When nothing relevant is retrieved, say so plainly rather than answering from memory.",
+            "What is the on-call phone number for the database team?",
+            "The provided documents do not say, so I can't answer that from the knowledge base.",
             "hard",
+            tags=["refusal", "no-answer"],
+            documents=[
+                "Pricing page: the Team plan costs $20 per seat per month.",
+            ],
+            rubric=_RAG_RUBRIC,
         ),
     ],
     "coordinator": [
-        (
+        _seed(
             "train",
             "My invoice is wrong, I was charged twice",
-            "This is a billing issue: route it to the billing specialist with the duplicate charge details.",
+            "This is a billing issue: route it to the billing specialist with the duplicate "
+            "charge details.",
             "easy",
+            tags=["billing"],
         ),
-        (
+        _seed(
             "train",
             "The API returns 500 on every upload",
-            "This is a technical fault: route it to the engineering specialist with the endpoint and status code.",
+            "This is a technical fault: route it to the engineering specialist with the endpoint "
+            "and status code.",
             "easy",
+            tags=["technical"],
         ),
-        (
+        _seed(
             "train",
             "How much does the enterprise plan cost?",
-            "This is a sales question: route it to the sales specialist for current enterprise pricing.",
+            "This is a sales question: route it to the sales specialist for current enterprise "
+            "pricing.",
             "easy",
+            tags=["sales"],
         ),
-        (
+        _seed(
             "train",
             "I need to export all my data before we cancel",
-            "This spans account management and engineering: route it to the account specialist and attach the export request.",
+            "This spans account management and engineering: route it to the account specialist "
+            "and attach the export request.",
             "medium",
+            tags=["account", "multi-specialist"],
         ),
-        (
+        _seed(
             "validation",
             "Can you reset the password on my account?",
-            "This is an account request: route it to the account specialist for a verified password reset.",
+            "This is an account request: route it to the account specialist for a verified "
+            "password reset.",
             "easy",
+            tags=["account"],
         ),
-        (
+        _seed(
             "validation",
             "Our latency doubled after the last release",
-            "This is a technical regression: route it to the engineering specialist with the release window.",
+            "This is a technical regression: route it to the engineering specialist with the "
+            "release window.",
             "medium",
+            tags=["technical", "regression"],
         ),
-        (
+        _seed(
             "test",
             "I was charged after cancelling and support never replied",
-            "This spans billing and support escalation: route it to billing first, then flag the unanswered ticket.",
+            "This spans billing and support escalation: route it to billing first, then flag the "
+            "unanswered ticket.",
             "hard",
+            tags=["billing", "escalation", "multi-specialist"],
         ),
-        (
+        _seed(
             "test",
             "What is the weather today?",
-            "This is out of scope: answer directly that the platform handles account, billing, and technical topics.",
+            "This is out of scope: answer directly that the platform handles account, billing, "
+            "and technical topics.",
             "easy",
+            tags=["out-of-scope"],
         ),
     ],
     "extraction": [
-        (
+        _seed(
             "train",
             "Extract the parties from: 'This agreement is between Acme Ltd and Globex Inc.'",
             "Parties: Acme Ltd; Globex Inc.",
             "easy",
+            tags=["parties"],
         ),
-        (
+        _seed(
             "train",
             "Extract the effective date from: 'Effective as of 1 March 2025.'",
             "Effective date: 2025-03-01.",
             "easy",
+            tags=["dates"],
         ),
-        (
+        _seed(
             "train",
             "Extract the payment terms from: 'Invoices are due net 30 from receipt.'",
             "Payment terms: net 30 days from receipt.",
             "medium",
+            tags=["payment"],
         ),
-        (
+        _seed(
             "train",
             "Extract the governing law from: 'Governed by the laws of Ireland.'",
             "Governing law: Ireland.",
             "easy",
+            tags=["governing-law"],
         ),
-        (
+        _seed(
             "validation",
-            "Extract the notice period from: 'Either party may terminate on 60 days written notice.'",
+            "Extract the notice period from: 'Either party may terminate on 60 days written "
+            "notice.'",
             "Notice period: 60 days, written, either party.",
             "medium",
+            tags=["termination"],
         ),
-        (
+        _seed(
             "validation",
             "Extract the contract value from: 'Total consideration is EUR 120,000 per annum.'",
             "Contract value: EUR 120,000 per year.",
             "medium",
+            tags=["financial"],
         ),
-        (
+        _seed(
             "test",
-            "Extract every obligation from: 'The supplier shall deliver monthly reports and maintain 99.9% uptime.'",
+            "Extract every obligation from: 'The supplier shall deliver monthly reports and "
+            "maintain 99.9% uptime.'",
             "Obligations: deliver monthly reports; maintain 99.9% uptime.",
             "hard",
+            tags=["obligations", "multi-value"],
         ),
-        (
+        _seed(
             "test",
-            "Extract the renewal terms from: 'Renews automatically unless cancelled 30 days prior.'",
+            "Extract the renewal terms from: 'Renews automatically unless cancelled 30 days "
+            "prior.'",
             "Renewal: automatic, unless cancelled at least 30 days before the term ends.",
             "hard",
+            tags=["renewal"],
         ),
     ],
 }
@@ -2083,19 +2349,36 @@ def _dataset_jsonl(name: str, template: str = "basic") -> str:
     family = _SEED_ALIASES.get(template, template)
     rows = _SEED_ROWS.get(family, _SEED_ROWS["basic"])
     lines = []
-    for idx, (split, query, response, difficulty) in enumerate(rows, start=1):
-        lines.append(
-            json.dumps(
-                {
-                    "id": f"{name}_{idx:03d}",
-                    "split": split,
-                    "input": {"current_query": query, "question": query},
-                    "expected_output": {"response": response},
-                    "metadata": {"domain": family, "difficulty": difficulty, "source": "seed"},
-                },
-                ensure_ascii=False,
-            )
-        )
+    for idx, row in enumerate(rows, start=1):
+        query = row["query"]
+        inputs: dict[str, Any] = {"current_query": query, "question": query}
+        if row["documents"]:
+            # What the agent answers from — and what judges check it against.
+            inputs["context"] = {"documents": row["documents"]}
+        if row["history"]:
+            # Earlier turns, ending with this one (the ``/chat`` shape).
+            inputs["messages"] = [
+                *({"role": role, "content": content} for role, content in row["history"]),
+                {"role": "user", "content": query},
+            ]
+        metadata: dict[str, Any] = {
+            "domain": family,
+            "difficulty": row["difficulty"],
+            "source": "seed",
+        }
+        if row["must_include"]:
+            metadata["must_include"] = row["must_include"]
+        example: dict[str, Any] = {
+            "id": f"{name}_{idx:03d}",
+            "split": row["split"],
+            "input": inputs,
+            "expected_output": {"response": row["response"]},
+            "metadata": metadata,
+            "tags": row["tags"],
+        }
+        if row["rubric"]:
+            example["rubric"] = row["rubric"]
+        lines.append(json.dumps(example, ensure_ascii=False))
     return "\n".join(lines) + "\n"
 
 
@@ -3777,6 +4060,8 @@ def get_template_files(template: str, name: str) -> dict[str, str]:
             "tools.py": _tools_py(name),
             **training,
             **common,
+            # The grounded prompt the agent runs — and fit() starts from.
+            "prompts.json": _prompts_json(_RAG_SYSTEM_PROMPT),
         }
 
     elif template == "chatbot":
