@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from ..types import copy_input
+
 if TYPE_CHECKING:
     from ..types import (
         AgentDataset,
@@ -83,7 +85,7 @@ class EvaluationMixin:
             start = time.perf_counter()
             try:
                 prediction: dict[str, Any] = self.transform(  # type: ignore[attr-defined]
-                    example.input,
+                    copy_input(example.input),
                 )
             except Exception as exc:  # noqa: BLE001
                 elapsed = (time.perf_counter() - start) * 1000

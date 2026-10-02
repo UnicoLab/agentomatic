@@ -212,6 +212,27 @@ def _field_quality_hint(field_name: str, input_data: dict[str, Any]) -> str:
     return base
 
 
+def copy_input(value: Any) -> Any:
+    """A deep copy of an example's input, to hand to an agent.
+
+    Evaluation must never change the dataset: an agent that edits the dict it
+    receives (appending retrieved documents to ``context``, say) would
+    otherwise rewrite the example for every later epoch and split.
+
+    Args:
+        value: The example's ``input``.
+
+    Returns:
+        A deep copy (a shallow one for uncopyable objects).
+    """
+    import copy
+
+    try:
+        return copy.deepcopy(value)
+    except Exception:  # noqa: BLE001 - uncopyable user objects
+        return dict(value) if isinstance(value, dict) else value
+
+
 @dataclass
 class AgentExample:
     """Single evaluation example for an agent.
@@ -278,9 +299,14 @@ class AgentExample:
         - ``input["request"]``   — REST-style alias
         - ``json.dumps(input)``  — last-resort serialisation
 
-        Context: ``input["context"]`` (dict or list) is serialised as a JSON
-        string and passed as the retrieval context so LLM-as-judge metrics can
-        evaluate groundedness against the project snapshot.
+        Context: ``input["context"]`` becomes the point's context documents so
+        LLM-as-judge metrics can evaluate groundedness and the optimizer sees
+        what the agent answered from — a list as is, one string as one
+        document, a dict's ``documents`` as the documents (any other keys as
+        one extra JSON document). The agent itself still receives the
+        original ``input`` (via ``metadata.invoke``), unchanged.
+
+        Tags travel as ``DataPoint.tags``.
 
         Expected answer: boolean-flag outputs (``{"content": true, "name": true}``)
         are converted to a human-readable description so judge LLMs can compare
@@ -307,13 +333,12 @@ class AgentExample:
             input_data=self.input or {},
         )
 
-        # ── context: extract project snapshot for judge groundedness eval ─
+        # ── context: documents for judge groundedness eval (and the optimizer) ─
+        # A list, one string, or a dict (``documents`` + any other keys).
+        from agentomatic.optimize.dataset import normalize_context
+
         raw_ctx = self.input.get("context") or (self.metadata.get("invoke") or {}).get("context")
-        context_list: list[str] = []
-        if isinstance(raw_ctx, dict) and raw_ctx:
-            context_list = [json.dumps(raw_ctx, ensure_ascii=False)]
-        elif isinstance(raw_ctx, list):
-            context_list = [str(c) for c in raw_ctx if c]
+        context_list = normalize_context(raw_ctx)
 
         # ── metadata / invoke ─────────────────────────────────────────────
         meta = dict(self.metadata or {})
@@ -334,6 +359,7 @@ class AgentExample:
             expected_answer=expected,
             context=context_list,
             metadata=meta,
+            tags=list(self.tags or []),
         )
 
 

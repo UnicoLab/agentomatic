@@ -904,6 +904,40 @@ _STRATEGY_INSTRUCTIONS: dict[str, str] = {
 _ITEM_LIST_KEYS = ("examples", "data", "items", "rows", "points", "variations", "results")
 
 
+#: Character budget for the seed's context in an augmentation prompt.
+_SEED_CONTEXT_CHARS = 3000
+
+
+def _seed_context_section(seed: DataPoint) -> tuple[str, bool]:
+    """The seed's inputs / context documents / tags as a prompt section.
+
+    Every variation inherits the seed's inputs (``prepare_dataset`` copies
+    them), so the generator has to see them: a RAG variation must stay
+    answerable from the same documents.
+
+    Returns:
+        ``(section, has_documents)`` — an empty section for a bare seed.
+    """
+    from agentomatic.optimize.dataset import example_context, normalize_context
+
+    view = example_context(seed.metadata, seed.context, seed.tags)
+    view.pop("metadata", None)  # labels of the seed's answer, not of a variation
+    inputs = view.get("inputs") or {}
+    docs = view.get("context") or normalize_context(inputs.get("context"))
+    if not view:
+        return "", False
+    text = json.dumps(view, ensure_ascii=False, default=str)
+    if len(text) > _SEED_CONTEXT_CHARS:
+        text = text[: _SEED_CONTEXT_CHARS - 1] + "…"
+    return (
+        "## Seed context\n"
+        "Every variation is asked with these same inputs"
+        + (" and context documents" if docs else "")
+        + f":\n{text}\n\n",
+        bool(docs),
+    )
+
+
 def _seed_prompt(seed: DataPoint, strategy: str, k: int) -> str:
     """Build the one-seed augmentation prompt."""
     from agentomatic.optimize.metrics import plain_expected
@@ -911,9 +945,16 @@ def _seed_prompt(seed: DataPoint, strategy: str, k: int) -> str:
     answer = plain_expected(seed.expected_answer) or ""
     keep = strategy in LABEL_PRESERVING_STRATEGIES
     seed_json = json.dumps({"query": seed.query, "expected_answer": answer}, ensure_ascii=False)
+    context_section, has_docs = _seed_context_section(seed)
+    grounding = (
+        "Ask only questions the context documents answer; do not use outside facts.\n"
+        if has_docs
+        else ""
+    )
     return (
         "You are a dataset augmentation expert.\n\n"
         f"## Seed example\n{seed_json}\n\n"
+        f"{context_section}"
         f"## Task\n{_STRATEGY_INSTRUCTIONS[strategy]}\n"
         f"Write {k} new, distinct variation(s) of the seed.\n"
         + (
@@ -921,6 +962,7 @@ def _seed_prompt(seed: DataPoint, strategy: str, k: int) -> str:
             if keep
             else "Give each variation its own correct expected_answer.\n"
         )
+        + grounding
         + "\nReply with ONLY a JSON array, no prose:\n"
         '[{"query": "...", "expected_answer": "..."}]\n'
     )

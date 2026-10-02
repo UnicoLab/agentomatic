@@ -58,7 +58,7 @@ from agentomatic.optimize.context import (
     OptimizationContext,
     RoundStats,
 )
-from agentomatic.optimize.dataset import Dataset
+from agentomatic.optimize.dataset import Dataset, example_context
 from agentomatic.optimize.events import (
     CallbackManager,
     EventData,
@@ -74,7 +74,7 @@ from agentomatic.optimize.metrics import (
     CompositeMetric,
     EvalResult,
 )
-from agentomatic.optimize.runner import AgentRunner, RunResult
+from agentomatic.optimize.runner import AgentRunner, RunResult, _merge_documents
 from agentomatic.optimize.search_space import PromptSearchSpace
 
 if TYPE_CHECKING:
@@ -180,9 +180,14 @@ def _wrap_local_agent(agent: Any) -> Any:
         if invoke:
             input_data.update({k: v for k, v in invoke.items() if k != "current_query"})
         if context:
-            input_data.setdefault("context", {})
-            if isinstance(input_data["context"], dict):
-                input_data["context"]["documents"] = list(context)
+            # Copy before adding documents: ``invoke`` belongs to the dataset.
+            ctx = input_data.get("context")
+            if ctx is None:
+                input_data["context"] = {"documents": list(context)}
+            elif isinstance(ctx, dict):
+                ctx = dict(ctx)
+                ctx["documents"] = _merge_documents(ctx.get("documents"), list(context))
+                input_data["context"] = ctx
         if prompt_override:
             # Top-level + metadata so resolve_system_prompt / transform stash both see it.
             input_data["system_prompt_override"] = prompt_override
@@ -273,6 +278,50 @@ def _wrap_local_agent(agent: Any) -> Any:
     return _callable
 
 
+def _example_view(rr: RunResult) -> dict[str, Any]:
+    """The scored example's inputs, context, metadata and tags (see ``example_context``)."""
+    meta = rr.metadata or {}
+    return example_context(meta.get("example"), rr.context, meta.get("example_tags"))
+
+
+#: Per-document / per-input character budget of a persisted example view.
+_VIEW_CHARS = 300
+
+
+def _compact_view(view: dict[str, Any] | None) -> dict[str, Any]:
+    """An example view small enough to keep with every per-example record.
+
+    The result (and its JSON artefact) stores one per scored example; long RAG
+    documents or a long conversation must not be copied there in full.
+    """
+    if not view:
+        return {}
+    from agentomatic.optimize.dataset import normalize_context
+
+    def clip(text: str) -> str:
+        return text if len(text) <= _VIEW_CHARS else text[: _VIEW_CHARS - 1] + "…"
+
+    def clip_value(value: Any) -> Any:
+        if isinstance(value, str):
+            return clip(value)
+        text = json.dumps(value, ensure_ascii=False, default=str)
+        return value if len(text) <= _VIEW_CHARS else clip(text)
+
+    inputs = dict(view.get("inputs") or {})
+    docs = list(view.get("context") or []) or normalize_context(inputs.get("context"))
+    inputs.pop("context", None)
+    out: dict[str, Any] = {}
+    if docs:
+        out["context"] = [clip(str(d)) for d in docs[:5]]
+    if inputs:
+        out["inputs"] = {k: clip_value(v) for k, v in inputs.items()}
+    if view.get("metadata"):
+        out["metadata"] = {k: clip_value(v) for k, v in view["metadata"].items()}
+    if view.get("tags"):
+        out["tags"] = list(view["tags"])
+    return out
+
+
 def _compact_examples(details: list[dict[str, Any]], limit: int = 50) -> list[dict[str, Any]]:
     """Per-example results trimmed for reports (question, answer, score, why)."""
     from agentomatic.optimize.metrics import plain_expected
@@ -293,6 +342,8 @@ def _compact_examples(details: list[dict[str, Any]], limit: int = 50) -> list[di
                 },
                 "feedback": str(feedback)[:500],
                 "failed": bool(d.get("error")),
+                # Tags / documents / inputs / metadata of the example.
+                "example": _compact_view(d.get("example")),
             }
         )
     return rows
@@ -1794,7 +1845,8 @@ class PromptFitter:
             artefact_dir.mkdir(parents=True, exist_ok=True)
             artefact_path = artefact_dir / f"fit_result_{experiment_id}.json"
             artefact_path.write_text(
-                json.dumps(result.to_dict(), indent=2, ensure_ascii=False) + "\n",
+                # ``default=str``: example inputs may hold non-JSON values.
+                json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str) + "\n",
                 encoding="utf-8",
             )
             logger.info("💾 Artefacts: {}", artefact_path)
@@ -2033,6 +2085,7 @@ class PromptFitter:
                 logger.debug("Skipping errored result for '{}'", rr.query[:50])
                 detail = {
                     "query": rr.query,
+                    "example": _example_view(rr),
                     "response": rr.response,
                     "expected": rr.expected,
                     "avg_score": 0.0,
@@ -2078,6 +2131,7 @@ class PromptFitter:
                     eval_details.append(
                         {
                             "query": rr.query,
+                            "example": _example_view(rr),
                             "response": rr.response,
                             "expected": rr.expected,
                             "avg_score": 0.0,
@@ -2108,6 +2162,7 @@ class PromptFitter:
                 reward = self._reward_adapter.reward_from_eval(eval_result)
                 detail = {
                     "query": rr.query,
+                    "example": _example_view(rr),
                     "response": rr.response,
                     "expected": rr.expected,
                     "avg_score": point_score,
@@ -2148,6 +2203,7 @@ class PromptFitter:
                 eval_details.append(
                     {
                         "query": rr.query,
+                        "example": _example_view(rr),
                         "response": rr.response,
                         "expected": rr.expected,
                         "avg_score": 0.0,
@@ -2407,6 +2463,13 @@ class PromptFitter:
                     "dimensions": detail.get("dimensions", {}),
                     "feedback": detail.get("feedback", ""),
                     "is_failure": detail.get("avg_score", 0.0) < _FAILURE_THRESHOLD,
+                    # Inputs / context / metadata / tags of the example, and
+                    # what the agent retrieved and did — so the optimizer sees
+                    # the whole case, not just the question and the answers.
+                    "example": dict(detail.get("example") or {}),
+                    "retrieval_context": list(detail.get("retrieval_context") or []),
+                    "tool_calls": list(detail.get("tool_calls") or []),
+                    "reasoning": detail.get("reasoning") or "",
                 }
             )
         return results

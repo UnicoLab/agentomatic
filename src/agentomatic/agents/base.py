@@ -74,6 +74,7 @@ from .types import (
     Optimizer,
     StateT,
     TraceEvent,
+    copy_input,
 )
 
 # Per-request system-prompt overrides, keyed by agent ``id()``. A ContextVar
@@ -590,7 +591,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
         for example in examples:
             t0 = time.perf_counter()
             try:
-                prediction = self.transform(example.input)
+                prediction = self.transform(copy_input(example.input))
                 duration = (time.perf_counter() - t0) * 1000
 
                 scores: dict[str, float] = {}
@@ -1076,7 +1077,7 @@ class BaseGraphAgent(ABC, Generic[StateT]):
 
         for example in examples:
             try:
-                prediction = self.transform(example.input)
+                prediction = self.transform(copy_input(example.input))
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"fit: transform failed for '{example.id}': {exc}")
                 if loss is not None:

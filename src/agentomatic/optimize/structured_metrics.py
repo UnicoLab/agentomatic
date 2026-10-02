@@ -202,8 +202,17 @@ def make_structured_fit_metric(
 
 
 def agent_keyword_score(example: Any, prediction: dict[str, Any]) -> float:
-    """Agent-lifecycle metric: must_include coverage with forbid penalty."""
+    """Agent-lifecycle metric: must_include coverage with forbid penalty.
+
+    Required / forbidden facts come from ``expected_output`` or, failing
+    that, the example's ``metadata`` (``must_include`` / ``must_not_include``).
+    """
     expected = dict(getattr(example, "expected_output", None) or {})
+    metadata = getattr(example, "metadata", None) or {}
+    if isinstance(metadata, dict):
+        for key in ("must_include", "must_not_include"):
+            if not expected.get(key) and metadata.get(key):
+                expected[key] = metadata[key]
     text = json.dumps(prediction, ensure_ascii=False).lower()
     must = [str(t) for t in (expected.get("must_include") or []) if str(t).strip()]
     if not must:

@@ -429,6 +429,17 @@ class OptimizeMetricAdapter:
         from agentomatic.optimize.metrics import scoring_run
         from agentomatic.optimize.runner import RunResult
 
+        # The agent inputs ride in ``metadata.invoke``, as they do in fit().
+        raw_input = getattr(example, "input", None)
+        invoke = (
+            {
+                k: v
+                for k, v in raw_input.items()
+                if k not in {"query", "request", "question", "current_query"}
+            }
+            if isinstance(raw_input, dict)
+            else {}
+        )
         run = RunResult(
             query=query,
             response=response,
@@ -436,10 +447,12 @@ class OptimizeMetricAdapter:
             context=list(context or []),
             metadata={
                 "example": {
+                    **({"invoke": invoke} if invoke else {}),
                     **(getattr(example, "metadata", None) or {}),
                     "id": getattr(example, "id", ""),
                     "split": getattr(example, "split", ""),
                 },
+                "example_tags": list(getattr(example, "tags", None) or []),
                 "output": dict(prediction),
             },
         )
@@ -508,14 +521,17 @@ class OptimizeMetricAdapter:
             )
 
         if context is None:
+            from agentomatic.optimize.dataset import normalize_context
+
             inp = getattr(example, "input", None) or {}
-            raw_ctx = None
-            if hasattr(inp, "get"):
-                raw_ctx = inp.get("context")
-            if isinstance(raw_ctx, dict) and raw_ctx:
-                context = [_json.dumps(raw_ctx, ensure_ascii=False)]
-            elif isinstance(raw_ctx, list) and raw_ctx:
-                context = [str(c) for c in raw_ctx if c]
+            raw_ctx = inp.get("context") if hasattr(inp, "get") else None
+            context = normalize_context(raw_ctx) or None
+        if context is None:
+            # No reference documents in the example: judge groundedness
+            # against what the agent says it retrieved (as PromptFitter does).
+            from agentomatic.optimize.runner import retrieval_from_output
+
+            context = retrieval_from_output(prediction) or None
 
         # --- the text judged: the same rule PromptFitter scores with ---
         # (structured ``output`` dict as JSON, else ``response``/``answer``),

@@ -163,6 +163,15 @@ class LocalJudgeMetric(BaseMetric):
         if context:
             ctx_block = "\n".join(str(c)[:800] for c in context[:5])
             prompt += f"## Context Documents\n{ctx_block}\n\n"
+        from agentomatic.optimize.metrics import scoring_example_labels
+
+        labels = scoring_example_labels(has_context=bool(context))
+        if labels:
+            prompt += (
+                "## Example inputs, metadata and tags\n"
+                "The query was asked with these — judge the response in their light.\n"
+                f"{labels}\n\n"
+            )
 
         prompt += (
             "## Instructions\n"

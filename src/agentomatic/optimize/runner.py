@@ -16,6 +16,67 @@ from typing import Any
 
 from loguru import logger
 
+from agentomatic.optimize.dataset import document_text
+
+#: Keys an agent output (or response ``metadata``) may list its sources under.
+_RETRIEVAL_KEYS = ("retrieval_context", "citations", "sources", "documents")
+
+
+def retrieval_from_output(data: Any) -> list[str]:
+    """Documents an agent output says it answered from.
+
+    A RAG agent that retrieves for itself reports its sources in its output;
+    surfacing them lets judges score groundedness and lets the optimizer see
+    what each answer was built from.
+
+    Args:
+        data: An agent output / response dict. ``retrieval_context`` wins,
+            then ``citations``, ``sources`` and ``documents`` — at the top
+            level, under ``output`` or under ``metadata``. Items may be
+            strings or dicts (``content`` / ``text`` / ``page_content`` …).
+
+    Returns:
+        The documents as strings; empty when the output lists none.
+    """
+    if not isinstance(data, dict):
+        return []
+    containers = [data]
+    for key in ("output", "metadata"):
+        nested = data.get(key)
+        if isinstance(nested, dict):
+            containers.append(nested)
+    for key in _RETRIEVAL_KEYS:
+        for container in containers:
+            items = container.get(key)
+            if isinstance(items, str):
+                items = [items]
+            if isinstance(items, list) and items:
+                docs = [d for d in (document_text(i) for i in items) if d]
+                if docs:
+                    return docs
+    return []
+
+
+def _copy_inputs(invoke: dict[str, Any]) -> dict[str, Any]:
+    """A deep copy of a point's agent inputs (shallow when not copyable)."""
+    import copy
+
+    try:
+        return copy.deepcopy(invoke)
+    except Exception:  # noqa: BLE001 - uncopyable user objects: shallow copy
+        return dict(invoke)
+
+
+def _merge_documents(existing: Any, extra: list[str]) -> list[Any]:
+    """``existing`` documents plus those of ``extra`` not already present."""
+    if isinstance(existing, str):
+        docs: list[Any] = [existing]
+    elif isinstance(existing, (list, tuple)):
+        docs = list(existing)
+    else:
+        docs = []
+    return docs + [d for d in extra if d not in docs]
+
 
 def _response_text(data: dict[str, Any]) -> str:
     """Prefer structured ``output`` dict, else string ``response``."""
@@ -174,6 +235,8 @@ class AgentRunner:
             return RunResult(
                 query=query,
                 response=response,
+                # What a RAG agent says it answered from (judges, optimizer).
+                retrieval_context=retrieval_from_output(raw),
                 duration_ms=duration,
                 # The full structured output, for metrics that score fields
                 # other than the response text (see ScoreMetricAdapter).
@@ -213,11 +276,8 @@ class AgentRunner:
                 payload["system_prompt_override"] = prompt_override
             if context:
                 ctx = payload.get("context")
-                if not isinstance(ctx, dict):
-                    ctx = {}
-                docs = list(ctx.get("documents") or [])
-                docs.extend(context)
-                ctx["documents"] = docs
+                ctx = dict(ctx) if isinstance(ctx, dict) else {}
+                ctx["documents"] = _merge_documents(ctx.get("documents"), list(context))
                 payload["context"] = ctx
 
             async with httpx.AsyncClient(base_url=self.api_base, timeout=self.timeout) as client:
@@ -232,7 +292,7 @@ class AgentRunner:
             return RunResult(
                 query=query,
                 response=_response_text(data),
-                retrieval_context=data.get("retrieval_context", []),
+                retrieval_context=retrieval_from_output(data),
                 tool_calls=data.get("tool_calls", []),
                 steps_taken=data.get("steps_taken", []),
                 reasoning=data.get("reasoning", ""),
@@ -273,8 +333,7 @@ class AgentRunner:
             if prompt_override:
                 ctx["system_prompt_override"] = prompt_override
             if context:
-                docs = list(ctx.get("documents") or [])
-                docs.extend(context)
+                docs = _merge_documents(ctx.get("documents"), list(context))
                 if docs:
                     ctx["documents"] = docs
             if ctx:
@@ -292,8 +351,9 @@ class AgentRunner:
             return RunResult(
                 query=query,
                 response=_response_text(data),
-                # Try to extract context from standard response
-                retrieval_context=data.get("metadata", {}).get("retrieval_context", []),
+                # Sources from the response (``metadata.retrieval_context``,
+                # ``output.citations``, …).
+                retrieval_context=retrieval_from_output(data),
                 citations=data.get("citations", []),
                 steps_taken=data.get("steps_taken", []),
                 duration_ms=duration,
@@ -341,21 +401,29 @@ class AgentRunner:
             async with semaphore:
                 meta = point.get("metadata") or {}
                 invoke = meta.get("invoke") if isinstance(meta, dict) else None
-                if not isinstance(invoke, dict):
-                    invoke = {}
+                # A copy: an agent (or a payload builder) must never be able to
+                # change the dataset it is evaluated on.
+                invoke = _copy_inputs(invoke) if isinstance(invoke, dict) else {}
+                context = list(point.get("context") or [])
                 result = await self.run_single(
                     query=point["query"],
                     prompt_override=prompt_override,
-                    context=point.get("context"),
+                    # An example's own context already travels in its inputs,
+                    # unchanged; sending its documents again would hand the
+                    # agent a second, re-serialised copy.
+                    context=None if "context" in invoke else (context or None),
                     invoke=invoke,
                 )
                 result.expected = point.get("expected_answer") or point.get("expected")
                 if not result.context:
-                    result.context = point.get("context", [])
+                    result.context = context
                 if isinstance(meta, dict) and meta:
                     # Dataset metadata (rubric hints, required facts, split…)
                     # for example-aware metrics.
                     result.metadata = {**result.metadata, "example": dict(meta)}
+                tags = point.get("tags")
+                if tags:
+                    result.metadata = {**result.metadata, "example_tags": list(tags)}
                 return result
 
         return list(await asyncio.gather(*[_run_one(p) for p in points]))

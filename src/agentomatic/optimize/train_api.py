@@ -37,6 +37,7 @@ Example (one-shot)::
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 from collections.abc import Sequence
@@ -416,7 +417,9 @@ def _augmented_example(seed: Any, dp: Any, *, strategy: str, idx: int) -> Any | 
     query = str(getattr(dp, "query", "") or "").strip()
     if not query:
         return None
-    inp = dict(seed.input or {})
+    # The seed's own inputs (context documents included) — copied, so the
+    # variation can never alias the seed.
+    inp = copy.deepcopy(dict(seed.input or {}))
     replaced = False
     for key in _QUERY_KEYS:
         if key in inp:
