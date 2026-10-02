@@ -12,6 +12,10 @@ and keeps only rows that are safe to learn from:
   test question in train inflates every score measured on it);
 * label-preserving strategies keep the seed's answer and metadata, so
   metadata-driven metrics (``must_include``) still score them correctly;
+* the generator is shown each seed's other inputs and context documents
+  ("Seed context") and told to ask only what the documents answer, and every
+  variation inherits a copy of its seed's inputs (documents, ``customer_plan``
+  …), tags (plus ``augmented``) and rubric — a RAG row stays answerable;
 * ``dataset.metadata["augment_stats"]`` records what happened, and a warning
   (or ``strict=True`` → error) fires when fewer rows than asked were added.
 
@@ -123,11 +127,13 @@ def main(argv: list[str] | None = None) -> int:
     new_rows = [e for e in augmented.examples if e.metadata.get("source") == "augment"]
     for example in new_rows[:8]:
         logger.info(
-            "  [{:<15}] from {:<11} {!r} → {!r}",
+            "  [{:<15}] from {:<11} {!r} → {!r}  inputs={} tags={}",
             example.metadata.get("strategy"),
             example.metadata.get("parent_id"),
             example.input.get("current_query"),
             str((example.expected_output or {}).get("response", ""))[:60],
+            sorted(k for k in example.input if k not in {"current_query", "question"}),
+            example.tags,
         )
 
     # ------------------------------------------------------------------
