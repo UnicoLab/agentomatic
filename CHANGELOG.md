@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.16.0 (2026-10-02)
+
+### Chores
+
+- Sync uv.lock with the 1.15.0 release version
+  ([`1e03643`](https://github.com/UnicoLab/agentomatic/commit/1e03643d0ba39e25d4ab96e2421faf1cb2c3a27c))
+
+### Documentation
+
+- **examples**: RAG context example and full row structure in prompt optimization scripts
+  ([`1106723`](https://github.com/UnicoLab/agentomatic/commit/11067238c4caa182398cdb119fabda9ea257a738))
+
+- **optimization**: Dataset row format, what each stage sees, RAG datasets
+  ([`3c66a75`](https://github.com/UnicoLab/agentomatic/commit/3c66a75003d4750a7d7df4a742bdfc9ccecdcd54))
+
+### Features
+
+- **optimize**: Pass every example's full context to the optimizer, judges and augmenter
+  ([`81f6227`](https://github.com/UnicoLab/agentomatic/commit/81f62279a7915dfa9dfc152246d3f35bbd5ccbf1))
+
+- **templates**: RAG agents answer from supplied documents; seed rows use every field
+  ([`ba50527`](https://github.com/UnicoLab/agentomatic/commit/ba5052702d6c1eb691bab0895c9f4c5ab09d95d1))
+
+
 ## v1.15.0 (2026-09-30)
 
 ### Bug Fixes
