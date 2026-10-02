@@ -50,7 +50,7 @@ additionally writes one per fit under `experiment_dir`.
 | **What changed in the prompt** | The initial → final diff (long lines wrapped so changed sentences stand out), both full prompts side by side, and every accepted change in order with why it was accepted. |
 | **Epochs** | Start / best / held-out / candidates / stop reason per epoch. |
 | **All candidates** | Every proposed candidate: epoch, round, minibatch / validation / held-out scores, confidence, **decision** and **reason**; the diff of each distinct candidate prompt. |
-| **Examples — before vs after** | Per example: question, expected answer, answer before and after, scores before and after, per-metric Δ, and the judge's rationale. Uses the test split when `baseline_eval`/`final_eval` are given, otherwise the validation examples the fitter scored. |
+| **Examples — before vs after** | Per example: question, its context (tags · documents · other inputs · metadata, when the data has any), expected answer, answer before and after, scores before and after, per-metric Δ, and the judge's rationale. Uses the test split when `baseline_eval`/`final_eval` are given, otherwise the validation examples the fitter scored. |
 | **Data & settings** | Split sizes, augmentation stats, and every fitter knob used. |
 | **Run configuration**, **Recommendations** | Model, optimizer, suggestions, parameter changes, metric deltas, a rollout recommendation. |
 | **Curves** | Best score / loss per round, Keras `loss` / `val_loss` and metrics per epoch, the held-out evaluation. |

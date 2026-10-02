@@ -63,6 +63,13 @@ flowchart TD
    never studies the examples it is then selected on (`reflect_on="train"`).
 3. **Proposal.** The optimizer (see the table below) proposes up to four
    candidate configurations per round from the incumbent and the reflection.
+   Its rewrite model reads a briefing: the current config, metrics, score
+   history, train samples, and the lowest- and highest-scoring examples. Each
+   example comes with everything it ran with: question, expected answer,
+   actual answer, judge feedback, context documents, other inputs, metadata,
+   tags, and what the agent retrieved. The briefing tells the model to write
+   instructions that use such context, never to copy one example's facts into
+   the prompt. See [what each stage sees](data.md#what-each-stage-sees).
    A candidate identical to one already scored is skipped for free: a weak
    rewrite model often re-proposes the current prompt.
 4. **Minibatch screen.** Each candidate runs on a slice of validation (30 %,
