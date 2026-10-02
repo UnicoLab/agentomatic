@@ -76,17 +76,29 @@ async def run(argv: list[str] | None = None) -> int:
     # 1. Datasets — explicit train / validation / holdout / test
     # ------------------------------------------------------------------
     # PromptFitter works on ``agentomatic.optimize.Dataset`` (a list of
-    # DataPoint(query, expected_answer, context, metadata)). Build one from
-    # dicts, JSONL, or — as here — from an AgentDataset's splits:
-    #     Dataset.from_list([{"query": "...", "expected_answer": "..."}])
+    # DataPoint(query, expected_answer, context, metadata, tags)). Build one
+    # from dicts, JSONL, or — as here — from an AgentDataset's splits:
+    #     Dataset.from_list([{"query": "...", "expected_answer": "...",
+    #                         "context": ["doc", ...], "tags": ["billing"],
+    #                         "metadata": {"invoke": {"customer_plan": "team"},
+    #                                      "must_include": ["30 days"]}}])
     #     Dataset.from_jsonl("eval.jsonl")
     #     trainset, valset = dataset.split(ratio=0.8)
+    # What each field is for:
+    #   context            documents → judges (groundedness) + the rewrite model;
+    #                      sent to the agent as context.documents
+    #   metadata.invoke    other agent inputs, sent to the agent as written
+    #   metadata (rest)    labels → metrics, judges and the rewrite model
+    #   tags               → judges, the rewrite model and the report
     from agentomatic.optimize import Dataset, load_data
 
     agent_data = load_data(DATASET)
 
     def to_points(examples: list) -> Dataset:
-        # to_datapoint() keeps metadata (e.g. must_include) for the metrics.
+        # to_datapoint() keeps all of it: the inputs (``metadata.invoke`` —
+        # customer_plan here), documents (``context``), labels such as
+        # must_include (``metadata``), ``tags``, and the rubric (folded into
+        # the expected reference the judge reads).
         return Dataset(points=[e.to_datapoint() for e in examples])
 
     trainset = to_points(agent_data.train)  # reflection: failures, feedback, few-shot

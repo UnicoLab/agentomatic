@@ -1373,6 +1373,7 @@ def training_sections(
             example_rows.append(
                 {
                     "example": str(before.get("query", ""))[:120],
+                    "context": _context_summary(before.get("example")),
                     "expected": str(before.get("expected", ""))[:240],
                     "before": str(before.get("response", ""))[:300],
                     "before score": _fmt(before.get("score"), 2),
@@ -1388,6 +1389,7 @@ def training_sections(
                     ],
                 }
             )
+        example_rows = _drop_empty_context(example_rows)
     blocks.append(
         Section(
             title="Examples — before vs after",
@@ -1435,6 +1437,35 @@ def training_sections(
     return blocks
 
 
+def _context_summary(view: dict[str, Any] | None, limit: int = 240) -> str:
+    """One line for an example's tags, documents, other inputs and metadata."""
+    if not view:
+        return ""
+    from agentomatic.optimize.dataset import normalize_context
+
+    inputs = dict(view.get("inputs") or {})
+    docs = list(view.get("context") or []) or normalize_context(inputs.pop("context", None))
+    parts: list[str] = []
+    if view.get("tags"):
+        parts.append("tags: " + ", ".join(str(t) for t in view["tags"]))
+    if docs:
+        first = str(docs[0])
+        parts.append(f"{len(docs)} doc(s): " + (first[:80] + "…" if len(first) > 80 else first))
+    if inputs:
+        parts.append("inputs: " + ", ".join(f"{k}={v}" for k, v in inputs.items()))
+    if view.get("metadata"):
+        parts.append("meta: " + ", ".join(f"{k}={v}" for k, v in view["metadata"].items()))
+    text = " · ".join(parts)
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _drop_empty_context(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep the ``context`` column only when some example has context."""
+    if any(row.get("context") for row in rows):
+        return rows
+    return [{k: v for k, v in row.items() if k != "context"} for row in rows]
+
+
 def _example_rows(baseline_eval: Any, final_eval: Any, eval_dataset: Any) -> list[dict[str, Any]]:
     """Join before/after ``EvaluationReport`` example results by example id."""
     if final_eval is None:
@@ -1448,13 +1479,18 @@ def _example_rows(baseline_eval: Any, final_eval: Any, eval_dataset: Any) -> lis
         example = by_id.get(after.example_id)
         query = ""
         expected = ""
+        context = ""
         if example is not None:
             try:
                 point = example.to_datapoint()
                 query = point.query
+                from agentomatic.optimize.dataset import example_context
                 from agentomatic.optimize.metrics import plain_expected
 
                 expected = plain_expected(point.expected_answer) or ""
+                context = _context_summary(
+                    example_context(point.metadata, point.context, point.tags)
+                )
             except Exception:  # noqa: BLE001
                 query = str(getattr(example, "input", ""))
         after_pred = after.prediction or {}
@@ -1474,6 +1510,7 @@ def _example_rows(baseline_eval: Any, final_eval: Any, eval_dataset: Any) -> lis
             {
                 "example": after.example_id,
                 "question": str(query)[:200],
+                "context": context,
                 "expected": str(expected)[:240],
                 "before": str(before_pred.get("response", before.error if before else ""))[:300],
                 "before scores": _scores_text(before.scores if before else None),
@@ -1483,4 +1520,4 @@ def _example_rows(baseline_eval: Any, final_eval: Any, eval_dataset: Any) -> lis
                 "why (judge)": rationale[:300],
             }
         )
-    return rows
+    return _drop_empty_context(rows)

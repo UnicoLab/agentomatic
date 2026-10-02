@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from .types import AgentDataset, Metric
+from .types import AgentDataset, Metric, copy_input
 
 if TYPE_CHECKING:
     from agentomatic.optimize.llm_types import LLMSpec
@@ -124,7 +124,7 @@ class GridSearchOptimizer:
             count = 0
             for example in examples:
                 try:
-                    prediction = agent.transform(example.input)
+                    prediction = agent.transform(copy_input(example.input))
                     for metric in metrics:
                         total_score += metric.score(
                             example,

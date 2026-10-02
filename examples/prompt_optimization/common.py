@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +34,8 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 DATASET = HERE / "datasets" / "support.jsonl"
+#: RAG rows that bring their own documents (``input.context.documents``).
+POLICIES_DATASET = HERE / "datasets" / "policies.jsonl"
 
 # Let ``python examples/prompt_optimization/<script>.py`` import ``agent`` and
 # ``common`` whatever the current directory is.
@@ -175,3 +178,56 @@ def must_include_score(example: Any, prediction: dict[str, Any]) -> float:
         return 0.0
     answer = str(prediction.get("response", "")).lower()
     return sum(1 for fact in facts if fact.lower() in answer) / len(facts)
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9%.:>-]+", text.lower()) if len(w) > 3}
+
+
+def grounded_score(example: Any, prediction: dict[str, Any]) -> float:
+    """Deterministic metric: share of the answer's content words found in its documents.
+
+    Reads the row's own ``input.context.documents`` (the RAG case — see
+    ``datasets/policies.jsonl``), falling back to the ``sources`` the agent
+    says it retrieved. An answer built from the documents scores near 1; a
+    generic or invented one scores near 0. Use it with
+    ``agentomatic.agents.CallableMetric``.
+
+    Args:
+        example: The ``AgentExample`` being scored.
+        prediction: The agent's output dict.
+
+    Returns:
+        A score in ``[0, 1]``; 0 when there is no answer or no document.
+    """
+    from agent import documents_from, snippet_text
+
+    inputs = getattr(example, "input", None) or {}
+    docs = documents_from(inputs.get("context")) or list(prediction.get("sources") or [])
+    answer = _content_words(str(prediction.get("response", "")))
+    if not docs or not answer:
+        return 0.0
+    support = _content_words(" ".join(snippet_text(d) for d in docs))
+    return len(answer & support) / len(answer)
+
+
+def scores_by_tag(report: Any, examples: list[Any]) -> dict[str, dict[str, float]]:
+    """Average an evaluation's per-example scores by each example's tags.
+
+    Args:
+        report: An ``EvaluationReport`` from ``agent.evaluate(examples)``.
+        examples: The ``AgentExample`` objects it was run on.
+
+    Returns:
+        ``{tag: {metric: mean score}}`` over the examples carrying the tag.
+    """
+    tags_by_id = {e.id: list(e.tags) for e in examples}
+    sums: dict[str, dict[str, list[float]]] = {}
+    for result in report.example_results:
+        for tag in tags_by_id.get(result.example_id, []):
+            for metric, score in (result.scores or {}).items():
+                sums.setdefault(tag, {}).setdefault(metric, []).append(float(score))
+    return {
+        tag: {metric: sum(v) / len(v) for metric, v in metrics.items()}
+        for tag, metrics in sorted(sums.items())
+    }

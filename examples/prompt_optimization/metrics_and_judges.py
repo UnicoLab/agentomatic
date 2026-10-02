@@ -33,12 +33,19 @@ Run::
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import build_parser, must_include_score, settings_from, setup_logging
+from common import (
+    build_parser,
+    grounded_score,
+    must_include_score,
+    settings_from,
+    setup_logging,
+)
 
 
 async def run(argv: list[str] | None = None) -> int:
@@ -50,18 +57,43 @@ async def run(argv: list[str] | None = None) -> int:
     # ------------------------------------------------------------------
     # 0. One example, three answers
     # ------------------------------------------------------------------
+    # A row carries more than a question and an answer — every field below
+    # reaches the metrics, and the LLM judges and the optimizer see it too:
+    #   input.current_query       the question
+    #   input.context.documents   what the answer must come from (RAG)
+    #   input.customer_plan       any other agent input, exactly as written
+    #   metadata                  labels (here the facts the answer must contain)
+    #   tags                      grouping labels
+    #   rubric                    per-dimension criteria for the judge
     from agentomatic.agents import AgentExample
 
     example = AgentExample(
         id="refund_1",
-        input={"current_query": "Can I get a refund on my monthly plan?"},
+        input={
+            "current_query": "Can I get a refund on my monthly plan?",
+            "context": {
+                "documents": [
+                    {
+                        "source": "refunds.md",
+                        "content": "Refunds are available within 30 days of purchase for "
+                        "annual plans only.",
+                    }
+                ]
+            },
+            "customer_plan": "monthly",
+        },
         expected_output={
             "response": "No. Refunds are only available for annual plans, within 30 days."
         },
-        metadata={"must_include": ["30 days", "annual"]},
+        metadata={"must_include": ["30 days", "annual"], "topic": "refund"},
+        tags=["billing", "refund"],
+        rubric={"policy": "Applies the refund rule to the customer's plan."},
     )
     query = example.input["current_query"]
     expected = example.expected_output["response"]
+    # What a judge gets as context documents (``DataPoint.context``):
+    # "Refunds are available within 30 days … (source: refunds.md)".
+    documents = example.to_datapoint().context
     answers = {
         "good": "No — refunds are only available for annual plans, within 30 days of purchase.",
         "partial": "Refunds are possible within 30 days.",
@@ -95,6 +127,15 @@ async def run(argv: list[str] | None = None) -> int:
     keys = ExactKeyMatchMetric(["response"], name="keys")
     similarity = ResponseSimilarityMetric(name="similarity")
     facts = CallableMetric("facts", must_include_score)  # reads example.metadata
+    grounded = CallableMetric("grounded", grounded_score)  # reads input.context.documents
+
+    def plan_rule(ex: AgentExample, prediction: dict) -> float:
+        """A monthly-plan refund question must be answered with a no."""
+        if ex.input.get("customer_plan") != "monthly":  # any input, as written
+            return 1.0
+        return 1.0 if re.search(r"\b(no|not)\b", prediction["response"].lower()) else 0.0
+
+    plan = CallableMetric("plan", plan_rule)
     blend = AgentWeightedMetric([("facts", facts, 0.7), ("similarity", similarity, 0.3)])
     for label, text in answers.items():
         prediction = {"response": text}
@@ -102,7 +143,7 @@ async def run(argv: list[str] | None = None) -> int:
             f"{label}",
             {
                 m.name: m.score(example, prediction)
-                for m in (terms, keys, similarity, facts, blend)
+                for m in (terms, keys, similarity, facts, grounded, plan, blend)
             },
         )
 
@@ -160,6 +201,10 @@ async def run(argv: list[str] | None = None) -> int:
     # Judges score the EXPECTED answer as reference; keep temperature=0.0 so the
     # same answer gets the same score in every epoch. A judge that cannot be
     # reached or parsed returns ``failed=True`` and score 0 — never a made-up 0.5.
+    # Pass the documents as ``context`` (fit()/evaluate() do it for you). Inside
+    # fit()/evaluate() a judge is ALSO shown the example's other inputs
+    # (customer_plan), metadata and tags, and the rubric is part of the
+    # expected reference — see rag_context.py.
     from agentomatic.optimize import LLMJudgeMetric, LocalJudgeMetric, MultiJudgePanel
 
     print(f"\n── 3. LLM judges ({settings.judge_model}) ──")
@@ -174,9 +219,9 @@ async def run(argv: list[str] | None = None) -> int:
     strict = LocalJudgeMetric(name="strict", model=settings.judge_spec, criteria=criteria)
     panel = MultiJudgePanel(judges=[judge, strict], aggregation="median", name="panel")
     for label, text in answers.items():
-        overall = await single.evaluate(query, text, expected)
-        detailed = await judge.evaluate(query, text, expected)
-        panelled = await panel.evaluate(query, text, expected)
+        overall = await single.evaluate(query, text, expected, documents)
+        detailed = await judge.evaluate(query, text, expected, documents)
+        panelled = await panel.evaluate(query, text, expected, documents)
         show(
             label,
             {

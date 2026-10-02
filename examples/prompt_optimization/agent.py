@@ -1,7 +1,11 @@
 """Support agent shared by every prompt-optimization example.
 
-A small but realistic class agent: it retrieves the relevant policy snippets
-from an in-memory knowledge base, then asks the model to answer with them.
+A small but realistic RAG class agent: it answers from policy snippets —
+the documents sent with the request (``context.documents``) when there are
+any, otherwise the ones it retrieves from an in-memory knowledge base — and
+takes the customer's plan (``customer_plan``) into account. It lists what it
+answered from under ``sources``, so judges can check groundedness and the
+optimizer sees what each answer was built from.
 
 What the optimizer tunes is the **system prompt** (and, optionally, few-shot
 examples and model parameters). The agent reads it through
@@ -61,8 +65,29 @@ class SupportState:
     """Per-run state of :class:`SupportAgent`."""
 
     question: str = ""
+    #: Documents sent with the request (``context.documents``), if any.
+    documents: list[Any] = field(default_factory=list)
+    #: The customer's plan, when the caller (or the dataset row) gives it.
+    customer_plan: str = ""
     snippets: list[str] = field(default_factory=list)
     output: dict[str, Any] = field(default_factory=dict)
+
+
+def documents_from(context: Any) -> list[Any]:
+    """Documents from ``{"documents": [...]}``, a list, or one string."""
+    if isinstance(context, dict):
+        context = context.get("documents")
+    if isinstance(context, str):
+        context = [context]
+    return [doc for doc in context or [] if doc]
+
+
+def snippet_text(doc: Any) -> str:
+    """A document as one snippet line: its text, then its source if it has one."""
+    if isinstance(doc, dict):
+        text = str(doc.get("content") or doc.get("text") or "")
+        return f"{text} (source: {doc['source']})" if doc.get("source") else text
+    return str(doc)
 
 
 class SupportAgent(BaseGraphAgent[SupportState]):
@@ -98,7 +123,10 @@ class SupportAgent(BaseGraphAgent[SupportState]):
     # --- nodes --------------------------------------------------------------
 
     def retrieve(self, state: SupportState) -> SupportState:
-        """Pick the knowledge-base snippets whose topic the question mentions."""
+        """Use the supplied documents, else the knowledge-base snippets on topic."""
+        if state.documents:
+            state.snippets = [snippet_text(doc) for doc in state.documents]
+            return state
         question = state.question.lower()
         state.snippets = [
             KNOWLEDGE_BASE[topic]
@@ -112,6 +140,7 @@ class SupportAgent(BaseGraphAgent[SupportState]):
         # The optimizer's candidate prompt arrives through this call.
         prompt = self.resolve_system_prompt(default=self.system_prompt)
         context = "\n".join(f"- {s}" for s in state.snippets) or "- (no matching policy)"
+        plan = f"Customer plan: {state.customer_plan}\n\n" if state.customer_plan else ""
         if self.llm is None:
             text = " ".join(state.snippets) or "I could not find a matching policy."
         else:
@@ -120,7 +149,9 @@ class SupportAgent(BaseGraphAgent[SupportState]):
                     {"role": "system", "content": prompt},
                     {
                         "role": "user",
-                        "content": f"Policy snippets:\n{context}\n\nQuestion: {state.question}",
+                        "content": (
+                            f"Policy snippets:\n{context}\n\n{plan}Question: {state.question}"
+                        ),
                     },
                 ]
             )
@@ -134,7 +165,15 @@ class SupportAgent(BaseGraphAgent[SupportState]):
         # REST sends ``query``; the platform normalises it to ``current_query``.
         # Datasets may use ``question`` — accept all three.
         question = data.get("current_query") or data.get("question") or data.get("query") or ""
-        return SupportState(question=str(question))
+        # ``context.documents`` arrives nested (and flattened to ``documents``
+        # over REST). Every other dataset input — here ``customer_plan`` —
+        # arrives exactly as written in the row.
+        documents = documents_from(data.get("context")) or documents_from(data.get("documents"))
+        return SupportState(
+            question=str(question),
+            documents=documents,
+            customer_plan=str(data.get("customer_plan") or ""),
+        )
 
     def state_to_output(self, state: SupportState) -> dict[str, Any]:
         return state.output

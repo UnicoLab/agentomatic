@@ -242,6 +242,13 @@ register_vector_store_adapter("my_db", MyDbStore)  # upsert/query/delete
   after `fit()`. `generate_fit_report(history, baseline_eval=..., final_eval=...)`
   shows the prompt diff, every candidate's decision and reason, and per-example
   answers. Guide: `docs/optimization/`; runnable: `examples/prompt_optimization/`.
+- Dataset rows carry the whole case — `input.context.documents` (RAG), any other
+  `input.*` (plan, `messages` …), `metadata`, `tags`, `rubric` — and every stage
+  gets it: the agent receives `input` as written (a copy; datasets are never
+  mutated), metrics the whole row, LLM judges the documents (or what the agent
+  listed under `citations` / `retrieval_context` / `sources`) plus inputs,
+  metadata and tags, the rewrite model all of it per example, the augmenter the
+  seed's documents. See `docs/optimization/data.md` and `rag_context.py`.
 
 ## Project conventions (match these when editing the framework)
 

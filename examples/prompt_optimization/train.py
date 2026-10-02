@@ -41,6 +41,7 @@ from common import (
     build_parser,
     make_llm,
     must_include_score,
+    scores_by_tag,
     settings_from,
     setup_logging,
 )
@@ -90,8 +91,18 @@ def main(argv: list[str] | None = None) -> int:
     # ------------------------------------------------------------------
     # 3. Data: load splits, optionally augment the TRAIN split, persist
     # ------------------------------------------------------------------
-    # JSONL rows: {"id", "split", "input": {...}, "expected_output": {...},
-    #              "metadata": {...}}   (see datasets/support.jsonl)
+    # JSONL rows (see datasets/support.jsonl):
+    #   {"id", "split",
+    #    "input": {"current_query": ..., "customer_plan": ...,   # agent inputs
+    #              "context": {"documents": [...]}},             # RAG documents
+    #    "expected_output": {"response": ...},
+    #    "metadata": {"must_include": [...], "topic": ...},
+    #    "tags": [...], "rubric": {...}}
+    # Every field reaches the optimization, not just question and answer:
+    # the agent gets ``input`` exactly as written; metrics get the whole row;
+    # LLM judges get the documents plus the other inputs, metadata and tags
+    # (the rubric is part of their reference); the rewrite model sees all of
+    # it next to each question. rag_context.py shows each stage's view.
     # The four data roles — the anti-overfitting contract:
     # * train      → what the optimizer LEARNS from (failure analysis, judge
     #                feedback, few-shot demos). Augmentation only grows this.
@@ -328,6 +339,10 @@ def main(argv: list[str] | None = None) -> int:
         model_name=settings.model,
         optimizer_name=args.optimizer,
     )
+    # Tags make the result readable per slice: did the new prompt help the
+    # billing questions and hurt the security ones? (Averages hide that.)
+    by_tag_before = scores_by_tag(baseline_report, dataset.test)
+    by_tag_after = scores_by_tag(final_report, dataset.test)
     summary = {
         "baseline_prompt": baseline_prompt,
         "best_prompt": best_prompt,
@@ -335,6 +350,8 @@ def main(argv: list[str] | None = None) -> int:
         "validation": {"before": fit_result.baseline_score, "after": fit_result.best_score},
         "test_scores_before": baseline_report.scores,
         "test_scores_after": final_report.scores,
+        "test_by_tag_before": by_tag_before,
+        "test_by_tag_after": by_tag_after,
         "history": history.history,
         "fit": fit_result.to_dict(),
         "report": str(report_path),
@@ -354,6 +371,13 @@ def main(argv: list[str] | None = None) -> int:
             name,
             baseline_report.scores.get(name, float("nan")),
             final_report.scores[name],
+        )
+    for tag, scores in by_tag_after.items():
+        logger.info(
+            "  test [{}] quality {:.3f} → {:.3f}",
+            tag,
+            by_tag_before.get(tag, {}).get("quality", float("nan")),
+            scores.get("quality", float("nan")),
         )
     if best_prompt != baseline_prompt:
         diff = difflib.unified_diff(

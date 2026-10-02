@@ -129,6 +129,24 @@ def _clip(value: Any, limit: int = 400) -> str:
     return text[: limit - 1] + "…"
 
 
+def _expected_first(value: Any) -> Any:
+    """Put an expected reference's answer before its rubric / guidance.
+
+    ``AgentExample.to_datapoint`` renders ``## Judge guidance`` and
+    ``## Rubric`` ahead of ``## Expected answer`` — the order a judge reads
+    them in. A clipped briefing line would then lose the answer itself, the
+    one thing a rewrite model most needs, so it goes first here (and the JSON
+    ``## Expected structured output`` that repeats it goes last).
+    """
+    if not isinstance(value, str) or "## Expected answer" not in value:
+        return value
+    sections = [sec.strip() for sec in re.split(r"\n(?=## )", value.strip())]
+    answer = [sec for sec in sections if sec.startswith("## Expected answer")]
+    structured = [sec for sec in sections if sec.startswith("## Expected structured output")]
+    rest = [sec for sec in sections if sec not in answer and sec not in structured]
+    return "\n\n".join(answer + rest + structured)
+
+
 def _labelled(label: str, value: Any, limit: int = 400, *, indent: str = "") -> str:
     """Render ``label: value``, keeping a multi-line value under its label.
 
@@ -144,7 +162,7 @@ def _labelled(label: str, value: Any, limit: int = 400, *, indent: str = "") -> 
     belongs to. That is the single field a rewrite model most needs to find,
     so give a multi-line value its own indented block instead.
     """
-    text = _clip(value, limit)
+    text = _clip(_expected_first(value), limit)
     if "\n" not in text:
         return f"{indent}{label}: {text}"
     body = "\n".join(f"{indent}  {line}" if line.strip() else "" for line in text.splitlines())
@@ -157,6 +175,51 @@ def _fmt_json(data: Any, limit: int = 800) -> str:
     except TypeError:
         text = str(data)
     return _clip(text, limit)
+
+
+def _fmt_inline(data: Any, limit: int) -> str:
+    """Compact one-line JSON, clipped."""
+    try:
+        text = json.dumps(data, ensure_ascii=False, default=str)
+    except TypeError:
+        text = str(data)
+    return _clip(text, limit)
+
+
+def format_example_context(view: dict[str, Any] | None, limit: int = 400) -> list[str]:
+    """Bullet lines for an example's context documents, inputs, metadata and tags.
+
+    Args:
+        view: An :func:`~agentomatic.optimize.dataset.example_context` view.
+        limit: Character budget per line (documents share it).
+
+    Returns:
+        Lines such as ``- Context documents: …`` / ``- Other inputs: …`` /
+        ``- Example metadata: …`` / ``- Tags: …``; empty for a bare example.
+    """
+    if not view:
+        return []
+    from agentomatic.optimize.dataset import normalize_context
+
+    lines: list[str] = []
+    inputs = dict(view.get("inputs") or {})
+    docs = list(view.get("context") or [])
+    if not docs and "context" in inputs:
+        # The example's own context, as the agent received it: show it as
+        # documents rather than as one JSON blob.
+        docs = normalize_context(inputs.pop("context"))
+    if docs:
+        shown = docs[:4]
+        per_doc = max(80, limit // len(shown))
+        more = f" (+{len(docs) - len(shown)} more)" if len(docs) > len(shown) else ""
+        lines.append("- Context documents: " + " | ".join(_clip(d, per_doc) for d in shown) + more)
+    if inputs:
+        lines.append(f"- Other inputs: {_fmt_inline(inputs, limit)}")
+    if view.get("metadata"):
+        lines.append(f"- Example metadata: {_fmt_inline(view['metadata'], limit)}")
+    if view.get("tags"):
+        lines.append("- Tags: " + _clip(", ".join(str(t) for t in view["tags"]), limit))
+    return lines
 
 
 def format_runtime_config(config: PromptRuntimeConfig) -> str:
@@ -214,18 +277,25 @@ def format_search_space(space: PromptSearchSpace | None) -> str:
 
 
 def format_dataset_samples(samples: list[Any], *, max_items: int = 8) -> str:
-    """Format train/val sample queries + expected answers."""
+    """Format train sample queries, expected answers and their example context."""
     if not samples:
         return "No dataset samples provided."
+    from agentomatic.optimize.dataset import example_context
+
     lines: list[str] = []
     for i, raw in enumerate(samples[:max_items], 1):
         if isinstance(raw, dict):
             query = raw.get("query") or raw.get("input") or ""
             expected = raw.get("expected_answer") or raw.get("expected") or raw.get("output") or ""
+            meta, context, tags = raw.get("metadata"), raw.get("context"), raw.get("tags")
         else:
             query = getattr(raw, "query", "")
             expected = getattr(raw, "expected_answer", None) or getattr(raw, "expected", "")
+            meta = getattr(raw, "metadata", None)
+            context, tags = getattr(raw, "context", None), getattr(raw, "tags", None)
         lines.append(f"{i}. Q: {_clip(query, 220)}")
+        view = example_context(meta if isinstance(meta, dict) else None, context, tags)
+        lines.extend(f"   {line}" for line in format_example_context(view, 260))
         lines.append(_labelled("Expected", expected, 220, indent="   "))
     return "\n".join(lines)
 
@@ -253,6 +323,7 @@ def format_eval_io(
         score = float(fail.get("score", fail.get("avg_score", 0.0)) or 0.0)
         lines.append(f"\n**Failure {idx}** (score={score:.3f})")
         lines.append(f"- Input/query: {_clip(fail.get('query'), clip)}")
+        lines.extend(format_example_context(fail.get("example"), clip))
         lines.append(_labelled("- Expected", fail.get("expected"), clip))
         lines.append(f"- Actual output: {_clip(fail.get('response'), clip)}")
         issues = fail.get("feedback") or fail.get("reason") or fail.get("details")
@@ -265,7 +336,9 @@ def format_eval_io(
             )
         ret_ctx = fail.get("retrieval_context") or []
         if ret_ctx:
-            lines.append("- Retrieval: " + "; ".join(_clip(d, 100) for d in ret_ctx[:3]))
+            lines.append(
+                "- Retrieved by the agent: " + " | ".join(_clip(d, 120) for d in ret_ctx[:3])
+            )
         tools = fail.get("tool_calls") or []
         if tools:
             names = ", ".join(
@@ -289,10 +362,23 @@ def format_eval_io(
             score = float(suc.get("score", suc.get("avg_score", 0.0)) or 0.0)
             lines.append(f"\n**Success {idx}** (score={score:.3f})")
             lines.append(f"- Input/query: {_clip(suc.get('query'), min(clip, 220))}")
+            lines.extend(format_example_context(suc.get("example"), min(clip, 220)))
             lines.append(_labelled("- Expected", suc.get("expected"), min(clip, 220)))
             lines.append(f"- Actual output: {_clip(suc.get('response'), min(clip, 220))}")
 
     return "\n".join(lines)
+
+
+def _has_example_context(sample: Any) -> bool:
+    """True when a dataset sample carries context, extra inputs, metadata or tags."""
+    from agentomatic.optimize.dataset import example_context
+
+    if isinstance(sample, dict):
+        meta, context, tags = sample.get("metadata"), sample.get("context"), sample.get("tags")
+    else:
+        meta = getattr(sample, "metadata", None)
+        context, tags = getattr(sample, "context", None), getattr(sample, "tags", None)
+    return bool(example_context(meta if isinstance(meta, dict) else None, context, tags))
 
 
 def build_full_optimization_briefing(
@@ -338,6 +424,15 @@ def build_full_optimization_briefing(
         "prompt/config using the observed inputs, outputs, expected answers, "
         "scores, parameters, and judge feedback.",
     ]
+    if any((r or {}).get("example") for r in eval_results) or any(
+        _has_example_context(s) for s in dataset_sample or []
+    ):
+        sections.append(
+            "Each example lists what it ran with — context documents, other "
+            "inputs, metadata and tags. Write instructions that tell the agent "
+            "how to USE such context (ground answers in the supplied documents, "
+            "honour the inputs); never copy one example's facts into the prompt."
+        )
     if agent_name:
         sections.append(f"**Agent:** `{agent_name}`")
     if rewrite_model:

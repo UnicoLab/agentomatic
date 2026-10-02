@@ -29,7 +29,7 @@ automatically.
 | | `agentomatic.agents` (class agents) | `agentomatic.optimize` (the fitter) |
 | --- | --- | --- |
 | Signature | `score(example, prediction) -> float` (sync) | `await evaluate(query, response, expected, context) -> EvalResult` |
-| Sees | The whole `AgentExample` (input, expected output, **metadata**) and the output dict | The question, the answer text, the reference text, retrieval context |
+| Sees | The whole `AgentExample` (input incl. context documents and other inputs, expected output, **metadata**, **tags**, rubric) and the output dict, the same in `fit()` and `evaluate()` | The question, the answer text, the reference text, the context documents (or what the agent retrieved). Inside `fit()` / `evaluate()`, `current_scoring_run()` also exposes the example |
 | Returns | A float | `EvalResult(score, reason, metadata)` — judges add `dimensions`, rationale; failures set `metadata["evaluation_failed"]` |
 | Best for | Checks that need structured output or per-example metadata | Judges and text checks |
 
@@ -118,6 +118,12 @@ How judges stay honest:
 * **Reference.** Judges receive the example's expected answer (and, for
   `AgentExample`s, a rich reference: expected output, rubric, required facts).
   Write expected answers that state the facts a correct answer must contain.
+* **Context.** Judges receive the row's context documents. If the row has
+  none, they get what the agent says it retrieved (`retrieval_context` /
+  `citations` / `sources` in its output). Inside `fit()` and `evaluate()`
+  they also get the row's other inputs (a plan, a locale…), its metadata and
+  its tags, in an "Example inputs, metadata and tags" section, so an answer
+  is judged in that light. See [what each stage sees](data.md#what-each-stage-sees).
 * **Deterministic.** Keep `temperature=0.0`. A judge that scores the same
   answer differently each time makes every comparison noise; the
   [significance rule](generalization.md#the-acceptance-rules) exists because

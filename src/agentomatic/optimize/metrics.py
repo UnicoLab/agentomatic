@@ -396,6 +396,9 @@ class LLMJudgeMetric(BaseMetric):
                 prompt += f"EXPECTED ANSWER: {expected}\n\n"
             if context:
                 prompt += f"CONTEXT:\n{chr(10).join(context[:3])}\n\n"
+            labels = scoring_example_labels(has_context=bool(context))
+            if labels:
+                prompt += f"EXAMPLE INPUTS, METADATA AND TAGS: {labels}\n\n"
             prompt += 'Reply with ONLY a JSON object: {"score": 0.X, "reason": "..."}\n'
 
             if isinstance(self.model, str):
@@ -1599,6 +1602,47 @@ def current_scoring_run() -> Any:
     return _SCORING_RUN.get()
 
 
+#: Character budget for the example labels shown to an LLM judge.
+_JUDGE_LABELS_CHARS = 1500
+
+
+def scoring_example_labels(*, has_context: bool) -> str:
+    """The scored example's other inputs, metadata and tags, for a judge prompt.
+
+    A judge already receives the question, the answer, the expected reference
+    and the context documents; this adds what else the example was asked
+    with (e.g. a customer tier, a locale, required facts, tags) so the
+    answer is judged in that light.
+
+    Args:
+        has_context: The judge already lists the context documents, so the
+            ``context`` input is left out.
+
+    Returns:
+        Compact JSON, or ``""`` when no run is being scored or it has none.
+    """
+    import json
+
+    from agentomatic.optimize.dataset import example_context
+
+    meta = getattr(current_scoring_run(), "metadata", None) or {}
+    example = meta.get("example")
+    view = example_context(
+        example if isinstance(example, dict) else None, None, meta.get("example_tags")
+    )
+    inputs = dict(view.pop("inputs", None) or {})
+    if has_context:
+        inputs.pop("context", None)
+    if inputs:
+        view = {"inputs": inputs, **view}
+    if not view:
+        return ""
+    text = json.dumps(view, ensure_ascii=False, default=str)
+    if len(text) > _JUDGE_LABELS_CHARS:
+        text = text[: _JUDGE_LABELS_CHARS - 1] + "…"
+    return text
+
+
 def _decode_json_dict(text: str | None) -> dict[str, Any] | None:
     """Return ``text`` parsed as a JSON object, or ``None`` when it is not one."""
     import json
@@ -1679,16 +1723,30 @@ class ScoreMetricAdapter(BaseMetric):
         expected_output = _expected_structured(expected) or _decode_json_dict(answer)
         if expected_output is None and answer is not None:
             expected_output = {"response": answer}
+        # Rebuild the example the metric would see in ``agent.evaluate()``:
+        # the agent inputs (``metadata.invoke`` — the original ``context``
+        # included) and the tags, not only the question.
+        from agentomatic.optimize.dataset import INTERNAL_INVOKE_KEYS
+
+        invoke = example_meta.get("invoke")
+        inputs = (
+            {k: v for k, v in invoke.items() if k not in INTERNAL_INVOKE_KEYS}
+            if isinstance(invoke, dict)
+            else {}
+        )
+        if context and "context" not in inputs:
+            inputs["context"] = list(context)
         example = AgentExample(
             id=str(example_meta.get("id") or "fit"),
             input={
+                **inputs,
                 "current_query": query,
                 "query": query,
                 "question": query,
-                **({"context": list(context)} if context else {}),
             },
             expected_output=expected_output,
             metadata=example_meta,
+            tags=[str(t) for t in run_meta.get("example_tags") or []],
             split=str(example_meta.get("split") or "validation"),
         )
         output = run_meta.get("output")
