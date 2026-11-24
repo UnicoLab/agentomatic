@@ -190,19 +190,25 @@ async def invoke_registered_agent(
     Raises:
         RuntimeError: If the agent has no invokable callable.
     """
-    instance = getattr(agent, "class_instance", None)
-    if instance is not None:
-        from agentomatic.agents.base import BaseGraphAgent
+    from agentomatic.logs.runtime import bind_llm_usage_scope, reset_llm_usage_scope
 
-        if isinstance(instance, BaseGraphAgent):
-            return await instance.atransform(_input_from_state(state))
+    scope_token = bind_llm_usage_scope(getattr(agent, "name", None))
+    try:
+        instance = getattr(agent, "class_instance", None)
+        if instance is not None:
+            from agentomatic.agents.base import BaseGraphAgent
 
-    if agent.graph_fn is not None:
-        graph = agent.graph_fn()
-        return await graph.ainvoke(state)
+            if isinstance(instance, BaseGraphAgent):
+                return await instance.atransform(_input_from_state(state))
 
-    if agent.node_fn is not None:
-        return await agent.node_fn(state)
+        if agent.graph_fn is not None:
+            graph = agent.graph_fn()
+            return await graph.ainvoke(state)
 
-    name = getattr(agent, "name", "?")
-    raise RuntimeError(f"Agent '{name}' has no callable (class_instance/graph_fn/node_fn)")
+        if agent.node_fn is not None:
+            return await agent.node_fn(state)
+
+        name = getattr(agent, "name", "?")
+        raise RuntimeError(f"Agent '{name}' has no callable (class_instance/graph_fn/node_fn)")
+    finally:
+        reset_llm_usage_scope(scope_token)

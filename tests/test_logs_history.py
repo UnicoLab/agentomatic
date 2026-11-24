@@ -521,3 +521,230 @@ async def test_persist_fit_result_via_fit_store() -> None:
         assert runs[0]["best_score"] == 0.8
     finally:
         set_fit_store(None)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_step2_deterministic_fastpath_does_not_inherit_step1_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A deterministic Step 2 with 0 LLM calls must not inherit Step 1 model/tokens."""
+    from types import SimpleNamespace
+
+    from agentomatic.core.manifest import RegisteredAgent
+    from agentomatic.core.registry import AgentRegistry
+    from agentomatic.logs.runtime import (
+        ensure_llm_usage,
+        get_invocation_log_recorder,
+        reset_llm_usage,
+        set_invocation_log_recorder,
+    )
+    from agentomatic.pipelines.engine import PipelineEngine
+    from agentomatic.pipelines.models import AgentStepConfig, PipelineConfig
+    from agentomatic.providers.llm import invoke_with_retry
+
+    class _FakeLLM:
+        model_name = "gpt-5"
+
+        async def ainvoke(self, _messages: list[Any], **_kwargs: Any) -> Any:
+            return SimpleNamespace(
+                content="evaluated",
+                additional_kwargs={},
+                response_metadata={"model_name": "gpt-5"},
+                usage_metadata={"input_tokens": 30, "output_tokens": 12, "total_tokens": 42},
+            )
+
+    async def _step1_node(state: dict[str, Any]) -> dict[str, Any]:
+        await invoke_with_retry(_FakeLLM(), [{"role": "user", "content": "hi"}], max_retries=0)
+        return {"response": "step1_ok"}
+
+    async def _step2_node(state: dict[str, Any]) -> dict[str, Any]:
+        # Deterministic fast-path: makes zero LLM calls.
+        return {"response": "step2_deterministic"}
+
+    registry = AgentRegistry()
+    registry._agents["step1_llm"] = RegisteredAgent(
+        manifest=AgentManifest(name="step1_llm", slug="step1_llm", description="LLM step"),
+        node_fn=_step1_node,
+    )
+    registry._agents["step2_fast"] = RegisteredAgent(
+        manifest=AgentManifest(name="step2_fast", slug="step2_fast", description="Fast step"),
+        node_fn=_step2_node,
+    )
+
+    store = MemoryStore()
+    recorder = InvocationLogRecorder(store)
+    prev_recorder = get_invocation_log_recorder()
+    set_invocation_log_recorder(recorder)
+
+    audit_events: list[dict[str, Any]] = []
+    from agentomatic.observability import audit as audit_mod
+
+    orig_emit = audit_mod.emit_audit_event
+
+    def _capture_audit(**kwargs: Any) -> dict[str, Any]:
+        rec = orig_emit(**kwargs)
+        audit_events.append(rec)
+        return rec
+
+    monkeypatch.setattr(audit_mod, "emit_audit_event", _capture_audit)
+    _, usage_token = ensure_llm_usage(force_new=True)
+    try:
+        config = PipelineConfig(
+            name="two_stage_test",
+            steps=[
+                AgentStepConfig(name="evaluate", agent="step1_llm"),
+                AgentStepConfig(name="advise", agent="step2_fast"),
+            ],
+        )
+        engine = PipelineEngine(config, registry)
+        result = await engine.run({"query": "bonjour"})
+        assert result.succeeded is True
+
+        await recorder.record(
+            resource_type="pipeline",
+            resource_name="two_stage_test",
+            endpoint="run",
+            status="ok",
+            duration_ms=10.0,
+        )
+
+        logs = await store.list_invocation_logs(limit=10)
+        by_name = {row["resource_name"]: row for row in logs}
+
+        assert by_name["step1_llm"]["metadata"]["model"] == "gpt-5"
+        assert by_name["step1_llm"]["metadata"]["tokens"] == 42
+        assert by_name["step1_llm"]["metadata"]["input_tokens"] == 30
+        assert by_name["step1_llm"]["metadata"]["output_tokens"] == 12
+
+        step2_meta = by_name["step2_fast"]["metadata"]
+        assert "model" not in step2_meta
+        assert "tokens" not in step2_meta
+        assert "input_tokens" not in step2_meta
+        assert "output_tokens" not in step2_meta
+
+        assert by_name["two_stage_test"]["metadata"]["model"] == "gpt-5"
+        assert by_name["two_stage_test"]["metadata"]["tokens"] == 42
+
+        by_agent = {ev["agent"]: ev for ev in audit_events}
+        assert by_agent["step1_llm"]["model"] == "gpt-5"
+        assert by_agent["step1_llm"]["tokens"] == 42
+        assert by_agent["step2_fast"]["model"] is None
+        assert by_agent["step2_fast"]["tokens"] is None
+        assert by_agent["two_stage_test"]["model"] == "gpt-5"
+        assert by_agent["two_stage_test"]["tokens"] == 42
+    finally:
+        reset_llm_usage(usage_token)
+        set_invocation_log_recorder(prev_recorder)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_step2_deterministic_endpoint_does_not_inherit_step1_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A deterministic EndpointStepConfig Step 2 must not inherit Step 1 model/tokens."""
+    from types import SimpleNamespace
+
+    from agentomatic.core.manifest import RegisteredAgent
+    from agentomatic.core.registry import AgentRegistry
+    from agentomatic.endpoints import BaseEndpoint, EndpointRegistry
+    from agentomatic.logs.runtime import (
+        ensure_llm_usage,
+        get_invocation_log_recorder,
+        reset_llm_usage,
+        set_invocation_log_recorder,
+    )
+    from agentomatic.pipelines.engine import PipelineEngine
+    from agentomatic.pipelines.models import AgentStepConfig, EndpointStepConfig, PipelineConfig
+    from agentomatic.providers.llm import invoke_with_retry
+
+    class _FakeLLM:
+        model_name = "gpt-5-mini"
+
+        async def ainvoke(self, _messages: list[Any], **_kwargs: Any) -> Any:
+            return SimpleNamespace(
+                content="evaluated",
+                additional_kwargs={},
+                response_metadata={"model_name": "gpt-5-mini"},
+                usage_metadata={"input_tokens": 111, "output_tokens": 22, "total_tokens": 133},
+            )
+
+    async def _step1_node(state: dict[str, Any]) -> dict[str, Any]:
+        await invoke_with_retry(_FakeLLM(), [{"role": "user", "content": "hi"}], max_retries=0)
+        return {"response": "step1_ok"}
+
+    class _DetEndpoint(BaseEndpoint):
+        endpoint_name = "det_endpoint"
+
+        async def handle(self, request: Any) -> dict[str, Any]:
+            return {"status": "ok"}
+
+    registry = AgentRegistry()
+    registry._agents["step1_llm"] = RegisteredAgent(
+        manifest=AgentManifest(name="step1_llm", slug="step1_llm", description="LLM step"),
+        node_fn=_step1_node,
+    )
+    endpoints = EndpointRegistry()
+    endpoints.register(_DetEndpoint())
+
+    store = MemoryStore()
+    recorder = InvocationLogRecorder(store)
+    prev_recorder = get_invocation_log_recorder()
+    set_invocation_log_recorder(recorder)
+
+    audit_events: list[dict[str, Any]] = []
+    from agentomatic.observability import audit as audit_mod
+
+    orig_emit = audit_mod.emit_audit_event
+
+    def _capture_audit(**kwargs: Any) -> dict[str, Any]:
+        rec = orig_emit(**kwargs)
+        audit_events.append(rec)
+        return rec
+
+    monkeypatch.setattr(audit_mod, "emit_audit_event", _capture_audit)
+    _, usage_token = ensure_llm_usage(force_new=True)
+    try:
+        config = PipelineConfig(
+            name="pipe_endpoint_isolation",
+            steps=[
+                AgentStepConfig(name="evaluate", agent="step1_llm"),
+                EndpointStepConfig(name="score", endpoint="det_endpoint"),
+            ],
+        )
+        engine = PipelineEngine(config, registry, endpoints=endpoints)
+        result = await engine.run({"query": "bonjour"})
+        assert result.succeeded is True
+
+        await recorder.record(
+            resource_type="pipeline",
+            resource_name="pipe_endpoint_isolation",
+            endpoint="run",
+            status="ok",
+            duration_ms=10.0,
+        )
+
+        logs = await store.list_invocation_logs(limit=10)
+        by_name = {row["resource_name"]: row for row in logs}
+
+        assert by_name["step1_llm"]["metadata"]["model"] == "gpt-5-mini"
+        assert by_name["step1_llm"]["metadata"]["tokens"] == 133
+
+        ep_meta = by_name["det_endpoint"]["metadata"]
+        assert "model" not in ep_meta
+        assert "tokens" not in ep_meta
+        assert "input_tokens" not in ep_meta
+        assert "output_tokens" not in ep_meta
+
+        assert by_name["pipe_endpoint_isolation"]["metadata"]["model"] == "gpt-5-mini"
+        assert by_name["pipe_endpoint_isolation"]["metadata"]["tokens"] == 133
+
+        by_agent = {ev["agent"]: ev for ev in audit_events}
+        assert by_agent["step1_llm"]["model"] == "gpt-5-mini"
+        assert by_agent["step1_llm"]["tokens"] == 133
+        assert by_agent["det_endpoint"]["model"] is None
+        assert by_agent["det_endpoint"]["tokens"] is None
+        assert by_agent["pipe_endpoint_isolation"]["model"] == "gpt-5-mini"
+        assert by_agent["pipe_endpoint_isolation"]["tokens"] == 133
+    finally:
+        reset_llm_usage(usage_token)
+        set_invocation_log_recorder(prev_recorder)

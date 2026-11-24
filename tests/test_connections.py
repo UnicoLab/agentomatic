@@ -586,5 +586,82 @@ async def test_connections_middleware_falls_back_to_platform():
     assert captured["connections"].scope == PLATFORM_SCOPE
 
 
+@pytest.mark.asyncio
+async def test_pure_asgi_middlewares_stream_sse_without_buffering() -> None:
+    """Logging, Metrics, Connections, and Maintenance middlewares are pure ASGI."""
+    from types import SimpleNamespace
+
+    from starlette.applications import Starlette
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import StreamingResponse
+    from starlette.routing import Route
+
+    from agentomatic.control.middleware import MaintenanceMiddleware
+    from agentomatic.control.state import ControlPlaneState
+    from agentomatic.middleware.connections import ConnectionsMiddleware
+    from agentomatic.middleware.logging import LoggingMiddleware
+    from agentomatic.middleware.metrics import MetricsMiddleware
+
+    for cls in (
+        LoggingMiddleware,
+        MetricsMiddleware,
+        ConnectionsMiddleware,
+        MaintenanceMiddleware,
+    ):
+        assert not issubclass(cls, BaseHTTPMiddleware)
+
+    delivered_chunks: list[bytes] = []
+    first_chunk_received = asyncio.Event()
+    disconnected = asyncio.Event()
+
+    async def sse_endpoint(request):
+        assert hasattr(request.state, "connections")
+
+        async def gen():
+            yield b"data: chunk1\n\n"
+            await asyncio.wait_for(first_chunk_received.wait(), timeout=2.0)
+            yield b"data: chunk2\n\n"
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
+
+    app = Starlette(routes=[Route("/api/v1/echo/stream", sse_endpoint)])
+    registry = SimpleNamespace(get=lambda _name: None)
+    state = ControlPlaneState()
+    app.add_middleware(ConnectionsMiddleware, registry=registry, api_prefix="/api/v1")
+    app.add_middleware(MaintenanceMiddleware, state=state, api_prefix="/api/v1")
+    app.add_middleware(MetricsMiddleware, prefix="test_pure_asgi_sse")
+    app.add_middleware(LoggingMiddleware)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/v1/echo/stream",
+        "raw_path": b"/api/v1/echo/stream",
+        "query_string": b"",
+        "headers": [],
+        "server": ("testserver", 80),
+    }
+
+    async def receive():
+        await disconnected.wait()
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        if message["type"] == "http.response.body":
+            body = message.get("body", b"")
+            if body:
+                delivered_chunks.append(body)
+                if b"chunk1" in body:
+                    first_chunk_received.set()
+            if not message.get("more_body", False):
+                disconnected.set()
+
+    await asyncio.wait_for(app(scope, receive, send), timeout=2.0)
+    assert delivered_chunks == [b"data: chunk1\n\n", b"data: chunk2\n\n"]
+
+
 if __name__ == "__main__":  # pragma: no cover
     pytest.main([__file__, "-v"])

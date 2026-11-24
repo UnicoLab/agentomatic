@@ -349,87 +349,97 @@ class TaskManager:
 
     async def _run(self, record: TaskRecord, batch_concurrency: int | None) -> None:
         """Execute a task record, honouring concurrency, cancellation, and retry."""
-        if record.id in self._cancel_requested:
-            await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled before start")
-            return
+        from agentomatic.logs.runtime import ensure_llm_usage, reset_llm_usage
 
-        async with self._semaphore:
+        _, usage_token = ensure_llm_usage(force_new=True)
+        try:
             if record.id in self._cancel_requested:
                 await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled before start")
                 return
 
-            record.status = TaskStatus.RUNNING
-            record.started_at = time.time()
-            await self.store.save(record)
-            await self._emit(record, "started")
-
-            dispatcher = self._dispatchers[record.target_type]
-            ctx = TaskContext(
-                record.id,
-                self._make_reporter(record),
-                lambda: record.id in self._cancel_requested,
-            )
-
-            max_attempts = record.retry.max_attempts if record.retry else 1
-            base_delay = record.retry.base_delay if record.retry else 1.0
-            backoff = record.retry.backoff if record.retry else "exponential"
-
-            last_error: Exception | None = None
-            for attempt in range(max_attempts):
-                record.attempts = attempt + 1
-                await self.store.save(record)
-                try:
-                    if record.batch is not None:
-                        result = await self._run_batch(record, dispatcher, ctx, batch_concurrency)
-                    else:
-                        result = await dispatcher(
-                            record.target,
-                            self._prepare_input(record),
-                            ctx,
-                        )
-                    await self._finalize(record, TaskStatus.SUCCEEDED, result=result)
-                    return
-                except asyncio.CancelledError:
-                    await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled")
-                    return
-                except Exception as exc:  # noqa: BLE001 - retry logic below
-                    last_error = exc
-                    logger.warning(
-                        f"Task {record.id} attempt {attempt + 1}/{max_attempts} failed: {exc}"
+            async with self._semaphore:
+                if record.id in self._cancel_requested:
+                    await self._finalize(
+                        record, TaskStatus.CANCELLED, error="Cancelled before start"
                     )
-                    if attempt + 1 >= max_attempts:
-                        break
-                    if backoff == "exponential":
-                        delay = base_delay * (2**attempt)
-                    elif backoff == "linear":
-                        delay = base_delay * (attempt + 1)
-                    else:
-                        delay = base_delay
-                    if delay > 0:
-                        await asyncio.sleep(delay)
+                    return
 
-            if isinstance(last_error, TargetFailedError):
-                # The target's own report (e.g. which pipeline step failed and
-                # why) — already what its HTTP route returns, so not sanitised.
-                logger.error(f"Task {record.id} failed: {last_error}")
+                record.status = TaskStatus.RUNNING
+                record.started_at = time.time()
+                await self.store.save(record)
+                await self._emit(record, "started")
+
+                dispatcher = self._dispatchers[record.target_type]
+                ctx = TaskContext(
+                    record.id,
+                    self._make_reporter(record),
+                    lambda: record.id in self._cancel_requested,
+                )
+
+                max_attempts = record.retry.max_attempts if record.retry else 1
+                base_delay = record.retry.base_delay if record.retry else 1.0
+                backoff = record.retry.backoff if record.retry else "exponential"
+
+                last_error: Exception | None = None
+                for attempt in range(max_attempts):
+                    record.attempts = attempt + 1
+                    await self.store.save(record)
+                    try:
+                        if record.batch is not None:
+                            result = await self._run_batch(
+                                record, dispatcher, ctx, batch_concurrency
+                            )
+                        else:
+                            result = await dispatcher(
+                                record.target,
+                                self._prepare_input(record),
+                                ctx,
+                            )
+                        await self._finalize(record, TaskStatus.SUCCEEDED, result=result)
+                        return
+                    except asyncio.CancelledError:
+                        await self._finalize(record, TaskStatus.CANCELLED, error="Cancelled")
+                        return
+                    except Exception as exc:  # noqa: BLE001 - retry logic below
+                        last_error = exc
+                        logger.warning(
+                            f"Task {record.id} attempt {attempt + 1}/{max_attempts} failed: {exc}"
+                        )
+                        if attempt + 1 >= max_attempts:
+                            break
+                        if backoff == "exponential":
+                            delay = base_delay * (2**attempt)
+                        elif backoff == "linear":
+                            delay = base_delay * (attempt + 1)
+                        else:
+                            delay = base_delay
+                        if delay > 0:
+                            await asyncio.sleep(delay)
+
+                if isinstance(last_error, TargetFailedError):
+                    # The target's own report (e.g. which pipeline step failed and
+                    # why) — already what its HTTP route returns, so not sanitised.
+                    logger.error(f"Task {record.id} failed: {last_error}")
+                    await self._finalize(
+                        record,
+                        TaskStatus.FAILED,
+                        result=last_error.result,
+                        error=str(last_error),
+                    )
+                    return
+                logger.exception(f"Task {record.id} failed after {record.attempts} attempts")
+                # Raw exception text routinely carries DSNs/paths, and this
+                # record is served verbatim by GET /tasks/{id}, /result and the
+                # task list — so sanitise before it is persisted.
                 await self._finalize(
                     record,
                     TaskStatus.FAILED,
-                    result=last_error.result,
-                    error=str(last_error),
+                    error=client_safe_message(last_error, context="Task failed")
+                    if isinstance(last_error, BaseException)
+                    else str(last_error),
                 )
-                return
-            logger.exception(f"Task {record.id} failed after {record.attempts} attempts")
-            # Raw exception text routinely carries DSNs/paths, and this
-            # record is served verbatim by GET /tasks/{id}, /result and the
-            # task list — so sanitise before it is persisted.
-            await self._finalize(
-                record,
-                TaskStatus.FAILED,
-                error=client_safe_message(last_error, context="Task failed")
-                if isinstance(last_error, BaseException)
-                else str(last_error),
-            )
+        finally:
+            reset_llm_usage(usage_token)
 
     def _prepare_input(self, record: TaskRecord) -> Any:
         """Build the payload for a dispatcher invocation, injecting checkpoints.

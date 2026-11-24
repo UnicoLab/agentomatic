@@ -484,14 +484,33 @@ def _looks_like_openai_cloud_model(model_name: str) -> bool:
     )
 
 
+_NO_CUSTOM_TEMPERATURE_MODEL_RE = re.compile(
+    r"(?:^|[^a-z0-9])(?:gpt-?5|o[134](?![0-9]))",
+    re.IGNORECASE,
+)
+
+
 def _openai_uses_max_completion_tokens(model_name: str) -> bool:
     """Newer OpenAI models reject ``max_tokens`` in favour of max_completion_tokens."""
     name = (model_name or "").strip().lower()
-    return name.startswith(("o1", "o3", "o4", "gpt-5"))
+    if not name:
+        return False
+    return (
+        name.startswith(("o1", "o3", "o4", "gpt-5"))
+        or _NO_CUSTOM_TEMPERATURE_MODEL_RE.search(name) is not None
+    )
 
 
 def _openai_supports_temperature(model_name: str) -> bool:
-    """Reasoning models often only allow the default temperature."""
+    """Reasoning models (GPT-5, o1/o3/o4) only allow the default temperature."""
+    name = (model_name or "").strip()
+    if not name:
+        return True
+    return _NO_CUSTOM_TEMPERATURE_MODEL_RE.search(name) is None
+
+
+def _openai_supports_json_mode(model_name: str) -> bool:
+    """Return True when the OpenAI model reliably supports ``json_object`` mode."""
     name = (model_name or "").strip().lower()
     return not name.startswith(("o1", "o3", "o4"))
 
@@ -601,7 +620,7 @@ async def _call_openai(
         kwargs["max_completion_tokens"] = max_tokens
     else:
         kwargs["max_tokens"] = max_tokens
-    if json_mode and _openai_supports_temperature(model_name):
+    if json_mode and _openai_supports_json_mode(model_name):
         # json_object mode is unreliable / unsupported on some reasoning models
         kwargs["response_format"] = {"type": "json_object"}
 
@@ -742,11 +761,17 @@ async def _call_litellm(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
-    response = await litellm.acompletion(
-        model=model_name,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout,
-    )
+    call_kwargs: dict[str, Any] = {
+        "model": model_name,
+        "messages": messages,
+        "timeout": timeout,
+    }
+    if _openai_supports_temperature(model_name):
+        call_kwargs["temperature"] = temperature
+    if _openai_uses_max_completion_tokens(model_name):
+        call_kwargs["max_completion_tokens"] = max_tokens
+    else:
+        call_kwargs["max_tokens"] = max_tokens
+
+    response = await litellm.acompletion(**call_kwargs)
     return _normalize_llm_text(response.choices[0].message.content or "")

@@ -127,14 +127,30 @@ def emit_audit_event(
     Returns:
         The audit record that was logged.
     """
+    resolved_model = model
+    resolved_tokens = tokens
+    if resolved_model is None or resolved_tokens is None:
+        try:
+            from agentomatic.logs.runtime import resolve_llm_usage
+
+            rtype = op.split(":", 1)[0].strip().lower() if ":" in op else "agent"
+            if rtype != "ingestion":
+                acc_model, _in_t, _out_t, tot_t, calls = resolve_llm_usage(rtype, agent)
+                if resolved_model is None and acc_model:
+                    resolved_model = acc_model
+                if resolved_tokens is None and (calls > 0 or tot_t > 0):
+                    resolved_tokens = tot_t
+        except Exception:  # noqa: BLE001
+            pass
+
     record = {
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "agent": agent,
         "op": op,
         "request_id": request_id,
         "outcome": outcome,
-        "model": model,
-        "tokens": tokens,
+        "model": resolved_model,
+        "tokens": resolved_tokens,
         "latency_ms": round(latency_ms, 2) if latency_ms is not None else None,
         "language": language,
         **(extra or {}),

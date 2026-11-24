@@ -61,3 +61,50 @@ def test_audit_timer_error() -> None:
         with timer:
             raise RuntimeError("boom")
     assert timer.record["outcome"] == "error"
+
+
+def test_emit_audit_event_resolves_contextvar_usage_and_isolates_steps() -> None:
+    """emit_audit_event falls back to active runtime usage and respects agent scoping."""
+    from agentomatic.logs.runtime import (
+        ensure_llm_usage,
+        record_llm_usage,
+        reset_llm_usage,
+    )
+
+    _, tok = ensure_llm_usage(force_new=True)
+    try:
+        record_llm_usage("gpt-5", 10, 5, 15, agent_name="step_one")
+        ev_step1 = emit_audit_event(
+            agent="step_one",
+            op="agent:pipeline_step",
+            request_id="req-step1",
+            outcome="success",
+        )
+        ev_step2 = emit_audit_event(
+            agent="step_two_fastpath",
+            op="agent:pipeline_step",
+            request_id="req-step2",
+            outcome="success",
+        )
+        ev_endpoint = emit_audit_event(
+            agent="det_endpoint",
+            op="endpoint:pipeline_step",
+            request_id="req-ep",
+            outcome="success",
+        )
+        ev_pipe = emit_audit_event(
+            agent="two_stage",
+            op="pipeline:run",
+            request_id="req-pipe",
+            outcome="success",
+        )
+        assert ev_step1["model"] == "gpt-5"
+        assert ev_step1["tokens"] == 15
+        assert ev_step2["model"] is None
+        assert ev_step2["tokens"] is None
+        assert ev_endpoint["model"] is None
+        assert ev_endpoint["tokens"] is None
+        assert ev_pipe["model"] == "gpt-5"
+        assert ev_pipe["tokens"] == 15
+    finally:
+        reset_llm_usage(tok)

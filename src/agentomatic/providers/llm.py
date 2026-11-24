@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
@@ -106,6 +108,359 @@ def registered_llm_providers() -> list[str]:
         return sorted(_LLM_PROVIDERS)
 
 
+_NO_CUSTOM_TEMPERATURE_MODEL_RE = re.compile(
+    r"(?:^|[^a-z0-9])(?:gpt-?5|o[134](?![0-9]))",
+    re.IGNORECASE,
+)
+
+
+def supports_custom_temperature(model: str | None) -> bool:
+    """Return ``False`` for GPT-5 and o1/o3/o4 models that reject custom temperature."""
+    name = (model or "").strip()
+    if not name:
+        return True
+    return _NO_CUSTOM_TEMPERATURE_MODEL_RE.search(name) is None
+
+
+def _strip_disallowed_temperature(mapping: dict[str, Any]) -> dict[str, Any]:
+    """Recursively strip ``temperature`` from top-level and nested extra dicts."""
+    cleaned: dict[str, Any] = {}
+    for key, val in mapping.items():
+        if key == "temperature":
+            continue
+        if key in ("extra", "extra_body", "model_kwargs") and isinstance(val, dict):
+            nested = _strip_disallowed_temperature(val)
+            if nested:
+                cleaned[key] = nested
+        else:
+            cleaned[key] = val
+    return cleaned
+
+
+_MAX_ERROR_MESSAGE_LEN = 500
+_MAX_FAILED_JSON_PROBES = 64
+_MAX_RECURSION_JSON_PROBES = 2
+_JSON_DECODER = json.JSONDecoder()
+
+_URL_USERINFO_RE = re.compile(r"(https?://)[^:@/\s]+:[^@/\s]+@", re.IGNORECASE)
+_URL_QUERY_RE = re.compile(r"(https?://[^\s?#]+)\?[^\s#]*", re.IGNORECASE)
+_BEARER_RE = re.compile(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{6,}")
+_COOKIE_HEADER_RE = re.compile(
+    r"(?i)\b((?:set-)?cookie)(?:"
+    r"['\"]\s*[:=]\s*(['\"])(?:\\[\s\S]|(?!\2)[^\\])*(?:\2|$)"
+    r"|\s*=\s*(['\"])(?:\\[\s\S]|(?!\3)[^\\])*\3(?![;=])"
+    r"|\s*[:=]\s*[^\r\n]+"
+    r")"
+)
+_AUTH_HEADER_RE = re.compile(
+    r"(?i)\b(authorization|x-api-key|ocp-apim-subscription-key|x-goog-api-key)"
+    r"(?:['\"])?\s*[:=]\s*(?:"
+    r"(['\"])(?:\\[\s\S]|(?!\2)[^\\])*(?:\2|$)"
+    r"|(?:(?:Bearer|Basic|Token|ApiKey)\s+)?[^\s,;]+"
+    r")"
+)
+_SECRET_KV_RE = re.compile(
+    r"(?i)(?:"
+    r"\b("
+    r"[a-z0-9_-]*(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token"
+    r"|password|passwd|secret|private[_-]?key|credential|system[_-]?prompt|user[_-]?prompt|raw[_-]?prompt"
+    r"|raw[_-]?response|raw[_-]?request)"
+    r"|token|session|sid|jwt|sig|prompt"
+    r")(?:['\"])?\s*[:=]"
+    r"|(?:['\"](messages|document|content)['\"]\s*[:=]|\b(messages|document|content)\s*=)"
+    r")\s*(?:"
+    r"(['\"])(?:\\[\s\S]|(?!\4)[^\\])*(?:\4|$)"
+    r"|\[[^\[\]]*(?:\]|$)"
+    r"|[^\s,;'\"}\]]+"
+    r")"
+)
+_SENSITIVE_KV_PREFIX_RE = re.compile(
+    r"(?i)(?:"
+    r"\b("
+    r"[a-z0-9_-]*(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token"
+    r"|password|passwd|secret|private[_-]?key|credential|system[_-]?prompt|user[_-]?prompt|raw[_-]?prompt"
+    r"|raw[_-]?response|raw[_-]?request)"
+    r"|token|session|sid|jwt|sig|prompt"
+    r")(?:['\"])?\s*[:=]"
+    r"|(?:['\"](messages|document|content)['\"]\s*[:=]|\b(messages|document|content)\s*=)"
+    r")\s*(?=[{\[])"
+)
+_CODE_KV_RE = re.compile(r"(?i)\b(code)\s*[:=]\s*(['\"]?)[^\s,;'\"]+\2")
+_SK_KEY_RE = re.compile(r"\bsk-[A-Za-z0-9_-]{10,}\b")
+_GEMINI_KEY_RE = re.compile(r"\bAIza[0-9A-Za-z_-]{20,}\b")
+
+_SAFE_TOKEN_META_KEYS = frozenset(
+    {
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "cached_tokens",
+        "reasoning_tokens",
+        "prompt_tokens",
+        "completion_tokens",
+        "tokens",
+        "token_count",
+        "max_tokens",
+        "max_completion_tokens",
+    }
+)
+_JSON_SENSITIVE_KEYS = frozenset(
+    {
+        "messages",
+        "raw_request",
+        "raw_response",
+        "document",
+        "content",
+        "prompt",
+        "system_prompt",
+        "user_prompt",
+        "raw_prompt",
+        "authorization",
+        "cookie",
+        "set-cookie",
+        "jwt",
+        "session",
+        "sid",
+        "sig",
+        "token",
+        "secret",
+        "password",
+        "passwd",
+        "api_key",
+        "apikey",
+        "credential",
+        "private_key",
+        "file_content",
+        "user_message",
+        "assistant_message",
+        "system_message",
+    }
+)
+_JSON_SENSITIVE_SUBSTRINGS = (
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "password",
+    "passwd",
+    "private_key",
+    "credential",
+    "prompt",
+    "raw_response",
+    "raw_request",
+    "bearer",
+    "cookie",
+    "file_content",
+)
+
+
+def _is_sensitive_json_key(key: str, value: Any = None) -> bool:
+    lower = key.strip().lower()
+    if not lower:
+        return True
+    if lower in _SAFE_TOKEN_META_KEYS:
+        return isinstance(value, str)
+    if lower in _JSON_SENSITIVE_KEYS:
+        return True
+    if any(sub in lower for sub in _JSON_SENSITIVE_SUBSTRINGS):
+        return True
+    if "token" in lower and not lower.endswith("_tokens"):
+        return True
+    return False
+
+
+def _redact_json_value(value: Any) -> tuple[Any, bool]:
+    if not isinstance(value, (dict, list)):
+        return value, False
+    changed = False
+    root_out: Any = {} if isinstance(value, dict) else []
+    stack: list[tuple[Any, Any]] = [(value, root_out)]
+    while stack:
+        src, dst = stack.pop()
+        if isinstance(src, dict):
+            for k, v in src.items():
+                key_str = str(k)
+                if _is_sensitive_json_key(key_str, v):
+                    dst[key_str] = "[REDACTED]"
+                    changed = True
+                elif isinstance(v, dict):
+                    child_dict: dict[str, Any] = {}
+                    dst[key_str] = child_dict
+                    stack.append((v, child_dict))
+                elif isinstance(v, list):
+                    child_list: list[Any] = []
+                    dst[key_str] = child_list
+                    stack.append((v, child_list))
+                else:
+                    dst[key_str] = v
+        elif isinstance(src, list):
+            for item in src:
+                if isinstance(item, dict):
+                    child_dict = {}
+                    dst.append(child_dict)
+                    stack.append((item, child_dict))
+                elif isinstance(item, list):
+                    child_list = []
+                    dst.append(child_list)
+                    stack.append((item, child_list))
+                else:
+                    dst.append(item)
+    return (root_out, True) if changed else (value, False)
+
+
+def _redact_json_fragments(text: str) -> str:
+    if "{" not in text and "[" not in text:
+        return text
+    out: list[str] = []
+    pos = 0
+    length = len(text)
+    failed_probes = 0
+    recursion_probes = 0
+    while pos < length:
+        next_obj = text.find("{", pos)
+        next_arr = text.find("[", pos)
+        candidates = [idx for idx in (next_obj, next_arr) if idx != -1]
+        if not candidates:
+            out.append(text[pos:])
+            break
+        idx = min(candidates)
+        if text.startswith("[REDACTED]", idx):
+            out.append(text[pos : idx + 10])
+            pos = idx + 10
+            continue
+        if (
+            failed_probes >= _MAX_FAILED_JSON_PROBES
+            or recursion_probes >= _MAX_RECURSION_JSON_PROBES
+        ):
+            out.append(text[pos:])
+            break
+        try:
+            parsed, end = _JSON_DECODER.raw_decode(text, idx)
+            if isinstance(parsed, (dict, list)):
+                sanitized, changed = _redact_json_value(parsed)
+                if changed:
+                    dumped = json.dumps(sanitized, ensure_ascii=False)
+                    out.append(text[pos:idx])
+                    out.append(dumped)
+                    pos = end
+                    continue
+        except RecursionError:
+            recursion_probes += 1
+            failed_probes += 1
+            skip_end = idx + 1
+            ch = text[idx]
+            while skip_end < length and text[skip_end] == ch:
+                skip_end += 1
+            out.append(text[pos:skip_end])
+            pos = skip_end
+            continue
+        except json.JSONDecodeError:
+            failed_probes += 1
+            skip_end = idx + 1
+            ch = text[idx]
+            while skip_end < length and text[skip_end] == ch:
+                skip_end += 1
+            out.append(text[pos:skip_end])
+            pos = skip_end
+            continue
+        out.append(text[pos:end])
+        pos = end
+    return "".join(out)
+
+
+def _scan_balanced_container_end(text: str, start: int) -> int:
+    """Return end index (exclusive) of a possibly nested/truncated ``[...]`` or ``{...}``."""
+    length = len(text)
+    stack: list[str] = []
+    i = start
+    in_quote: str | None = None
+    escaped = False
+    while i < length:
+        ch = text[i]
+        if in_quote is not None:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == in_quote:
+                in_quote = None
+        else:
+            if ch in ('"', "'"):
+                in_quote = ch
+            elif ch == "[":
+                stack.append("]")
+            elif ch == "{":
+                stack.append("}")
+            elif ch in ("]", "}"):
+                if stack and ch == stack[-1]:
+                    stack.pop()
+                    if not stack:
+                        return i + 1
+                elif ch in stack:
+                    while stack and stack[-1] != ch:
+                        stack.pop()
+                    if stack:
+                        stack.pop()
+                        if not stack:
+                            return i + 1
+                else:
+                    return i
+        i += 1
+    return length
+
+
+def _redact_malformed_sensitive_containers(text: str) -> str:
+    """Redact nested/truncated ``[...]`` or ``{...}`` values of sensitive keys in O(N)."""
+    if "{" not in text and "[" not in text:
+        return text
+    out: list[str] = []
+    pos = 0
+    length = len(text)
+    while pos < length:
+        match = _SENSITIVE_KV_PREFIX_RE.search(text, pos)
+        if match is None:
+            out.append(text[pos:])
+            break
+        key = match.group(1) or match.group(2) or match.group(3) or "secret"
+        open_idx = match.end()
+        out.append(text[pos : match.start()])
+        out.append(f"{key}=[REDACTED]")
+        if text.startswith("[REDACTED]", open_idx):
+            pos = open_idx + 10
+        else:
+            pos = _scan_balanced_container_end(text, open_idx)
+    return "".join(out)
+
+
+def _replace_secret_kv(match: re.Match[str]) -> str:
+    key = match.group(1) or match.group(2) or match.group(3) or "secret"
+    return f"{key}=[REDACTED]"
+
+
+def _sanitize_error_for_log(raw: Any, *, max_len: int = _MAX_ERROR_MESSAGE_LEN) -> str:
+    """Redact credentials, tokens, URL query/userinfo, and prompts for log lines."""
+    if raw is None:
+        return ""
+    text = str(raw).strip()
+    if not text:
+        return ""
+    text = _redact_json_fragments(text)
+    text = _redact_malformed_sensitive_containers(text)
+    text = _URL_USERINFO_RE.sub(r"\1[REDACTED]@", text)
+    text = _URL_QUERY_RE.sub(r"\1", text)
+    text = _BEARER_RE.sub(r"\1 [REDACTED]", text)
+    text = _COOKIE_HEADER_RE.sub(r"\1=[REDACTED]", text)
+    text = _AUTH_HEADER_RE.sub(r"\1=[REDACTED]", text)
+    text = _SECRET_KV_RE.sub(_replace_secret_kv, text)
+    text = _CODE_KV_RE.sub(r"\1=[REDACTED]", text)
+    text = _SK_KEY_RE.sub("[REDACTED]", text)
+    text = _GEMINI_KEY_RE.sub("[REDACTED]", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > max_len:
+        return text[:max_len]
+    return text
+
+
 def get_failover_count() -> int:
     """Return the number of LLM failover events recorded."""
     with _llm_lock:
@@ -122,8 +477,9 @@ def record_failover(
     with _llm_lock:
         _failover_count += 1
         count = _failover_count
+    safe_error = _sanitize_error_for_log(error)
     logger.warning(
-        f"🔄 LLM failover #{count}: {primary_provider} -> {fallback_provider} | Error: {error}"
+        f"🔄 LLM failover #{count}: {primary_provider} -> {fallback_provider} | Error: {safe_error}"
     )
 
 
@@ -201,7 +557,10 @@ def get_llm(
                 fallback_on=fallback_on,
             )
         except Exception as exc:
-            logger.warning(f"Failed to build {provider} LLM: {exc}. Falling back to dummy.")
+            logger.warning(
+                f"Failed to build {provider} LLM: {_sanitize_error_for_log(exc)}. "
+                "Falling back to dummy."
+            )
             _llm_instance = _build_dummy_llm()
 
         return _llm_instance
@@ -311,13 +670,34 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
             or kwargs.get("model")
             or ""
         )
-        return AzureChatOpenAI(
-            api_key=kwargs.get("api_key", ""),
-            azure_endpoint=endpoint,
-            api_version=kwargs.get("api_version", "2024-02-15-preview"),
-            azure_deployment=deployment,
-            temperature=kwargs.get("temperature", 0.1),
-        )
+        model_name = str(kwargs.get("model") or deployment or "")
+        allow_temp = supports_custom_temperature(model_name)
+        azure_kwargs: dict[str, Any] = {
+            "api_key": kwargs.get("api_key", ""),
+            "azure_endpoint": endpoint,
+            "api_version": kwargs.get("api_version", "2024-02-15-preview"),
+            "azure_deployment": deployment,
+        }
+        if kwargs.get("model"):
+            azure_kwargs["model"] = kwargs["model"]
+        if allow_temp:
+            azure_kwargs["temperature"] = kwargs.get("temperature", 0.1)
+        else:
+            azure_kwargs["temperature"] = None
+        if kwargs.get("max_tokens") is not None:
+            azure_kwargs["max_tokens"] = kwargs["max_tokens"]
+        if kwargs.get("max_completion_tokens") is not None:
+            azure_kwargs["max_completion_tokens"] = kwargs["max_completion_tokens"]
+        azure_fields = getattr(AzureChatOpenAI, "model_fields", None)
+        if "stream_usage" in kwargs and kwargs["stream_usage"] is not None:
+            azure_kwargs["stream_usage"] = kwargs["stream_usage"]
+        elif isinstance(azure_fields, dict) and "stream_usage" in azure_fields:
+            azure_kwargs["stream_usage"] = True
+        openai_bits = _openai_compat_kwargs(kwargs)
+        if not allow_temp:
+            openai_bits = _strip_disallowed_temperature(openai_bits)
+        azure_kwargs.update(openai_bits)
+        return AzureChatOpenAI(**azure_kwargs)
 
     elif provider in ("openai", "openai_compatible", "omlx"):
         from langchain_openai import ChatOpenAI
@@ -338,15 +718,24 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
             # ChatOpenAI refuses to build without *some* key; local servers
             # ignore its value.
             api_key = os.getenv("OMLX_API_KEY") or os.getenv("OPENAI_API_KEY") or "omlx"
+        model_name = str(kwargs.get("model", "gpt-4"))
+        allow_temp = supports_custom_temperature(model_name)
         ctor_kwargs: dict[str, Any] = {
             "api_key": api_key,
-            "model": kwargs.get("model", "gpt-4"),
-            "temperature": kwargs.get("temperature", 0.1),
+            "model": model_name,
+            "temperature": kwargs.get("temperature", 0.1) if allow_temp else None,
         }
         if base_url:
             ctor_kwargs["base_url"] = base_url
         if kwargs.get("max_tokens") is not None:
             ctor_kwargs["max_tokens"] = kwargs["max_tokens"]
+        if kwargs.get("max_completion_tokens") is not None:
+            ctor_kwargs["max_completion_tokens"] = kwargs["max_completion_tokens"]
+        chat_fields = getattr(ChatOpenAI, "model_fields", None)
+        if "stream_usage" in kwargs and kwargs["stream_usage"] is not None:
+            ctor_kwargs["stream_usage"] = kwargs["stream_usage"]
+        elif isinstance(chat_fields, dict) and "stream_usage" in chat_fields:
+            ctor_kwargs["stream_usage"] = True
         for key in ("max_retries", "default_headers", "default_query"):
             if kwargs.get(key) is not None:
                 ctor_kwargs[key] = kwargs[key]
@@ -365,18 +754,23 @@ def _build_llm(provider: str, **kwargs: Any) -> Any:
 
         # Stack ``extra:`` + flat kwargs → model_kwargs / extra_body (oMLX, vLLM, …)
         openai_bits = _openai_compat_kwargs(kwargs)
+        if not allow_temp:
+            openai_bits = _strip_disallowed_temperature(openai_bits)
         ctor_kwargs.update(openai_bits)
         return ChatOpenAI(**ctor_kwargs)
 
     elif provider == "vertex":
         from langchain_google_vertexai import ChatVertexAI  # pyright: ignore[reportDeprecated]
 
-        return ChatVertexAI(  # pyright: ignore[reportDeprecated]
-            model_name=kwargs.get("model", "gemini-2.0-flash"),
-            project=kwargs.get("project", ""),
-            location=kwargs.get("location", "us-central1"),
-            temperature=kwargs.get("temperature", 0.1),
-        )
+        model_name = kwargs.get("model", "gemini-2.0-flash")
+        vertex_kwargs: dict[str, Any] = {
+            "model_name": model_name,
+            "project": kwargs.get("project", ""),
+            "location": kwargs.get("location", "us-central1"),
+        }
+        if supports_custom_temperature(str(model_name)):
+            vertex_kwargs["temperature"] = kwargs.get("temperature", 0.1)
+        return ChatVertexAI(**vertex_kwargs)  # pyright: ignore[reportDeprecated]
 
     elif provider == "dummy":
         return _build_dummy_llm()
@@ -460,9 +854,15 @@ def _openai_compat_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         "model",
         "temperature",
         "max_tokens",
+        "max_completion_tokens",
+        "stream_usage",
         "api_key",
         "base_url",
         "api_base",
+        "api_version",
+        "azure_endpoint",
+        "azure_deployment",
+        "deployment_name",
         "timeout",
         "max_retries",
         "default_headers",
@@ -634,7 +1034,11 @@ def _wrap_with_fallbacks(
             fallback_models.append(_build_llm(fb_kwargs["provider"], **build_kwargs))
             labels.append(label)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to build fallback LLM {}: {}", label, exc)
+            logger.warning(
+                "Failed to build fallback LLM {}: {}",
+                label,
+                _sanitize_error_for_log(exc),
+            )
 
     if not fallback_models:
         return primary
@@ -732,7 +1136,7 @@ def get_named_llm(
             # dummy so local development still runs. It is logged loudly
             # because every answer from here on is fake.
             logger.warning(
-                f"Failed to build LLM '{name}' ({provider}): {exc}. "
+                f"Failed to build LLM '{name}' ({provider}): {_sanitize_error_for_log(exc)}. "
                 "Using a DUMMY model — responses are fabricated."
             )
             built = _build_dummy_llm()
@@ -783,7 +1187,10 @@ def apply_stack_defaults(stack_manager: StackManager | None) -> Any:
         try:
             fallbacks = stack_manager.resolve_fallbacks(entry)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to resolve stack LLM fallbacks: {}", exc)
+            logger.warning(
+                "Failed to resolve stack LLM fallbacks: {}",
+                _sanitize_error_for_log(exc),
+            )
             fallbacks = [
                 fb.model_dump() if hasattr(fb, "model_dump") else fb
                 for fb in cast(list[Any], entry.fallbacks)
@@ -804,7 +1211,7 @@ def apply_stack_defaults(stack_manager: StackManager | None) -> Any:
         )
         return instance
     except Exception as exc:  # noqa: BLE001
-        logger.warning(f"Failed to apply stack default LLM: {exc}")
+        logger.warning(f"Failed to apply stack default LLM: {_sanitize_error_for_log(exc)}")
         return None
 
 
@@ -857,7 +1264,7 @@ def get_llm_for_agent(
                 "Failed to resolve fallbacks for agent={} role={}: {}",
                 agent_name,
                 role,
-                exc,
+                _sanitize_error_for_log(exc),
             )
             fallbacks = [
                 fb.model_dump() if hasattr(fb, "model_dump") else fb
@@ -990,6 +1397,10 @@ async def invoke_with_retry(
                                 content=getattr(normalized, "content", ""),
                                 additional_kwargs=additional,
                                 response_metadata=getattr(normalized, "response_metadata", {}),
+                                usage_metadata=(
+                                    getattr(normalized, "usage_metadata", None)
+                                    or getattr(result, "usage_metadata", None)
+                                ),
                                 raw=result,
                             )
                     else:
@@ -999,11 +1410,36 @@ async def invoke_with_retry(
                             content=getattr(normalized, "content", ""),
                             additional_kwargs=additional,
                             response_metadata=getattr(normalized, "response_metadata", {}),
+                            usage_metadata=(
+                                getattr(normalized, "usage_metadata", None)
+                                or getattr(result, "usage_metadata", None)
+                            ),
                             raw=result,
                         )
 
             duration = time.perf_counter() - t0
             prompt_t, completion_t, _total, thinking_t = extract_token_usage(normalized)
+            try:
+                from agentomatic.logs.runtime import record_llm_usage
+
+                resp_meta = getattr(normalized, "response_metadata", None) or {}
+                resolved_model = (
+                    (resp_meta.get("model_name") or resp_meta.get("model"))
+                    if isinstance(resp_meta, dict)
+                    else None
+                ) or (
+                    getattr(llm, "model_name", None)
+                    or getattr(llm, "model", None)
+                    or getattr(llm, "deployment_name", None)
+                )
+                record_llm_usage(
+                    model=str(resolved_model) if resolved_model else None,
+                    input_tokens=prompt_t,
+                    output_tokens=completion_t,
+                    total_tokens=_total or (prompt_t + completion_t),
+                )
+            except Exception:  # noqa: BLE001
+                pass
             thinking_text = ""
             try:
                 thinking_text = message_thinking(normalized) or ""
@@ -1033,7 +1469,10 @@ async def invoke_with_retry(
             if attempt < max_retries:
                 retries_used += 1
                 delay = retry_delay * (2**attempt)
-                logger.warning(f"LLM attempt {attempt + 1} failed: {exc}. Retrying in {delay}s...")
+                logger.warning(
+                    f"LLM attempt {attempt + 1} failed: {_sanitize_error_for_log(exc)}. "
+                    f"Retrying in {delay}s..."
+                )
                 await asyncio.sleep(delay)
 
     duration = time.perf_counter() - t0
@@ -1073,7 +1512,7 @@ async def astream_with_thinking(
     """
     import time
 
-    from agentomatic.observability.metrics import record_llm_call
+    from agentomatic.observability.metrics import extract_token_usage, record_llm_call
     from agentomatic.providers.message_utils import (
         THINK_TAG_RE,
         message_text,
@@ -1107,8 +1546,20 @@ async def astream_with_thinking(
     thinking_buf: list[str] = []
     inline_buf = ""
     in_think_tag = False
+    latest_usage_chunk: Any = None
+    latest_model_name: str | None = None
 
     async for chunk in llm.astream(messages):
+        if getattr(chunk, "usage_metadata", None) is not None:
+            latest_usage_chunk = chunk
+        chunk_meta = getattr(chunk, "response_metadata", None)
+        if isinstance(chunk_meta, dict):
+            if chunk_meta.get("token_usage") or chunk_meta.get("usage"):
+                latest_usage_chunk = chunk
+            chunk_model = chunk_meta.get("model_name") or chunk_meta.get("model")
+            if chunk_model:
+                latest_model_name = str(chunk_model)
+
         # Structured reasoning on the chunk
         for attr in ("reasoning_content", "reasoning", "thinking"):
             piece = getattr(chunk, attr, None)
@@ -1251,6 +1702,35 @@ async def astream_with_thinking(
     generation_s = None
     if first_answer_at is not None:
         generation_s = max(0.0, time.perf_counter() - first_answer_at)
+
+    prompt_t = completion_t = total_t = thinking_t = 0
+    if latest_usage_chunk is not None:
+        prompt_t, completion_t, total_t, thinking_t = extract_token_usage(latest_usage_chunk)
+    heuristic_completion = len("".join(answer_buf).split())
+    resolved_completion = (
+        completion_t if (completion_t > 0 or prompt_t > 0) else heuristic_completion
+    )
+    resolved_thinking = thinking_t or (
+        len("\n\n".join(thinking_buf).split()) if thinking_buf else 0
+    )
+    resolved_model = (
+        latest_model_name
+        or getattr(llm, "model_name", None)
+        or getattr(llm, "model", None)
+        or getattr(llm, "deployment_name", None)
+    )
+    try:
+        from agentomatic.logs.runtime import record_llm_usage
+
+        record_llm_usage(
+            model=str(resolved_model) if resolved_model else None,
+            input_tokens=prompt_t,
+            output_tokens=completion_t,
+            total_tokens=total_t or (prompt_t + completion_t),
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
     record_llm_call(
         llm=llm,
         outcome="success",
@@ -1259,8 +1739,9 @@ async def astream_with_thinking(
         ttft_s=ttft_s,
         thinking_s=thinking_s,
         generation_s=generation_s,
-        completion_tokens=len("".join(answer_buf).split()),
-        thinking_tokens=len("\n\n".join(thinking_buf).split()) if thinking_buf else 0,
+        prompt_tokens=prompt_t,
+        completion_tokens=resolved_completion,
+        thinking_tokens=resolved_thinking,
     )
 
     yield {
@@ -1310,10 +1791,10 @@ class StructuredOutputFallbackWrapper:
                 except Exception as exc:
                     logger.warning(
                         f"Structured output parse failed for "
-                        f"{self.response_model.__name__}: {exc}. "
+                        f"{self.response_model.__name__}: {_sanitize_error_for_log(exc)}. "
                         f"Falling back to dummy values. "
                         f"Raw content (first 200 chars): "
-                        f"{content[:200]!r}"
+                        f"{_sanitize_error_for_log(content[:200])!r}"
                     )
                     try:
                         from agentomatic.observability.metrics import record_structure_error

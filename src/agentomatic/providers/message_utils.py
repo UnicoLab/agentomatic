@@ -261,5 +261,6 @@ def attach_thinking_metadata(result: Any, *, strip_content: bool = True) -> Any:
         content=new_content,
         additional_kwargs=additional,
         response_metadata=response_metadata,
+        usage_metadata=getattr(result, "usage_metadata", None),
         raw=result,
     )

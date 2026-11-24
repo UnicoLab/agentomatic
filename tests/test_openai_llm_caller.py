@@ -10,7 +10,9 @@ import pytest
 
 from agentomatic.optimize.llm_caller import (
     LLMCaller,
+    _call_litellm,
     _looks_like_openai_cloud_model,
+    _openai_supports_json_mode,
     _openai_supports_temperature,
     _openai_uses_max_completion_tokens,
     _resolve_openai_endpoint,
@@ -50,9 +52,17 @@ def test_looks_like_openai_cloud_model(name: str, expected: bool) -> None:
 
 def test_openai_token_and_temperature_helpers() -> None:
     assert _openai_uses_max_completion_tokens("o3-mini") is True
+    assert _openai_uses_max_completion_tokens("gpt-5") is True
+    assert _openai_uses_max_completion_tokens("axa-gpt-5-mini") is True
     assert _openai_uses_max_completion_tokens("gpt-4o-mini") is False
     assert _openai_supports_temperature("gpt-4o-mini") is True
     assert _openai_supports_temperature("o1-preview") is False
+    assert _openai_supports_temperature("gpt-5") is False
+    assert _openai_supports_temperature("gpt-5-mini") is False
+    assert _openai_supports_temperature("axa-gpt-5-mini") is False
+    assert _openai_supports_json_mode("gpt-5") is True
+    assert _openai_supports_json_mode("gpt-5-mini") is True
+    assert _openai_supports_json_mode("o3-mini") is False
 
 
 def test_resolve_ignores_local_env_base_for_cloud_models(
@@ -225,3 +235,62 @@ async def test_configure_still_routes_openai_to_local(
     assert captured["client"]["base_url"] == "http://127.0.0.1:8000/v1"
     assert captured["client"]["api_key"] == "local-key"
     assert "extra_body" in captured["create"]
+
+
+@pytest.mark.asyncio
+async def test_call_openai_gpt5_omits_temperature_and_keeps_json_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-unit-test")
+    captured: dict[str, Any] = {}
+
+    with patch("openai.AsyncOpenAI", _fake_async_openai(captured, content='{"ok": true}')):
+        await LLMCaller.call(
+            "openai/gpt-5",
+            "hi",
+            temperature=0.3,
+            max_tokens=128,
+            json_mode=True,
+        )
+
+    create = captured["create"]
+    assert create["max_completion_tokens"] == 128
+    assert "max_tokens" not in create
+    assert "temperature" not in create
+    assert create["response_format"] == {"type": "json_object"}
+
+
+@pytest.mark.asyncio
+async def test_call_litellm_gates_temperature_and_max_completion_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+    import types
+
+    calls: list[dict[str, Any]] = []
+
+    async def _fake_acompletion(**kwargs: Any) -> Any:
+        calls.append(kwargs)
+        msg = MagicMock()
+        msg.content = "ok"
+        return MagicMock(choices=[MagicMock(message=msg)])
+
+    fake_litellm = types.SimpleNamespace(acompletion=_fake_acompletion)
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+
+    await _call_litellm("gpt-5", "hi", temperature=0.5, max_tokens=200)
+    await _call_litellm("o3-mini", "hi", temperature=0.5, max_tokens=150)
+    await _call_litellm("gpt-4o-mini", "hi", temperature=0.5, max_tokens=100)
+
+    assert "temperature" not in calls[0]
+    assert calls[0]["max_completion_tokens"] == 200
+    assert "max_tokens" not in calls[0]
+
+    assert "temperature" not in calls[1]
+    assert calls[1]["max_completion_tokens"] == 150
+    assert "max_tokens" not in calls[1]
+
+    assert calls[2]["temperature"] == 0.5
+    assert calls[2]["max_tokens"] == 100
+    assert "max_completion_tokens" not in calls[2]

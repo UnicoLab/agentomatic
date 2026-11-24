@@ -2,6 +2,13 @@
 
 <!-- version list -->
 
+## v1.16.1 (2026-11-24)
+
+### Bug Fixes
+
+- **runtime**: Restore bounded `MemoryStore` LRU/TTL eviction, reasoning-model (`gpt-5*`, `o1*`, `o3*`, `o4*`) `temperature` sanitization, `model`/`tokens` runtime usage logging & log sanitization, and pure ASGI non-buffering SSE streaming
+
+
 ## v1.16.0 (2026-10-02)
 
 ### Chores

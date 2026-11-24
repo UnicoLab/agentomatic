@@ -21,6 +21,16 @@ DEFAULT_FALLBACK_ON: tuple[str, ...] = (
 )
 
 
+def _sanitize_for_fallback_log(value: Any) -> str:
+    """Redact credentials, tokens, URL userinfo/query, and prompt payloads for logs."""
+    try:
+        from agentomatic.providers.llm import _sanitize_error_for_log
+
+        return _sanitize_error_for_log(value)
+    except Exception:  # noqa: BLE001
+        return str(value)[:500]
+
+
 class EmptyLLMResponseError(RuntimeError):
     """Raised when an LLM returns an empty or whitespace-only response."""
 
@@ -255,7 +265,12 @@ class FallbackLLM:
             try:
                 result = self._invoke_one_sync(llm, label, *args, **kwargs)
                 if idx > 0:
-                    self._log_failover_success(idx, reason=str(last_exc or "fallback"))
+                    self._log_failover_success(
+                        idx,
+                        reason=_sanitize_for_fallback_log(last_exc)
+                        if last_exc is not None
+                        else "fallback",
+                    )
                 else:
                     logger.debug("LLM primary succeeded: {}", label)
                 return result
@@ -274,7 +289,12 @@ class FallbackLLM:
             try:
                 result = await self._invoke_one_async(llm, label, *args, **kwargs)
                 if idx > 0:
-                    self._log_failover_success(idx, reason=str(last_exc or "fallback"))
+                    self._log_failover_success(
+                        idx,
+                        reason=_sanitize_for_fallback_log(last_exc)
+                        if last_exc is not None
+                        else "fallback",
+                    )
                 else:
                     logger.debug("LLM primary succeeded: {}", label)
                 return result
@@ -314,12 +334,16 @@ class FallbackLLM:
 
         primary_label = self._labels[idx]
         next_label = self._labels[idx + 1]
-        record_failover(primary_label, next_label, f"{type(exc).__name__}: {exc}")
+        record_failover(
+            primary_label,
+            next_label,
+            _sanitize_for_fallback_log(f"{type(exc).__name__}: {exc}"),
+        )
 
     def _log_failover_success(self, idx: int, *, reason: str) -> None:
         logger.info(
             "LLM fallback succeeded with {} (after failure on {}); reason={}",
             self._labels[idx],
             self._labels[idx - 1],
-            reason,
+            _sanitize_for_fallback_log(reason),
         )

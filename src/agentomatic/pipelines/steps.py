@@ -63,6 +63,9 @@ async def execute_agent_step(
     t0 = time.perf_counter()
     agent_name = config.agent
 
+    from agentomatic.logs.runtime import bind_llm_usage_scope, reset_llm_usage_scope
+
+    scope_token = bind_llm_usage_scope(agent_name)
     try:
         agent = registry.get(agent_name)
         if agent is None:
@@ -146,6 +149,8 @@ async def execute_agent_step(
             duration_ms=duration,
             agent_used=agent_name,
         )
+    finally:
+        reset_llm_usage_scope(scope_token)
 
 
 async def _record_step_invocation(
@@ -287,6 +292,9 @@ async def execute_endpoint_step(
             error=f"Endpoint '{name}' not found in registry",
         )
 
+    from agentomatic.logs.runtime import bind_llm_usage_scope, reset_llm_usage_scope
+
+    scope_token = bind_llm_usage_scope(f"endpoint:{name}")
     try:
         payload = _resolve_resource_input(config.input, ctx, endpoint.get_input_schema())
 
@@ -349,6 +357,8 @@ async def execute_endpoint_step(
             error=str(exc),
             duration_ms=duration,
         )
+    finally:
+        reset_llm_usage_scope(scope_token)
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +403,9 @@ async def execute_plugin_step(
             error=f"Plugin '{name}' not found in registry",
         )
 
+    from agentomatic.logs.runtime import bind_llm_usage_scope, reset_llm_usage_scope
+
+    scope_token = bind_llm_usage_scope(f"plugin:{name}")
     try:
         payload = _resolve_resource_input(config.input, ctx, plugin.get_input_schema())
 
@@ -459,6 +472,8 @@ async def execute_plugin_step(
             error=str(exc),
             duration_ms=duration,
         )
+    finally:
+        reset_llm_usage_scope(scope_token)
 
 
 # ---------------------------------------------------------------------------

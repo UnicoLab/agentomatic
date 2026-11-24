@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from agentomatic.logs.runtime import get_pipeline_log_name, normalize_resource_type
+from agentomatic.logs.runtime import (
+    get_pipeline_log_name,
+    normalize_resource_type,
+    resolve_llm_usage,
+)
 
 if TYPE_CHECKING:
     from agentomatic.storage.base import BaseStore
@@ -190,6 +194,8 @@ class InvocationLogRecorder:
         error: str | None = None,
         duration_ms: float | None = None,
         status: str = "ok",
+        model: str | None = None,
+        tokens: int | None = None,
     ) -> dict[str, Any] | None:
         """Persist one invocation log entry.
 
@@ -232,6 +238,28 @@ class InvocationLogRecorder:
         if pipeline_name and "pipeline" not in meta:
             meta["pipeline"] = pipeline_name
 
+        acc_model, in_t, out_t, tot_t, calls = resolve_llm_usage(rtype, name)
+        explicit_model = model if model is not None else meta.get("model")
+        clean_explicit_model = str(explicit_model).strip() if explicit_model is not None else ""
+        if clean_explicit_model.lower() in {"", "unknown", "none"}:
+            clean_explicit_model = ""
+        resolved_model = clean_explicit_model or acc_model
+
+        explicit_tokens = tokens if tokens is not None else meta.get("tokens")
+        resolved_tokens: int | None = (
+            int(explicit_tokens)
+            if explicit_tokens is not None
+            else (tot_t if (calls > 0 or tot_t > 0) else None)
+        )
+        if resolved_model:
+            meta.setdefault("model", resolved_model)
+        if resolved_tokens is not None:
+            meta.setdefault("tokens", resolved_tokens)
+            if calls > 0 or tot_t > 0:
+                meta.setdefault("input_tokens", in_t)
+                meta.setdefault("output_tokens", out_t)
+                meta.setdefault("total_tokens", tot_t)
+
         try:
             run_id = run_id or f"run_{uuid.uuid4().hex[:12]}"
             entry = await self._store.create_invocation_log(
@@ -259,6 +287,8 @@ class InvocationLogRecorder:
                     op=f"{rtype}:{endpoint}",
                     request_id=run_id,
                     outcome={"ok": "success", "suspended": "suspended"}.get(status, "error"),
+                    model=resolved_model,
+                    tokens=resolved_tokens,
                     latency_ms=duration_ms,
                     extra={
                         "resource_type": rtype,

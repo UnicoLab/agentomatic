@@ -17,30 +17,29 @@ shared platform scope.  The platform scope is always available at
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from starlette.middleware.base import BaseHTTPMiddleware
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from starlette.requests import Request
     from starlette.responses import Response
+    from starlette.types import Receive, Scope, Send
 
     from agentomatic.core.registry import AgentRegistry
 
 
-class ConnectionsMiddleware(BaseHTTPMiddleware):
-    """Expose the routed agent's connection manager on ``request.state``."""
+class ConnectionsMiddleware:
+    """Pure ASGI middleware exposing the routed agent's connection manager."""
 
     def __init__(
         self,
-        app: object,
+        app: Any,
         *,
         registry: AgentRegistry,
         api_prefix: str = "/api/v1",
     ) -> None:
-        super().__init__(app)  # type: ignore[arg-type]
+        self.app = app
         self._registry = registry
         self._api_prefix = api_prefix.rstrip("/")
 
@@ -60,12 +59,26 @@ class ConnectionsMiddleware(BaseHTTPMiddleware):
             return name if isinstance(name, str) else None
         return segment if self._registry.get(segment) is not None else None
 
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Attach connection managers to ``scope['state']`` without buffering."""
+        if scope.get("type") == "http":
+            from agentomatic.connections.manager import PLATFORM_SCOPE, get_connections
+
+            platform_mgr = get_connections(PLATFORM_SCOPE)
+            state = scope.setdefault("state", {})
+            state["platform_connections"] = platform_mgr
+
+            agent_name = self._agent_for_path(str(scope.get("path") or ""))
+            state["agent_name"] = agent_name
+            state["connections"] = get_connections(agent_name) if agent_name else platform_mgr
+        await self.app(scope, receive, send)
+
     async def dispatch(
         self,
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Attach connection managers to ``request.state`` then continue."""
+        """Legacy Starlette-style dispatch helper preserved for unit tests."""
         from agentomatic.connections.manager import PLATFORM_SCOPE, get_connections
 
         platform_mgr = get_connections(PLATFORM_SCOPE)

@@ -260,9 +260,15 @@ class PipelineEngine:
         logger.info(f"🚀 Pipeline '{self.config.name}' starting ({len(self.config.steps)} steps)")
 
         # Tag in-process step logs with the parent pipeline name.
-        from agentomatic.logs.runtime import bind_pipeline_log_name, reset_pipeline_log_name
+        from agentomatic.logs.runtime import (
+            bind_pipeline_log_name,
+            ensure_llm_usage,
+            reset_llm_usage,
+            reset_pipeline_log_name,
+        )
 
         pipe_token = bind_pipeline_log_name(self.config.name)
+        _, usage_token = ensure_llm_usage()
         try:
             # Input-schema enforcement (advisory unless strict_schema=True)
             input_errors = validate_against_schema(
@@ -288,6 +294,7 @@ class PipelineEngine:
                 pipeline_result.error = f"Pipeline timed out after {self.config.timeout}s"
                 logger.error(pipeline_result.error)
         finally:
+            reset_llm_usage(usage_token)
             reset_pipeline_log_name(pipe_token)
 
         # Calculate final output

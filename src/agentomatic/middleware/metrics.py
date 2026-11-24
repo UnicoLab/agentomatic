@@ -8,12 +8,10 @@ Automatically tracks request count, latency histogram, and active requests.
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response as StarletteResponse
+from starlette.types import Message, Receive, Scope, Send
 
 from agentomatic.middleware.pathutils import OPERATIONAL_PATHS
 
@@ -83,60 +81,68 @@ def _collectors(prefix: str) -> tuple[Any, Any, Any]:
     return collectors
 
 
-class MetricsMiddleware(BaseHTTPMiddleware):
-    """Prometheus metrics collection per request."""
+class MetricsMiddleware:
+    """Pure ASGI Prometheus metrics collection per HTTP request."""
 
     def __init__(self, app: Any, *, prefix: str = "agentomatic") -> None:
-        super().__init__(app)
+        self.app = app
         self._requests: Any | None = None
         self._duration: Any | None = None
         self._active: Any | None = None
         if HAS_PROMETHEUS:
             self._requests, self._duration, self._active = _collectors(prefix)
 
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        if request.url.path in _SKIP_PATHS:
-            # Serve /metrics endpoint
-            if request.url.path == "/metrics" and HAS_PROMETHEUS:
-                from starlette.responses import Response as StarletteResponse
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
 
-                body = generate_latest()
-                return StarletteResponse(
-                    content=body,
+        path = str(scope.get("path") or "")
+        if path in _SKIP_PATHS:
+            if path == "/metrics" and HAS_PROMETHEUS:
+                resp = StarletteResponse(
+                    content=generate_latest(),
                     media_type=CONTENT_TYPE_LATEST,
                 )
-            response: Response = await call_next(request)
-            return response
+                await resp(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
 
+        method = str(scope.get("method") or "GET").upper()
         if self._active:
             self._active.inc()
 
+        status_code = 0
+
+        async def send_wrapper(message: Message) -> None:
+            nonlocal status_code
+            if message.get("type") == "http.response.start":
+                status_code = int(message.get("status", 0) or 0)
+            await send(message)
+
         t0 = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - t0
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            duration = time.perf_counter() - t0
+            if self._active:
+                self._active.dec()
 
-        # Normalize path for cardinality control
-        path = request.url.path
-        # Collapse UUIDs and hex IDs to reduce cardinality
-        parts = path.split("/")
-        normalized = "/".join(
-            "{id}" if (len(p) > 8 and any(c.isdigit() for c in p)) else p for p in parts
-        )
-
-        if self._requests:
-            self._requests.labels(
-                method=request.method,
-                path=normalized,
-                status=str(response.status_code),
-            ).inc()
-        if self._duration:
-            self._duration.labels(
-                method=request.method,
-                path=normalized,
-            ).observe(duration)
-        if self._active:
-            self._active.dec()
-
-        return response
+            # Normalize path for cardinality control
+            parts = path.split("/")
+            normalized = "/".join(
+                "{id}" if (len(p) > 8 and any(c.isdigit() for c in p)) else p for p in parts
+            )
+            resolved_status = status_code or 500
+            if self._requests:
+                self._requests.labels(
+                    method=method,
+                    path=normalized,
+                    status=str(resolved_status),
+                ).inc()
+            if self._duration:
+                self._duration.labels(
+                    method=method,
+                    path=normalized,
+                ).observe(duration)

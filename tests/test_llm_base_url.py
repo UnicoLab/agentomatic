@@ -169,3 +169,165 @@ def test_apply_stack_defaults_promotes_to_global(_patch_langchain_openai):
     assert isinstance(llm, _FakeChatOpenAI)
     assert llm.kwargs["base_url"] == "https://gw.example.com/v1"
     assert llm.kwargs["model"] == "gpt-4o-mini"
+
+
+@pytest.mark.parametrize(
+    "model",
+    ["o1", "o1-mini", "o1-preview", "gpt-5", "gpt-5-mini", "o3-mini", "o4-mini"],
+)
+def test_build_llm_reasoning_models_omit_temperature_in_payload_and_http_body(model: str) -> None:
+    """Real ChatOpenAI & AzureChatOpenAI must omit temperature for reasoning models."""
+    import json
+
+    import httpx
+
+    sent_bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent_bodies.append(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-test",
+                "object": "chat.completion",
+                "created": 1,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7},
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    openai_llm = llm_module._build_llm(
+        "openai",
+        model=model,
+        api_key="k",
+        temperature=0.7,
+        extra={"extra_body": {"temperature": 0.3}},
+        model_kwargs={"temperature": 0.4, "extra_body": {"temperature": 0.2}},
+    )
+    openai_llm.root_client._client._transport = transport
+    openai_llm.invoke("bonjour")
+    assert len(sent_bodies) == 1
+    assert "temperature" not in sent_bodies[0]
+    assert "temperature" not in (sent_bodies[0].get("extra_body") or {})
+
+    azure_llm = llm_module._build_llm(
+        "azure",
+        model=model,
+        api_key="k",
+        azure_endpoint="https://az.example.com",
+        azure_deployment=model,
+        temperature=0.7,
+        extra={"extra_body": {"temperature": 0.3}},
+        model_kwargs={"temperature": 0.4, "extra_body": {"temperature": 0.2}},
+    )
+    azure_llm.root_client._client._transport = transport
+    azure_llm.invoke("bonjour azure")
+    assert len(sent_bodies) == 2
+    assert "temperature" not in sent_bodies[1]
+    assert "temperature" not in (sent_bodies[1].get("extra_body") or {})
+
+
+def test_build_llm_preserves_temperature_for_gpt4o_and_strips_extra_body_for_gpt5(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-reasoning models keep temperature; reasoning models strip nested extras and vertex."""
+    import json
+    import sys
+    import types
+
+    import httpx
+
+    sent_bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent_bodies.append(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-4o",
+                "object": "chat.completion",
+                "created": 1,
+                "model": "gpt-4o",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7},
+            },
+        )
+
+    llm_4o = llm_module._build_llm("openai", model="gpt-4o", api_key="k", temperature=0.35)
+    llm_4o.root_client._client._transport = httpx.MockTransport(handler)
+    llm_4o.invoke("hi")
+    assert sent_bodies[0]["temperature"] == 0.35
+
+    cleaned = llm_module._strip_disallowed_temperature(
+        {
+            "temperature": 0.7,
+            "extra_body": {"temperature": 0.2},
+            "model_kwargs": {"extra_body": {"temperature": 0.1}},
+            "top_p": 0.9,
+        }
+    )
+    assert cleaned == {"top_p": 0.9}
+
+    vertex_calls: list[dict] = []
+
+    class _FakeVertex:
+        def __init__(self, **kwargs):
+            vertex_calls.append(kwargs)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "langchain_google_vertexai",
+        types.SimpleNamespace(ChatVertexAI=_FakeVertex),
+    )
+    llm_module._build_llm("vertex", model="gpt-5-mini", project="p", temperature=0.6)
+    llm_module._build_llm("vertex", model="o1-mini", project="p", temperature=0.6)
+    llm_module._build_llm("vertex", model="gemini-2.5-flash", project="p", temperature=0.4)
+    assert "temperature" not in vertex_calls[0]
+    assert "temperature" not in vertex_calls[1]
+    assert vertex_calls[2]["temperature"] == 0.4
+
+
+@pytest.mark.asyncio
+async def test_invoke_with_retry_redacts_secrets_in_warning_log() -> None:
+    """Retry warnings must redact credentials, query strings, and prompt payloads."""
+    from loguru import logger
+
+    captured: list[str] = []
+    sink_id = logger.add(lambda msg: captured.append(str(msg)), level="WARNING")
+
+    class _FlakyLLM:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def ainvoke(self, _messages: list, **_kwargs) -> str:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError(
+                    "Bearer tok_secret_abc https://u:p@host/v1?api_key=q1 secret=mysecret"
+                )
+            return "recovered"
+
+    try:
+        res = await llm_module.invoke_with_retry(_FlakyLLM(), [], max_retries=1, retry_delay=0.0)
+        assert getattr(res, "content", res) == "recovered"
+        joined = "\n".join(captured)
+        assert "tok_secret_abc" not in joined
+        assert "api_key=q1" not in joined
+        assert "mysecret" not in joined
+        assert "[REDACTED]" in joined
+    finally:
+        logger.remove(sink_id)
